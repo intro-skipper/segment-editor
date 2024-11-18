@@ -32,7 +32,7 @@
     "@intlify/vite-plugin-vue-i18n": "^3.4.0",
     "@quasar/app-vite": "^1.9.5",
     "@quasar/cli": "^2.4.1",
-    "@tauri-apps/cli": "^2.0.0-rc.7",
+    "@tauri-apps/cli": "2.1.0",
     "@types/node": "22.5.0",
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
