@@ -3,9 +3,12 @@ name: 'Tauri Android'
 on:
     push:
         branches:
-            - main
+            - android
 
     workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
     publish-android:
@@ -14,6 +17,17 @@ jobs:
             contents: write
         steps:
             - uses: actions/checkout@v4
+
+            - name: Drop orphan tags
+              continue-on-error: true
+              uses: fabriziocacicia/delete-tags-without-release-action@v0.1.0
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Set Environment GIT_HASH
+              run: |
+                GIT_HASH=$(git rev-parse --short HEAD)
+                echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
 
             - uses: pnpm/action-setup@v4
               with:
@@ -31,37 +45,35 @@ jobs:
             - name: Install NDK
               run: sdkmanager "ndk;27.0.11902837"
 
-            - name: setup node
+            - name: Setup node
               uses: actions/setup-node@v4
               with:
                   node-version: lts/*
 
-            - name: install Rust stable
+            - name: Install Rust stable
               uses: dtolnay/rust-toolchain@stable
               with:
                   targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
-            - name: Install dependencies
+            - name: Install app packages
               run: pnpm install
 
-            - name: Build app bundle
+            - name: Initialize app bundle
               run: |
                   pnpm tauri android init
-                  pnpm tauri android build
+                  pnpm tauri icon public/icon.png
               env:
                   NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.11902837
 
-            - name: Extract android signing key from env
-              run: base64 -d <<< "${{ secrets.ANDROID_RELEASE_KEYSTORE }}" > src-tauri/gen/android/release.decrypted.jks
+            - name: Build app bundle
+              run: pnpm tauri android build
+              env:
+                  NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.11902837
 
-            - name: Sign APK
+            - name: Modify AndroidManifest
               run: |
-                  ${{ env.ANDROID_HOME }}/build-tools/34.0.0/apksigner sign --ks src-tauri/gen/android/release.decrypted.jks \
-                    --ks-key-alias endrl \
-                    --ks-pass pass:segment-editor \
-                    --key-pass pass:segment-editor \
-                    --out src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-signed.apk \
-                    src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
+                  java -jar ManifestEditor-2.0.jar -aa "android-usesCleartextTraffic:true" src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
+                  java -jar uber-apk-signer-1.3.0.jar -apks  src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned-unsigned.apk
 
             - name: Get Node project version
               id: package-version
@@ -69,15 +81,22 @@ jobs:
 
             - name: Rename APK file
               run: |
-                  mv ./src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-signed.apk ./src-tauri/gen/android/app/build/outputs/apk/universal/release/segment-editor-${{ steps.package-version.outputs.current-version}}.apk
+                  mv ./src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk ./src-tauri/gen/android/app/build/outputs/apk/universal/release/Jellyfin.Segment.Editor_${{ steps.package-version.outputs.current-version}}.apk
+
+            - name: Purge past releases
+              uses: dev-drprasad/delete-older-releases@v0.3.4
+              with:
+                keep_latest: 1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Publish
               uses: softprops/action-gh-release@v2.0.8
               with:
                   draft: false
-                  name: Segment Editor v${{ steps.package-version.outputs.current-version}}
-                  tag_name: v${{ steps.package-version.outputs.current-version}}
+                  name: Jellyfin Segment Editor ${{ steps.package-version.outputs.current-version}}-${{ env.GIT_HASH }}
+                  tag_name: ${{ steps.package-version.outputs.current-version}}-${{ env.GIT_HASH }}
                   generate_release_notes: true
-                  files: src-tauri/gen/android/app/build/outputs/apk/universal/release/segment-editor-*.apk
+                  files: src-tauri/gen/android/app/build/outputs/apk/universal/release/Jellyfin.Segment.Editor_*.apk
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
