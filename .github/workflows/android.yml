@@ -55,7 +55,7 @@ jobs:
               with:
                   targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
-            - name: Install package manager
+            - name: Install app packages
               run: pnpm install
 
             - name: Initialize app bundle
