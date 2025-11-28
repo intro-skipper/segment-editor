@@ -1,5 +1,5 @@
 # build
-FROM node:20.9-alpine AS build-step
+FROM node:lts-alpine AS build-step
 
 LABEL org.opencontainers.image.description="https://github.com/intro-skipper/segment-editor"
 
