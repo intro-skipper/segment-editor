@@ -5,6 +5,7 @@
 
 import type { BaseItemDto, ImageType } from '@/types/jellyfin'
 import { buildUrl } from '@/services/jellyfin/client'
+import { generateUUID } from '../../lib/segment-utils'
 
 /**
  * Options for generating a video stream URL.
@@ -56,7 +57,7 @@ function getDeviceId(): string {
   const storageKey = 'segment-editor-device-id'
   let deviceId = localStorage.getItem(storageKey)
   if (!deviceId) {
-    deviceId = crypto.randomUUID()
+    deviceId = generateUUID()
     localStorage.setItem(storageKey, deviceId)
   }
   return deviceId
@@ -81,7 +82,7 @@ export function getVideoStreamUrl(options: VideoStreamOptions): string {
   query.set('DeviceId', getDeviceId())
   // MediaSourceId is the itemId without hyphens
   query.set('MediaSourceId', itemId.replace(/-/g, ''))
-  query.set('PlaySessionId', crypto.randomUUID())
+  query.set('PlaySessionId', generateUUID())
 
   // Video codec preferences - prefer modern codecs for better quality
   query.set('VideoCodec', 'av1,hevc,h264,vp9')
