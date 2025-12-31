@@ -6,7 +6,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Library, RefreshCw, Search } from 'lucide-react'
+import {
+  AlertCircle,
+  Film,
+  Library,
+  Mic2,
+  RefreshCw,
+  Search,
+  Tv,
+} from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import {
@@ -27,6 +35,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
 import { MediaCard } from '@/components/filter/MediaCard'
@@ -35,6 +51,25 @@ import { useSessionStore } from '@/stores/session-store'
 /** Available page size options */
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+
+/** Get icon for collection type based on name */
+function getCollectionIcon(name: string) {
+  const lowerName = name.toLowerCase()
+  if (lowerName.includes('movie') || lowerName.includes('film')) {
+    return Film
+  }
+  if (
+    lowerName.includes('series') ||
+    lowerName.includes('tv') ||
+    lowerName.includes('show')
+  ) {
+    return Tv
+  }
+  if (lowerName.includes('music') || lowerName.includes('artist')) {
+    return Mic2
+  }
+  return Library
+}
 
 /**
  * Skeleton loader for media cards.
@@ -158,13 +193,6 @@ export function FilterView() {
     return items.slice(startIndex, startIndex + pageSize)
   }, [items, currentPage, pageSize])
 
-  // Auto-select first collection when collections load
-  useEffect(() => {
-    if (collectionOptions.length > 0 && !selectedCollection) {
-      setSelectedCollection(collectionOptions[0].id)
-    }
-  }, [collectionOptions, selectedCollection])
-
   // Reset to page 1 when filter/collection changes
   useEffect(() => {
     setCurrentPage(1)
@@ -270,6 +298,49 @@ export function FilterView() {
       {/* Content Area */}
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-7xl mx-auto">
+          {/* Library Picker - shown when no collection selected */}
+          {!selectedCollection && !collectionsLoading && !collectionsError && (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <Empty className="border-none">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Library />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {t('items.selectLibrary', {
+                      defaultValue: 'Select a Library',
+                    })}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {t('items.selectLibraryDescription', {
+                      defaultValue:
+                        'Choose a library to browse your media collection',
+                    })}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    {collectionOptions.map((collection) => {
+                      const Icon = getCollectionIcon(collection.name)
+                      return (
+                        <Button
+                          key={collection.id}
+                          variant="outline"
+                          size="lg"
+                          className="gap-2 min-w-[140px]"
+                          onClick={() => handleCollectionChange(collection.id)}
+                        >
+                          <Icon className="size-4" />
+                          {collection.name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </EmptyContent>
+              </Empty>
+            </div>
+          )}
+
           {/* Loading State */}
           {(collectionsLoading || (selectedCollection && itemsLoading)) && (
             <MediaGridSkeleton count={pageSize} />
