@@ -431,7 +431,7 @@ export default function Header() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 shrink-0 group">
           <div className="size-7 rounded-md bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-            <Scissors className="size-3.5 text-primary-foreground" />
+            <Scissors className="size-4 text-primary-foreground" />
           </div>
           <span className="text-sm font-semibold tracking-tight hidden sm:inline group-hover:text-primary transition-colors">
             {t('app.title')}
