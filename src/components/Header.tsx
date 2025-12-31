@@ -419,11 +419,11 @@ export default function Header() {
   }
 
   return (
-    <header className="h-12 px-3 flex items-center justify-between bg-background/95 backdrop-blur-sm border-b border-border/40 sticky top-0 z-50">
+    <header className="h-12 px-3 flex items-center justify-between bg-background/95 backdrop-blur-sm border-b border-border/40 sticky top-0 z-50 overflow-hidden">
       {/* Left: Logo + Breadcrumb */}
       <div
         className={cn(
-          'flex items-center gap-2 min-w-0 flex-1 transition-opacity duration-200',
+          'flex items-center gap-2 min-w-0 flex-1 overflow-hidden transition-opacity duration-200',
           searchExpanded &&
             'opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto',
         )}
@@ -442,8 +442,8 @@ export default function Header() {
         {isDetailPage && (
           <>
             <BreadcrumbSeparator className="text-muted-foreground/50 hidden sm:block" />
-            <Breadcrumb className="min-w-0">
-              <BreadcrumbList className="flex-nowrap">
+            <Breadcrumb className="min-w-0 overflow-hidden">
+              <BreadcrumbList className="flex-nowrap overflow-hidden">
                 {/* Mobile: Home icon */}
                 <BreadcrumbItem className="sm:hidden">
                   <BreadcrumbLink render={<Link to="/" />}>
