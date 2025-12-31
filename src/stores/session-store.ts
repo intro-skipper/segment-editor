@@ -10,6 +10,8 @@ export interface SessionState {
   settingsOpen: boolean
   /** Segment stored in clipboard for copy/paste operations */
   clipboardSegment: MediaSegmentDto | null
+  /** Currently selected collection/library ID in FilterView */
+  selectedCollectionId: string | null
 }
 
 export interface SessionActions {
@@ -23,6 +25,8 @@ export interface SessionActions {
   getFromClipboard: () => MediaSegmentDto | null
   /** Clear the clipboard */
   clearClipboard: () => void
+  /** Set the selected collection/library ID */
+  setSelectedCollectionId: (id: string | null) => void
 }
 
 export type SessionStore = SessionState & SessionActions
@@ -30,6 +34,7 @@ export type SessionStore = SessionState & SessionActions
 const initialState: SessionState = {
   settingsOpen: false,
   clipboardSegment: null,
+  selectedCollectionId: null,
 }
 
 /**
@@ -57,5 +62,9 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   clearClipboard: () => {
     set({ clipboardSegment: null })
+  },
+
+  setSelectedCollectionId: (id: string | null) => {
+    set({ selectedCollectionId: id })
   },
 }))

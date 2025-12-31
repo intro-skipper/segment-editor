@@ -30,6 +30,7 @@ import {
 import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
 import { MediaCard } from '@/components/filter/MediaCard'
+import { useSessionStore } from '@/stores/session-store'
 
 /** Available page size options */
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
@@ -107,8 +108,11 @@ function getPageNumbers(
  */
 export function FilterView() {
   const { t } = useTranslation()
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(
-    null,
+  const selectedCollection = useSessionStore(
+    (state) => state.selectedCollectionId,
+  )
+  const setSelectedCollection = useSessionStore(
+    (state) => state.setSelectedCollectionId,
   )
   const [searchFilter, setSearchFilter] = useState<string>('')
   const [currentPage, setCurrentPage] = useState(1)
