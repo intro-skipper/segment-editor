@@ -1,0 +1,116 @@
+{
+  "login": {
+    "api_key": "Jellyfin API Key",
+    "server_address": "Jellyfin Server Adresse",
+    "test_conn": "Verbindung testen",
+    "validation": {
+      "api_key_invalid": "Ungültiger API Key",
+      "url_invalid": "URL Fehler. Sollte mit http:// oder https:// beginnen"
+    },
+    "connect_fail": "Verbindung fehlgeschlagen!",
+    "auth_fail": "Authentifizierung fehlgeschlagen!"
+  },
+  "app": {
+    "theme": {
+      "title": "Stil",
+      "system": "System",
+      "dark": "Dunkel",
+      "light": "Hell"
+    },
+    "locale": {
+      "auto": "Auto",
+      "en-US": "Englisch",
+      "de": "Deutsch",
+      "fr": "Französisch",
+      "title": "Sprache"
+    },
+    "plugins": {
+      "title": "Installierte Server Plugins"
+    },
+    "title": "Segment Editor",
+    "showVideoPlayer": "Videoplayer anzeigen"
+  },
+  "items": {
+    "select_collection": "Wähle eine Sammlung zum Durchsuchen",
+    "filter": {
+      "name": "Suchen",
+      "collection": "Sammlung"
+    }
+  },
+  "editor": {
+    "saveSegment": "Speichern",
+    "deleteSure": "Möchtest du dieses '{{Type}}' Segment wirklich löschen?",
+    "deleteSureTitle": "Segment entfernen",
+    "deleteSureTitle_plural": "{{count}} Segmente entfernen",
+    "time": "Zeit",
+    "deleteSegments": "Möchtest du wirklich alle Segmente für '{{item}}' entfernen?",
+    "newSegment": "Neues Segment",
+    "slider": {
+      "title": "Slider Editor"
+    },
+    "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
+    "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
+    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert"
+  },
+  "yes": "Ja",
+  "no": "Nein",
+  "segment": {
+    "start": "Start",
+    "end": "Ende",
+    "type": "Segment Typ",
+    "edit": "Segment bearbeiten",
+    "duration": "Dauer"
+  },
+  "validation": {
+    "StartEnd": "Start liegt immer vor dem Ende"
+  },
+  "close": "Schließen",
+  "back": "Zurück",
+  "provider": {
+    "title": "Provider ID (Name)",
+    "skipper": "Intro Skipper",
+    "chapter": "Chapter Segments",
+    "segment": "MediaSegments API"
+  },
+  "plugin": {
+    "edl": {
+      "enable": "EDL Unterstützung",
+      "created": "EDL Datei wurde erstellt"
+    },
+    "chapter": {
+      "enable": "Kapitelersteller",
+      "created": "Kapiteldatei erstellt"
+    }
+  },
+  "error": {
+    "not_found": "Seite nicht gefunden",
+    "not_found_description": "Die gesuchte Seite existiert nicht oder wurde verschoben."
+  },
+  "common": {
+    "go_back": "Zurück",
+    "goBack": "Zurück",
+    "home": "Startseite",
+    "retry": "Erneut versuchen"
+  },
+  "player": {
+    "videoPlayer": "Videoplayer",
+    "volume": "Lautstärke",
+    "volumeSlider": "Lautstärkeregler",
+    "mute": "Stumm",
+    "unmute": "Ton an",
+    "retry": "Erneut versuchen",
+    "error": {
+      "network": "Netzwerkfehler. Überprüfe deine Verbindung.",
+      "media": "Wiedergabefehler. Wiederherstellung wird versucht...",
+      "unknown": "Video kann nicht abgespielt werden."
+    }
+  },
+  "series": {
+    "unknownSeries": "Unbekannte Serie",
+    "noSeasons": "Keine Staffeln für diese Serie gefunden",
+    "noEpisodes": "Keine Episoden gefunden",
+    "loadingEpisodes": "Lade Episoden für {{season}}...",
+    "episodeLoadError": "Episoden konnten nicht geladen werden",
+    "seasonNumber": "Staffel {{number}}"
+  }
+}
