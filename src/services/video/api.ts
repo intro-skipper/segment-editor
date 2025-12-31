@@ -70,12 +70,10 @@ function getDeviceId(): string {
 export function getVideoStreamUrl(options: VideoStreamOptions): string {
   const {
     itemId,
-    container = 'ts',
+    container = 'mp4',
     audioCodec = 'aac',
-    videoCodec = 'h264',
-    maxStreamingBitrate = 120000000,
+    maxStreamingBitrate = 140000000,
     startTimeTicks = 0,
-    enableTranscoding = true,
   } = options
 
   const query = new URLSearchParams()
@@ -85,17 +83,32 @@ export function getVideoStreamUrl(options: VideoStreamOptions): string {
   query.set('MediaSourceId', itemId.replace(/-/g, ''))
   query.set('PlaySessionId', crypto.randomUUID())
 
-  query.set('Container', container)
+  // Video codec preferences - prefer modern codecs for better quality
+  query.set('VideoCodec', 'av1,hevc,h264,vp9')
   query.set('AudioCodec', audioCodec)
-  query.set('VideoCodec', videoCodec)
+
+  // Bitrate settings - use high values for quality
+  query.set('VideoBitrate', String(maxStreamingBitrate))
+  query.set('AudioBitrate', '384000')
+  query.set('AudioSampleRate', '48000')
   query.set('MaxStreamingBitrate', String(maxStreamingBitrate))
+
+  // Transcoding settings
   query.set('StartTimeTicks', String(startTimeTicks))
-  query.set('EnableTranscoding', String(enableTranscoding))
   query.set('TranscodingProtocol', 'hls')
-  query.set('TranscodingContainer', 'ts')
-  query.set('SegmentContainer', 'ts')
+  query.set('SegmentContainer', container)
   query.set('MinSegments', '1')
-  query.set('BreakOnNonKeyFrames', 'true')
+  query.set('BreakOnNonKeyFrames', 'True')
+  query.set('RequireAvc', 'false')
+  query.set('EnableAudioVbrEncoding', 'true')
+  query.set('TranscodingMaxAudioChannels', '6')
+
+  // Codec profiles for quality
+  query.set('h264-profile', 'high')
+  query.set('h264-level', '51')
+  query.set('hevc-profile', 'main,main10')
+  query.set('hevc-level', '186')
+  query.set('av1-profile', 'main')
 
   return buildUrl(`Videos/${itemId}/master.m3u8`, query)
 }
