@@ -173,6 +173,35 @@ export async function getEpisodes(
 }
 
 /**
+ * Fetches ALL episodes for a series (across all seasons).
+ * @param seriesId - The series ID
+ * @returns Array of episode items sorted by season and episode number
+ */
+export async function getAllEpisodes(
+  seriesId: string,
+): Promise<Array<BaseItemDto>> {
+  if (!seriesId) {
+    return []
+  }
+
+  try {
+    const query = new URLSearchParams()
+    query.set('sortBy', 'AiredEpisodeOrder')
+    query.set('isMissing', 'false')
+    query.set('fields', 'MediaStreams')
+
+    const response = await fetchWithAuth<ItemsResponse>(
+      `Shows/${seriesId}/Episodes`,
+      query,
+    )
+    return response.Items ?? []
+  } catch (error) {
+    console.error('Failed to fetch all episodes:', error)
+    return []
+  }
+}
+
+/**
  * Fetches albums for an artist.
  * @param artistId - The artist ID
  * @returns Array of album items

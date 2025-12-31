@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle, Loader2, XCircle } from 'lucide-react'
 
 import type { Locale, Theme } from '@/stores/app-store'
+import type { PageSize } from '@/stores/session-store'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { useSessionStore } from '@/stores/session-store'
+import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
 import { useApiStore } from '@/stores/api-store'
 import { useAppStore } from '@/stores/app-store'
 import { testConnection } from '@/services/jellyfin/client'
@@ -34,6 +35,8 @@ export function SettingsDialog() {
   // Session store
   const settingsOpen = useSessionStore((state) => state.settingsOpen)
   const setSettingsOpen = useSessionStore((state) => state.setSettingsOpen)
+  const pageSize = useSessionStore((state) => state.pageSize)
+  const setPageSize = useSessionStore((state) => state.setPageSize)
 
   // API store
   const serverAddress = useApiStore((state) => state.serverAddress)
@@ -238,6 +241,30 @@ export function SettingsDialog() {
                 <SelectItem value="ChapterSegments">
                   {t('provider.chapter')}
                 </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Page Size Selection */}
+          <div className="space-y-3">
+            <Label>
+              {t('items.perPage', { defaultValue: 'Items per page' })}
+            </Label>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) =>
+                value && setPageSize(Number(value) as PageSize)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

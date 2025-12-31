@@ -1,6 +1,10 @@
 import { create } from 'zustand'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 
+/** Available page size options */
+export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
+export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+
 /**
  * Session state for transient UI state.
  * Not persisted to localStorage - resets on page refresh.
@@ -12,6 +16,12 @@ export interface SessionState {
   clipboardSegment: MediaSegmentDto | null
   /** Currently selected collection/library ID in FilterView */
   selectedCollectionId: string | null
+  /** Number of items per page in grid views */
+  pageSize: PageSize
+  /** Whether the search input is expanded in the header */
+  searchExpanded: boolean
+  /** Current search filter text */
+  searchFilter: string
 }
 
 export interface SessionActions {
@@ -27,6 +37,14 @@ export interface SessionActions {
   clearClipboard: () => void
   /** Set the selected collection/library ID */
   setSelectedCollectionId: (id: string | null) => void
+  /** Set the page size for grid views */
+  setPageSize: (size: PageSize) => void
+  /** Toggle search input expansion */
+  toggleSearch: () => void
+  /** Set search expanded state */
+  setSearchExpanded: (expanded: boolean) => void
+  /** Set search filter text */
+  setSearchFilter: (filter: string) => void
 }
 
 export type SessionStore = SessionState & SessionActions
@@ -35,6 +53,9 @@ const initialState: SessionState = {
   settingsOpen: false,
   clipboardSegment: null,
   selectedCollectionId: null,
+  pageSize: 24,
+  searchExpanded: false,
+  searchFilter: '',
 }
 
 /**
@@ -66,5 +87,21 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   setSelectedCollectionId: (id: string | null) => {
     set({ selectedCollectionId: id })
+  },
+
+  setPageSize: (size: PageSize) => {
+    set({ pageSize: size })
+  },
+
+  toggleSearch: () => {
+    set((state) => ({ searchExpanded: !state.searchExpanded }))
+  },
+
+  setSearchExpanded: (expanded: boolean) => {
+    set({ searchExpanded: expanded })
+  },
+
+  setSearchFilter: (filter: string) => {
+    set({ searchFilter: filter })
   },
 }))

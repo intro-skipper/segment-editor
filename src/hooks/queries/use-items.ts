@@ -6,7 +6,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { ApiStore } from '@/stores/api-store'
-import { getItemById, getItems } from '@/services/items/api'
+import { getAllEpisodes, getItemById, getItems } from '@/services/items/api'
 import { useApiStore } from '@/stores/api-store'
 
 /**
@@ -126,6 +126,31 @@ export function useItem(itemId: string, options?: { enabled?: boolean }) {
     queryKey: itemsKeys.detail(itemId),
     queryFn: () => getItemById(itemId),
     enabled: validConnection && enabled && !!itemId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+  })
+}
+
+/**
+ * Hook to fetch all episodes for a series.
+ *
+ * @param seriesId - The series ID to fetch episodes for
+ * @param options - Additional query options
+ * @returns TanStack Query result with episodes data
+ */
+export function useAllEpisodes(
+  seriesId: string,
+  options?: { enabled?: boolean },
+) {
+  const validConnection = useApiStore(
+    (state: ApiStore) => state.validConnection,
+  )
+  const enabled = options?.enabled ?? true
+
+  return useQuery<Array<BaseItemDto>, Error>({
+    queryKey: [...itemsKeys.all, 'episodes', seriesId],
+    queryFn: () => getAllEpisodes(seriesId),
+    enabled: validConnection && enabled && !!seriesId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   })

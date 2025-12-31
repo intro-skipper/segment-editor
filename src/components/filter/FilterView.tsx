@@ -16,14 +16,6 @@ import {
   Tv,
 } from 'lucide-react'
 
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import {
@@ -47,10 +39,6 @@ import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { useSessionStore } from '@/stores/session-store'
-
-/** Available page size options */
-const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
-type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
 /** Get icon for collection type based on name */
 function getCollectionIcon(name: string) {
@@ -149,9 +137,10 @@ export function FilterView() {
   const setSelectedCollection = useSessionStore(
     (state) => state.setSelectedCollectionId,
   )
-  const [searchFilter, setSearchFilter] = useState<string>('')
+  const searchFilter = useSessionStore((state) => state.searchFilter)
+  const setSearchFilter = useSessionStore((state) => state.setSearchFilter)
+  const pageSize = useSessionStore((state) => state.pageSize)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(24)
 
   // Fetch collections from the server
   const {
@@ -203,98 +192,16 @@ export function FilterView() {
     setSearchFilter('')
   }
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchFilter(e.target.value)
-  }
-
-  const handlePageSizeChange = (value: string | null) => {
-    if (value) {
-      setPageSize(Number(value) as PageSize)
-    }
-  }
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     // Scroll to top of content area
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Get display text for the selected collection
-  const selectedCollectionName = useMemo(() => {
-    if (!selectedCollection) return null
-    const collection = collectionOptions.find(
-      (c) => c.id === selectedCollection,
-    )
-    return collection?.name
-  }, [selectedCollection, collectionOptions])
-
   const pageNumbers = getPageNumbers(currentPage, totalPages)
 
   return (
     <div className="flex flex-col h-full">
-      {/* Filter Controls */}
-      <div className="p-4 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex flex-col sm:flex-row gap-3 max-w-7xl mx-auto">
-          {/* Collection Dropdown */}
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <Library className="size-4 text-muted-foreground shrink-0" />
-            <Select
-              value={selectedCollection}
-              onValueChange={handleCollectionChange}
-              disabled={collectionsLoading}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {selectedCollectionName || t('items.filter.collection')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {collectionOptions.map((collection) => (
-                  <SelectItem key={collection.id} value={collection.id}>
-                    {collection.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Search Input */}
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Search className="size-4 text-muted-foreground shrink-0" />
-            <Input
-              type="text"
-              placeholder={t('items.filter.name')}
-              value={searchFilter}
-              onChange={handleSearchChange}
-              disabled={!selectedCollection}
-              className="w-full"
-            />
-          </div>
-
-          {/* Page Size Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {t('items.perPage', { defaultValue: 'Per page' })}:
-            </span>
-            <Select
-              value={String(pageSize)}
-              onValueChange={handlePageSizeChange}
-            >
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
       {/* Content Area */}
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-7xl mx-auto">
