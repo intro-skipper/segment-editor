@@ -252,9 +252,6 @@ export function PlayerEditor({
         type: 'positive',
         message: t('editor.saveSegment'),
       })
-
-      // Navigate back
-      navigate({ to: '/' })
     } catch (error) {
       showNotification({
         type: 'negative',
