@@ -3,9 +3,9 @@
  * Handles video streaming URLs and image URLs for Jellyfin media.
  */
 
+import { generateUUID } from '../../lib/segment-utils'
 import type { BaseItemDto, ImageType } from '@/types/jellyfin'
 import { buildUrl } from '@/services/jellyfin/client'
-import { generateUUID } from '../../lib/segment-utils'
 
 /**
  * Options for generating a video stream URL.

@@ -9,6 +9,26 @@ export {
 
 export type { PluginAvailability, PluginTestResult } from './detection'
 
-export { createEdlById, getEdlById } from './edl'
+export {
+  createEdlById,
+  getEdlById,
+  edlEntryToSegment,
+  segmentToEdlEntry,
+  edlToSegments,
+  segmentsToEdl,
+  EdlAction,
+} from './edl'
 
-export { createChapterById, getChapterById } from './chapter'
+export type { EdlEntry, EdlData, EdlCreateResult } from './edl'
+
+export {
+  createChapterById,
+  getChapterById,
+  chapterToSegment,
+  segmentToChapter,
+  chaptersToSegments,
+  segmentsToChapters,
+  getSegmentTypeFromChapterName,
+} from './chapter'
+
+export type { ChapterMarker, ChapterData, ChapterCreateResult } from './chapter'
