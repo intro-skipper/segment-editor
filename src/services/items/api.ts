@@ -39,7 +39,8 @@ export async function getCollections(): Promise<Array<VirtualFolderInfo>> {
     const response = await fetchWithAuth<Array<VirtualFolderInfo>>(
       'Library/VirtualFolders',
     )
-    return response
+    // remove CollectionType === "homevideos"
+    return response.filter((folder => folder.CollectionType !== 'homevideos'))
   } catch (error) {
     console.error('Failed to fetch collections:', error)
     return []
