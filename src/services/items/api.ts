@@ -65,6 +65,7 @@ export async function getItems(
     query.set('parentId', parentId)
     query.set('sortBy', 'AiredEpisodeOrder,SortName')
     query.set('isMissing', 'false')
+    query.set('filters', 'IsNotFolder')
 
     if (includeMediaStreams) {
       query.set('fields', 'MediaStreams')
