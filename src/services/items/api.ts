@@ -81,7 +81,7 @@ export async function getCollections(): Promise<Array<VirtualFolderInfo>> {
     if (!validation.success) {
       logValidationWarning('[Items] Collections', validation.error)
     }
-    return data
+    return data.filter((folder => folder.CollectionType !== 'homevideos'))
   })
   return result ?? []
 }
