@@ -129,10 +129,13 @@ function SelectItem({
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator
         render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+          <span
+            className="pointer-events-none absolute right-2 flex size-4 items-center justify-center"
+            aria-hidden="true"
+          />
         }
       >
-        <CheckIcon className="pointer-events-none" />
+        <CheckIcon className="pointer-events-none" aria-hidden="true" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )
@@ -165,9 +168,10 @@ function SelectScrollUpButton({
         "bg-popover z-10 flex cursor-default items-center justify-center py-1 [&_svg:not([class*='size-'])]:size-4 top-0 w-full",
         className,
       )}
+      aria-label="Scroll up"
       {...props}
     >
-      <ChevronUpIcon />
+      <ChevronUpIcon aria-hidden="true" />
     </SelectPrimitive.ScrollUpArrow>
   )
 }
@@ -183,9 +187,10 @@ function SelectScrollDownButton({
         "bg-popover z-10 flex cursor-default items-center justify-center py-1 [&_svg:not([class*='size-'])]:size-4 bottom-0 w-full",
         className,
       )}
+      aria-label="Scroll down"
       {...props}
     >
-      <ChevronDownIcon />
+      <ChevronDownIcon aria-hidden="true" />
     </SelectPrimitive.ScrollDownArrow>
   )
 }

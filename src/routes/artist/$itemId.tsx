@@ -1,34 +1,57 @@
 /**
  * Artist route - Displays artist albums.
  * Renders the ArtistView component for a specific artist.
- * Requirements: 2.6, 7.3
  */
 
-import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { createFileRoute, notFound } from '@tanstack/react-router'
+import { z } from 'zod'
 
-import type { BaseItemDto } from '@/types/jellyfin'
 import { ArtistView } from '@/components/views/ArtistView'
-import { itemsKeys, useItem } from '@/hooks/queries/use-items'
+import {
+  QUERY_STALE_TIMES,
+  artistKeys,
+  itemsKeys,
+  useAlbums,
+  useItem,
+} from '@/hooks/queries'
 import { Skeleton } from '@/components/ui/skeleton'
+import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
+import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getAlbums, getItemById } from '@/services/items/api'
-import { useApiStore } from '@/stores/api-store'
 
 /**
- * Query key factory for artist-related queries.
+ * Route params schema - validates itemId is a valid UUID.
+ * Security: Prevents injection attacks via malformed IDs.
  */
-export const artistKeys = {
-  all: ['artist'] as const,
-  albums: (artistId: string) =>
-    [...artistKeys.all, 'albums', artistId] as const,
-}
+/**
+ * Route params schema - validates itemId is a valid Jellyfin ID.
+ * Accepts both standard UUID format and Jellyfin's 32-char hex format.
+ * Security: Prevents injection attacks via malformed IDs.
+ */
+const jellyfinIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i,
+    'Invalid artist ID format',
+  )
+
+const artistParamsSchema = z.object({
+  itemId: jellyfinIdSchema,
+})
 
 /**
  * Loading skeleton for the artist page.
+ * Uses consistent height variables and ARIA attributes.
  */
 function ArtistSkeleton() {
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
+    <main
+      className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading artist</span>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Back button and title skeleton */}
         <div className="flex items-center gap-4">
@@ -38,7 +61,11 @@ function ArtistSkeleton() {
         {/* Albums grid skeleton */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="space-y-2">
+            <div
+              key={i}
+              className="space-y-2 animate-in fade-in duration-300"
+              style={{ animationDelay: `${i * 40}ms` }}
+            >
               <Skeleton className="aspect-square w-full rounded-lg" />
               <Skeleton className="h-4 w-3/4" />
             </div>
@@ -50,6 +77,10 @@ function ArtistSkeleton() {
 }
 
 export const Route = createFileRoute('/artist/$itemId')({
+  params: {
+    parse: (params) => artistParamsSchema.parse(params),
+    stringify: (params) => params,
+  },
   loader: async ({ params, context }) => {
     const { itemId } = params
     const { queryClient } = context
@@ -58,33 +89,23 @@ export const Route = createFileRoute('/artist/$itemId')({
     await queryClient.ensureQueryData({
       queryKey: itemsKeys.detail(itemId),
       queryFn: () => getItemById(itemId),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: QUERY_STALE_TIMES.LONG,
     })
 
     // Prefetch albums data
     await queryClient.ensureQueryData({
       queryKey: artistKeys.albums(itemId),
       queryFn: () => getAlbums(itemId),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: QUERY_STALE_TIMES.LONG,
     })
+  },
+  onError: () => {
+    // Throw notFound for invalid params (e.g., malformed UUID)
+    throw notFound()
   },
   pendingComponent: ArtistSkeleton,
   component: ArtistPage,
 })
-
-/**
- * Hook to fetch albums for an artist.
- */
-function useAlbums(artistId: string) {
-  const validConnection = useApiStore((state) => state.validConnection)
-
-  return useQuery<Array<BaseItemDto>, Error>({
-    queryKey: artistKeys.albums(artistId),
-    queryFn: () => getAlbums(artistId),
-    enabled: validConnection && !!artistId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  })
-}
 
 function ArtistPage() {
   const { itemId } = Route.useParams()
@@ -112,17 +133,21 @@ function ArtistPage() {
 
   if (error || !artist) {
     return (
-      <main className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-destructive">
-          {error?.message || 'Artist not found'}
-        </div>
-      </main>
+      <RouteErrorFallback
+        message={error?.message || 'Artist not found'}
+        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
+      />
     )
   }
 
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
-      <ArtistView artist={artist} albums={albums || []} />
+    <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto">
+      <FeatureErrorBoundary
+        featureName="Artist"
+        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
+      >
+        <ArtistView artist={artist} albums={albums || []} />
+      </FeatureErrorBoundary>
     </main>
   )
 }

@@ -1,7 +1,5 @@
 /**
- * AlbumView component for displaying album tracks.
- * Displays tracks in a list with navigation to player.
- * Requirements: 7.4, 7.5
+ * AlbumView - Displays album tracks with navigation to player.
  */
 
 import * as React from 'react'
@@ -11,6 +9,8 @@ import { ChevronLeft, Music, Play } from 'lucide-react'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { Button } from '@/components/ui/button'
 import { ItemImage } from '@/components/media/ItemImage'
+import { InteractiveCard } from '@/components/ui/interactive-card'
+import { EmptyState } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
 import { formatReadableTime } from '@/lib/time-utils'
 
@@ -21,19 +21,16 @@ export interface AlbumViewProps {
   tracks: Array<BaseItemDto>
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TrackRow - Memoized track display
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface TrackRowProps {
-  /** The track item */
   track: BaseItemDto
-  /** Track index (1-based) */
   index: number
-  /** Click handler */
   onClick: () => void
 }
 
-/**
- * Track row component displaying track number, name, and duration.
- * Memoized to prevent re-renders when other tracks change.
- */
 const TrackRow = React.memo(function TrackRow({
   track,
   index,
@@ -41,35 +38,20 @@ const TrackRow = React.memo(function TrackRow({
 }: TrackRowProps) {
   const trackNumber = track.IndexNumber ?? index
   const duration = track.RunTimeTicks
-    ? formatReadableTime(track.RunTimeTicks / 10000000)
+    ? formatReadableTime(track.RunTimeTicks / 10_000_000)
     : '--:--'
 
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClick()
-      }
-    },
-    [onClick],
-  )
-
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <InteractiveCard
       onClick={onClick}
-      onKeyDown={handleKeyDown}
       className={cn(
         'flex items-center gap-4 p-3 rounded-lg',
-        'cursor-pointer transition-colors',
-        'hover:bg-accent/50',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        'group',
+        'hover:bg-accent/50 group',
       )}
+      aria-label={`Play track ${trackNumber}: ${track.Name || `Track ${trackNumber}`}, duration ${duration}`}
     >
       {/* Track Number / Play Icon */}
-      <div className="w-8 text-center text-muted-foreground">
+      <div className="w-8 text-center text-muted-foreground" aria-hidden="true">
         <span className="group-hover:hidden">{trackNumber}</span>
         <Play className="h-4 w-4 hidden group-hover:inline" />
       </div>
@@ -82,26 +64,28 @@ const TrackRow = React.memo(function TrackRow({
       </div>
 
       {/* Duration */}
-      <div className="text-sm text-muted-foreground">{duration}</div>
-    </div>
+      <div
+        className="text-sm text-muted-foreground"
+        aria-label={`Duration: ${duration}`}
+      >
+        {duration}
+      </div>
+    </InteractiveCard>
   )
 })
 
-/**
- * AlbumView displays an album with its tracks.
- * Clicking a track navigates to the player.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// AlbumView - Main component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function AlbumView({ album, tracks }: AlbumViewProps) {
   const navigate = useNavigate()
 
   const albumName = album.Name || 'Unknown Album'
   const artistName = album.AlbumArtist || album.Artists?.[0] || 'Unknown Artist'
 
-  const handleBack = React.useCallback(() => {
-    navigate({ to: '/' })
-  }, [navigate])
+  const handleBack = React.useCallback(() => navigate({ to: '/' }), [navigate])
 
-  // Memoize track click handler factory to prevent re-creating handlers
   const handleTrackClick = React.useCallback(
     (trackId: string) => {
       navigate({
@@ -115,7 +99,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with back button */}
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -130,8 +114,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
       {/* Album Info */}
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-        {/* Album Artwork */}
-        <div className="flex-shrink-0 w-[160px] h-[160px] sm:w-[200px] sm:h-[200px] bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
+        <div className="flex-shrink-0 w-[var(--spacing-thumbnail-sm)] h-[var(--spacing-thumbnail-sm)] sm:w-[var(--spacing-thumbnail-md)] sm:h-[var(--spacing-thumbnail-md)] bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
           <ItemImage
             item={album}
             maxWidth={200}
@@ -140,7 +123,6 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           />
         </div>
 
-        {/* Album Details */}
         <div className="flex flex-col justify-end text-center sm:text-left">
           <p className="text-sm text-muted-foreground uppercase tracking-wide">
             Album
@@ -157,12 +139,17 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
       {/* Tracks List */}
       {tracks.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8 flex flex-col items-center gap-2">
-          <Music className="h-8 w-8" />
-          <p>No tracks found for this album</p>
-        </div>
+        <EmptyState
+          icon={<Music className="h-8 w-8" aria-hidden="true" />}
+          message="No tracks found for this album"
+          className="py-8"
+        />
       ) : (
-        <div className="space-y-1">
+        <div
+          className="space-y-1"
+          role="list"
+          aria-label={`${tracks.length} tracks in ${albumName}`}
+        >
           {tracks.map((track, index) => (
             <TrackRow
               key={track.Id}

@@ -26,4 +26,36 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React ecosystem
+          'react-vendor': ['react', 'react-dom', 'zod'],
+          // TanStack libraries
+          'tanstack-vendor': [
+            '@tanstack/react-query',
+            '@tanstack/react-router',
+            '@tanstack/react-virtual',
+          ],
+          // UI libraries
+          'ui-vendor': [
+            '@base-ui/react',
+            'lucide-react',
+            'sonner',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+          ],
+          // Media libraries
+          'media-vendor': ['node-vibrant', 'culori', 'blurhash'],
+          'hls-vendor': ['hls.js'],
+          // Jellyfin SDK
+          'jellyfin-vendor': ['@jellyfin/sdk', 'axios'],
+          // i18n
+          'i18n-vendor': ['i18next', 'react-i18next'],
+        },
+      },
+    },
+  },
 })

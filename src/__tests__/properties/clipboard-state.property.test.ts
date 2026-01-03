@@ -58,13 +58,14 @@ describe('Clipboard State Management', () => {
   it('round-trips segments through clipboard', () => {
     fc.assert(
       fc.property(mediaSegmentArb, (segment) => {
-        const store = useSessionStore.getState()
+        // Clear before each property test iteration
+        useSessionStore.getState().clearClipboard()
 
         // Save segment to clipboard
-        store.saveToClipboard(segment)
+        useSessionStore.getState().saveToClipboard(segment)
 
-        // Retrieve from clipboard
-        const retrieved = store.getFromClipboard()
+        // Retrieve from clipboard via state selector (get fresh state)
+        const retrieved = useSessionStore.getState().clipboardSegment
 
         // Verify segment is retrieved
         expect(retrieved).not.toBeNull()
@@ -93,14 +94,15 @@ describe('Clipboard State Management', () => {
         mediaSegmentArb,
         fc.integer({ min: 2, max: 10 }),
         (segment, retrievalCount) => {
-          const store = useSessionStore.getState()
+          // Clear before each property test iteration
+          useSessionStore.getState().clearClipboard()
 
           // Save segment to clipboard
-          store.saveToClipboard(segment)
+          useSessionStore.getState().saveToClipboard(segment)
 
           // Retrieve multiple times and verify consistency
           for (let i = 0; i < retrievalCount; i++) {
-            const retrieved = store.getFromClipboard()
+            const retrieved = useSessionStore.getState().clipboardSegment
             expect(retrieved).not.toBeNull()
             expect(retrieved!.Id).toBe(segment.Id)
             expect(retrieved!.ItemId).toBe(segment.ItemId)
@@ -123,15 +125,18 @@ describe('Clipboard State Management', () => {
   it('replaces clipboard content when saving new segment', () => {
     fc.assert(
       fc.property(mediaSegmentArb, mediaSegmentArb, (segment1, segment2) => {
-        const store = useSessionStore.getState()
+        // Clear before each property test iteration
+        useSessionStore.getState().clearClipboard()
 
         // Save first segment
-        store.saveToClipboard(segment1)
-        expect(store.getFromClipboard()!.Id).toBe(segment1.Id)
+        useSessionStore.getState().saveToClipboard(segment1)
+        expect(useSessionStore.getState().clipboardSegment!.Id).toBe(
+          segment1.Id,
+        )
 
         // Save second segment (should replace first)
-        store.saveToClipboard(segment2)
-        const retrieved = store.getFromClipboard()
+        useSessionStore.getState().saveToClipboard(segment2)
+        const retrieved = useSessionStore.getState().clipboardSegment
 
         // Verify second segment is now in clipboard
         expect(retrieved).not.toBeNull()
@@ -154,17 +159,18 @@ describe('Clipboard State Management', () => {
   it('clears clipboard content', () => {
     fc.assert(
       fc.property(mediaSegmentArb, (segment) => {
-        const store = useSessionStore.getState()
+        // Clear before each property test iteration
+        useSessionStore.getState().clearClipboard()
 
         // Save segment to clipboard
-        store.saveToClipboard(segment)
-        expect(store.getFromClipboard()).not.toBeNull()
+        useSessionStore.getState().saveToClipboard(segment)
+        expect(useSessionStore.getState().clipboardSegment).not.toBeNull()
 
         // Clear clipboard
-        store.clearClipboard()
+        useSessionStore.getState().clearClipboard()
 
         // Verify clipboard is empty
-        expect(store.getFromClipboard()).toBeNull()
+        expect(useSessionStore.getState().clipboardSegment).toBeNull()
 
         return true
       }),
@@ -174,11 +180,11 @@ describe('Clipboard State Management', () => {
 
   /**
    * Property: Empty clipboard returns null
-   * When clipboard is empty, getFromClipboard should return null.
+   * When clipboard is empty, clipboardSegment should be null.
    */
   it('returns null for empty clipboard', () => {
     const store = useSessionStore.getState()
     store.clearClipboard()
-    expect(store.getFromClipboard()).toBeNull()
+    expect(store.clipboardSegment).toBeNull()
   })
 })

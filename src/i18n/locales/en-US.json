@@ -1,4 +1,67 @@
 {
+  "accessibility": {
+    "copySegment": "Copy segment to clipboard",
+    "deleteSegment": "Delete segment",
+    "seekToStart": "Seek to start time",
+    "seekToEnd": "Seek to end time",
+    "playPause": "Play or pause video",
+    "keyboardShortcuts": "View keyboard shortcuts",
+    "skipTimeSelector": "Select skip time interval",
+    "dragHandle": "Drag to reorder",
+    "closeDialog": "Close dialog",
+    "skipToMain": "Skip to main content",
+    "mainContent": "Main content",
+    "navigation": "Main navigation",
+    "loading": "Loading content",
+    "loadingComplete": "Content loaded",
+    "searchResults": "{{count}} results found",
+    "noResults": "No results found",
+    "currentPage": "Page {{page}} of {{total}}",
+    "expandMenu": "Expand menu",
+    "collapseMenu": "Collapse menu",
+    "required": "Required field",
+    "optional": "Optional field",
+    "error": "Error: {{message}}",
+    "success": "Success: {{message}}",
+    "pagination": {
+      "previous": "Go to previous page",
+      "next": "Go to next page",
+      "page": "Go to page {{page}}",
+      "current": "Current page, page {{page}}"
+    },
+    "mediaCard": {
+      "viewSeries": "View series: {{name}}",
+      "viewArtist": "View artist: {{name}}",
+      "viewAlbum": "View album: {{name}}",
+      "playMovie": "Play movie: {{name}}",
+      "playEpisode": "Play episode: {{name}}",
+      "play": "Play: {{name}}"
+    },
+    "player": {
+      "videoProgress": "Video progress: {{current}} of {{total}}",
+      "volumeLevel": "Volume: {{level}}%",
+      "muted": "Audio muted",
+      "unmuted": "Audio unmuted",
+      "playing": "Video playing",
+      "paused": "Pause video",
+      "buffering": "Video buffering",
+      "controls": "Video player controls"
+    },
+    "segment": {
+      "selected": "Segment {{index}} selected",
+      "created": "New segment created",
+      "deleted": "Segment deleted",
+      "updated": "Segment updated"
+    },
+    "form": {
+      "invalidInput": "Invalid input",
+      "fieldRequired": "This field is required",
+      "characterCount": "{{current}} of {{max}} characters"
+    },
+    "settings": {
+      "description": "Configure application settings including server connection, theme, language, and display preferences"
+    }
+  },
   "login": {
     "api_key": "Jellyfin API Key",
     "server_address": "Jellyfin Server Address",
@@ -34,8 +97,15 @@
     "select_collection": "Select a collection to browse",
     "filter": {
       "name": "Search",
-      "collection": "Collection"
-    }
+      "collection": "Collection",
+      "selectCollection": "Select collection"
+    },
+    "mediaGrid": "Media items",
+    "selectLibrary": "Select a Library",
+    "selectLibraryDescription": "Choose a library to browse your media collection",
+    "selectLibraryButton": "Browse {{name}} library",
+    "showing": "Showing {{start}}-{{end}} of {{total}}",
+    "noItems": "No items found"
   },
   "editor": {
     "saveSegment": "Save",
@@ -45,6 +115,7 @@
     "time": "Time",
     "deleteSegments": "Are you sure to delete all segments for '{{item}}'?",
     "newSegment": "New Segment",
+    "actions": "Segment actions",
     "slider": {
       "title": "Slider Editor"
     },
@@ -59,7 +130,11 @@
     "end": "End",
     "type": "Segment Type",
     "edit": "Edit Segment",
-    "duration": "Duration"
+    "duration": "Duration",
+    "sliderGroup": "{{type}} segment range slider",
+    "sliderDescription": "{{type}} segment from {{start}} to {{end}}, duration {{duration}}. Use arrow keys to adjust handles.",
+    "startHandle": "{{type}} segment start handle",
+    "endHandle": "{{type}} segment end handle"
   },
   "validation": {
     "StartEnd": "Start is always before End"
@@ -99,6 +174,9 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "retry": "Retry",
+    "selectEpisode": "Select episode",
+    "controls": "Video player controls",
+    "recovering": "Recovering playback",
     "error": {
       "network": "Network error. Check your connection.",
       "media": "Media playback error. Attempting recovery...",
@@ -111,6 +189,24 @@
     "noEpisodes": "No episodes found",
     "loadingEpisodes": "Loading episodes for {{season}}...",
     "episodeLoadError": "Failed to load episodes",
-    "seasonNumber": "Season {{number}}"
+    "seasonNumber": "Season {{number}}",
+    "episodes": "Episodes",
+    "loadError": "Failed to load episodes",
+    "episode": "Episode"
+  },
+  "search": {
+    "open": "Open search",
+    "title": "Search",
+    "placeholder": "Search media...",
+    "clear": "Clear search",
+    "results": "Search results",
+    "no_results": "No results found",
+    "start_typing": "Start typing to search..."
+  },
+  "settings": {
+    "open": "Open settings"
+  },
+  "navigation": {
+    "back": "Go back"
   }
 }

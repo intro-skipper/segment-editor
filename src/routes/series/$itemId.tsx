@@ -1,36 +1,57 @@
 /**
  * Series route - Displays series seasons and episodes.
  * Renders the SeriesView component for a specific series.
- * Requirements: 2.5, 7.1
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { createFileRoute, notFound } from '@tanstack/react-router'
+import { z } from 'zod'
 
-import { useQuery } from '@tanstack/react-query'
-import type { BaseItemDto } from '@/types/jellyfin'
 import { SeriesView } from '@/components/views/SeriesView'
-import { itemsKeys, useItem } from '@/hooks/queries/use-items'
+import {
+  QUERY_STALE_TIMES,
+  itemsKeys,
+  seriesKeys,
+  useItem,
+  useSeasons,
+} from '@/hooks/queries'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getEpisodes, getItemById, getSeasons } from '@/services/items/api'
-import { useApiStore } from '@/stores/api-store'
+import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
+import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
+import { getItemById, getSeasons } from '@/services/items/api'
+import { getBestImageUrl } from '@/services/video/api'
+import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { useSessionStore } from '@/stores/session-store'
 
 /**
- * Query key factory for series-related queries.
+ * Route params schema - validates itemId is a valid Jellyfin ID.
+ * Accepts both standard UUID format and Jellyfin's 32-char hex format.
+ * Security: Prevents injection attacks via malformed IDs.
  */
-export const seriesKeys = {
-  all: ['series'] as const,
-  seasons: (seriesId: string) =>
-    [...seriesKeys.all, 'seasons', seriesId] as const,
-  episodes: (seriesId: string, seasonId: string) =>
-    [...seriesKeys.all, 'episodes', seriesId, seasonId] as const,
-}
+const jellyfinIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i,
+    'Invalid series ID format',
+  )
+
+const seriesParamsSchema = z.object({
+  itemId: jellyfinIdSchema,
+})
 
 /**
  * Loading skeleton for the series page.
+ * Uses consistent height variables and ARIA attributes.
  */
 function SeriesSkeleton() {
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
+    <main
+      className="h-[var(--spacing-page-min-height-skeleton)] px-4 py-6 sm:px-6 overflow-auto"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading series</span>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Back button and title skeleton */}
         <div className="flex items-center gap-4">
@@ -39,9 +60,13 @@ function SeriesSkeleton() {
         </div>
         {/* Season accordions skeleton */}
         <div className="space-y-3">
-          <Skeleton className="h-14 w-full rounded-lg" />
-          <Skeleton className="h-14 w-full rounded-lg" />
-          <Skeleton className="h-14 w-full rounded-lg" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className="h-14 w-full rounded-lg animate-in fade-in duration-300"
+              style={{ animationDelay: `${i * 50}ms` }}
+            />
+          ))}
         </div>
       </div>
     </main>
@@ -49,6 +74,10 @@ function SeriesSkeleton() {
 }
 
 export const Route = createFileRoute('/series/$itemId')({
+  params: {
+    parse: (params) => seriesParamsSchema.parse(params),
+    stringify: (params) => params,
+  },
   loader: async ({ params, context }) => {
     const { itemId } = params
     const { queryClient } = context
@@ -57,36 +86,27 @@ export const Route = createFileRoute('/series/$itemId')({
     await queryClient.ensureQueryData({
       queryKey: itemsKeys.detail(itemId),
       queryFn: () => getItemById(itemId),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: QUERY_STALE_TIMES.LONG,
     })
 
     // Prefetch seasons data
     await queryClient.ensureQueryData({
       queryKey: seriesKeys.seasons(itemId),
       queryFn: () => getSeasons(itemId),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: QUERY_STALE_TIMES.LONG,
     })
+  },
+  onError: () => {
+    // Throw notFound for invalid params (e.g., malformed UUID)
+    throw notFound()
   },
   pendingComponent: SeriesSkeleton,
   component: SeriesPage,
 })
 
-/**
- * Hook to fetch seasons for a series.
- */
-function useSeasons(seriesId: string) {
-  const validConnection = useApiStore((state) => state.validConnection)
-
-  return useQuery<Array<BaseItemDto>, Error>({
-    queryKey: seriesKeys.seasons(seriesId),
-    queryFn: () => getSeasons(seriesId),
-    enabled: validConnection && !!seriesId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  })
-}
-
 function SeriesPage() {
   const { itemId } = Route.useParams()
+  const setVibrantColors = useSessionStore((s) => s.setVibrantColors)
 
   // Fetch series data using the hook (will use cached data from loader)
   const {
@@ -102,6 +122,16 @@ function SeriesPage() {
     error: seasonsError,
   } = useSeasons(itemId)
 
+  // Extract vibrant color from series poster
+  const imageUrl = series ? getBestImageUrl(series, 300) : null
+  const vibrantColors = useVibrantColor(imageUrl || null)
+
+  // Sync vibrant colors to session store for header - must be called unconditionally
+  useEffect(() => {
+    setVibrantColors(vibrantColors)
+    return () => setVibrantColors(null)
+  }, [vibrantColors, setVibrantColors])
+
   const isLoading = isLoadingSeries || isLoadingSeasons
   const error = seriesError || seasonsError
 
@@ -111,38 +141,44 @@ function SeriesPage() {
 
   if (error || !series) {
     return (
-      <main className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-destructive">
-          {error?.message || 'Series not found'}
-        </div>
-      </main>
+      <RouteErrorFallback
+        message={error?.message || 'Series not found'}
+        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
+      />
     )
   }
 
   if (!seasons || seasons.length === 0) {
     return (
-      <main className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-muted-foreground">
-          No seasons found for this series
-        </div>
-      </main>
+      <RouteErrorFallback
+        message="No seasons found for this series"
+        showRetry={false}
+        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
+      />
     )
   }
 
-  // Function to fetch episodes for a season
-  const fetchEpisodes = async (
-    seasonId: string,
-  ): Promise<Array<BaseItemDto>> => {
-    return getEpisodes(itemId, seasonId)
-  }
-
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
-      <SeriesView
-        series={series}
-        seasons={seasons}
-        getEpisodes={fetchEpisodes}
-      />
-    </main>
+    <>
+      {/* Full-screen background that extends behind header */}
+      {vibrantColors && (
+        <div
+          className="fixed inset-0 -z-10 transition-colors duration-700"
+          style={{ backgroundColor: vibrantColors.background }}
+        />
+      )}
+      <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto">
+        <FeatureErrorBoundary
+          featureName="Series"
+          minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
+        >
+          <SeriesView
+            series={series}
+            seasons={seasons}
+            vibrantColors={vibrantColors}
+          />
+        </FeatureErrorBoundary>
+      </main>
+    </>
   )
 }

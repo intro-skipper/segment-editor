@@ -1,29 +1,25 @@
 /**
- * SeriesView component for displaying series seasons and episodes.
- * Displays seasons as expandable accordion sections with episodes inside.
- * Requirements: 7.1, 7.2, 7.5
+ * SeriesView - Displays series seasons and episodes.
+ * Features pill tabs for seasons and clean card list for episodes.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import {
-  AlertCircle,
-  ChevronLeft,
-  Loader2,
-  Play,
-  RefreshCw,
-} from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { Button } from '@/components/ui/button'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
+import { useEpisodes } from '@/hooks/queries/use-items'
+import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
+import { InteractiveCard } from '@/components/ui/interactive-card'
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
 
 export interface SeriesViewProps {
@@ -31,306 +27,383 @@ export interface SeriesViewProps {
   series: BaseItemDto
   /** Array of seasons for the series */
   seasons: Array<BaseItemDto>
-  /** Function to fetch episodes for a season */
-  getEpisodes: (seasonId: string) => Promise<Array<BaseItemDto>>
+  /** Extracted vibrant colors from series poster */
+  vibrantColors?: VibrantColors | null
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SeasonTabs - Pill-style season selector with ARIA support
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SeasonTabsProps {
+  seasons: Array<BaseItemDto>
+  selectedSeasonId: string | null
+  onSeasonSelect: (seasonId: string) => void
+  vibrantColors?: VibrantColors | null
+}
+
+/** Check if a season is a "Specials" season */
+const isSpecialSeason = (s: BaseItemDto) =>
+  s.IndexNumber === 0 || (s.Name || '').toLowerCase().includes('special')
+
+const SeasonTabs = React.memo(function SeasonTabs({
+  seasons,
+  selectedSeasonId,
+  onSeasonSelect,
+  vibrantColors,
+}: SeasonTabsProps) {
+  const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
+
+  // Memoize sorted seasons - specials always last
+  const orderedSeasons = React.useMemo(() => {
+    const normal = seasons.filter((s) => !isSpecialSeason(s))
+    const specials = seasons.filter(isSpecialSeason)
+    return [...normal, ...specials]
+  }, [seasons])
+
+  return (
+    <div
+      className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+      role="tablist"
+      aria-label="Seasons"
+    >
+      {orderedSeasons.map((season, index) => {
+        const isSelected = season.Id === selectedSeasonId
+        const label = season.Name ?? `Season ${season.IndexNumber ?? index + 1}`
+
+        return (
+          <button
+            key={season.Id}
+            role="tab"
+            aria-selected={isSelected}
+            aria-controls={`season-panel-${season.Id}`}
+            onClick={() => season.Id && onSeasonSelect(season.Id)}
+            className={cn(
+              'flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap',
+              'transition-all duration-200 ease-out border-2',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              !hasColors &&
+                (isSelected
+                  ? 'bg-primary/20 text-primary border-primary/40'
+                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent'),
+            )}
+            style={getTabStyle(isSelected)}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EpisodeCard - Memoized episode display with animation
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface EpisodeCardProps {
+  episode: BaseItemDto
+  index: number
+  onClick: () => void
+  vibrantColors?: VibrantColors | null
+}
+
+const EpisodeCard = React.memo(function EpisodeCard({
+  episode,
+  index,
+  onClick,
+  vibrantColors,
+}: EpisodeCardProps) {
+  const { t } = useTranslation()
+
+  const episodeLabel = `S${episode.ParentIndexNumber ?? '?'}E${episode.IndexNumber ?? '?'}`
+  const runtime = episode.RunTimeTicks
+    ? Math.round(episode.RunTimeTicks / 600_000_000)
+    : null
+  const animationDelay = Math.min(index * 40, 400)
+
+  // Memoize style objects to prevent re-renders
+  const cardStyle = React.useMemo(
+    () =>
+      vibrantColors ? { backgroundColor: vibrantColors.primary } : undefined,
+    [vibrantColors],
+  )
+  const textStyle = React.useMemo(
+    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
+    [vibrantColors],
+  )
+
+  const episodeName = episode.Name || episodeLabel
+  const ariaLabel = runtime
+    ? `${episodeLabel}: ${episodeName}, ${runtime} minutes`
+    : `${episodeLabel}: ${episodeName}`
+
+  return (
+    <InteractiveCard
+      onClick={onClick}
+      animate
+      animationDelay={animationDelay}
+      className={cn(
+        'group flex items-center gap-4 p-3 rounded-2xl',
+        !vibrantColors && 'bg-card/60 backdrop-blur-sm',
+        'hover:shadow-lg hover:shadow-black/10',
+      )}
+      style={cardStyle}
+      aria-label={ariaLabel}
+    >
+      {/* Thumbnail */}
+      <div className="relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted shadow-md">
+        <ItemImage
+          item={episode}
+          maxWidth={64}
+          aspectRatio="aspect-square"
+          className="w-full h-full object-cover"
+        />
+        <div
+          className={cn(
+            'absolute inset-0 flex items-center justify-center',
+            'bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200',
+          )}
+          aria-hidden="true"
+        >
+          <Play className="size-6 text-white fill-white" />
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="flex-grow min-w-0 py-0.5">
+        <p className="font-semibold truncate leading-tight" style={textStyle}>
+          {episode.Name || episodeLabel}
+        </p>
+        <p className="text-sm truncate mt-0.5 opacity-80" style={textStyle}>
+          {episode.Name ? episodeLabel : t('series.episode')}
+          {runtime && ` · ${runtime} min`}
+        </p>
+      </div>
+    </InteractiveCard>
+  )
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SeasonEpisodes - Episode list with TanStack Query
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface SeasonEpisodesProps {
-  /** The season item */
+  seriesId: string
   season: BaseItemDto
-  /** Function to fetch episodes */
-  getEpisodes: (seasonId: string) => Promise<Array<BaseItemDto>>
+  vibrantColors?: VibrantColors | null
 }
 
-/** Episode loading state */
-interface EpisodeState {
-  episodes: Array<BaseItemDto>
-  isLoading: boolean
-  error: string | null
-  hasLoaded: boolean
-}
-
-/**
- * Component to display episodes within a season.
- * Fetches episodes when the season accordion is expanded.
- */
-function SeasonEpisodes({ season, getEpisodes }: SeasonEpisodesProps) {
+function SeasonEpisodes({
+  seriesId,
+  season,
+  vibrantColors,
+}: SeasonEpisodesProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const [state, setState] = useState<EpisodeState>({
-    episodes: [],
-    isLoading: true,
-    error: null,
-    hasLoaded: false,
-  })
 
-  const loadEpisodes = useCallback(async () => {
-    if (state.hasLoaded) return
+  const {
+    data: episodes = [],
+    isLoading,
+    error,
+    refetch,
+  } = useEpisodes(seriesId, season.Id ?? '', { enabled: !!season.Id })
 
-    // Cancel any pending request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    abortControllerRef.current = new AbortController()
-
-    setState((prev) => ({ ...prev, isLoading: true, error: null }))
-
-    try {
-      const seasonId = season.Id ?? ''
-      const episodeData = await getEpisodes(seasonId)
-      setState({
-        episodes: episodeData,
-        isLoading: false,
-        error: null,
-        hasLoaded: true,
+  const handleEpisodeClick = React.useCallback(
+    (episodeId: string) => {
+      navigate({
+        to: '/player/$itemId',
+        params: { itemId: episodeId },
+        search: { fetchSegments: 'true' },
       })
-    } catch (error) {
-      // Don't update state if request was aborted
-      if (error instanceof Error && error.name === 'AbortError') return
+    },
+    [navigate],
+  )
 
-      console.error('Failed to load episodes:', error)
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: t('series.episodeLoadError'),
-      }))
-    }
-  }, [season.Id, getEpisodes, state.hasLoaded, t])
-
-  // Load episodes when component mounts
-  useEffect(() => {
-    loadEpisodes()
-
-    return () => {
-      // Cleanup: abort pending request on unmount
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, [loadEpisodes])
-
-  const handleRetry = () => {
-    setState((prev) => ({ ...prev, hasLoaded: false }))
-  }
-
-  const handleEpisodeClick = (episode: BaseItemDto) => {
-    navigate({
-      to: '/player/$itemId',
-      params: { itemId: episode.Id ?? '' },
-      search: { fetchSegments: 'true' },
-    })
-  }
-
-  if (state.isLoading) {
+  if (isLoading) {
     return (
-      <div className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        <span>
-          {t('series.loadingEpisodes', {
-            season: season.Name ?? season.IndexNumber,
-          })}
-        </span>
-      </div>
+      <LoadingState
+        message={t('series.loadingEpisodes', {
+          season: season.Name ?? season.IndexNumber,
+        })}
+      />
     )
   }
 
-  if (state.error) {
+  if (error) {
     return (
-      <div className="py-6 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-        <AlertCircle className="size-8 text-destructive" />
-        <p className="text-sm">{state.error}</p>
-        <Button variant="outline" size="sm" onClick={handleRetry}>
-          <RefreshCw className="size-4 mr-2" />
-          {t('common.retry')}
-        </Button>
-      </div>
+      <ErrorState
+        message={t('series.episodeLoadError')}
+        onRetry={() => refetch()}
+        retryText={t('common.retry')}
+      />
     )
   }
 
-  if (state.episodes.length === 0) {
+  if (episodes.length === 0) {
+    return <EmptyState message={t('series.noEpisodes')} />
+  }
+
+  // Virtualize only for large lists
+  if (episodes.length > 30) {
     return (
-      <div className="py-6 text-center text-muted-foreground">
-        {t('series.noEpisodes')}
-      </div>
+      <VirtualizedEpisodeList
+        episodes={episodes}
+        seasonId={season.Id ?? ''}
+        onEpisodeClick={handleEpisodeClick}
+        vibrantColors={vibrantColors}
+      />
     )
   }
 
   return (
-    <div className="space-y-2">
-      {state.episodes.map((episode) => (
-        <EpisodeRow
+    <div
+      className="space-y-1.5"
+      role="tabpanel"
+      id={`season-panel-${season.Id}`}
+    >
+      {episodes.map((episode, index) => (
+        <EpisodeCard
           key={episode.Id}
           episode={episode}
-          onClick={() => handleEpisodeClick(episode)}
+          index={index}
+          onClick={() => handleEpisodeClick(episode.Id ?? '')}
+          vibrantColors={vibrantColors}
         />
       ))}
     </div>
   )
 }
 
-interface EpisodeRowProps {
-  episode: BaseItemDto
-  onClick: () => void
+/** Virtualized episode list for seasons with many episodes */
+interface VirtualizedEpisodeListProps {
+  episodes: Array<BaseItemDto>
+  seasonId: string
+  onEpisodeClick: (episodeId: string) => void
+  vibrantColors?: VibrantColors | null
 }
 
-/**
- * Single episode row with thumbnail, episode info, and play button.
- */
-function EpisodeRow({ episode, onClick }: EpisodeRowProps) {
-  const episodeNumber = episode.IndexNumber
-  const seasonNumber = episode.ParentIndexNumber
-  const episodeName = episode.Name
+function VirtualizedEpisodeList({
+  episodes,
+  seasonId,
+  onEpisodeClick,
+  vibrantColors,
+}: VirtualizedEpisodeListProps) {
+  const parentRef = React.useRef<HTMLDivElement>(null)
 
-  // Format episode label (e.g., "S1E5 - Episode Name")
-  const episodeLabel = `S${seasonNumber ?? '?'}E${episodeNumber ?? '?'}`
-  const showName = episodeName && !episodeName.toLowerCase().includes('episode')
+  const virtualizer = useVirtualizer({
+    count: episodes.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 96, // ~80px card + 16px gap
+    overscan: 5,
+  })
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      className={cn(
-        'flex items-center gap-4 p-2 rounded-lg',
-        'cursor-pointer transition-colors',
-        'hover:bg-accent/50',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-      )}
+      ref={parentRef}
+      className="h-[600px] overflow-auto"
+      role="tabpanel"
+      id={`season-panel-${seasonId}`}
     >
-      {/* Episode Thumbnail */}
-      <div className="flex-shrink-0 w-[124px] h-[70px] rounded overflow-hidden bg-muted">
-        <ItemImage
-          item={episode}
-          maxWidth={124}
-          aspectRatio="aspect-video"
-          className="w-full h-full object-cover"
-        />
-      </div>
-
-      {/* Episode Info */}
-      <div className="flex-grow min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">{episodeLabel}</span>
-          {showName && (
-            <span className="text-sm text-muted-foreground truncate">
-              - {episodeName}
-            </span>
-          )}
-        </div>
-        {episode.RunTimeTicks && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {Math.round(episode.RunTimeTicks / 600000000)} min
-          </p>
-        )}
-      </div>
-
-      {/* Play Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="flex-shrink-0"
-        onClick={(e) => {
-          e.stopPropagation()
-          onClick()
-        }}
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        <Play className="h-4 w-4" />
-        <span className="sr-only">Play episode</span>
-      </Button>
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const episode = episodes[virtualItem.index]
+
+          return (
+            <div
+              key={episode.Id}
+              className="absolute top-0 left-0 w-full py-0.75"
+              style={{
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <EpisodeCard
+                episode={episode}
+                index={virtualItem.index}
+                onClick={() => onEpisodeClick(episode.Id ?? '')}
+                vibrantColors={vibrantColors}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-/**
- * SeriesView displays a series with expandable season sections.
- * Each season can be expanded to show its episodes.
- */
-export function SeriesView({ series, seasons, getEpisodes }: SeriesViewProps) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SeriesView - Main component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function SeriesView({
+  series,
+  seasons,
+  vibrantColors,
+}: SeriesViewProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const [expandedSeasons, setExpandedSeasons] = useState<Array<string>>(
-    seasons[0]?.Id ? [seasons[0].Id] : [],
+
+  const findDefaultSeasonId = React.useCallback(() => {
+    const firstNonSpecial = seasons.find((s) => !isSpecialSeason(s))
+    return firstNonSpecial?.Id ?? seasons[0]?.Id ?? null
+  }, [seasons])
+
+  const [selectedSeasonId, setSelectedSeasonId] = React.useState<string | null>(
+    () => findDefaultSeasonId(),
   )
 
-  const seriesName =
-    series.Name ?? seasons[0]?.SeriesName ?? t('series.unknownSeries')
+  const selectedSeason = seasons.find((s) => s.Id === selectedSeasonId)
 
-  const handleBack = () => {
-    navigate({ to: '/' })
-  }
+  // Keep selection in sync when `seasons` prop changes (e.g. navigating to
+  // another series). If the previously selected season is not present in the
+  // new list, pick the first season (or null if none).
+  React.useEffect(() => {
+    if (seasons.length === 0) {
+      setSelectedSeasonId(null)
+      return
+    }
 
-  // Empty state for series with no seasons
+    const hasSelected = selectedSeasonId
+      ? seasons.some((s) => s.Id === selectedSeasonId)
+      : false
+
+    if (!hasSelected) {
+      setSelectedSeasonId(findDefaultSeasonId())
+    }
+  }, [seasons, selectedSeasonId, findDefaultSeasonId])
+
   if (seasons.length === 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleBack}
-            className="rounded-full"
-          >
-            <ChevronLeft className="h-5 w-5" />
-            <span className="sr-only">{t('common.goBack')}</span>
-          </Button>
-          <h1 className="text-xl font-semibold">{seriesName}</h1>
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-          <AlertCircle className="size-12 mb-4 opacity-50" />
-          <p>{t('series.noSeasons')}</p>
-        </div>
+      <div className="max-w-3xl mx-auto px-4">
+        <EmptyState
+          icon={<AlertCircle className="size-14" />}
+          message={t('series.noSeasons')}
+        />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with back button and series name */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleBack}
-          className="rounded-full"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          <span className="sr-only">{t('common.goBack')}</span>
-        </Button>
-        <h1 className="text-xl font-semibold">{seriesName}</h1>
-      </div>
+    <div className="max-w-3xl mx-auto">
+      <SeasonTabs
+        seasons={seasons}
+        selectedSeasonId={selectedSeasonId}
+        onSeasonSelect={setSelectedSeasonId}
+        vibrantColors={vibrantColors}
+      />
 
-      {/* Seasons Accordion */}
-      <Accordion
-        value={expandedSeasons}
-        onValueChange={setExpandedSeasons}
-        multiple
-        className="space-y-2"
-      >
-        {seasons.map((season) => (
-          <AccordionItem
-            key={season.Id}
-            value={season.Id ?? ''}
-            className="border rounded-lg px-4"
-          >
-            <AccordionTrigger className="hover:no-underline">
-              <span className="font-medium">
-                {season.Name ??
-                  t('series.seasonNumber', { number: season.IndexNumber })}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <SeasonEpisodes season={season} getEpisodes={getEpisodes} />
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+      <div className="mt-2">
+        {selectedSeason && series.Id && (
+          <SeasonEpisodes
+            key={selectedSeason.Id}
+            seriesId={series.Id}
+            season={selectedSeason}
+            vibrantColors={vibrantColors}
+          />
+        )}
+      </div>
     </div>
   )
 }

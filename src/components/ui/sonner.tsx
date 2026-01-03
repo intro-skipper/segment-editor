@@ -29,8 +29,6 @@ function resolveTheme(theme: 'auto' | 'dark' | 'light'): 'light' | 'dark' {
  * Toast notification component using sonner.
  * Integrates with the app's theme system via Zustand store.
  * Displays notifications in the top-right corner with auto-dismiss.
- *
- * Requirements: 12.5
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const theme = useAppStore((state) => state.theme)

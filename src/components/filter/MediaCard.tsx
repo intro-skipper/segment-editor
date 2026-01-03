@@ -1,113 +1,66 @@
 /**
- * MediaCard component for displaying media items in the grid.
- * Handles navigation based on item type (movie, series, artist).
- * Requirements: 2.4, 2.5, 2.6
+ * MediaCard - Clickable media item card with dynamic color extraction.
+ * Navigates to appropriate view based on item type.
  */
 
-import * as React from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 import { ItemImage } from '@/components/media/ItemImage'
+import { getBestImageUrl } from '@/services/video/api'
+import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
+import { getNavigationRoute } from '@/lib/navigation-utils'
 
 export interface MediaCardProps {
-  /** The Jellyfin item to display */
   item: BaseItemDto
-  /** Additional CSS classes */
   className?: string
+  index?: number
+  tabIndex?: number
+  role?: 'gridcell'
+  'data-grid-index'?: number
+  'aria-selected'?: boolean
+  onFocus?: (index: number) => void
 }
 
-/**
- * Determines the navigation route based on item type.
- * - Movies navigate to player with fetchSegments enabled
- * - Series navigate to series detail page
- * - Music artists navigate to artist detail page
- * - Other types navigate to player
- */
-function getNavigationRoute(item: BaseItemDto): {
-  to: string
-  params?: Record<string, string>
-  search?: Record<string, string>
-} {
-  const itemId = item.Id || ''
-
-  switch (item.Type) {
-    case BaseItemKind.Series:
-      return {
-        to: '/series/$itemId',
-        params: { itemId },
-      }
-
-    case BaseItemKind.MusicArtist:
-      return {
-        to: '/artist/$itemId',
-        params: { itemId },
-      }
-
-    case BaseItemKind.MusicAlbum:
-      return {
-        to: '/album/$itemId',
-        params: { itemId },
-      }
-
-    case BaseItemKind.Movie:
-    case BaseItemKind.Episode:
-    case BaseItemKind.Audio:
-    default:
-      // Movies and other playable items go to player with fetchSegments
-      return {
-        to: '/player/$itemId',
-        params: { itemId },
-        search: { fetchSegments: 'true' },
-      }
-  }
+/** Label key mapping by item type */
+const LABEL_KEY_MAP: Record<string, string> = {
+  [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
+  [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
+  [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
+  [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
+  [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
 }
 
-/**
- * Generate accessible label based on item type.
- */
-function getAccessibleLabel(item: BaseItemDto): string {
-  const name = item.Name ?? 'Unknown'
-  const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
+/** Max animation delay to prevent long waits on large grids */
+const MAX_ANIMATION_DELAY = 300
+const ANIMATION_STAGGER = 30
 
-  switch (item.Type) {
-    case BaseItemKind.Series:
-      return `View series: ${name}${year}`
-    case BaseItemKind.MusicArtist:
-      return `View artist: ${name}`
-    case BaseItemKind.MusicAlbum:
-      return `View album: ${name}${year}`
-    case BaseItemKind.Movie:
-      return `Play movie: ${name}${year}`
-    case BaseItemKind.Episode:
-      return `Play episode: ${name}`
-    default:
-      return `Play: ${name}${year}`
-  }
-}
-
-/**
- * MediaCard displays a media item thumbnail with name.
- * Clicking navigates to the appropriate page based on item type.
- */
-export const MediaCard = React.memo(function MediaCard({
+export const MediaCard = memo(function MediaCard({
   item,
   className,
+  index = 0,
+  tabIndex = 0,
+  role = 'gridcell',
+  'data-grid-index': dataGridIndex,
+  'aria-selected': ariaSelected,
+  onFocus,
 }: MediaCardProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+  const imageUrl = useMemo(() => getBestImageUrl(item, 200), [item])
+  const vibrantColors = useVibrantColor(imageUrl ?? null)
 
-  const handleClick = React.useCallback(() => {
+  const handleClick = useCallback(() => {
     const route = getNavigationRoute(item)
-    navigate({
-      to: route.to as '/',
-      params: route.params,
-      search: route.search,
-    } as Parameters<typeof navigate>[0])
+    // Type assertion needed due to dynamic route resolution
+    navigate(route as unknown as Parameters<typeof navigate>[0])
   }, [item, navigate])
 
-  const handleKeyDown = React.useCallback(
+  const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -117,22 +70,69 @@ export const MediaCard = React.memo(function MediaCard({
     [handleClick],
   )
 
-  const accessibleLabel = React.useMemo(() => getAccessibleLabel(item), [item])
+  // Compute accessible label using translation
+  const accessibleLabel = useMemo(() => {
+    const name = item.Name ?? 'Unknown'
+    const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
+    const labelKey =
+      LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
+    return t(labelKey, { name: `${name}${year}` })
+  }, [item, t])
+
+  // Derived values - no useMemo needed for simple computations
+  const animationDelay = Math.min(
+    index * ANIMATION_STAGGER,
+    MAX_ANIMATION_DELAY,
+  )
+
+  // Memoize style objects to prevent re-renders
+  const textBoxStyle = useMemo(
+    () =>
+      vibrantColors
+        ? {
+            background: vibrantColors.primary,
+            color: vibrantColors.text,
+          }
+        : undefined,
+    [vibrantColors],
+  )
+
+  const cardStyle = useMemo(
+    () => ({
+      animationDelay: `${animationDelay}ms`,
+      backgroundColor: vibrantColors?.primary ?? 'var(--card)',
+    }),
+    [animationDelay, vibrantColors?.primary],
+  )
+
+  const textStyle = useMemo(
+    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
+    [vibrantColors],
+  )
+
+  const handleFocus = useCallback(() => {
+    onFocus?.(index)
+  }, [onFocus, index])
 
   return (
     <div
-      role="button"
-      tabIndex={0}
+      role={role}
+      tabIndex={tabIndex}
+      data-grid-index={dataGridIndex}
+      aria-selected={ariaSelected}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
       aria-label={accessibleLabel}
       className={cn(
-        'group cursor-pointer rounded-lg overflow-hidden',
-        'transition-all duration-200 ease-out',
-        'hover:scale-[1.02] hover:shadow-lg',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'group cursor-pointer rounded-2xl overflow-hidden',
+        'transition-all duration-300 ease-out',
+        'hover:scale-[1.03] hover:shadow-xl hover:shadow-black/20',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
         className,
       )}
+      style={cardStyle}
     >
       {/* Item Thumbnail */}
       <ItemImage
@@ -142,21 +142,33 @@ export const MediaCard = React.memo(function MediaCard({
         className="w-full"
       />
 
-      {/* Item Name */}
-      <div className="p-2 bg-card">
+      {/* Item Name - with extracted poster color */}
+      <div
+        className="px-3 py-2.5 transition-colors duration-500"
+        style={textBoxStyle}
+      >
+        {/* Title - fixed height for 2 lines */}
         <p
-          className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary transition-colors"
+          className={cn(
+            'text-sm font-semibold line-clamp-2 leading-snug h-[2.5em]',
+            !vibrantColors && 'text-foreground group-hover:text-primary',
+          )}
+          style={textStyle}
           title={item.Name || undefined}
         >
           {item.Name || 'Unknown'}
         </p>
 
-        {/* Optional: Show year for movies/series */}
-        {item.ProductionYear && (
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {item.ProductionYear}
-          </p>
-        )}
+        {/* Year - always in third row */}
+        <p
+          className={cn(
+            'text-xs opacity-70 font-medium h-[1.25em]',
+            !vibrantColors && 'text-muted-foreground',
+          )}
+          style={textStyle}
+        >
+          {item.ProductionYear ?? '\u00A0'}
+        </p>
       </div>
     </div>
   )

@@ -1,241 +1,270 @@
 /**
  * Segment API service.
  * Handles CRUD operations for media segments.
- * Converts between ticks (server format) and seconds (UI format).
+ *
+ * Security: All inputs are validated before use, and URL parameters are properly encoded.
  */
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import { deleteJson, fetchWithAuth, postJson } from '@/services/jellyfin/client'
+import type { ApiOptions } from '@/lib/api-utils'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
+import { API_CONFIG } from '@/lib/constants'
+import { AppError, isAbortError } from '@/lib/unified-error'
+import { withRetryOrFalse } from '@/lib/retry-utils'
+import { getAuthHeaders } from '@/lib/header-utils'
+import {
+  MediaSegmentArraySchema,
+  encodeUrlParam,
+  isValidItemId,
+  isValidProviderId,
+} from '@/lib/schemas'
+import { logValidationWarning } from '@/lib/validation-logger'
+import { getRequestConfig, getRetryOptions, logApiError } from '@/lib/api-utils'
 import { useAppStore } from '@/stores/app-store'
+import {
+  getAccessToken,
+  getServerBaseUrl,
+  getTypedApis,
+} from '@/services/jellyfin/sdk'
 
-/**
- * Response from the MediaSegments API.
- */
-interface MediaSegmentsResponse {
-  Items?: Array<MediaSegmentDto>
-  TotalRecordCount?: number
-}
-
-/**
- * Input for creating a new segment.
- */
 export interface CreateSegmentInput {
-  /** Item ID the segment belongs to */
   itemId: string
-  /** Segment type */
   type: MediaSegmentType
-  /** Start time in seconds */
   startSeconds: number
-  /** End time in seconds */
   endSeconds: number
 }
 
-/**
- * Fetches all segments for a media item.
- * Converts tick values to seconds for UI display.
- * @param itemId - The media item ID
- * @returns Array of segments with times in seconds
- */
-export async function getSegmentsById(
-  itemId: string,
-): Promise<Array<MediaSegmentDto>> {
-  if (!itemId) {
-    return []
+export type SegmentApiOptions = ApiOptions
+
+/** Converts server ticks to UI seconds */
+const toUiSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
+  ...s,
+  StartTicks: ticksToSeconds(s.StartTicks),
+  EndTicks: ticksToSeconds(s.EndTicks),
+})
+
+/** Converts UI seconds to server ticks */
+const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
+  ...s,
+  Id: s.Id || generateUUID(),
+  StartTicks: secondsToTicks(s.StartTicks ?? 0),
+  EndTicks: secondsToTicks(s.EndTicks ?? 0),
+})
+
+/** Validation result for segment operations */
+interface SegmentValidation {
+  valid: boolean
+  provider?: string
+}
+
+/** Validates segment creation prerequisites */
+function validateSegmentCreation(
+  segment: MediaSegmentDto,
+  providerId?: string,
+): SegmentValidation {
+  const provider = providerId ?? useAppStore.getState().providerId
+
+  if (!provider || !isValidProviderId(provider)) {
+    console.error('Invalid or missing provider ID')
+    return { valid: false }
   }
 
+  if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
+    console.error('Invalid or missing Item ID')
+    return { valid: false }
+  }
+
+  return { valid: true, provider }
+}
+
+/** Validates segment input data */
+function validateSegmentInput(input: CreateSegmentInput): boolean {
+  if (
+    !input.itemId ||
+    input.startSeconds < 0 ||
+    input.endSeconds < 0 ||
+    input.startSeconds >= input.endSeconds
+  ) {
+    console.error('Invalid segment input')
+    return false
+  }
+  return true
+}
+
+/** Validates segment deletion prerequisites */
+function validateSegmentDeletion(segment: MediaSegmentDto): boolean {
+  if (!segment.Id || !isValidItemId(segment.Id)) {
+    console.error('Invalid or missing segment ID')
+    return false
+  }
+  return true
+}
+
+export async function getSegmentsById(
+  itemId: string,
+  options?: SegmentApiOptions,
+): Promise<Array<MediaSegmentDto>> {
+  if (!itemId || options?.signal?.aborted) return []
+
   try {
-    const query = new URLSearchParams()
-    query.set('itemId', itemId)
+    const apis = getTypedApis()
+    if (!apis) return []
 
-    const response = await fetchWithAuth<MediaSegmentsResponse>(
-      `MediaSegments/${itemId}`,
-      query,
+    const { data } = await apis.mediaSegmentsApi.getItemSegments(
+      { itemId },
+      getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
     )
+    const segments = data.Items ?? []
 
-    const segments = response.Items ?? []
+    const validation = MediaSegmentArraySchema.safeParse(segments)
+    if (!validation.success)
+      logValidationWarning('Segment API', validation.error)
 
-    // Convert ticks to seconds for UI
-    return segments.map((segment) => ({
-      ...segment,
-      StartTicks: ticksToSeconds(segment.StartTicks),
-      EndTicks: ticksToSeconds(segment.EndTicks),
-    }))
+    return segments.map(toUiSegment)
   } catch (error) {
-    console.error('Failed to fetch segments:', error)
+    if (isAbortError(error)) return []
+    logApiError(
+      AppError.from(error, 'Failed to fetch segments'),
+      'Segments API',
+    )
     return []
   }
 }
 
-/**
- * Creates a new segment on the server.
- * Converts seconds to ticks for server storage.
- * @param segment - Segment data with times in seconds
- * @param providerId - Provider ID for the segment
- * @returns Created segment or false on failure
- */
 export async function createSegment(
   segment: MediaSegmentDto,
   providerId?: string,
+  options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  const provider = providerId ?? useAppStore.getState().providerId
+  const validation = validateSegmentCreation(segment, providerId)
+  if (!validation.valid) return false
 
-  if (!provider) {
-    console.error('Provider ID is required to create a segment')
-    return false
+  if (options?.signal?.aborted) return false
+
+  const apis = getTypedApis()
+  if (!apis) return false
+
+  // Security: Properly encode URL parameters to prevent injection
+  const url = `${getServerBaseUrl()}/MediaSegmentsApi/${encodeUrlParam(segment.ItemId!)}?providerId=${encodeUrlParam(validation.provider!)}`
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(getAccessToken()),
   }
 
-  if (!segment.ItemId) {
-    console.error('Item ID is required to create a segment')
-    return false
-  }
+  const result = await withRetryOrFalse(async () => {
+    const { data } = await apis.api.axiosInstance.post<MediaSegmentDto>(
+      url,
+      toServerSegment(segment),
+      { headers, ...getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS) },
+    )
+    return toUiSegment(data)
+  }, getRetryOptions(options))
 
-  // Generate UUID if not provided
-  const segmentId = segment.Id || generateUUID()
-
-  // Convert seconds to ticks for server
-  const serverSegment: MediaSegmentDto = {
-    ...segment,
-    Id: segmentId,
-    StartTicks: secondsToTicks(segment.StartTicks ?? 0),
-    EndTicks: secondsToTicks(segment.EndTicks ?? 0),
-  }
-
-  const query = new URLSearchParams()
-  query.set('providerId', provider)
-
-  const result = await postJson<MediaSegmentDto>(
-    `MediaSegmentsApi/${segment.ItemId}`,
-    serverSegment,
-    query,
-  )
-
-  if (result === false) {
-    return false
-  }
-
-  // Return segment with times converted back to seconds
-  return {
-    ...result,
-    StartTicks: ticksToSeconds(result.StartTicks),
-    EndTicks: ticksToSeconds(result.EndTicks),
-  }
+  if (result === false) console.error('Failed to create segment after retries')
+  return result
 }
 
-/**
- * Creates a new segment from input data.
- * Generates a UUID and handles tick conversion.
- * @param input - Segment creation input
- * @param providerId - Optional provider ID override
- * @returns Created segment or false on failure
- */
 export async function createSegmentFromInput(
   input: CreateSegmentInput,
   providerId?: string,
+  options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  const segment: MediaSegmentDto = {
-    Id: generateUUID(),
-    ItemId: input.itemId,
-    Type: input.type,
-    StartTicks: input.startSeconds,
-    EndTicks: input.endSeconds,
-  }
+  if (!validateSegmentInput(input)) return false
 
-  return createSegment(segment, providerId)
+  return createSegment(
+    {
+      Id: generateUUID(),
+      ItemId: input.itemId,
+      Type: input.type,
+      StartTicks: input.startSeconds,
+      EndTicks: input.endSeconds,
+    },
+    providerId,
+    options,
+  )
 }
 
-/**
- * Deletes a segment from the server.
- * @param segment - Segment to delete
- * @returns True if deletion was successful
- */
 export async function deleteSegment(
   segment: MediaSegmentDto,
+  options?: SegmentApiOptions,
 ): Promise<boolean> {
-  if (!segment.Id) {
-    console.error('Segment ID is required for deletion')
-    return false
+  if (!validateSegmentDeletion(segment)) return false
+
+  if (options?.signal?.aborted) return false
+
+  const apis = getTypedApis()
+  if (!apis) return false
+
+  // Security: Properly encode URL parameters to prevent injection
+  const params = new URLSearchParams()
+  if (segment.ItemId && isValidItemId(segment.ItemId)) {
+    params.set('itemId', segment.ItemId)
   }
-
-  const query = new URLSearchParams()
-
-  if (segment.ItemId) {
-    query.set('itemId', segment.ItemId)
-  }
-
   if (segment.Type != null) {
-    query.set('type', String(segment.Type))
+    params.set('type', String(segment.Type))
   }
 
-  const result = await deleteJson(
-    `MediaSegmentsApi/${segment.Id}`,
-    undefined,
-    query,
-  )
+  const url = `${getServerBaseUrl()}/MediaSegmentsApi/${encodeUrlParam(segment.Id!)}?${params}`
 
-  return result === true || (typeof result === 'object' && result !== null)
+  const result = await withRetryOrFalse(async () => {
+    await apis.api.axiosInstance.delete(url, {
+      headers: getAuthHeaders(getAccessToken()),
+      ...getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
+    })
+    return true
+  }, getRetryOptions(options))
+
+  if (result === false) console.error('Failed to delete segment after retries')
+  return result !== false
 }
 
-/**
- * Updates a segment by deleting the old one and creating a new one.
- * This is the pattern used by the Jellyfin API.
- * @param oldSegment - Existing segment to replace
- * @param newSegment - New segment data
- * @param providerId - Optional provider ID override
- * @returns Updated segment or false on failure
- */
 export async function updateSegment(
   oldSegment: MediaSegmentDto,
   newSegment: MediaSegmentDto,
   providerId?: string,
+  options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  // Delete the old segment first
-  const deleted = await deleteSegment(oldSegment)
-
-  if (!deleted) {
-    console.error('Failed to delete old segment during update')
-    return false
-  }
-
-  // Create the new segment
-  return createSegment(newSegment, providerId)
+  if (options?.signal?.aborted) return false
+  const deleted = await deleteSegment(oldSegment, options)
+  if (!deleted || options?.signal?.aborted) return false
+  return createSegment(newSegment, providerId, options)
 }
 
-/**
- * Batch saves segments by deleting existing ones and creating new ones.
- * @param itemId - Item ID for the segments
- * @param existingSegments - Segments to delete
- * @param newSegments - Segments to create
- * @param providerId - Optional provider ID override
- * @returns Array of created segments
- */
 export async function batchSaveSegments(
   itemId: string,
   existingSegments: Array<MediaSegmentDto>,
   newSegments: Array<MediaSegmentDto>,
   providerId?: string,
+  options?: SegmentApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
-  // Delete all existing segments
-  const deletePromises = existingSegments.map((segment) =>
-    deleteSegment(segment),
-  )
-  await Promise.all(deletePromises)
+  if (options?.signal?.aborted) return []
 
-  // Create all new segments
-  const createPromises = newSegments.map((segment) =>
-    createSegment(
-      {
-        ...segment,
-        ItemId: itemId,
-        Id: segment.Id || generateUUID(),
-      },
-      providerId,
+  // Delete existing segments (continue on partial failure)
+  const deleteResults = await Promise.allSettled(
+    existingSegments.map((s) => deleteSegment(s, options)),
+  )
+  const failures = deleteResults.filter((r) => r.status === 'rejected').length
+  if (failures > 0) console.warn(`${failures} segment deletions failed`)
+
+  if (options?.signal?.aborted) return []
+
+  // Create new segments
+  const createResults = await Promise.allSettled(
+    newSegments.map((s) =>
+      createSegment(
+        { ...s, ItemId: itemId, Id: s.Id || generateUUID() },
+        providerId,
+        options,
+      ),
     ),
   )
 
-  const results = await Promise.all(createPromises)
-
-  // Filter out failed creations
-  return results.filter((result): result is MediaSegmentDto => result !== false)
+  return createResults
+    .filter(
+      (r): r is PromiseFulfilledResult<MediaSegmentDto | false> =>
+        r.status === 'fulfilled',
+    )
+    .map((r) => r.value)
+    .filter((v): v is MediaSegmentDto => v !== false)
 }

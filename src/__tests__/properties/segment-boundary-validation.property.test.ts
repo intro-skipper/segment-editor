@@ -9,10 +9,7 @@
 import { describe, it } from 'vitest'
 import * as fc from 'fast-check'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import {
-  validateSegment,
-  validateSegmentWithDuration,
-} from '@/lib/segment-utils'
+import { validateSegment } from '@/lib/segment-utils'
 
 /** Valid segment types for testing */
 const SEGMENT_TYPES: Array<MediaSegmentType> = [
@@ -413,7 +410,7 @@ describe('Segment Boundary Validation', () => {
             EndTicks: maxDuration + 100,
           }
 
-          const result = validateSegmentWithDuration(testSegment, maxDuration)
+          const result = validateSegment(testSegment, maxDuration)
           return (
             result.valid === false &&
             result.error === 'End time exceeds media duration'
@@ -447,7 +444,7 @@ describe('Segment Boundary Validation', () => {
             return true // Skip invalid test cases
           }
 
-          const result = validateSegmentWithDuration(testSegment, maxDuration)
+          const result = validateSegment(testSegment, maxDuration)
           return result.valid === true
         },
       ),

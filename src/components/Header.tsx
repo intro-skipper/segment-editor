@@ -1,345 +1,105 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useParams,
-} from '@tanstack/react-router'
+/**
+ * Header - Minimal navigation header
+ * Single-responsibility: Navigation + collection selection + settings access
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Home, Scissors, Search, Settings, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Search, Settings } from 'lucide-react'
 import { useShallow } from 'zustand/shallow'
 
-import type { BaseItemDto } from '@/types/jellyfin'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from '@/components/ui/combobox'
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections } from '@/hooks/queries/use-collections'
-import { useAllEpisodes, useItem, useItems } from '@/hooks/queries/use-items'
+import { useItem } from '@/hooks/queries/use-items'
+import { formatEpisodeLabel } from '@/lib/header-utils'
 import { cn } from '@/lib/utils'
+import { CommandPalette } from '@/components/header/CommandPalette'
+import { EpisodeSwitcher } from '@/components/header/EpisodeSwitcher'
 
 // ============================================================================
-// Types
+// Sub-Components (inline for performance - avoids memo overhead for simple UI)
 // ============================================================================
 
-type PageType = 'home' | 'player' | 'album' | 'artist' | 'series'
-
-interface QuickSwitchProps {
-  itemId: string
-  currentItemName: string
-  isEpisode: boolean
-  seriesId: string | null | undefined
-  selectedCollection: string | null
+interface CollectionSelectorProps {
+  collections: Array<{ ItemId?: string | null; Name?: string | null }>
+  selectedId: string | null
+  onSelect: (id: string | null) => void
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/** Determine page type from pathname */
-function getPageType(pathname: string): PageType {
-  if (pathname === '/') return 'home'
-  if (pathname.startsWith('/player/')) return 'player'
-  if (pathname.startsWith('/album/')) return 'album'
-  if (pathname.startsWith('/artist/')) return 'artist'
-  if (pathname.startsWith('/series/')) return 'series'
-  return 'home'
-}
-
-/** Format episode label (S1E2 format) */
-function formatEpisodeLabel(item: BaseItemDto | null): string | null {
-  if (!item) return null
-  const { ParentIndexNumber: season, IndexNumber: episode, Name: name } = item
-
-  if (season !== undefined && episode !== undefined) {
-    const label = `S${season}E${episode}`
-    return name && !name.toLowerCase().startsWith('episode')
-      ? `${label} ${name}`
-      : label
-  }
-  return name || null
-}
-
-/** Format item for combobox display */
-function formatComboboxItem(item: BaseItemDto, isEpisode: boolean): string {
-  if (isEpisode && item.Type === 'Episode') {
-    const { ParentIndexNumber: s, IndexNumber: e, Name } = item
-    if (s !== undefined && e !== undefined) {
-      return `S${s}E${e} ${Name || ''}`
-    }
-  }
-  return item.Name || ''
-}
-
-/** Get route for item type */
-function getItemRoute(itemType: string | undefined): string {
-  switch (itemType?.toLowerCase()) {
-    case 'series':
-      return '/series/$itemId'
-    case 'musicalbum':
-    case 'album':
-      return '/album/$itemId'
-    case 'musicartist':
-      return '/artist/$itemId'
-    default:
-      return '/player/$itemId'
-  }
-}
-
-// ============================================================================
-// Sub-Components
-// ============================================================================
-
-/** Quick switch combobox - isolated to prevent parent re-renders */
-const QuickSwitch = memo(function QuickSwitch({
-  itemId,
-  currentItemName,
-  isEpisode,
-  seriesId,
-  selectedCollection,
-}: QuickSwitchProps) {
+/** Collection dropdown - extracted props to avoid internal store subscriptions */
+function CollectionSelector({
+  collections,
+  selectedId,
+  onSelect,
+}: CollectionSelectorProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
+  const currentName = collections.find((c) => c.ItemId === selectedId)?.Name
 
-  // Only fetch when dropdown is open (lazy loading)
-  const { data: episodeItems, isLoading: loadingEpisodes } = useAllEpisodes(
-    seriesId ?? '',
-    { enabled: open && !!seriesId && isEpisode },
-  )
-
-  const { data: collectionItems, isLoading: loadingCollection } = useItems({
-    parentId: selectedCollection ?? '',
-    enabled: open && !!selectedCollection && !isEpisode,
-  })
-
-  const items = isEpisode ? episodeItems : collectionItems
-  const isLoading = isEpisode ? loadingEpisodes : loadingCollection
-
-  // Memoized filtered items
-  const filteredItems = useMemo(() => {
-    if (!items) return []
-    if (!search.trim()) return items.slice(0, 30)
-    const lowerSearch = search.toLowerCase()
-    return items
-      .filter((item) => item.Name?.toLowerCase().includes(lowerSearch))
-      .slice(0, 30)
-  }, [items, search])
-
+  // Handle collection selection - navigate to update URL which syncs to store
   const handleSelect = useCallback(
-    (newItemId: string | null) => {
-      if (!newItemId || !items) return
-      const item = items.find((i) => i.Id === newItemId)
-      if (!item) return
-
-      if (isEpisode) {
-        navigate({
-          to: '/player/$itemId',
-          params: { itemId: newItemId },
-          search: { fetchSegments: 'true' },
-        })
-      } else {
-        navigate({
-          to: getItemRoute(item.Type),
-          params: { itemId: newItemId },
-        })
-      }
-      setOpen(false)
-      setSearch('')
+    (id: string | null) => {
+      // Update store for immediate UI feedback
+      onSelect(id)
+      // Navigate to update URL (source of truth)
+      navigate({
+        to: '/',
+        search: {
+          collection: id ?? undefined,
+          page: undefined,
+          search: undefined,
+        },
+      })
     },
-    [items, isEpisode, navigate],
+    [onSelect, navigate],
   )
-
-  return (
-    <Combobox
-      open={open}
-      onOpenChange={setOpen}
-      value={itemId}
-      onValueChange={handleSelect}
-    >
-      <ComboboxInput
-        placeholder={currentItemName}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        showTrigger
-        showClear={false}
-        className="h-7 w-auto min-w-[100px] max-w-[140px] sm:max-w-[200px] text-sm border-none bg-transparent hover:bg-accent/50 rounded-md transition-colors [&_input]:text-foreground [&_input]:placeholder:text-foreground [&_input]:font-normal"
-      />
-      <ComboboxContent className="w-[300px]">
-        <ComboboxList>
-          {isLoading ? (
-            <div className="py-4 text-center text-sm text-muted-foreground">
-              {t('common.loading', { defaultValue: 'Loading...' })}
-            </div>
-          ) : filteredItems.length > 0 ? (
-            filteredItems.map((item) => (
-              <ComboboxItem key={item.Id} value={item.Id ?? ''}>
-                <span className="truncate">
-                  {formatComboboxItem(item, isEpisode)}
-                </span>
-              </ComboboxItem>
-            ))
-          ) : search ? (
-            <div className="py-4 text-center text-sm text-muted-foreground">
-              {t('items.noResults', { defaultValue: 'No items found' })}
-            </div>
-          ) : null}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
-  )
-})
-
-/** Expandable search input */
-const SearchInput = memo(function SearchInput() {
-  const { t } = useTranslation()
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const { searchExpanded, searchFilter, setSearchExpanded, setSearchFilter } =
-    useSessionStore(
-      useShallow((state) => ({
-        searchExpanded: state.searchExpanded,
-        searchFilter: state.searchFilter,
-        setSearchExpanded: state.setSearchExpanded,
-        setSearchFilter: state.setSearchFilter,
-      })),
-    )
-
-  // Focus input when expanded
-  useEffect(() => {
-    if (searchExpanded) {
-      inputRef.current?.focus()
-    }
-  }, [searchExpanded])
-
-  const handleToggle = useCallback(() => {
-    if (searchExpanded) {
-      setSearchExpanded(false)
-      setSearchFilter('')
-    } else {
-      setSearchExpanded(true)
-    }
-  }, [searchExpanded, setSearchExpanded, setSearchFilter])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSearchExpanded(false)
-        setSearchFilter('')
-      }
-    },
-    [setSearchExpanded, setSearchFilter],
-  )
-
-  const handleBlur = useCallback(() => {
-    if (!searchFilter.trim()) {
-      setSearchExpanded(false)
-    }
-  }, [searchFilter, setSearchExpanded])
-
-  if (!searchExpanded) {
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleToggle}
-        aria-label={t('items.filter.name')}
-        className="size-8 text-muted-foreground hover:text-foreground"
-      >
-        <Search className="size-4" />
-      </Button>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-1 w-full sm:w-auto">
-      <div className="relative flex-1 sm:w-64">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-        <Input
-          ref={inputRef}
-          type="text"
-          placeholder={t('items.filter.name')}
-          value={searchFilter}
-          onChange={(e) => setSearchFilter(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          className="pl-8 pr-8 h-8 bg-background border-border/50"
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleToggle}
-          className="absolute right-0 top-0 size-8 text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-    </div>
-  )
-})
-
-/** Collection dropdown selector */
-const CollectionSelector = memo(function CollectionSelector() {
-  const { t } = useTranslation()
-  const { data: collections } = useCollections()
-
-  const { selectedCollection, setSelectedCollection } = useSessionStore(
-    useShallow((state) => ({
-      selectedCollection: state.selectedCollectionId,
-      setSelectedCollection: state.setSelectedCollectionId,
-    })),
-  )
-
-  const currentName = useMemo(
-    () => collections?.find((c) => c.ItemId === selectedCollection)?.Name,
-    [collections, selectedCollection],
-  )
-
-  if (!collections?.length) return null
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 h-7 px-2 text-sm font-normal text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors">
-        {currentName || t('items.filter.collection')}
-        <ChevronDown className="size-3.5" />
+      <DropdownMenuTrigger
+        className="flex items-center gap-3 hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+        aria-label={t('items.filter.selectCollection', 'Select collection')}
+      >
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+          {currentName ?? t('items.filter.collection', 'All Libraries')}
+        </h1>
+        <ChevronDown className="size-5 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {collections.map((collection) => (
+      <DropdownMenuContent
+        align="start"
+        className="min-w-[var(--spacing-dropdown-min)]"
+      >
+        {collections.map((c, index) => (
           <DropdownMenuItem
-            key={collection.ItemId}
-            onClick={() => setSelectedCollection(collection.ItemId || null)}
-            className={
-              selectedCollection === collection.ItemId ? 'bg-accent' : ''
-            }
+            key={c.ItemId ?? c.Name ?? `collection-${index}`}
+            onClick={() => handleSelect(c.ItemId ?? null)}
+            className={cn(
+              'cursor-pointer',
+              selectedId === c.ItemId && 'bg-primary/10 text-primary',
+            )}
           >
-            {collection.Name}
+            {c.Name}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
-})
+}
+
+/** Shared styles for icon buttons */
+const iconButtonClass = cn(
+  'size-11 rounded-full',
+  'transition-colors duration-150',
+  'focus-visible:ring-2 focus-visible:ring-ring',
+)
 
 // ============================================================================
 // Main Component
@@ -348,205 +108,223 @@ const CollectionSelector = memo(function CollectionSelector() {
 export default function Header() {
   const { t } = useTranslation()
   const location = useLocation()
+  const navigate = useNavigate()
   const params = useParams({ strict: false })
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
-  const { toggleSettings, searchExpanded, selectedCollection } =
-    useSessionStore(
-      useShallow((state) => ({
-        toggleSettings: state.toggleSettings,
-        searchExpanded: state.searchExpanded,
-        selectedCollection: state.selectedCollectionId,
-      })),
-    )
+  // Single store subscription - extract all needed values at once
+  const {
+    toggleSettings,
+    selectedCollection,
+    setSelectedCollection,
+    vibrantColors,
+  } = useSessionStore(
+    useShallow((s) => ({
+      toggleSettings: s.toggleSettings,
+      selectedCollection: s.selectedCollectionId,
+      setSelectedCollection: s.setSelectedCollectionId,
+      vibrantColors: s.vibrantColors,
+    })),
+  )
+
+  // Collections query
+  const { data: collections } = useCollections()
 
   // Derived state
   const itemId = (params as { itemId?: string }).itemId
-  const pageType = getPageType(location.pathname)
-  const isHome = pageType === 'home'
-  const isDetailPage = pageType !== 'home'
-
-  // Fetch collections (needed for breadcrumb on detail pages)
-  const { data: collections } = useCollections()
+  const isDetailPage = location.pathname !== '/'
 
   // Fetch current item only on detail pages
   const { data: currentItem } = useItem(itemId ?? '', {
     enabled: isDetailPage && !!itemId,
   })
 
-  // Episode detection
-  const isEpisode = currentItem?.Type === 'Episode' || !!currentItem?.SeriesId
-  const seriesId = currentItem?.SeriesId
+  // Compute page title and check if on player page - memoized to avoid recalculation
+  const { pageTitle, isEpisode, seriesId, isPlayerPage } = useMemo(() => {
+    const onPlayerPage = location.pathname.startsWith('/player/')
 
-  // Fetch parent series only for episodes (for breadcrumb)
-  const { data: parentSeries } = useItem(seriesId ?? '', {
-    enabled: isEpisode && !!seriesId,
-  })
+    if (!currentItem)
+      return {
+        pageTitle: '',
+        isEpisode: false,
+        seriesId: undefined,
+        isPlayerPage: onPlayerPage,
+      }
 
-  // Memoized derived values
-  const currentCollectionName = useMemo(
-    () => collections?.find((c) => c.ItemId === selectedCollection)?.Name,
-    [collections, selectedCollection],
-  )
+    const isEp = currentItem.Type === 'Episode' || !!currentItem.SeriesId
+    const title = isEp
+      ? (formatEpisodeLabel(currentItem) ?? currentItem.Name ?? '')
+      : (currentItem.Name ?? currentItem.SeriesName ?? '')
 
-  const seriesName = useMemo(
-    () => (isEpisode ? currentItem.SeriesName || parentSeries?.Name : null),
-    [isEpisode, currentItem?.SeriesName, parentSeries?.Name],
-  )
-
-  const currentItemName = useMemo(
-    () =>
-      isEpisode
-        ? formatEpisodeLabel(currentItem)
-        : currentItem?.Name || currentItem?.SeriesName,
-    [isEpisode, currentItem],
-  )
-
-  // Close search on navigation away from home
-  const setSearchExpanded = useSessionStore((state) => state.setSearchExpanded)
-  useEffect(() => {
-    if (!isHome) {
-      setSearchExpanded(false)
+    return {
+      pageTitle: title,
+      isEpisode: isEp,
+      seriesId: currentItem.SeriesId,
+      isPlayerPage: onPlayerPage,
     }
-  }, [location.pathname, isHome, setSearchExpanded])
+  }, [currentItem, location.pathname])
 
-  // Page type labels for breadcrumb fallback
-  const pageLabels: Record<PageType, string> = {
-    home: '',
-    player: t('player.title', 'Player'),
-    album: t('album.title', 'Album'),
-    artist: t('artist.title', 'Artist'),
-    series: t('series.title', 'Series'),
-  }
+  // Keyboard shortcut for command palette (Cmd/Ctrl+K or /)
+  useEffect(() => {
+    const controller = new AbortController()
+
+    document.addEventListener(
+      'keydown',
+      (e: KeyboardEvent) => {
+        const isSearchShortcut =
+          (e.key === 'k' && (e.metaKey || e.ctrlKey)) ||
+          (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey)
+
+        if (!isSearchShortcut) return
+
+        const target = e.target as HTMLElement
+        const isEditable =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+
+        if (isEditable) return
+
+        e.preventDefault()
+        setCommandPaletteOpen(true)
+      },
+      { signal: controller.signal },
+    )
+
+    return () => controller.abort()
+  }, [])
+
+  // Back navigation - go to series page if viewing episode, otherwise home with collection preserved
+  const handleBack = useCallback(() => {
+    if (isEpisode && seriesId) {
+      navigate({ to: '/series/$itemId', params: { itemId: seriesId } })
+    } else {
+      // Preserve selected collection when going back to home
+      navigate({
+        to: '/',
+        search: selectedCollection
+          ? { collection: selectedCollection }
+          : undefined,
+      })
+    }
+  }, [isEpisode, seriesId, navigate, selectedCollection])
+
+  // Memoize style objects to prevent re-renders
+  const headerStyle = useMemo(
+    () =>
+      vibrantColors
+        ? ({
+            backgroundColor: `${vibrantColors.background}99`,
+          } as React.CSSProperties)
+        : undefined,
+    [vibrantColors],
+  )
+
+  const accentButtonStyle = useMemo(
+    () =>
+      vibrantColors
+        ? {
+            backgroundColor: vibrantColors.accent,
+            color: vibrantColors.accentText,
+          }
+        : undefined,
+    [vibrantColors],
+  )
 
   return (
-    <header className="h-12 px-3 flex items-center justify-between bg-background/95 backdrop-blur-sm border-b border-border/40 sticky top-0 z-50 overflow-hidden">
-      {/* Left: Logo + Breadcrumb */}
-      <div
-        className={cn(
-          'flex items-center gap-2 min-w-0 flex-1 overflow-hidden transition-opacity duration-200',
-          searchExpanded &&
-            'opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto',
-        )}
+    <>
+      <header
+        className="sticky top-0 z-40 backdrop-blur-xl"
+        role="banner"
+        style={headerStyle}
       >
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 shrink-0 group">
-          <div className="size-7 rounded-md bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-            <Scissors className="size-4 text-primary-foreground" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight hidden sm:inline group-hover:text-primary transition-colors">
-            {t('app.title')}
-          </span>
-        </Link>
-
-        {/* Breadcrumb Navigation */}
-        {isDetailPage && (
-          <>
-            <BreadcrumbSeparator className="text-muted-foreground/50 hidden sm:block" />
-            <Breadcrumb className="min-w-0 overflow-hidden">
-              <BreadcrumbList className="flex-nowrap overflow-hidden">
-                {/* Mobile: Home icon */}
-                <BreadcrumbItem className="sm:hidden">
-                  <BreadcrumbLink render={<Link to="/" />}>
-                    <Home className="size-4" />
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="sm:hidden" />
-
-                {/* Collection link (desktop) */}
-                {currentCollectionName && (
-                  <>
-                    <BreadcrumbItem className="hidden sm:inline-flex">
-                      <BreadcrumbLink
-                        render={<Link to="/" />}
-                        className="max-w-[80px] truncate text-xs"
-                      >
-                        {currentCollectionName}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="hidden sm:block" />
-                  </>
-                )}
-
-                {/* Series link (for episodes) */}
-                {isEpisode && seriesName && seriesId && (
-                  <>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink
-                        render={
-                          <Link
-                            to="/series/$itemId"
-                            params={{ itemId: seriesId }}
-                          />
-                        }
-                        className="max-w-[100px] sm:max-w-[140px] truncate"
-                      >
-                        {seriesName}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                  </>
-                )}
-
-                {/* Current item with quick switch */}
-                <BreadcrumbItem>
-                  {currentItemName && itemId ? (
-                    <QuickSwitch
-                      itemId={itemId}
-                      currentItemName={currentItemName}
-                      isEpisode={isEpisode}
-                      seriesId={seriesId}
-                      selectedCollection={selectedCollection}
+        <nav
+          className="px-4 py-4 sm:px-6"
+          role="navigation"
+          aria-label={t('accessibility.navigation', 'Main navigation')}
+        >
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Navigation / Collection selector */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              {isDetailPage ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleBack}
+                    className={cn(
+                      iconButtonClass,
+                      !vibrantColors && 'bg-secondary/80 hover:bg-secondary',
+                      'active:scale-95',
+                    )}
+                    style={accentButtonStyle}
+                    aria-label={t('navigation.back', 'Go back')}
+                  >
+                    <ChevronLeft className="size-5" aria-hidden />
+                  </Button>
+                  {/* Episode switcher replaces title for episodes on player page */}
+                  {isPlayerPage && isEpisode && currentItem ? (
+                    <EpisodeSwitcher
+                      currentEpisode={currentItem}
+                      vibrantColors={vibrantColors}
+                      className="flex-1 min-w-0"
                     />
                   ) : (
-                    <BreadcrumbPage className="max-w-[150px] sm:max-w-[200px] truncate">
-                      {pageLabels[pageType]}
-                    </BreadcrumbPage>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+                      {pageTitle}
+                    </h1>
                   )}
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </>
-        )}
+                </>
+              ) : (
+                collections?.length && (
+                  <CollectionSelector
+                    collections={collections}
+                    selectedId={selectedCollection}
+                    onSelect={setSelectedCollection}
+                  />
+                )
+              )}
+            </div>
 
-        {/* Collection selector (home only) */}
-        {isHome && (
-          <>
-            <BreadcrumbSeparator className="text-muted-foreground/50 hidden sm:block" />
-            <CollectionSelector />
-          </>
-        )}
-      </div>
-
-      {/* Right: Search + Settings */}
-      <div className="flex items-center gap-1 shrink-0">
-        {/* Search (home only) */}
-        {isHome && selectedCollection && (
-          <div
-            className={cn(
-              'flex items-center transition-all duration-200 ease-out',
-              searchExpanded
-                ? 'absolute inset-x-3 sm:relative sm:inset-auto'
-                : '',
-            )}
-          >
-            <SearchInput />
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedCollection && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCommandPaletteOpen(true)}
+                  className={cn(
+                    iconButtonClass,
+                    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+                  )}
+                  style={accentButtonStyle}
+                  aria-label={t('search.open', 'Open search')}
+                >
+                  <Search className="size-5" aria-hidden />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSettings}
+                className={cn(
+                  iconButtonClass,
+                  !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+                )}
+                style={accentButtonStyle}
+                aria-label={t('settings.open', 'Open settings')}
+              >
+                <Settings className="size-5" aria-hidden />
+              </Button>
+            </div>
           </div>
-        )}
+        </nav>
+      </header>
 
-        {/* Settings */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSettings}
-          aria-label={t('app.theme.title')}
-          className={cn(
-            'size-8 text-muted-foreground hover:text-foreground shrink-0',
-            searchExpanded && 'hidden sm:flex',
-          )}
-        >
-          <Settings className="size-4" />
-        </Button>
-      </div>
-    </header>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+      />
+    </>
   )
 }

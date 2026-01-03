@@ -11,13 +11,11 @@ import * as fc from 'fast-check'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
+import { AxiosError } from 'axios'
+import type { AxiosRequestConfig } from 'axios'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { useDeleteSegment } from '@/hooks/mutations/use-segment-mutations'
 import { segmentsKeys } from '@/hooks/queries/use-segments'
-
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch
 
 // Track DELETE requests for verification
 interface DeleteRequest {
@@ -28,6 +26,40 @@ interface DeleteRequest {
 }
 
 const deleteRequests: Array<DeleteRequest> = []
+
+// Mock axios instance used by SDK
+const mockAxiosInstance = {
+  delete: vi.fn(),
+  get: vi.fn(),
+  post: vi.fn(),
+  defaults: { headers: { common: {} } },
+}
+
+// Mock the SDK module - must provide both getTypedApis and api accessor structure
+vi.mock('@/services/jellyfin/sdk', () => ({
+  getTypedApis: vi.fn(() => ({
+    itemsApi: {},
+    libraryApi: {},
+    tvShowsApi: {},
+    imageApi: {},
+    videosApi: {},
+    pluginsApi: {},
+    mediaSegmentsApi: {},
+    systemApi: {},
+    api: {
+      basePath: 'http://localhost:8096',
+      axiosInstance: mockAxiosInstance,
+    },
+  })),
+  buildUrl: vi.fn((path: string) => `http://localhost:8096${path}`),
+  getApi: vi.fn(() => ({
+    basePath: 'http://localhost:8096',
+    axiosInstance: mockAxiosInstance,
+  })),
+  getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
+  getAccessToken: vi.fn(() => 'test-token'),
+  resetSdkState: vi.fn(),
+}))
 
 // Custom arbitrary for hex strings
 const hexStringArb = (length: number) =>
@@ -94,14 +126,19 @@ function createWrapper() {
   }
 }
 
-// Setup mock fetch to track DELETE requests
-function setupMockFetch(success: boolean = true): void {
-  mockFetch.mockImplementation((url: string, options?: RequestInit) => {
-    // Track DELETE requests
-    if (options?.method === 'DELETE') {
+// Setup mock axios to track DELETE requests
+function setupMockAxios(success: boolean = true): void {
+  mockAxiosInstance.delete.mockImplementation(
+    (url: string, _config?: AxiosRequestConfig) => {
+      // Parse URL to extract segment ID and query params
       const urlObj = new URL(url, 'http://localhost:8096')
       const pathParts = urlObj.pathname.split('/')
-      const segmentId = pathParts[pathParts.length - 1]
+      // Segment ID is after 'MediaSegmentsApi' in the path
+      const segmentIdPart = pathParts[pathParts.length - 1]
+      // Remove query string from segment ID if present
+      const segmentId = segmentIdPart.split('?')[0]
+
+      // Get query params from URL (segments API puts them in URL)
       const itemId = urlObj.searchParams.get('itemId') ?? undefined
       const type = urlObj.searchParams.get('type') ?? undefined
 
@@ -111,31 +148,33 @@ function setupMockFetch(success: boolean = true): void {
         itemId,
         type,
       })
-    }
 
-    if (success) {
-      return Promise.resolve({
-        ok: true,
-        status: 204,
-        statusText: 'No Content',
-        json: () => Promise.resolve({}),
-        text: () => Promise.resolve(''),
-      })
-    } else {
-      return Promise.resolve({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: () => Promise.resolve({ message: 'Server Error' }),
-        text: () => Promise.resolve('Server Error'),
-      })
-    }
-  })
+      if (success) {
+        return Promise.resolve({
+          data: {},
+          status: 204,
+          statusText: 'No Content',
+        })
+      } else {
+        const error = new AxiosError('Server Error')
+        error.response = {
+          status: 500,
+          data: { message: 'Server Error' },
+          statusText: 'Internal Server Error',
+          headers: {},
+          config: {} as never,
+        }
+        return Promise.reject(error)
+      }
+    },
+  )
 }
 
 describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
-    mockFetch.mockClear()
+    mockAxiosInstance.delete.mockClear()
+    mockAxiosInstance.get.mockClear()
+    mockAxiosInstance.post.mockClear()
     deleteRequests.length = 0
   })
 
@@ -153,10 +192,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous requests
         deleteRequests.length = 0
-        mockFetch.mockClear()
+        mockAxiosInstance.delete.mockClear()
 
         // Setup successful delete response
-        setupMockFetch(true)
+        setupMockAxios(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -203,10 +242,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous state
         deleteRequests.length = 0
-        mockFetch.mockClear()
+        mockAxiosInstance.delete.mockClear()
 
         // Setup successful delete response
-        setupMockFetch(true)
+        setupMockAxios(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -264,10 +303,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous state
         deleteRequests.length = 0
-        mockFetch.mockClear()
+        mockAxiosInstance.delete.mockClear()
 
         // Setup successful delete response
-        setupMockFetch(true)
+        setupMockAxios(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -313,13 +352,19 @@ describe('Segment Deletion State Synchronization', () => {
         fc
           .array(segmentArb, { minLength: 2, maxLength: 5 })
           .chain((segments) => {
-            // Ensure all segments have unique IDs and same ItemId
+            // Ensure all segments have same ItemId but unique valid UUIDs
             const itemId = segments[0].ItemId
-            const uniqueSegments = segments.map((s, i) => ({
-              ...s,
-              Id: `${s.Id}-${i}`, // Make IDs unique
-              ItemId: itemId, // Same ItemId for all
-            }))
+            // Generate unique UUIDs for each segment by using different random values
+            const uniqueSegments = segments.map((s, i) => {
+              // Create a valid UUID v4 with unique values based on index
+              const hexIndex = i.toString(16).padStart(4, '0')
+              const uniqueId = `${s.Id!.slice(0, 9)}${hexIndex}${s.Id!.slice(13)}`
+              return {
+                ...s,
+                Id: uniqueId,
+                ItemId: itemId, // Same ItemId for all
+              }
+            })
             return fc.constant(uniqueSegments)
           }),
         fc.integer({ min: 0, max: 4 }),
@@ -331,10 +376,10 @@ describe('Segment Deletion State Synchronization', () => {
 
           // Clear previous state
           deleteRequests.length = 0
-          mockFetch.mockClear()
+          mockAxiosInstance.delete.mockClear()
 
           // Setup successful delete response
-          setupMockFetch(true)
+          setupMockAxios(true)
 
           const { queryClient, wrapper } = createWrapper()
 

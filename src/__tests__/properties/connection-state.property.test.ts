@@ -9,11 +9,42 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
+import { AxiosError } from 'axios'
+import type { AxiosResponse } from 'axios'
 import { useApiStore } from '@/stores/api-store'
 
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+// Response type definitions for property testing
+type ResponseType =
+  | 'success'
+  | 'auth_failure'
+  | 'server_error'
+  | 'network_error'
+
+// Create mock system API that we can control per-test
+const mockGetSystemInfo = vi.fn()
+const mockSystemApi = { getSystemInfo: mockGetSystemInfo }
+const mockApis = {
+  systemApi: mockSystemApi,
+  itemsApi: {},
+  libraryApi: {},
+  tvShowsApi: {},
+  imageApi: {},
+  videosApi: {},
+  pluginsApi: {},
+  mediaSegmentsApi: {},
+  api: { basePath: 'http://localhost:8096', axiosInstance: {} },
+}
+
+// Mock the SDK module
+vi.mock('@/services/jellyfin/sdk', () => ({
+  getTypedApis: vi.fn(() => mockApis),
+  buildUrl: vi.fn((path: string) => `http://localhost:8096${path}`),
+  getApi: vi.fn(() => ({
+    basePath: 'http://localhost:8096',
+    axiosInstance: {},
+  })),
+  resetSdkState: vi.fn(),
+}))
 
 // Custom arbitrary for hex strings (API keys)
 const hexStringArb = (length: number) =>
@@ -24,73 +55,17 @@ const hexStringArb = (length: number) =>
     })
     .map((chars) => chars.join(''))
 
-// Response type definitions for property testing
-type ResponseType =
-  | 'success'
-  | 'auth_failure'
-  | 'server_error'
-  | 'network_error'
-
-interface MockResponse {
-  type: ResponseType
-  status: number
-  ok: boolean
-  body?: object
-}
-
-// Generate mock responses based on type
-function createMockResponse(type: ResponseType): MockResponse {
-  switch (type) {
-    case 'success':
-      return {
-        type,
-        status: 200,
-        ok: true,
-        body: { Version: '10.8.0' },
-      }
-    case 'auth_failure':
-      return {
-        type,
-        status: 401,
-        ok: false,
-        body: { message: 'Unauthorized' },
-      }
-    case 'server_error':
-      return {
-        type,
-        status: 500,
-        ok: false,
-        body: { message: 'Internal Server Error' },
-      }
-    case 'network_error':
-      return {
-        type,
-        status: 0,
-        ok: false,
-      }
-  }
-}
-
-// Setup mock fetch to return specific response
-function setupMockFetch(response: MockResponse): void {
-  if (response.type === 'network_error') {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
-  } else {
-    mockFetch.mockResolvedValueOnce({
-      ok: response.ok,
-      status: response.status,
-      statusText: response.status === 401 ? 'Unauthorized' : 'OK',
-      json: () => Promise.resolve(response.body),
-      text: () => Promise.resolve(JSON.stringify(response.body)),
-    })
-  }
-}
-
 describe('Connection State Management', () => {
   // Store original state
   let originalState: ReturnType<typeof useApiStore.getState>
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn> | undefined
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn> | undefined
 
   beforeEach(() => {
+    // Property tests intentionally explore failing states; keep output clean.
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
     // Save original state
     originalState = useApiStore.getState()
 
@@ -101,17 +76,61 @@ describe('Connection State Management', () => {
       serverVersion: '',
       validConnection: false,
       validAuth: false,
-      isPluginMode: false,
     })
 
-    // Clear mock
-    mockFetch.mockClear()
+    // Clear the mock
+    mockGetSystemInfo.mockReset()
   })
 
   afterEach(() => {
+    consoleErrorSpy?.mockRestore()
+    consoleWarnSpy?.mockRestore()
+
     // Restore original state
     useApiStore.setState(originalState)
   })
+
+  // Helper to setup mock SDK response
+  function setupMockSdkResponse(
+    type: ResponseType,
+    version: string = '10.8.0',
+  ) {
+    switch (type) {
+      case 'success':
+        mockGetSystemInfo.mockResolvedValueOnce({
+          data: { Version: version },
+          status: 200,
+        } as AxiosResponse)
+        break
+      case 'auth_failure': {
+        const authError = new AxiosError('Unauthorized')
+        authError.response = {
+          status: 401,
+          data: { message: 'Unauthorized' },
+          statusText: 'Unauthorized',
+          headers: {},
+          config: {} as never,
+        }
+        mockGetSystemInfo.mockRejectedValueOnce(authError)
+        break
+      }
+      case 'server_error': {
+        const serverError = new AxiosError('Server Error')
+        serverError.response = {
+          status: 500,
+          data: { message: 'Server Error' },
+          statusText: 'Internal Server Error',
+          headers: {},
+          config: {} as never,
+        }
+        mockGetSystemInfo.mockRejectedValueOnce(serverError)
+        break
+      }
+      case 'network_error':
+        mockGetSystemInfo.mockRejectedValueOnce(new AxiosError('Network Error'))
+        break
+    }
+  }
 
   /**
    * Property: Successful responses set validConnection and validAuth to true
@@ -119,7 +138,6 @@ describe('Connection State Management', () => {
    * a valid connection with valid authentication.
    */
   it('sets validConnection and validAuth to true on successful response', async () => {
-    // Import testConnection dynamically to use mocked fetch
     const { testConnection } = await import('@/services/jellyfin/client')
 
     await fc.assert(
@@ -130,7 +148,8 @@ describe('Connection State Management', () => {
           version: fc.stringMatching(/^\d+\.\d+\.\d+$/),
         }),
         async ({ serverAddress, apiKey, version }) => {
-          // Setup store with generated values
+          // Reset state for this iteration
+          mockGetSystemInfo.mockReset()
           useApiStore.setState({
             serverAddress,
             apiKey,
@@ -139,12 +158,7 @@ describe('Connection State Management', () => {
           })
 
           // Setup successful response
-          setupMockFetch({
-            type: 'success',
-            status: 200,
-            ok: true,
-            body: { Version: version },
-          })
+          setupMockSdkResponse('success', version)
 
           // Test connection
           const result = await testConnection()
@@ -168,7 +182,7 @@ describe('Connection State Management', () => {
   })
 
   /**
-   * Property: 401 responses set validAuth to false
+   * Property: 401 responses set validAuth to false but validConnection to true
    * For any 401 Unauthorized response, the store should reflect
    * that authentication has failed while connection may still be valid.
    */
@@ -182,7 +196,8 @@ describe('Connection State Management', () => {
           apiKey: hexStringArb(32),
         }),
         async ({ serverAddress, apiKey }) => {
-          // Setup store
+          // Reset state for this iteration
+          mockGetSystemInfo.mockReset()
           useApiStore.setState({
             serverAddress,
             apiKey,
@@ -191,18 +206,18 @@ describe('Connection State Management', () => {
           })
 
           // Setup 401 response
-          setupMockFetch(createMockResponse('auth_failure'))
+          setupMockSdkResponse('auth_failure')
 
           // Test connection
           const result = await testConnection()
 
           // Verify result - 401 means server is reachable but auth failed
-          expect(result.valid).toBe(false)
+          expect(result.valid).toBe(true)
           expect(result.authenticated).toBe(false)
 
           // Verify store state
           const state = useApiStore.getState()
-          expect(state.validConnection).toBe(false)
+          expect(state.validConnection).toBe(true)
           expect(state.validAuth).toBe(false)
 
           return true
@@ -214,7 +229,7 @@ describe('Connection State Management', () => {
 
   /**
    * Property: Network errors set both validConnection and validAuth to false
-   * For any network error (fetch throws), both connection and auth should be invalid.
+   * For any network error (axios throws), both connection and auth should be invalid.
    */
   it('sets validConnection and validAuth to false on network error', async () => {
     const { testConnection } = await import('@/services/jellyfin/client')
@@ -226,7 +241,8 @@ describe('Connection State Management', () => {
           apiKey: hexStringArb(32),
         }),
         async ({ serverAddress, apiKey }) => {
-          // Setup store with initially valid connection
+          // Reset state for this iteration
+          mockGetSystemInfo.mockReset()
           useApiStore.setState({
             serverAddress,
             apiKey,
@@ -235,7 +251,7 @@ describe('Connection State Management', () => {
           })
 
           // Setup network error
-          setupMockFetch(createMockResponse('network_error'))
+          setupMockSdkResponse('network_error')
 
           // Test connection
           const result = await testConnection()
@@ -269,10 +285,10 @@ describe('Connection State Management', () => {
         fc.record({
           serverAddress: fc.webUrl(),
           apiKey: hexStringArb(32),
-          errorStatus: fc.integer({ min: 500, max: 599 }),
         }),
-        async ({ serverAddress, apiKey, errorStatus }) => {
-          // Setup store
+        async ({ serverAddress, apiKey }) => {
+          // Reset state for this iteration
+          mockGetSystemInfo.mockReset()
           useApiStore.setState({
             serverAddress,
             apiKey,
@@ -281,14 +297,7 @@ describe('Connection State Management', () => {
           })
 
           // Setup server error response
-          mockFetch.mockResolvedValueOnce({
-            ok: false,
-            status: errorStatus,
-            statusText: 'Server Error',
-            json: () => Promise.resolve({ message: 'Server Error' }),
-            text: () =>
-              Promise.resolve(JSON.stringify({ message: 'Server Error' })),
-          })
+          setupMockSdkResponse('server_error')
 
           // Test connection
           const result = await testConnection()
@@ -326,7 +335,8 @@ describe('Connection State Management', () => {
       fc.asyncProperty(
         fc.array(responseTypeArb, { minLength: 1, maxLength: 5 }),
         async (responseSequence) => {
-          // Setup initial store state
+          // Reset state for this iteration
+          mockGetSystemInfo.mockReset()
           useApiStore.setState({
             serverAddress: 'http://localhost:8096',
             apiKey: 'test-key',
@@ -336,7 +346,7 @@ describe('Connection State Management', () => {
 
           // Process each response in sequence
           for (const responseType of responseSequence) {
-            setupMockFetch(createMockResponse(responseType))
+            setupMockSdkResponse(responseType)
             await testConnection()
           }
 
@@ -350,6 +360,9 @@ describe('Connection State Management', () => {
               expect(state.validAuth).toBe(true)
               break
             case 'auth_failure':
+              expect(state.validConnection).toBe(true)
+              expect(state.validAuth).toBe(false)
+              break
             case 'server_error':
             case 'network_error':
               expect(state.validConnection).toBe(false)
