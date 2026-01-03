@@ -77,7 +77,8 @@ export function useGridKeyboardNavigation({
     const item = gridRef.current.querySelector<HTMLElement>(
       `[data-grid-index="${focusedIndex}"]`,
     )
-    if (item && document.activeElement !== item) item.focus()
+    if (item && document.activeElement !== item)
+      item.focus({ preventScroll: true })
   }, [focusedIndex, enabled])
 
   const handleKeyDown = useCallback(

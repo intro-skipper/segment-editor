@@ -8,7 +8,6 @@ import { API_CONFIG } from './constants'
 import type { RetryOptions } from './retry-utils'
 import { getTypedApis } from '@/services/jellyfin/sdk'
 
-
 /** Common options for API operations */
 export interface ApiOptions {
   signal?: AbortSignal
