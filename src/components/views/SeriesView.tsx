@@ -63,7 +63,7 @@ const SeasonTabs = React.memo(function SeasonTabs({
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 scrollbar-hide"
       role="tablist"
       aria-label="Seasons"
     >
@@ -79,7 +79,7 @@ const SeasonTabs = React.memo(function SeasonTabs({
             aria-controls={`season-panel-${season.Id}`}
             onClick={() => season.Id && onSeasonSelect(season.Id)}
             className={cn(
-              'flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap',
+              'flex-shrink-0 px-4 py-3 md:px-6 md:py-4 rounded-full text-base md:text-lg font-semibold whitespace-nowrap',
               'transition-all duration-200 ease-out border-2',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               !hasColors &&
@@ -144,7 +144,7 @@ const EpisodeCard = React.memo(function EpisodeCard({
       animate
       animationDelay={animationDelay}
       className={cn(
-        'group flex items-center gap-4 p-3 rounded-2xl',
+        'group flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl',
         !vibrantColors && 'bg-card/60 backdrop-blur-sm',
         'hover:shadow-lg hover:shadow-black/10',
       )}
@@ -152,10 +152,10 @@ const EpisodeCard = React.memo(function EpisodeCard({
       aria-label={ariaLabel}
     >
       {/* Thumbnail */}
-      <div className="relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-muted shadow-md">
+      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
         <ItemImage
           item={episode}
-          maxWidth={64}
+          maxWidth={192}
           aspectRatio="aspect-square"
           className="w-full h-full object-cover"
         />
@@ -166,16 +166,22 @@ const EpisodeCard = React.memo(function EpisodeCard({
           )}
           aria-hidden="true"
         >
-          <Play className="size-6 text-white fill-white" />
+          <Play className="size-6 md:size-8 text-white fill-white" />
         </div>
       </div>
 
       {/* Info */}
-      <div className="flex-grow min-w-0 py-0.5">
-        <p className="font-semibold truncate leading-tight" style={textStyle}>
+      <div className="flex-grow min-w-0 py-0.5 md:py-1">
+        <p
+          className="font-semibold truncate leading-tight text-base md:text-lg"
+          style={textStyle}
+        >
           {episode.Name || episodeLabel}
         </p>
-        <p className="text-sm truncate mt-0.5 opacity-80" style={textStyle}>
+        <p
+          className="text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80"
+          style={textStyle}
+        >
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
@@ -258,7 +264,7 @@ function SeasonEpisodes({
 
   return (
     <div
-      className="space-y-1.5"
+      className="space-y-2 md:space-y-3"
       role="tabpanel"
       id={`season-panel-${season.Id}`}
     >
@@ -294,14 +300,14 @@ function VirtualizedEpisodeList({
   const virtualizer = useVirtualizer({
     count: episodes.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 96, // ~80px card + 16px gap
+    estimateSize: () => 112, // ~96px card + 16px gap on desktop
     overscan: 5,
   })
 
   return (
     <div
       ref={parentRef}
-      className="h-[600px] overflow-auto"
+      className="h-[600px] md:h-[700px] overflow-auto"
       role="tabpanel"
       id={`season-panel-${seasonId}`}
     >
@@ -315,7 +321,7 @@ function VirtualizedEpisodeList({
           return (
             <div
               key={episode.Id}
-              className="absolute top-0 left-0 w-full py-0.75"
+              className="absolute top-0 left-0 w-full py-1 md:py-1.5"
               style={{
                 transform: `translateY(${virtualItem.start}px)`,
               }}
@@ -386,7 +392,7 @@ export function SeriesView({
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto">
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={selectedSeasonId}
@@ -394,7 +400,7 @@ export function SeriesView({
         vibrantColors={vibrantColors}
       />
 
-      <div className="mt-2">
+      <div className="mt-2 md:mt-4">
         {selectedSeason && series.Id && (
           <SeasonEpisodes
             key={selectedSeason.Id}

@@ -377,7 +377,7 @@ export function PlayerEditor({
       )}
 
       <div
-        className="flex flex-row justify-center gap-3"
+        className="flex flex-row justify-center gap-4"
         role="group"
         aria-label={t('editor.actions', 'Segment actions')}
       >

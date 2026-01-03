@@ -125,7 +125,7 @@ export const MediaCard = memo(function MediaCard({
       onFocus={handleFocus}
       aria-label={accessibleLabel}
       className={cn(
-        'group cursor-pointer rounded-2xl overflow-hidden',
+        'group cursor-pointer rounded-2xl overflow-hidden min-h-[44px]',
         'transition-all duration-300 ease-out',
         'hover:scale-[1.03] hover:shadow-xl hover:shadow-black/20',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
@@ -144,13 +144,13 @@ export const MediaCard = memo(function MediaCard({
 
       {/* Item Name - with extracted poster color */}
       <div
-        className="px-3 py-2.5 transition-colors duration-500"
+        className="px-3 py-2.5 md:px-4 md:py-3 transition-colors duration-500"
         style={textBoxStyle}
       >
         {/* Title - fixed height for 2 lines */}
         <p
           className={cn(
-            'text-sm font-semibold line-clamp-2 leading-snug h-[2.5em]',
+            'text-sm md:text-base font-semibold line-clamp-2 leading-snug h-[2.5em]',
             !vibrantColors && 'text-foreground group-hover:text-primary',
           )}
           style={textStyle}
@@ -162,7 +162,7 @@ export const MediaCard = memo(function MediaCard({
         {/* Year - always in third row */}
         <p
           className={cn(
-            'text-xs opacity-70 font-medium h-[1.25em]',
+            'text-xs md:text-sm opacity-70 font-medium h-[1.25em]',
             !vibrantColors && 'text-muted-foreground',
           )}
           style={textStyle}
