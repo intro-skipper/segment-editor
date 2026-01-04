@@ -23,7 +23,18 @@ export const getSegmentCssVar = (type: MediaSegmentType | undefined): string =>
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-export const generateUUID = (): string => crypto.randomUUID()
+export const generateUUID = (): string => {
+  // Use crypto.randomUUID if available (secure contexts), otherwise fallback
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback for non-secure contexts (e.g., HTTP localhost)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
 
 export const isValidUUID = (uuid: string | null | undefined): boolean =>
   typeof uuid === 'string' && UUID_V4.test(uuid)

@@ -14,6 +14,7 @@ import './styles.css'
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 const router = createRouter({
   routeTree,
+  basepath: '/SegmentEditor',
   context: {
     ...TanStackQueryProviderContext,
   },

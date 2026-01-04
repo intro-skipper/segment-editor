@@ -18,6 +18,7 @@ import {
 } from '@jellyfin/sdk/lib/utils/api'
 import type { Api } from '@jellyfin/sdk'
 import { useApiStore } from '@/stores/api-store'
+import { generateUUID } from '@/lib/segment-utils'
 
 interface JellyfinApiClient {
   serverAddress?: () => string
@@ -42,7 +43,7 @@ const DEVICE_ID_KEY = 'segment-editor-device-id'
 function getDeviceInfo() {
   let deviceId = localStorage.getItem(DEVICE_ID_KEY)
   if (!deviceId) {
-    deviceId = crypto.randomUUID()
+    deviceId = generateUUID()
     localStorage.setItem(DEVICE_ID_KEY, deviceId)
   }
   return { name: navigator.userAgent.split(' ')[0] || 'Browser', id: deviceId }
