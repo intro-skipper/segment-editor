@@ -8,7 +8,7 @@ import { createQueryKey } from './query-error-handling'
 import { createStandardQueryOptions } from './create-query-hook'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { getSegmentsById } from '@/services/segments/api'
-import { useApiStore } from '@/stores/api-store'
+import { selectValidAuth, useApiStore } from '@/stores'
 
 /**
  * Type-safe query key factory for segments.
@@ -36,14 +36,14 @@ export interface UseSegmentsOptions {
  * @returns TanStack Query result with segments data
  */
 export function useSegments(itemId: string, options?: UseSegmentsOptions) {
-  const validConnection = useApiStore((state) => state.validConnection)
+  const validAuth = useApiStore(selectValidAuth)
   const enabled = options?.enabled ?? true
 
   return useQuery(
     createStandardQueryOptions<Array<MediaSegmentDto>>({
       queryKey: segmentsKeys.list(itemId),
       queryFn: () => getSegmentsById(itemId),
-      enabled: validConnection && enabled && !!itemId,
+      enabled: validAuth && enabled && !!itemId,
       cacheDuration: 'SHORT',
       operation: 'Fetch segments',
     }),

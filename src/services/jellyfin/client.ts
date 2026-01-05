@@ -8,10 +8,7 @@
  */
 
 import type { ApiOptions } from '@/services/jellyfin/sdk'
-import {
-  getRequestConfig,
-  withApi,
-} from '@/services/jellyfin/sdk'
+import { getRequestConfig, withApi } from '@/services/jellyfin/sdk'
 import { useApiStore } from '@/stores/api-store'
 import { AppError, isAbortError } from '@/lib/unified-error'
 
@@ -46,15 +43,12 @@ export async function testConnection(
   const store = useApiStore.getState()
 
   try {
-    const result = await withApi(
-      async (apis) => {
-        const { data } = await apis.systemApi.getSystemInfo(
-          getRequestConfig(options),
-        )
-        return data.Version ?? ''
-      },
-      options,
-    )
+    const result = await withApi(async (apis) => {
+      const { data } = await apis.systemApi.getSystemInfo(
+        getRequestConfig(options),
+      )
+      return data.Version ?? ''
+    }, options)
 
     // withApi returns null on abort or unavailable
     if (result === null) {

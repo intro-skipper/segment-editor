@@ -8,7 +8,7 @@ import { createQueryKey } from './query-error-handling'
 import { createStandardQueryOptions } from './create-query-hook'
 import type { VirtualFolderInfo } from '@/types/jellyfin'
 import { getCollections } from '@/services/items/api'
-import { useApiStore } from '@/stores/api-store'
+import { selectValidAuth, useApiStore } from '@/stores'
 
 /**
  * Type-safe query key factory for collections.
@@ -20,18 +20,18 @@ export const collectionsKeys = {
 
 /**
  * Hook to fetch all collections (virtual folders) from the Jellyfin server.
- * Only fetches when there's a valid connection.
+ * Only fetches when there's a valid authenticated connection.
  *
  * @returns TanStack Query result with collections data
  */
 export function useCollections() {
-  const validConnection = useApiStore((state) => state.validConnection)
+  const validAuth = useApiStore(selectValidAuth)
 
   return useQuery(
     createStandardQueryOptions<Array<VirtualFolderInfo>>({
       queryKey: collectionsKeys.list(),
       queryFn: getCollections,
-      enabled: validConnection,
+      enabled: validAuth,
       cacheDuration: 'LONG',
       operation: 'Fetch collections',
     }),

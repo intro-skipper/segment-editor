@@ -134,19 +134,21 @@ function NotFoundComponent() {
 function RootComponent() {
   const { t } = useTranslation()
   const serverAddress = useApiStore((state) => state.serverAddress)
+  const apiKey = useApiStore((state) => state.apiKey)
 
   // Plugin mode handles its own auto-connection
   const { isPlugin } = usePluginMode()
 
   // Test connection on app start for standalone mode (non-plugin)
+  // Only when both server address AND api key are configured
   useEffect(() => {
-    if (isPlugin || !serverAddress) return
+    if (isPlugin || !serverAddress || !apiKey) return
 
     const controller = new AbortController()
     testConnection({ signal: controller.signal })
 
     return () => controller.abort()
-  }, [isPlugin, serverAddress])
+  }, [isPlugin, serverAddress, apiKey])
 
   return (
     <div className="min-h-screen">

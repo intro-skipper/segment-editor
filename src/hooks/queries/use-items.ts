@@ -15,7 +15,7 @@ import {
   getSeasons,
   getTracks,
 } from '@/services/items/api'
-import { useApiStore } from '@/stores/api-store'
+import { selectValidAuth, useApiStore } from '@/stores'
 
 // Query Keys
 export const itemsKeys = {
@@ -42,10 +42,6 @@ export const artistKeys = {
   albums: (artistId: string) => createQueryKey('artist', 'albums', artistId),
 } as const
 
-// Shared selector
-const selectValidConnection = (s: { validConnection: boolean }) =>
-  s.validConnection
-
 interface UseEntityOptions {
   enabled?: boolean
 }
@@ -59,14 +55,14 @@ const useEntityQuery = <T>(
   options?: UseEntityOptions,
   cacheDuration: CacheDuration = 'LONG',
 ) => {
-  const validConnection = useApiStore(selectValidConnection)
+  const validAuth = useApiStore(selectValidAuth)
   const idsValid = Array.isArray(ids) ? ids.every(Boolean) : !!ids
 
   return useQuery(
     createStandardQueryOptions<T>({
       queryKey,
       queryFn,
-      enabled: validConnection && idsValid && (options?.enabled ?? true),
+      enabled: validAuth && idsValid && (options?.enabled ?? true),
       cacheDuration,
       operation,
     }),
@@ -91,7 +87,7 @@ export function useItems({
   startIndex,
   enabled = true,
 }: UseItemsOptions) {
-  const validConnection = useApiStore(selectValidConnection)
+  const validAuth = useApiStore(selectValidAuth)
   const select = useMemo(
     () => (data: Array<BaseItemDto>) => filterItemsByName(data, nameFilter),
     [nameFilter],
@@ -105,7 +101,7 @@ export function useItems({
     ...createStandardQueryOptions<Array<BaseItemDto>>({
       queryKey: itemsKeys.list(parentId),
       queryFn,
-      enabled: validConnection && enabled && !!parentId,
+      enabled: validAuth && enabled && !!parentId,
       cacheDuration: 'MEDIUM',
       operation: 'Fetch items',
     }),

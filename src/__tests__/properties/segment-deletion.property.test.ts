@@ -76,10 +76,15 @@ vi.mock('@/services/jellyfin/sdk', () => ({
   getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
   getAccessToken: vi.fn(() => 'test-token'),
   resetSdkState: vi.fn(),
-  getRequestConfig: vi.fn((options?: { signal?: AbortSignal; timeout?: number }, defaultTimeout = 30000) => ({
-    signal: options?.signal,
-    timeout: options?.timeout ?? defaultTimeout,
-  })),
+  getRequestConfig: vi.fn(
+    (
+      options?: { signal?: AbortSignal; timeout?: number },
+      defaultTimeout = 30000,
+    ) => ({
+      signal: options?.signal,
+      timeout: options?.timeout ?? defaultTimeout,
+    }),
+  ),
 }))
 
 // Custom arbitrary for hex strings

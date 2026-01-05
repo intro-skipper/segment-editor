@@ -6,10 +6,7 @@
 import { PluginStatus } from '@jellyfin/sdk/lib/generated-client'
 import type { PluginInfo } from '@jellyfin/sdk/lib/generated-client'
 import type { ApiOptions } from '@/services/jellyfin/sdk'
-import {
-  getRequestConfig,
-  withApi,
-} from '@/services/jellyfin/sdk'
+import { getRequestConfig, withApi } from '@/services/jellyfin/sdk'
 import {
   AppError,
   ErrorCodes,
@@ -96,15 +93,12 @@ export async function testServerPlugins(
   options?: PluginDetectionOptions,
 ): Promise<PluginTestResult> {
   try {
-    const plugins = await withApi(
-      async (apis) => {
-        const { data } = await apis.pluginsApi.getPlugins(
-          getRequestConfig(options),
-        )
-        return data
-      },
-      options,
-    )
+    const plugins = await withApi(async (apis) => {
+      const { data } = await apis.pluginsApi.getPlugins(
+        getRequestConfig(options),
+      )
+      return data
+    }, options)
 
     // withApi returns null on abort or unavailable
     if (plugins === null) {

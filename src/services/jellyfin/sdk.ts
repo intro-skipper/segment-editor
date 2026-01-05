@@ -61,7 +61,7 @@ function getJellyfinApiClient(): JellyfinApiClient | undefined {
 
   // First check parent window (iframe inside Jellyfin)
   try {
-    const parentClient = window.parent?.ApiClient
+    const parentClient = window.parent.ApiClient
     if (parentClient) return parentClient
   } catch {
     // Cross-origin access blocked - not in same-origin iframe

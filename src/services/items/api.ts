@@ -126,7 +126,9 @@ export async function getItemById(itemId: string): Promise<BaseItemDto | null> {
   return result ?? null
 }
 
-export async function getSeasons(seriesId: string): Promise<Array<BaseItemDto>> {
+export async function getSeasons(
+  seriesId: string,
+): Promise<Array<BaseItemDto>> {
   requireParam(seriesId, 'Series ID')
   requireValidId(seriesId, 'Series ID')
 

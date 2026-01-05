@@ -11,11 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
 import { toast } from 'sonner'
 import type { NotificationType } from '@/lib/notifications'
-import {
-  showError,
-  showNotification,
-  showSuccess,
-} from '@/lib/notifications'
+import { showError, showNotification, showSuccess } from '@/lib/notifications'
 
 // Mock sonner toast
 vi.mock('sonner', () => ({

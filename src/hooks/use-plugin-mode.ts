@@ -9,7 +9,11 @@
  */
 
 import { useEffect, useState } from 'react'
-import { isPluginMode, getServerBaseUrl, getAccessToken } from '@/services/jellyfin/sdk'
+import {
+  getAccessToken,
+  getServerBaseUrl,
+  isPluginMode,
+} from '@/services/jellyfin/sdk'
 import { testConnection } from '@/services/jellyfin/client'
 import { useApiStore } from '@/stores/api-store'
 
@@ -30,7 +34,7 @@ interface PluginModeState {
  */
 export function usePluginMode(): PluginModeState {
   const [isConnecting, setIsConnecting] = useState(false)
-  const validConnection = useApiStore((s) => s.validConnection)
+  const validAuth = useApiStore((s) => s.validAuth)
   const serverAddress = useApiStore((s) => s.serverAddress)
   const apiKey = useApiStore((s) => s.apiKey)
 
@@ -46,7 +50,7 @@ export function usePluginMode(): PluginModeState {
 
   // Auto-connect in plugin mode when credentials become available
   useEffect(() => {
-    if (!isPlugin || !hasCredentials || validConnection) return
+    if (!isPlugin || !hasCredentials || validAuth) return
 
     const controller = new AbortController()
     setIsConnecting(true)
@@ -58,12 +62,12 @@ export function usePluginMode(): PluginModeState {
     })
 
     return () => controller.abort()
-  }, [isPlugin, hasCredentials, validConnection])
+  }, [isPlugin, hasCredentials, validAuth])
 
   return {
     isPlugin,
     hasCredentials,
-    isConnected: validConnection,
+    isConnected: validAuth,
     isConnecting,
   }
 }

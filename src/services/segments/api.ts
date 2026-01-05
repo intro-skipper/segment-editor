@@ -102,7 +102,12 @@ const validateForCreate = (
 /** Validates segment input data */
 const validateInput = (input: CreateSegmentInput): boolean => {
   const { itemId, startSeconds, endSeconds } = input
-  if (!itemId || startSeconds < 0 || endSeconds < 0 || startSeconds >= endSeconds) {
+  if (
+    !itemId ||
+    startSeconds < 0 ||
+    endSeconds < 0 ||
+    startSeconds >= endSeconds
+  ) {
     console.error('[Segments] Invalid segment input')
     return false
   }
@@ -133,8 +138,7 @@ const buildSegmentUrl = (path: string, params?: URLSearchParams): string => {
 const withSegmentRetry = <T>(
   fn: () => Promise<T>,
   options?: SegmentApiOptions,
-): Promise<T | false> =>
-  withRetryOrFalse(fn, getRetryOptions(options))
+): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
 export async function getSegmentsById(
   itemId: string,

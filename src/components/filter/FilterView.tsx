@@ -10,10 +10,13 @@ import {
   AlertCircle,
   Film,
   Library,
+  Loader2,
   Mic2,
   RefreshCw,
   Search,
+  Settings2,
   Tv,
+  Unplug,
 } from 'lucide-react'
 
 import type { SessionStore } from '@/stores/session-store'
@@ -48,7 +51,6 @@ import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { getNavigationRoute } from '@/lib/navigation-utils'
-import { Loader2, Settings2, Unplug } from 'lucide-react'
 
 // Stable selectors to prevent re-renders - defined outside component
 const selectPageSize = (state: SessionStore) => state.pageSize
@@ -194,7 +196,8 @@ export function FilterView() {
   const columns = useGridColumns()
 
   // Plugin mode and connection state
-  const { isPlugin, hasCredentials, isConnected, isConnecting } = usePluginMode()
+  const { isPlugin, hasCredentials, isConnected, isConnecting } =
+    usePluginMode()
   const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
   // Fetch collections and items
@@ -419,62 +422,62 @@ export function FilterView() {
           !selectedCollection &&
           !collectionsLoading &&
           !collectionsError && (
-          <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
-            <Empty className="border-none bg-transparent">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Library className="size-12" aria-hidden="true" />
-                </EmptyMedia>
-                <EmptyTitle className="text-2xl">
-                  {t('items.selectLibrary', {
-                    defaultValue: 'Select a Library',
-                  })}
-                </EmptyTitle>
-                <EmptyDescription className="text-base">
-                  {t('items.selectLibraryDescription', {
-                    defaultValue:
-                      'Choose a library to browse your media collection',
-                  })}
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <div
-                  className="flex flex-wrap gap-3 justify-center mt-4"
-                  role="group"
-                  aria-label={t('items.selectLibrary', {
-                    defaultValue: 'Select a Library',
-                  })}
-                >
-                  {collectionOptions.map((collection) => {
-                    const Icon = getCollectionIcon(collection.name)
-                    return (
-                      <Button
-                        key={collection.id}
-                        variant="secondary"
-                        size="lg"
-                        className={cn(
-                          'gap-3 min-w-[var(--spacing-library-button-min)] h-14',
-                          'rounded-2xl text-base font-medium',
-                          'border border-border/50',
-                          'transition-all duration-200',
-                          'hover:scale-[1.02] active:scale-[0.98]',
-                        )}
-                        onClick={() => handleCollectionChange(collection.id)}
-                        aria-label={t('items.selectLibraryButton', {
-                          name: collection.name,
-                          defaultValue: `Browse ${collection.name} library`,
-                        })}
-                      >
-                        <Icon className="size-5" aria-hidden="true" />
-                        {collection.name}
-                      </Button>
-                    )
-                  })}
-                </div>
-              </EmptyContent>
-            </Empty>
-          </div>
-        )}
+            <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+              <Empty className="border-none bg-transparent">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Library className="size-12" aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-2xl">
+                    {t('items.selectLibrary', {
+                      defaultValue: 'Select a Library',
+                    })}
+                  </EmptyTitle>
+                  <EmptyDescription className="text-base">
+                    {t('items.selectLibraryDescription', {
+                      defaultValue:
+                        'Choose a library to browse your media collection',
+                    })}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <div
+                    className="flex flex-wrap gap-3 justify-center mt-4"
+                    role="group"
+                    aria-label={t('items.selectLibrary', {
+                      defaultValue: 'Select a Library',
+                    })}
+                  >
+                    {collectionOptions.map((collection) => {
+                      const Icon = getCollectionIcon(collection.name)
+                      return (
+                        <Button
+                          key={collection.id}
+                          variant="secondary"
+                          size="lg"
+                          className={cn(
+                            'gap-3 min-w-[var(--spacing-library-button-min)] h-14',
+                            'rounded-2xl text-base font-medium',
+                            'border border-border/50',
+                            'transition-all duration-200',
+                            'hover:scale-[1.02] active:scale-[0.98]',
+                          )}
+                          onClick={() => handleCollectionChange(collection.id)}
+                          aria-label={t('items.selectLibraryButton', {
+                            name: collection.name,
+                            defaultValue: `Browse ${collection.name} library`,
+                          })}
+                        >
+                          <Icon className="size-5" aria-hidden="true" />
+                          {collection.name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </EmptyContent>
+              </Empty>
+            </div>
+          )}
 
         {/* Loading State */}
         {showLoading && (
