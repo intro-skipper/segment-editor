@@ -25,7 +25,10 @@ const UUID_V4 =
 
 export const generateUUID = (): string => {
   // Use crypto.randomUUID if available (secure contexts), otherwise fallback
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID()
   }
   // Fallback for non-secure contexts (e.g., HTTP localhost)

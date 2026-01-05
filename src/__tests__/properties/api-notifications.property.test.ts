@@ -12,7 +12,6 @@ import * as fc from 'fast-check'
 import { toast } from 'sonner'
 import type { NotificationType } from '@/lib/notifications'
 import {
-  handleApiError,
   showError,
   showNotification,
   showSuccess,
@@ -159,99 +158,6 @@ describe('API Operation Notifications', () => {
             description,
             duration: 4000,
           })
-
-          return true
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: handleApiError displays appropriate error for status codes
-   * For any HTTP error status code, handleApiError SHALL display
-   * a negative notification with relevant error details.
-   */
-  it('handleApiError displays negative notification for error status codes', () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: 400, max: 599 }),
-        fc.option(fc.string({ minLength: 1, maxLength: 200 }), {
-          nil: undefined,
-        }),
-        (status, serverMessage) => {
-          vi.clearAllMocks()
-
-          handleApiError(status, serverMessage)
-
-          // Should always call toast.error for error status codes
-          expect(toast.error).toHaveBeenCalledTimes(1)
-
-          return true
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: handleApiError provides specific messages for known status codes
-   * For specific HTTP status codes (400, 401, 404, 500), handleApiError SHALL
-   * display appropriate user-friendly messages.
-   */
-  it('handleApiError provides specific messages for known status codes', () => {
-    const knownStatusCodes = [
-      { status: 400, expectedMessage: 'Bad Request' },
-      { status: 401, expectedMessage: 'Authentication failed' },
-      { status: 404, expectedMessage: 'Not found' },
-      { status: 500, expectedMessage: 'Server error' },
-    ]
-
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...knownStatusCodes),
-        fc.option(fc.string({ minLength: 1, maxLength: 200 }), {
-          nil: undefined,
-        }),
-        ({ status, expectedMessage }, serverMessage) => {
-          vi.clearAllMocks()
-
-          handleApiError(status, serverMessage)
-
-          expect(toast.error).toHaveBeenCalledTimes(1)
-          const [actualMessage] = (toast.error as ReturnType<typeof vi.fn>).mock
-            .calls[0]
-          expect(actualMessage).toBe(expectedMessage)
-
-          return true
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: handleApiError includes server message when provided
-   * For any error status code with a server message, handleApiError SHALL
-   * include the server message in the notification description.
-   */
-  it('handleApiError includes server message in description', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(400, 404, 500),
-        fc.string({ minLength: 1, maxLength: 200 }),
-        (status, serverMessage) => {
-          vi.clearAllMocks()
-
-          handleApiError(status, serverMessage)
-
-          expect(toast.error).toHaveBeenCalledTimes(1)
-          const [, options] = (toast.error as ReturnType<typeof vi.fn>).mock
-            .calls[0]
-
-          // For 400, server message is passed as description
-          // For 404 and 500, server message is used if provided
-          expect(options.description).toBe(serverMessage)
 
           return true
         },

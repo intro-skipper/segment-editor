@@ -1,19 +1,24 @@
-/** Items API service - Jellyfin media item fetching.
+/**
+ * Items API service - Jellyfin media item fetching.
  *
- * Security: All inputs are validated before use, and API responses are validated
+ * Architecture:
+ * - Uses withApi wrapper for consistent error/abort handling
+ * - Validation separated from API calls (SRP)
+ * - Schema validation on responses for data integrity
+ *
+ * Security: All inputs validated before use, API responses validated
  * against Zod schemas to ensure data integrity.
  */
 
 import { ItemFields, SortOrder } from '@jellyfin/sdk/lib/generated-client'
 import type { BaseItemDto, VirtualFolderInfo } from '@/types/jellyfin'
-import { requireTypedApis } from '@/services/jellyfin/sdk'
-import { apiCall, requireParam, requireParams } from '@/lib/api-utils'
+import { withApi } from '@/services/jellyfin/sdk'
+import { AppError, logValidationWarning } from '@/lib/unified-error'
 import {
   BaseItemArraySchema,
   VirtualFolderArraySchema,
   isValidItemId,
 } from '@/lib/schemas'
-import { logValidationWarning } from '@/lib/validation-logger'
 
 export interface GetItemsOptions {
   parentId: string
@@ -27,36 +32,59 @@ export interface PaginationOptions {
   startIndex?: number
 }
 
-/**
- * Validates items array against schema and logs warnings for invalid data.
- * Security: Ensures API responses conform to expected structure.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Validation Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Validates items array against schema, logs warnings for invalid data */
 const validateItems = (items: Array<BaseItemDto>, context: string) => {
   const result = BaseItemArraySchema.safeParse(items)
-  if (!result.success)
-    logValidationWarning(`[Items API] ${context}`, result.error)
+  if (!result.success) {
+    logValidationWarning(`[Items] ${context}`, result.error)
+  }
   return items
 }
 
-/**
- * Validates that an ID is a valid Jellyfin ID format.
- * Security: Prevents injection via malformed IDs.
- */
-const validateItemId = (id: string, name: string): void => {
+/** Validates Jellyfin ID format, throws on invalid */
+const requireValidId = (id: string, name: string): void => {
   if (!isValidItemId(id)) {
-    throw new Error(`Invalid ${name} format`)
+    throw AppError.validation(`Invalid ${name} format`)
   }
 }
 
-export const getCollections = (): Promise<Array<VirtualFolderInfo>> =>
-  apiCall(async () => {
-    const { data } =
-      await requireTypedApis().libraryStructureApi.getVirtualFolders()
-    const result = VirtualFolderArraySchema.safeParse(data)
-    if (!result.success)
-      logValidationWarning('[Items API] Collections', result.error)
+/** Validates required parameter */
+const requireParam = (value: unknown, name: string): void => {
+  if (!value) throw AppError.validation(`${name} is required`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Common Field Sets (DRY)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DETAIL_FIELDS = [
+  ItemFields.MediaStreams,
+  ItemFields.Overview,
+  ItemFields.People,
+  ItemFields.Genres,
+] as const
+
+const SORT_ASCENDING = [SortOrder.Ascending] as const
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Operations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getCollections(): Promise<Array<VirtualFolderInfo>> {
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.libraryStructureApi.getVirtualFolders()
+    const validation = VirtualFolderArraySchema.safeParse(data)
+    if (!validation.success) {
+      logValidationWarning('[Items] Collections', validation.error)
+    }
     return data
-  }, 'Failed to fetch collections')
+  })
+  return result ?? []
+}
 
 export async function getItems({
   parentId,
@@ -65,52 +93,51 @@ export async function getItems({
   startIndex,
 }: GetItemsOptions): Promise<Array<BaseItemDto>> {
   requireParam(parentId, 'Parent ID')
-  validateItemId(parentId, 'Parent ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().itemsApi.getItems({
+  requireValidId(parentId, 'Parent ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.itemsApi.getItems({
       parentId,
       sortBy: ['AiredEpisodeOrder', 'SortName'],
-      sortOrder: [SortOrder.Ascending],
+      sortOrder: [...SORT_ASCENDING],
       isMissing: false,
       fields: includeMediaStreams ? [ItemFields.MediaStreams] : undefined,
       limit,
       startIndex,
     })
     return validateItems(data.Items ?? [], 'getItems')
-  }, 'Failed to fetch items')
+  })
+  return result ?? []
 }
 
 export async function getItemById(itemId: string): Promise<BaseItemDto | null> {
   requireParam(itemId, 'Item ID')
-  validateItemId(itemId, 'Item ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().itemsApi.getItems({
+  requireValidId(itemId, 'Item ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.itemsApi.getItems({
       ids: [itemId],
-      fields: [
-        ItemFields.MediaStreams,
-        ItemFields.Overview,
-        ItemFields.People,
-        ItemFields.Genres,
-      ],
+      fields: [...DETAIL_FIELDS],
     })
     const items = data.Items ?? []
     validateItems(items, 'getItemById')
     return items[0] ?? null
-  }, 'Failed to fetch item')
+  })
+  return result ?? null
 }
 
-export async function getSeasons(
-  seriesId: string,
-): Promise<Array<BaseItemDto>> {
+export async function getSeasons(seriesId: string): Promise<Array<BaseItemDto>> {
   requireParam(seriesId, 'Series ID')
-  validateItemId(seriesId, 'Series ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().tvShowsApi.getSeasons({
+  requireValidId(seriesId, 'Series ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.tvShowsApi.getSeasons({
       seriesId,
       isMissing: false,
     })
     return validateItems(data.Items ?? [], 'getSeasons')
-  }, 'Failed to fetch seasons')
+  })
+  return result ?? []
 }
 
 export async function getEpisodes(
@@ -118,11 +145,13 @@ export async function getEpisodes(
   seasonId: string,
   options?: PaginationOptions,
 ): Promise<Array<BaseItemDto>> {
-  requireParams({ 'Series ID': seriesId, 'Season ID': seasonId })
-  validateItemId(seriesId, 'Series ID')
-  validateItemId(seasonId, 'Season ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().tvShowsApi.getEpisodes({
+  requireParam(seriesId, 'Series ID')
+  requireParam(seasonId, 'Season ID')
+  requireValidId(seriesId, 'Series ID')
+  requireValidId(seasonId, 'Season ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.tvShowsApi.getEpisodes({
       seriesId,
       seasonId,
       isMissing: false,
@@ -131,22 +160,25 @@ export async function getEpisodes(
       startIndex: options?.startIndex,
     })
     return validateItems(data.Items ?? [], 'getEpisodes')
-  }, 'Failed to fetch episodes')
+  })
+  return result ?? []
 }
 
 export async function getAlbums(artistId: string): Promise<Array<BaseItemDto>> {
   requireParam(artistId, 'Artist ID')
-  validateItemId(artistId, 'Artist ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().itemsApi.getItems({
+  requireValidId(artistId, 'Artist ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.itemsApi.getItems({
       artistIds: [artistId],
       sortBy: ['ProductionYear', 'SortName'],
-      sortOrder: [SortOrder.Ascending],
+      sortOrder: [...SORT_ASCENDING],
       includeItemTypes: ['MusicAlbum'],
       recursive: true,
     })
     return validateItems(data.Items ?? [], 'getAlbums')
-  }, 'Failed to fetch albums')
+  })
+  return result ?? []
 }
 
 export async function getTracks(
@@ -154,16 +186,18 @@ export async function getTracks(
   options?: PaginationOptions,
 ): Promise<Array<BaseItemDto>> {
   requireParam(albumId, 'Album ID')
-  validateItemId(albumId, 'Album ID')
-  return apiCall(async () => {
-    const { data } = await requireTypedApis().itemsApi.getItems({
+  requireValidId(albumId, 'Album ID')
+
+  const result = await withApi(async (apis) => {
+    const { data } = await apis.itemsApi.getItems({
       parentId: albumId,
       sortBy: ['ParentIndexNumber', 'IndexNumber'],
-      sortOrder: [SortOrder.Ascending],
+      sortOrder: [...SORT_ASCENDING],
       fields: [ItemFields.MediaStreams],
       limit: options?.limit,
       startIndex: options?.startIndex,
     })
     return validateItems(data.Items ?? [], 'getTracks')
-  }, 'Failed to fetch tracks')
+  })
+  return result ?? []
 }

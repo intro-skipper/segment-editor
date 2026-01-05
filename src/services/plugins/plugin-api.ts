@@ -5,15 +5,13 @@
  * Security: All URL parameters are properly encoded to prevent injection attacks.
  */
 
-import type { ApiOptions } from '@/lib/api-utils'
+import type { ApiOptions } from '@/services/jellyfin/sdk'
 import {
-  getAccessToken,
+  getRequestConfig,
   getServerBaseUrl,
-  getTypedApis,
+  withApi,
 } from '@/services/jellyfin/sdk'
-import { AppError, isAbortError } from '@/lib/unified-error'
-import { getAuthHeaders } from '@/lib/header-utils'
-import { getRequestConfig, logApiError } from '@/lib/api-utils'
+import { AppError, logApiError } from '@/lib/unified-error'
 import {
   UrlSafeStringSchema,
   encodeUrlParam,
@@ -81,34 +79,37 @@ async function executeRequest<T>(
   options?: PluginApiOptions,
   data?: unknown,
 ): Promise<{ data?: T; error?: string }> {
-  if (options?.signal?.aborted) return { error: 'Request cancelled' }
-
-  const apis = getTypedApis()
-  if (!apis) return { error: 'API not available' }
-
   // Security: Validate endpoint doesn't contain dangerous patterns
   const endpointValidation = UrlSafeStringSchema.safeParse(endpoint)
   if (!endpointValidation.success) {
     return { error: 'Invalid endpoint format' }
   }
 
-  const config = {
-    headers: {
-      ...(method === 'post' && { 'Content-Type': 'application/json' }),
-      ...getAuthHeaders(getAccessToken()),
-    },
-    ...getRequestConfig(options),
-  }
-
   try {
-    const url = `${getServerBaseUrl()}${endpoint}`
-    const response =
-      method === 'get'
-        ? await apis.api.axiosInstance.get<T>(url, config)
-        : await apis.api.axiosInstance.post<T>(url, data, config)
-    return { data: response.data }
+    const result = await withApi(async (apis) => {
+      // The SDK's axios instance already has auth headers configured
+      const config = {
+        ...(method === 'post' && {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        ...getRequestConfig(options),
+      }
+
+      const url = `${getServerBaseUrl()}${endpoint}`
+      const response =
+        method === 'get'
+          ? await apis.api.axiosInstance.get<T>(url, config)
+          : await apis.api.axiosInstance.post<T>(url, data, config)
+      return response.data
+    }, options)
+
+    if (result === null) {
+      if (options?.signal?.aborted) return { error: 'Request cancelled' }
+      return { error: 'API not available' }
+    }
+
+    return { data: result }
   } catch (error) {
-    if (isAbortError(error)) return { error: 'Request cancelled' }
     const appError = AppError.from(
       error,
       `Failed to ${method.toUpperCase()} ${endpoint}`,

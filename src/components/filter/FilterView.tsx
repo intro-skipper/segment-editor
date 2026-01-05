@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/empty'
 import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
+import { usePluginMode } from '@/hooks/use-plugin-mode'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { useSessionStore } from '@/stores/session-store'
@@ -47,6 +48,7 @@ import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { getNavigationRoute } from '@/lib/navigation-utils'
+import { Loader2, Settings2, Unplug } from 'lucide-react'
 
 // Stable selectors to prevent re-renders - defined outside component
 const selectPageSize = (state: SessionStore) => state.pageSize
@@ -190,6 +192,10 @@ export function FilterView() {
   )
 
   const columns = useGridColumns()
+
+  // Plugin mode and connection state
+  const { isPlugin, hasCredentials, isConnected, isConnecting } = usePluginMode()
+  const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
   // Fetch collections and items
   const {
@@ -336,11 +342,83 @@ export function FilterView() {
   const showEmpty =
     selectedCollection && !itemsLoading && !itemsError && items?.length === 0
 
+  // Not connected state (standalone mode only)
+  const showNotConnected = !isPlugin && !hasCredentials
+
+  // Connecting state (plugin mode waiting for parent ApiClient)
+  const showConnecting = isPlugin && !isConnected && isConnecting
+
   return (
     <div className="px-4 pb-8 sm:px-6">
       <div className="max-w-7xl mx-auto">
+        {/* Not Connected State - standalone mode without credentials */}
+        {showNotConnected && (
+          <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+            <Empty className="border-none bg-transparent">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Unplug className="size-12" aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle className="text-2xl">
+                  {t('connection.notConnected', {
+                    defaultValue: 'Not Connected',
+                  })}
+                </EmptyTitle>
+                <EmptyDescription className="text-base">
+                  {t('connection.notConnectedDescription', {
+                    defaultValue:
+                      'Configure your Jellyfin server connection to get started',
+                  })}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button
+                  size="lg"
+                  className="gap-2 rounded-2xl"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings2 className="size-5" aria-hidden="true" />
+                  {t('connection.openSettings', {
+                    defaultValue: 'Open Settings',
+                  })}
+                </Button>
+              </EmptyContent>
+            </Empty>
+          </div>
+        )}
+
+        {/* Connecting State - plugin mode waiting for credentials */}
+        {showConnecting && (
+          <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+            <Empty className="border-none bg-transparent">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Loader2
+                    className="size-12 animate-spin"
+                    aria-hidden="true"
+                  />
+                </EmptyMedia>
+                <EmptyTitle className="text-2xl">
+                  {t('connection.connecting', {
+                    defaultValue: 'Connecting...',
+                  })}
+                </EmptyTitle>
+                <EmptyDescription className="text-base">
+                  {t('connection.connectingDescription', {
+                    defaultValue: 'Establishing connection to Jellyfin server',
+                  })}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        )}
+
         {/* Library Picker - shown when no collection selected */}
-        {!selectedCollection && !collectionsLoading && !collectionsError && (
+        {!showNotConnected &&
+          !showConnecting &&
+          !selectedCollection &&
+          !collectionsLoading &&
+          !collectionsError && (
           <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
             <Empty className="border-none bg-transparent">
               <EmptyHeader>

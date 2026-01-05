@@ -1,6 +1,10 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
+import {
+  RouterProvider,
+  createHashHistory,
+  createRouter,
+} from '@tanstack/react-router'
 
 import * as TanStackQueryProvider from './integrations/tanstack-query/root-provider.tsx'
 
@@ -12,9 +16,11 @@ import './styles.css'
 // Create a new router instance
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
+const hashHistory = createHashHistory()
 const router = createRouter({
   routeTree,
   basepath: '/SegmentEditor',
+  history: hashHistory,
   context: {
     ...TanStackQueryProviderContext,
   },

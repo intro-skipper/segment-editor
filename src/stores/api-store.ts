@@ -30,18 +30,31 @@ const initialState: ApiState = {
 const sanitize = (val: string | undefined): string | undefined =>
   val?.trim().replace(/\/+$/, '') || undefined
 
+/** Clears SDK API cache when credentials change */
+const clearApiCache = () => {
+  // Dynamic import to avoid circular dependency
+  import('@/services/jellyfin/sdk').then((sdk) => sdk.clearApiCache())
+}
+
 export const useApiStore = create<ApiStore>()(
   persist(
     (set) => ({
       ...initialState,
-      setServerAddress: (serverAddress) =>
-        set({ serverAddress: sanitize(serverAddress) ?? '' }),
-      setApiKey: (apiKey) => set({ apiKey: sanitize(apiKey) }),
+      setServerAddress: (serverAddress) => {
+        clearApiCache()
+        set({ serverAddress: sanitize(serverAddress) ?? '' })
+      },
+      setApiKey: (apiKey) => {
+        clearApiCache()
+        set({ apiKey: sanitize(apiKey) })
+      },
       setServerVersion: (serverVersion) => set({ serverVersion }),
       setConnectionStatus: (validConnection, validAuth) =>
         set({ validConnection, validAuth }),
-      resetConnection: () =>
-        set({ validConnection: false, validAuth: false, serverVersion: '' }),
+      resetConnection: () => {
+        clearApiCache()
+        set({ validConnection: false, validAuth: false, serverVersion: '' })
+      },
     }),
     {
       name: 'segment-editor-api',

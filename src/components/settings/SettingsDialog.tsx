@@ -34,9 +34,6 @@ import { showNotification } from '@/lib/notifications'
 import { isValidServerUrl } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
 
-/** Plugin mode singleton - computed once */
-const pluginMode = isPluginMode()
-
 export function SettingsDialog() {
   const { t, i18n } = useTranslation()
   const [isTesting, setIsTesting] = useState(false)
@@ -44,6 +41,9 @@ export function SettingsDialog() {
   const triggerRef = useRef<HTMLElement | null>(null)
   // AbortController ref for cancelling in-flight connection tests
   const testAbortRef = useRef<AbortController | null>(null)
+
+  // Check plugin mode dynamically (parent ApiClient may load after iframe)
+  const pluginMode = isPluginMode()
 
   // Session store - single subscription
   const { settingsOpen, setSettingsOpen, pageSize, setPageSize } =
@@ -240,7 +240,8 @@ export function SettingsDialog() {
                 <SettingsField label={t('login.server_address')}>
                   <input
                     id="server-address"
-                    type="url"
+                    type="text"
+                    inputMode="url"
                     placeholder="https://jellyfin.example.com"
                     value={serverAddress}
                     onChange={handleServerAddressChange}

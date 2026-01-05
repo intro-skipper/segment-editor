@@ -26,6 +26,7 @@ import {
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
+import { usePluginMode } from '../hooks/use-plugin-mode'
 import { useApiStore } from '../stores/api-store'
 import { testConnection } from '../services/jellyfin/client'
 
@@ -126,24 +127,26 @@ function NotFoundComponent() {
 
 /**
  * Root layout component that initializes the application.
- * - Tests server connection on startup
- * - Initializes plugin mode detection
+ * - Auto-connects in plugin mode when parent ApiClient is available
+ * - Tests server connection on startup for standalone mode
  * - Renders global UI elements (Header, Settings, Toaster)
  */
 function RootComponent() {
   const { t } = useTranslation()
   const serverAddress = useApiStore((state) => state.serverAddress)
 
-  // Test connection on app start if server address is configured
-  // Uses AbortController to prevent state updates after unmount
+  // Plugin mode handles its own auto-connection
+  const { isPlugin } = usePluginMode()
+
+  // Test connection on app start for standalone mode (non-plugin)
   useEffect(() => {
-    if (!serverAddress) return
+    if (isPlugin || !serverAddress) return
 
     const controller = new AbortController()
     testConnection({ signal: controller.signal })
 
     return () => controller.abort()
-  }, [serverAddress])
+  }, [isPlugin, serverAddress])
 
   return (
     <div className="min-h-screen">

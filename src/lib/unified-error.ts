@@ -5,6 +5,9 @@
  * Tokens, API keys, and other sensitive data are never exposed in error messages.
  */
 
+import type { ErrorInfo } from 'react'
+import type { ZodError } from 'zod'
+
 export const ErrorCodes = {
   API_UNAVAILABLE: 'API_UNAVAILABLE',
   NETWORK_ERROR: 'NETWORK_ERROR',
@@ -223,4 +226,82 @@ export const getErrorMessage = (error: unknown): string => {
         : 'An unexpected error occurred'
   // Security: Sanitize error message to prevent credential leakage
   return sanitizeErrorMessage(rawMessage)
+}
+
+// ============================================================================
+// Logging utilities
+// ============================================================================
+
+export interface ErrorLogContext {
+  component?: string
+  context?: Record<string, unknown>
+  action?: string
+  severity?: 'low' | 'medium' | 'high' | 'critical'
+}
+
+export interface LoggedError {
+  message: string
+  stack?: string
+  componentStack?: string
+  timestamp: string
+  context: ErrorLogContext
+}
+
+/** Logs an error with context. Dev: full details. Prod: condensed.
+ * Security: All messages are sanitized to prevent credential leakage.
+ */
+export function logError(
+  error: Error,
+  errorInfo?: ErrorInfo | null,
+  context: ErrorLogContext = {},
+): LoggedError {
+  const sanitizedMessage = sanitizeErrorMessage(error.message)
+
+  const loggedError: LoggedError = {
+    message: sanitizedMessage,
+    stack: error.stack,
+    componentStack: errorInfo?.componentStack ?? undefined,
+    timestamp: new Date().toISOString(),
+    context: { severity: 'medium', ...context },
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.group(`🚨 Error: ${sanitizedMessage}`)
+    console.error('Error:', error)
+    if (errorInfo?.componentStack)
+      console.error('Component Stack:', errorInfo.componentStack)
+    if (Object.keys(context).length > 0) console.info('Context:', context)
+    console.groupEnd()
+  } else {
+    console.error(
+      `[${loggedError.timestamp}] ${context.component ?? 'Unknown'}: ${sanitizedMessage}`,
+    )
+  }
+
+  return loggedError
+}
+
+/**
+ * Logs an API error with consistent formatting.
+ * Security: Error messages are sanitized to prevent credential leakage.
+ */
+export function logApiError(
+  error: { message: string; code: string; recoverable: boolean },
+  context?: string,
+): void {
+  const sanitizedMessage = sanitizeErrorMessage(error.message)
+  console.error(`[API]${context ? ` ${context}:` : ''} ${sanitizedMessage}`, {
+    code: error.code,
+    recoverable: error.recoverable,
+  })
+}
+
+/** Logs validation warnings for API responses with context. */
+export function logValidationWarning(context: string, error: ZodError): void {
+  console.warn(`[${context}] Validation warning:`, {
+    issues: error.issues.map((i) => ({
+      path: i.path.join('.'),
+      message: i.message,
+    })),
+  })
 }

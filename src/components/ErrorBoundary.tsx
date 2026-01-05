@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { logError } from '@/lib/error-logger'
+import { logError } from '@/lib/unified-error'
 
 export interface ErrorBoundaryProps {
   /** Child components to wrap */

@@ -5,12 +5,18 @@
 
 import { PluginStatus } from '@jellyfin/sdk/lib/generated-client'
 import type { PluginInfo } from '@jellyfin/sdk/lib/generated-client'
-import type { ApiOptions } from '@/lib/api-utils'
-import { getTypedApis } from '@/services/jellyfin/sdk'
-import { AppError, ErrorCodes, isAbortError } from '@/lib/unified-error'
+import type { ApiOptions } from '@/services/jellyfin/sdk'
+import {
+  getRequestConfig,
+  withApi,
+} from '@/services/jellyfin/sdk'
+import {
+  AppError,
+  ErrorCodes,
+  logApiError,
+  logValidationWarning,
+} from '@/lib/unified-error'
 import { PluginInfoArraySchema } from '@/lib/schemas'
-import { logValidationWarning } from '@/lib/validation-logger'
-import { getRequestConfig, logApiError } from '@/lib/api-utils'
 
 export type PluginDetectionOptions = ApiOptions
 
@@ -89,25 +95,30 @@ const categorizeError = (error: unknown): PluginCheckError => {
 export async function testServerPlugins(
   options?: PluginDetectionOptions,
 ): Promise<PluginTestResult> {
-  if (options?.signal?.aborted) {
-    return createDefaultResult({
-      type: 'unknown',
-      message: 'Request cancelled',
-    })
-  }
-
-  const apis = getTypedApis()
-  if (!apis) {
-    return createDefaultResult({
-      type: 'auth',
-      message: 'API not available: Please configure server connection',
-    })
-  }
-
   try {
-    const { data: plugins } = await apis.pluginsApi.getPlugins(
-      getRequestConfig(options),
+    const plugins = await withApi(
+      async (apis) => {
+        const { data } = await apis.pluginsApi.getPlugins(
+          getRequestConfig(options),
+        )
+        return data
+      },
+      options,
     )
+
+    // withApi returns null on abort or unavailable
+    if (plugins === null) {
+      if (options?.signal?.aborted) {
+        return createDefaultResult({
+          type: 'unknown',
+          message: 'Request cancelled',
+        })
+      }
+      return createDefaultResult({
+        type: 'auth',
+        message: 'API not available: Please configure server connection',
+      })
+    }
 
     const validation = PluginInfoArraySchema.safeParse(plugins)
     if (!validation.success)
@@ -120,12 +131,6 @@ export async function testServerPlugins(
       segmentsApi: checkPluginStatus(plugins, PLUGIN_NAMES.SEGMENTS_API),
     }
   } catch (error) {
-    if (isAbortError(error)) {
-      return createDefaultResult({
-        type: 'unknown',
-        message: 'Request cancelled',
-      })
-    }
     const categorized = categorizeError(error)
     logApiError(AppError.from(error), `Plugin Detection (${categorized.type})`)
     return createDefaultResult(categorized)

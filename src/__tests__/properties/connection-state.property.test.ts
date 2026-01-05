@@ -43,7 +43,15 @@ vi.mock('@/services/jellyfin/sdk', () => ({
     basePath: 'http://localhost:8096',
     axiosInstance: {},
   })),
-  resetSdkState: vi.fn(),
+  clearApiCache: vi.fn(),
+  getRequestConfig: vi.fn((options?: { signal?: AbortSignal; timeout?: number }, defaultTimeout = 30000) => ({
+    signal: options?.signal,
+    timeout: options?.timeout ?? defaultTimeout,
+  })),
+  withApi: vi.fn(async (fn: (apis: typeof mockApis) => Promise<unknown>, options?: { signal?: AbortSignal }) => {
+    if (options?.signal?.aborted) return null
+    return fn(mockApis)
+  }),
 }))
 
 // Custom arbitrary for hex strings (API keys)

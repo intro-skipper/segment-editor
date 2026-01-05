@@ -2,30 +2,33 @@
  * Segment API service.
  * Handles CRUD operations for media segments.
  *
- * Security: All inputs are validated before use, and URL parameters are properly encoded.
+ * Architecture:
+ * - Uses withApi pattern consistently for all operations
+ * - Validation separated from API calls (SRP)
+ * - Time conversion handled at boundary (UI seconds <-> server ticks)
+ *
+ * Security: All inputs validated before use, URL parameters properly encoded.
  */
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import type { ApiOptions } from '@/lib/api-utils'
+import type { ApiOptions } from '@/services/jellyfin/sdk'
+import type { RetryOptions } from '@/lib/retry-utils'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
 import { API_CONFIG } from '@/lib/constants'
-import { AppError, isAbortError } from '@/lib/unified-error'
 import { withRetryOrFalse } from '@/lib/retry-utils'
-import { getAuthHeaders } from '@/lib/header-utils'
 import {
   MediaSegmentArraySchema,
   encodeUrlParam,
   isValidItemId,
   isValidProviderId,
 } from '@/lib/schemas'
-import { logValidationWarning } from '@/lib/validation-logger'
-import { getRequestConfig, getRetryOptions, logApiError } from '@/lib/api-utils'
+import { logValidationWarning } from '@/lib/unified-error'
 import { useAppStore } from '@/stores/app-store'
 import {
-  getAccessToken,
+  getRequestConfig,
   getServerBaseUrl,
-  getTypedApis,
+  withApi,
 } from '@/services/jellyfin/sdk'
 
 export interface CreateSegmentInput {
@@ -37,6 +40,21 @@ export interface CreateSegmentInput {
 
 export type SegmentApiOptions = ApiOptions
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Retry Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+const getRetryOptions = (options?: { signal?: AbortSignal }): RetryOptions => ({
+  maxRetries: API_CONFIG.MAX_RETRIES,
+  baseDelay: API_CONFIG.BASE_RETRY_DELAY_MS,
+  maxDelay: API_CONFIG.MAX_RETRY_DELAY_MS,
+  signal: options?.signal,
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Time Conversion (Boundary Layer)
+// ─────────────────────────────────────────────────────────────────────────────
+
 /** Converts server ticks to UI seconds */
 const toUiSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   ...s,
@@ -44,7 +62,7 @@ const toUiSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   EndTicks: ticksToSeconds(s.EndTicks),
 })
 
-/** Converts UI seconds to server ticks */
+/** Converts UI seconds to server ticks, ensuring ID exists */
 const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   ...s,
   Id: s.Id || generateUUID(),
@@ -52,26 +70,29 @@ const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   EndTicks: secondsToTicks(s.EndTicks ?? 0),
 })
 
-/** Validation result for segment operations */
+// ─────────────────────────────────────────────────────────────────────────────
+// Validation (Single Responsibility)
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface SegmentValidation {
   valid: boolean
   provider?: string
 }
 
 /** Validates segment creation prerequisites */
-function validateSegmentCreation(
+const validateForCreate = (
   segment: MediaSegmentDto,
   providerId?: string,
-): SegmentValidation {
+): SegmentValidation => {
   const provider = providerId ?? useAppStore.getState().providerId
 
   if (!provider || !isValidProviderId(provider)) {
-    console.error('Invalid or missing provider ID')
+    console.error('[Segments] Invalid or missing provider ID')
     return { valid: false }
   }
 
   if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
-    console.error('Invalid or missing Item ID')
+    console.error('[Segments] Invalid or missing Item ID')
     return { valid: false }
   }
 
@@ -79,38 +100,49 @@ function validateSegmentCreation(
 }
 
 /** Validates segment input data */
-function validateSegmentInput(input: CreateSegmentInput): boolean {
-  if (
-    !input.itemId ||
-    input.startSeconds < 0 ||
-    input.endSeconds < 0 ||
-    input.startSeconds >= input.endSeconds
-  ) {
-    console.error('Invalid segment input')
+const validateInput = (input: CreateSegmentInput): boolean => {
+  const { itemId, startSeconds, endSeconds } = input
+  if (!itemId || startSeconds < 0 || endSeconds < 0 || startSeconds >= endSeconds) {
+    console.error('[Segments] Invalid segment input')
     return false
   }
   return true
 }
 
 /** Validates segment deletion prerequisites */
-function validateSegmentDeletion(segment: MediaSegmentDto): boolean {
+const validateForDelete = (segment: MediaSegmentDto): boolean => {
   if (!segment.Id || !isValidItemId(segment.Id)) {
-    console.error('Invalid or missing segment ID')
+    console.error('[Segments] Invalid or missing segment ID')
     return false
   }
   return true
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// API Operations (Using withApi Pattern Consistently)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Builds segment API URL with proper encoding */
+const buildSegmentUrl = (path: string, params?: URLSearchParams): string => {
+  const base = getServerBaseUrl()
+  const qs = params?.toString()
+  return `${base}/MediaSegmentsApi/${path}${qs ? `?${qs}` : ''}`
+}
+
+/** Executes segment mutation with retry logic */
+const withSegmentRetry = <T>(
+  fn: () => Promise<T>,
+  options?: SegmentApiOptions,
+): Promise<T | false> =>
+  withRetryOrFalse(fn, getRetryOptions(options))
+
 export async function getSegmentsById(
   itemId: string,
   options?: SegmentApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
-  if (!itemId || options?.signal?.aborted) return []
+  if (!itemId) return []
 
-  try {
-    const apis = getTypedApis()
-    if (!apis) return []
-
+  const result = await withApi(async (apis) => {
     const { data } = await apis.mediaSegmentsApi.getItemSegments(
       { itemId },
       getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
@@ -118,18 +150,14 @@ export async function getSegmentsById(
     const segments = data.Items ?? []
 
     const validation = MediaSegmentArraySchema.safeParse(segments)
-    if (!validation.success)
+    if (!validation.success) {
       logValidationWarning('Segment API', validation.error)
+    }
 
     return segments.map(toUiSegment)
-  } catch (error) {
-    if (isAbortError(error)) return []
-    logApiError(
-      AppError.from(error, 'Failed to fetch segments'),
-      'Segments API',
-    )
-    return []
-  }
+  }, options)
+
+  return result ?? []
 }
 
 export async function createSegment(
@@ -137,31 +165,29 @@ export async function createSegment(
   providerId?: string,
   options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  const validation = validateSegmentCreation(segment, providerId)
+  const validation = validateForCreate(segment, providerId)
   if (!validation.valid) return false
 
-  if (options?.signal?.aborted) return false
-
-  const apis = getTypedApis()
-  if (!apis) return false
-
-  // Security: Properly encode URL parameters to prevent injection
-  const url = `${getServerBaseUrl()}/MediaSegmentsApi/${encodeUrlParam(segment.ItemId!)}?providerId=${encodeUrlParam(validation.provider!)}`
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(getAccessToken()),
-  }
-
-  const result = await withRetryOrFalse(async () => {
-    const { data } = await apis.api.axiosInstance.post<MediaSegmentDto>(
-      url,
-      toServerSegment(segment),
-      { headers, ...getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS) },
+  const result = await withApi(async (apis) => {
+    const url = buildSegmentUrl(
+      encodeUrlParam(segment.ItemId!),
+      new URLSearchParams({ providerId: validation.provider! }),
     )
-    return toUiSegment(data)
-  }, getRetryOptions(options))
 
-  if (result === false) console.error('Failed to create segment after retries')
+    return withSegmentRetry(async () => {
+      const { data } = await apis.api.axiosInstance.post<MediaSegmentDto>(
+        url,
+        toServerSegment(segment),
+        getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
+      )
+      return toUiSegment(data)
+    }, options)
+  }, options)
+
+  if (result === null || result === false) {
+    console.error('[Segments] Failed to create segment')
+    return false
+  }
   return result
 }
 
@@ -170,7 +196,7 @@ export async function createSegmentFromInput(
   providerId?: string,
   options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  if (!validateSegmentInput(input)) return false
+  if (!validateInput(input)) return false
 
   return createSegment(
     {
@@ -189,34 +215,33 @@ export async function deleteSegment(
   segment: MediaSegmentDto,
   options?: SegmentApiOptions,
 ): Promise<boolean> {
-  if (!validateSegmentDeletion(segment)) return false
+  if (!validateForDelete(segment)) return false
 
-  if (options?.signal?.aborted) return false
+  const result = await withApi(async (apis) => {
+    const params = new URLSearchParams()
+    if (segment.ItemId && isValidItemId(segment.ItemId)) {
+      params.set('itemId', segment.ItemId)
+    }
+    if (segment.Type != null) {
+      params.set('type', String(segment.Type))
+    }
 
-  const apis = getTypedApis()
-  if (!apis) return false
+    const url = buildSegmentUrl(encodeUrlParam(segment.Id!), params)
 
-  // Security: Properly encode URL parameters to prevent injection
-  const params = new URLSearchParams()
-  if (segment.ItemId && isValidItemId(segment.ItemId)) {
-    params.set('itemId', segment.ItemId)
+    return withSegmentRetry(async () => {
+      await apis.api.axiosInstance.delete(
+        url,
+        getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
+      )
+      return true
+    }, options)
+  }, options)
+
+  if (result === null || result === false) {
+    console.error('[Segments] Failed to delete segment')
+    return false
   }
-  if (segment.Type != null) {
-    params.set('type', String(segment.Type))
-  }
-
-  const url = `${getServerBaseUrl()}/MediaSegmentsApi/${encodeUrlParam(segment.Id!)}?${params}`
-
-  const result = await withRetryOrFalse(async () => {
-    await apis.api.axiosInstance.delete(url, {
-      headers: getAuthHeaders(getAccessToken()),
-      ...getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
-    })
-    return true
-  }, getRetryOptions(options))
-
-  if (result === false) console.error('Failed to delete segment after retries')
-  return result !== false
+  return true
 }
 
 export async function updateSegment(
@@ -226,8 +251,10 @@ export async function updateSegment(
   options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
   if (options?.signal?.aborted) return false
+
   const deleted = await deleteSegment(oldSegment, options)
   if (!deleted || options?.signal?.aborted) return false
+
   return createSegment(newSegment, providerId, options)
 }
 
@@ -245,7 +272,9 @@ export async function batchSaveSegments(
     existingSegments.map((s) => deleteSegment(s, options)),
   )
   const failures = deleteResults.filter((r) => r.status === 'rejected').length
-  if (failures > 0) console.warn(`${failures} segment deletions failed`)
+  if (failures > 0) {
+    console.warn(`[Segments] ${failures} deletions failed`)
+  }
 
   if (options?.signal?.aborted) return []
 
