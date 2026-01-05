@@ -7,7 +7,7 @@ import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/SegmentEditor/',
+  base: 'https://appassets.androidplatform.net/assets/dist/',
   plugins: [
     devtools(),
     tanstackRouter({
