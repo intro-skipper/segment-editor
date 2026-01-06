@@ -27,8 +27,13 @@ const initialState: ApiState = {
   validAuth: false,
 }
 
-const sanitize = (val: string | undefined): string | undefined =>
+/** Sanitizes URL by trimming whitespace and removing trailing slashes */
+export const sanitizeUrl = (val: string | undefined): string | undefined =>
   val?.trim().replace(/\/+$/, '') || undefined
+
+/** Sanitizes API key by trimming whitespace */
+const sanitizeKey = (val: string | undefined): string | undefined =>
+  val?.trim() || undefined
 
 /** Clears SDK API cache when credentials change */
 const clearApiCache = () => {
@@ -42,11 +47,12 @@ export const useApiStore = create<ApiStore>()(
       ...initialState,
       setServerAddress: (serverAddress) => {
         clearApiCache()
-        set({ serverAddress: sanitize(serverAddress) ?? '' })
+        // Store raw value - sanitization happens when URL is used
+        set({ serverAddress: serverAddress.trim() })
       },
       setApiKey: (apiKey) => {
         clearApiCache()
-        set({ apiKey: sanitize(apiKey) })
+        set({ apiKey: sanitizeKey(apiKey) })
       },
       setServerVersion: (serverVersion) => set({ serverVersion }),
       setConnectionStatus: (validConnection, validAuth) =>
@@ -63,8 +69,8 @@ export const useApiStore = create<ApiStore>()(
         const p = persisted as Partial<ApiState> | null
         return {
           ...current,
-          serverAddress: sanitize(p?.serverAddress) ?? '',
-          apiKey: sanitize(p?.apiKey),
+          serverAddress: p?.serverAddress?.trim() ?? '',
+          apiKey: sanitizeKey(p?.apiKey),
         }
       },
     },

@@ -177,13 +177,16 @@ export default function Header() {
 
         if (!isSearchShortcut) return
 
+        // Skip if user is typing in an input field
         const target = e.target as HTMLElement
-        const isEditable =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
+        const tagName = target.tagName.toUpperCase()
+        if (
+          tagName === 'INPUT' ||
+          tagName === 'TEXTAREA' ||
           target.isContentEditable
-
-        if (isEditable) return
+        ) {
+          return
+        }
 
         e.preventDefault()
         setCommandPaletteOpen(true)
