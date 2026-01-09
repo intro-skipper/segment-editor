@@ -1,30 +1,34 @@
 /**
  * PlayerScrubber component.
  * Timeline scrubber for video playback with seek functionality.
- * Requirements: 3.5
+ * Supports mouse, touch, and keyboard interactions.
  */
 
 import * as React from 'react'
+
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
+import type { SessionStore } from '@/stores/session-store'
 import { cn } from '@/lib/utils'
 import { formatTime } from '@/lib/time-utils'
+import { useSessionStore } from '@/stores/session-store'
+import { handleRangeKeyboard } from '@/lib/keyboard-utils'
+
+/** Step sizes for scrubber keyboard navigation */
+const SCRUBBER_STEP_FINE = 5
+const SCRUBBER_STEP_COARSE = 10
 
 export interface PlayerScrubberProps {
-  /** Current playback time in seconds */
   currentTime: number
-  /** Total duration in seconds */
   duration: number
-  /** Buffered time in seconds */
   buffered?: number
-  /** Callback when user seeks to a new time */
   onSeek: (time: number) => void
-  /** Additional class names */
   className?: string
 }
 
-/**
- * Timeline scrubber component for video playback.
- * Displays current time, allows seeking via click/drag.
- */
+// Stable selector to prevent re-renders - returns primitive reference
+const selectVibrantColors = (s: SessionStore): VibrantColors | null =>
+  s.vibrantColors
+
 export function PlayerScrubber({
   currentTime,
   duration,
@@ -32,185 +36,192 @@ export function PlayerScrubber({
   onSeek,
   className,
 }: PlayerScrubberProps) {
+  const vibrantColors = useSessionStore(selectVibrantColors)
   const scrubberRef = React.useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
   const [hoverTime, setHoverTime] = React.useState<number | null>(null)
   const [hoverPosition, setHoverPosition] = React.useState(0)
 
-  // Refs for stable callback references
-  const durationRef = React.useRef(duration)
-  const onSeekRef = React.useRef(onSeek)
-  const isDraggingRef = React.useRef(isDragging)
-
-  React.useEffect(() => {
-    durationRef.current = duration
-  }, [duration])
-  React.useEffect(() => {
-    onSeekRef.current = onSeek
-  }, [onSeek])
-  React.useEffect(() => {
-    isDraggingRef.current = isDragging
-  }, [isDragging])
-
-  // Calculate progress percentages
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
   const bufferedProgress = duration > 0 ? (buffered / duration) * 100 : 0
 
-  // Calculate time from mouse position - stable reference
-  const getTimeFromPosition = React.useCallback((clientX: number): number => {
-    if (!scrubberRef.current || durationRef.current <= 0) return 0
-
-    const rect = scrubberRef.current.getBoundingClientRect()
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width))
-    const percentage = x / rect.width
-    return percentage * durationRef.current
-  }, [])
-
-  // Handle mouse down - start dragging
-  const handleMouseDown = React.useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      setIsDragging(true)
-      const time = getTimeFromPosition(e.clientX)
-      onSeekRef.current(time)
+  const getTimeFromPosition = React.useCallback(
+    (clientX: number): number => {
+      const scrubber = scrubberRef.current
+      if (!scrubber || duration <= 0) return 0
+      const rect = scrubber.getBoundingClientRect()
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width))
+      return (x / rect.width) * duration
     },
-    [getTimeFromPosition],
+    [duration],
   )
 
-  // Handle mouse move - update hover preview and drag
-  const handleMouseMove = React.useCallback(
-    (e: React.MouseEvent) => {
-      if (!scrubberRef.current) return
+  const handlePointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      setIsDragging(true)
+      onSeek(getTimeFromPosition(e.clientX))
+    },
+    [getTimeFromPosition, onSeek],
+  )
 
-      const rect = scrubberRef.current.getBoundingClientRect()
+  const handlePointerMove = React.useCallback(
+    (e: React.PointerEvent) => {
+      const scrubber = scrubberRef.current
+      if (!scrubber) return
+
+      const rect = scrubber.getBoundingClientRect()
       const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-      const time = getTimeFromPosition(e.clientX)
-
-      setHoverTime(time)
+      setHoverTime(getTimeFromPosition(e.clientX))
       setHoverPosition(x)
 
-      if (isDraggingRef.current) {
-        onSeekRef.current(time)
-      }
+      if (isDragging) onSeek(getTimeFromPosition(e.clientX))
     },
-    [getTimeFromPosition],
+    [getTimeFromPosition, isDragging, onSeek],
   )
 
-  // Handle mouse leave - clear hover state
-  const handleMouseLeave = React.useCallback(() => {
+  const handlePointerUp = React.useCallback((e: React.PointerEvent) => {
+    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    setIsDragging(false)
+  }, [])
+
+  const handlePointerLeave = React.useCallback(() => {
     setHoverTime(null)
   }, [])
 
-  // Global mouse up handler for drag end - stable reference
-  React.useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsDragging(false)
-    }
+  const handleKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (duration <= 0) return
 
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isDraggingRef.current) {
-        const time = getTimeFromPosition(e.clientX)
-        onSeekRef.current(time)
+      const result = handleRangeKeyboard(e.key, e.shiftKey, {
+        min: 0,
+        max: duration,
+        value: currentTime,
+        stepFine: SCRUBBER_STEP_FINE,
+        stepCoarse: SCRUBBER_STEP_COARSE,
+      })
+
+      if (result.handled) {
+        e.preventDefault()
+        onSeek(result.newValue)
       }
-    }
+    },
+    [currentTime, duration, onSeek],
+  )
 
-    if (isDragging) {
-      document.addEventListener('mouseup', handleGlobalMouseUp)
-      document.addEventListener('mousemove', handleGlobalMouseMove)
-    }
+  // Memoize dynamic styles to prevent object recreation
+  const trackStyle = React.useMemo(
+    () =>
+      vibrantColors
+        ? { backgroundColor: vibrantColors.primary + '30' }
+        : undefined,
+    [vibrantColors],
+  )
 
-    return () => {
-      document.removeEventListener('mouseup', handleGlobalMouseUp)
-      document.removeEventListener('mousemove', handleGlobalMouseMove)
-    }
-  }, [isDragging, getTimeFromPosition])
+  const progressStyle = React.useMemo(
+    () => ({
+      width: `${progress}%`,
+      backgroundColor: vibrantColors?.accent,
+    }),
+    [progress, vibrantColors?.accent],
+  )
+
+  const thumbStyle = React.useMemo(
+    () => ({
+      left: `${progress}%`,
+      backgroundColor: vibrantColors?.accent,
+      boxShadow: vibrantColors
+        ? `0 0 0 2px ${vibrantColors.primary}40, 0 4px 6px -1px rgba(0, 0, 0, 0.1)`
+        : undefined,
+      transform: 'translate(-50%, -50%)',
+    }),
+    [progress, vibrantColors],
+  )
+
+  // Memoize buffered progress style
+  const bufferedStyle = React.useMemo(
+    () => ({ width: `${bufferedProgress}%` }),
+    [bufferedProgress],
+  )
+
+  // Memoize hover indicator style
+  const hoverIndicatorStyle = React.useMemo(
+    () => ({ left: hoverPosition, transform: 'translateX(-50%)' }),
+    [hoverPosition],
+  )
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      {/* Current time display */}
-      <span className="text-xs text-muted-foreground font-mono min-w-[70px]">
+      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)]">
         {formatTime(currentTime)}
       </span>
 
-      {/* Scrubber track */}
       <div
         ref={scrubberRef}
-        className="relative flex-1 h-2 cursor-pointer group"
+        className="relative flex-1 h-2 cursor-pointer group touch-none"
+        style={{ contain: 'layout style' }}
         role="slider"
         aria-label="Video progress"
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(currentTime)}
         aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+        aria-orientation="horizontal"
         tabIndex={0}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onKeyDown={(e) => {
-          const step = e.shiftKey ? 10 : 5
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault()
-            onSeek(Math.max(0, currentTime - step))
-          } else if (e.key === 'ArrowRight') {
-            e.preventDefault()
-            onSeek(Math.min(duration, currentTime + step))
-          } else if (e.key === 'Home') {
-            e.preventDefault()
-            onSeek(0)
-          } else if (e.key === 'End') {
-            e.preventDefault()
-            onSeek(duration)
-          }
-        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        onKeyDown={handleKeyDown}
       >
-        {/* Background track */}
-        <div className="absolute inset-0 bg-muted rounded-full overflow-hidden">
-          {/* Buffered progress */}
+        <div
+          className={cn(
+            'absolute inset-0 rounded-full overflow-hidden',
+            !vibrantColors && 'bg-muted',
+          )}
+          style={trackStyle}
+        >
           <div
-            className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full transition-transform"
-            style={{ width: `${bufferedProgress}%` }}
+            className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full"
+            style={bufferedStyle}
           />
-          {/* Playback progress */}
           <div
-            className="absolute inset-y-0 left-0 bg-primary rounded-full transition-transform"
-            style={{ width: `${progress}%` }}
+            className={cn(
+              'absolute inset-y-0 left-0 rounded-full',
+              !vibrantColors && 'bg-primary',
+            )}
+            style={progressStyle}
           />
         </div>
 
-        {/* Hover indicator */}
         <div
           className={cn(
             'absolute top-0 w-0.5 h-full bg-white/50 pointer-events-none transition-opacity',
             hoverTime !== null ? 'opacity-100' : 'opacity-0',
           )}
-          style={{ left: `${hoverPosition}px`, transform: 'translateX(-50%)' }}
+          style={hoverIndicatorStyle}
         />
 
-        {/* Playback head */}
         <div
-          className="absolute top-1/2 w-4 h-4 bg-primary rounded-full shadow-md transition-transform group-hover:scale-110"
-          style={{
-            left: `${progress}%`,
-            transform: 'translate(-50%, -50%)',
-          }}
+          className={cn(
+            'absolute top-1/2 w-4 h-4 rounded-full shadow-md transition-transform group-hover:scale-110',
+            !vibrantColors && 'bg-primary',
+          )}
+          style={thumbStyle}
         />
 
-        {/* Hover time tooltip */}
         {hoverTime !== null && (
           <div
             className="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none"
-            style={{
-              left: `${hoverPosition}px`,
-              transform: 'translateX(-50%)',
-            }}
+            style={hoverIndicatorStyle}
           >
             {formatTime(hoverTime)}
           </div>
         )}
       </div>
 
-      {/* Duration display */}
-      <span className="text-xs text-muted-foreground font-mono min-w-[70px] text-right">
+      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)] text-right">
         {formatTime(duration)}
       </span>
     </div>

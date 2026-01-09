@@ -1,18 +1,22 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Loader2, XCircle } from 'lucide-react'
+import {
+  CheckCircle,
+  Globe,
+  Loader2,
+  Monitor,
+  Palette,
+  Server,
+  Settings2,
+  XCircle,
+} from 'lucide-react'
+import { useShallow } from 'zustand/shallow'
 
 import type { Locale, Theme } from '@/stores/app-store'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import type { PageSize } from '@/stores/session-store'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -21,44 +25,99 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { useSessionStore } from '@/stores/session-store'
+import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
 import { useApiStore } from '@/stores/api-store'
-import { useAppStore } from '@/stores/app-store'
+import { getEffectiveLocale, useAppStore } from '@/stores/app-store'
 import { testConnection } from '@/services/jellyfin/client'
+import { isPluginMode } from '@/services/jellyfin/sdk'
 import { showNotification } from '@/lib/notifications'
+import { isValidServerUrl } from '@/lib/schemas'
+import { cn } from '@/lib/utils'
 
 export function SettingsDialog() {
   const { t, i18n } = useTranslation()
   const [isTesting, setIsTesting] = useState(false)
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
+  // AbortController ref for cancelling in-flight connection tests
+  const testAbortRef = useRef<AbortController | null>(null)
 
-  // Session store
-  const settingsOpen = useSessionStore((state) => state.settingsOpen)
-  const setSettingsOpen = useSessionStore((state) => state.setSettingsOpen)
+  // Check plugin mode dynamically (parent ApiClient may load after iframe)
+  const pluginMode = isPluginMode()
 
-  // API store
-  const serverAddress = useApiStore((state) => state.serverAddress)
-  const setServerAddress = useApiStore((state) => state.setServerAddress)
-  const apiKey = useApiStore((state) => state.apiKey)
-  const setApiKey = useApiStore((state) => state.setApiKey)
-  const validConnection = useApiStore((state) => state.validConnection)
-  const validAuth = useApiStore((state) => state.validAuth)
-  const serverVersion = useApiStore((state) => state.serverVersion)
-  const isPluginMode = useApiStore((state) => state.isPluginMode)
+  // Session store - single subscription
+  const { settingsOpen, setSettingsOpen, pageSize, setPageSize } =
+    useSessionStore(
+      useShallow((s) => ({
+        settingsOpen: s.settingsOpen,
+        setSettingsOpen: s.setSettingsOpen,
+        pageSize: s.pageSize,
+        setPageSize: s.setPageSize,
+      })),
+    )
 
-  // App store
-  const theme = useAppStore((state) => state.theme)
-  const setTheme = useAppStore((state) => state.setTheme)
-  const locale = useAppStore((state) => state.locale)
-  const setLocale = useAppStore((state) => state.setLocale)
-  const providerId = useAppStore((state) => state.providerId)
-  const setProviderId = useAppStore((state) => state.setProviderId)
+  // Store the trigger element when dialog opens for focus restoration
+  useEffect(() => {
+    if (settingsOpen) {
+      triggerRef.current = document.activeElement as HTMLElement
+    }
+  }, [settingsOpen])
 
-  const handleTestConnection = async () => {
+  // Handle dialog close with focus restoration
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      setSettingsOpen(open)
+      if (!open) {
+        // Cancel any in-flight connection test when dialog closes
+        testAbortRef.current?.abort()
+        testAbortRef.current = null
+        // Restore focus to the element that triggered the dialog
+        setTimeout(() => {
+          triggerRef.current?.focus()
+        }, 0)
+      }
+    },
+    [setSettingsOpen],
+  )
+
+  // API store - single subscription
+  const {
+    serverAddress,
+    setServerAddress,
+    apiKey,
+    setApiKey,
+    validConnection,
+    validAuth,
+    serverVersion,
+  } = useApiStore(
+    useShallow((s) => ({
+      serverAddress: s.serverAddress,
+      setServerAddress: s.setServerAddress,
+      apiKey: s.apiKey,
+      setApiKey: s.setApiKey,
+      validConnection: s.validConnection,
+      validAuth: s.validAuth,
+      serverVersion: s.serverVersion,
+    })),
+  )
+
+  // App store - single subscription
+  const { theme, setTheme, locale, setLocale, providerId, setProviderId } =
+    useAppStore(
+      useShallow((s) => ({
+        theme: s.theme,
+        setTheme: s.setTheme,
+        locale: s.locale,
+        setLocale: s.setLocale,
+        providerId: s.providerId,
+        setProviderId: s.setProviderId,
+      })),
+    )
+
+  const handleTestConnection = useCallback(async () => {
     // Validate URL format
-    if (
-      !serverAddress.startsWith('http://') &&
-      !serverAddress.startsWith('https://')
-    ) {
+    if (!isValidServerUrl(serverAddress)) {
+      setUrlError(t('login.validation.url_invalid'))
       showNotification({
         type: 'negative',
         message: t('login.validation.url_invalid'),
@@ -66,9 +125,18 @@ export function SettingsDialog() {
       return
     }
 
+    // Cancel any previous in-flight test
+    testAbortRef.current?.abort()
+    const controller = new AbortController()
+    testAbortRef.current = controller
+
+    setUrlError(null)
     setIsTesting(true)
     try {
-      const result = await testConnection()
+      const result = await testConnection({ signal: controller.signal })
+      // Check if request was cancelled
+      if (result.cancelled) return
+
       if (result.valid) {
         if (result.authenticated) {
           showNotification({
@@ -88,107 +156,156 @@ export function SettingsDialog() {
         })
       }
     } catch {
-      showNotification({
-        type: 'negative',
-        message: t('login.connect_fail'),
-      })
-    } finally {
-      setIsTesting(false)
-    }
-  }
-
-  const handleLocaleChange = (newLocale: Locale) => {
-    setLocale(newLocale)
-    // Apply locale to i18next
-    if (newLocale === 'auto') {
-      const browserLang = navigator.language
-      if (browserLang.startsWith('de')) {
-        i18n.changeLanguage('de')
-      } else if (browserLang.startsWith('fr')) {
-        i18n.changeLanguage('fr')
-      } else {
-        i18n.changeLanguage('en-US')
+      // Only show error if not cancelled
+      if (!controller.signal.aborted) {
+        showNotification({
+          type: 'negative',
+          message: t('login.connect_fail'),
+        })
       }
-    } else {
-      i18n.changeLanguage(newLocale)
+    } finally {
+      // Only update state if not cancelled
+      if (!controller.signal.aborted) {
+        setIsTesting(false)
+      }
     }
-  }
+  }, [serverAddress, t])
+
+  const handleServerAddressChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value
+      setServerAddress(value)
+      // Clear error when user starts typing
+      if (urlError) {
+        setUrlError(null)
+      }
+    },
+    [setServerAddress, urlError],
+  )
+
+  const handleLocaleChange = useCallback(
+    (newLocale: Locale) => {
+      setLocale(newLocale)
+      // Apply resolved locale to i18next
+      i18n.changeLanguage(getEffectiveLocale(newLocale))
+    },
+    [setLocale, i18n],
+  )
 
   return (
-    <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t('app.title')} Settings</DialogTitle>
-        </DialogHeader>
+    <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
+        aria-describedby="settings-description"
+        showCloseButton={false}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 pt-5 pb-3">
+          <div className="size-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Settings2 className="size-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold">
+              {t('app.title')} Settings
+            </h2>
+            <p
+              id="settings-description"
+              className="text-xs text-muted-foreground"
+            >
+              Configure your preferences
+            </p>
+          </div>
+        </div>
 
-        <div className="space-y-6">
+        <div className="max-h-[min(480px,70vh)] overflow-y-auto px-3 pb-3">
           {/* Server Connection Section */}
-          {!isPluginMode && (
-            <>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Server Connection</h3>
-                  {validConnection && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      {validAuth ? (
-                        <CheckCircle className="size-3.5 text-green-500" />
-                      ) : (
-                        <XCircle className="size-3.5 text-destructive" />
-                      )}
-                      <span>{serverVersion || 'Connected'}</span>
-                    </div>
+          {!pluginMode && (
+            <SettingsSection
+              icon={Server}
+              title="Server Connection"
+              badge={
+                validConnection ? (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {validAuth ? (
+                      <CheckCircle className="size-3.5 text-green-500" />
+                    ) : (
+                      <XCircle className="size-3.5 text-destructive" />
+                    )}
+                    <span>{serverVersion || 'Connected'}</span>
+                  </div>
+                ) : null
+              }
+            >
+              <div className="space-y-3">
+                <SettingsField label={t('login.server_address')}>
+                  <input
+                    id="server-address"
+                    type="text"
+                    inputMode="url"
+                    placeholder="https://jellyfin.example.com"
+                    value={serverAddress}
+                    onChange={handleServerAddressChange}
+                    aria-invalid={!!urlError}
+                    aria-describedby={urlError ? 'server-url-error' : undefined}
+                    className={cn(
+                      'w-full h-9 px-3 rounded-lg bg-muted/60 text-sm outline-none transition-colors',
+                      'placeholder:text-muted-foreground',
+                      'focus:bg-muted focus:ring-2 focus:ring-ring/50',
+                      urlError && 'ring-2 ring-destructive/50',
+                    )}
+                  />
+                  {urlError && (
+                    <p
+                      id="server-url-error"
+                      className="text-xs text-destructive mt-1"
+                      role="alert"
+                    >
+                      {urlError}
+                    </p>
                   )}
-                </div>
+                </SettingsField>
 
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="server-address">
-                      {t('login.server_address')}
-                    </Label>
-                    <Input
-                      id="server-address"
-                      type="url"
-                      placeholder="https://jellyfin.example.com"
-                      value={serverAddress}
-                      onChange={(e) => setServerAddress(e.target.value)}
-                    />
-                  </div>
+                <SettingsField label={t('login.api_key')}>
+                  <input
+                    id="api-key"
+                    type="password"
+                    placeholder="••••••••••••••••"
+                    value={apiKey || ''}
+                    onChange={(e) => setApiKey(e.target.value || undefined)}
+                    className="w-full h-9 px-3 rounded-lg bg-muted/60 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:bg-muted focus:ring-2 focus:ring-ring/50"
+                  />
+                </SettingsField>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="api-key">{t('login.api_key')}</Label>
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="••••••••••••••••"
-                      value={apiKey || ''}
-                      onChange={(e) => setApiKey(e.target.value || undefined)}
-                    />
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    onClick={handleTestConnection}
-                    disabled={isTesting || !serverAddress}
-                    className="w-full"
-                  >
-                    {isTesting && <Loader2 className="size-4 animate-spin" />}
-                    {t('login.test_conn')}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={isTesting || !serverAddress}
+                  className="w-full h-9 rounded-lg"
+                  aria-busy={isTesting}
+                  aria-live="polite"
+                >
+                  {isTesting && (
+                    <>
+                      <Loader2
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                      <span className="sr-only">Testing connection</span>
+                    </>
+                  )}
+                  {t('login.test_conn')}
+                </Button>
               </div>
-
-              <Separator />
-            </>
+            </SettingsSection>
           )}
 
-          {/* Theme Selection */}
-          <div className="space-y-3">
-            <Label>{t('app.theme.title')}</Label>
+          {/* Appearance Section */}
+          <SettingsSection icon={Palette} title={t('app.theme.title')}>
             <Select
               value={theme}
               onValueChange={(value) => setTheme(value as Theme)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -197,16 +314,15 @@ export function SettingsDialog() {
                 <SelectItem value="light">{t('app.theme.light')}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </SettingsSection>
 
-          {/* Language Selection */}
-          <div className="space-y-3">
-            <Label>{t('app.locale.title')}</Label>
+          {/* Language Section */}
+          <SettingsSection icon={Globe} title={t('app.locale.title')}>
             <Select
               value={locale}
               onValueChange={(value) => handleLocaleChange(value as Locale)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -216,16 +332,15 @@ export function SettingsDialog() {
                 <SelectItem value="fr">{t('app.locale.fr')}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </SettingsSection>
 
-          {/* Provider Selection */}
-          <div className="space-y-3">
-            <Label>{t('provider.title')}</Label>
+          {/* Provider Section */}
+          <SettingsSection icon={Monitor} title={t('provider.title')}>
             <Select
               value={providerId}
               onValueChange={(value) => value && setProviderId(value)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -240,10 +355,78 @@ export function SettingsDialog() {
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </SettingsSection>
+
+          {/* Page Size Section */}
+          <SettingsSection
+            icon={Settings2}
+            title={t('items.perPage', { defaultValue: 'Items per page' })}
+          >
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) =>
+                value && setPageSize(Number(value) as PageSize)
+              }
+            >
+              <SelectTrigger className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsSection>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Helper components for consistent styling
+interface SettingsSectionProps {
+  icon: typeof Settings2
+  title: string
+  badge?: React.ReactNode
+  children: React.ReactNode
+}
+
+function SettingsSection({
+  icon: Icon,
+  title,
+  badge,
+  children,
+}: SettingsSectionProps) {
+  return (
+    <div className="p-3 rounded-xl hover:bg-muted/40 transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Icon className="size-4 text-muted-foreground" aria-hidden />
+          <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+            {title}
+          </span>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+interface SettingsFieldProps {
+  label: string
+  children: React.ReactNode
+}
+
+function SettingsField({ label, children }: SettingsFieldProps) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {children}
+    </div>
   )
 }
 

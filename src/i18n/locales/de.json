@@ -1,4 +1,28 @@
 {
+  "accessibility": {
+    "copySegment": "Segment in Zwischenablage kopieren",
+    "deleteSegment": "Segment löschen",
+    "seekToStart": "Zur Startzeit springen",
+    "seekToEnd": "Zur Endzeit springen",
+    "playPause": "Video abspielen oder pausieren",
+    "keyboardShortcuts": "Tastaturkürzel anzeigen",
+    "skipTimeSelector": "Sprungzeit auswählen",
+    "dragHandle": "Zum Neuordnen ziehen",
+    "closeDialog": "Dialog schließen",
+    "pagination": {
+      "previous": "Zur vorherigen Seite",
+      "next": "Zur nächsten Seite",
+      "page": "Zu Seite {{page}}"
+    },
+    "mediaCard": {
+      "viewSeries": "Serie anzeigen: {{name}}",
+      "viewArtist": "Künstler anzeigen: {{name}}",
+      "viewAlbum": "Album anzeigen: {{name}}",
+      "playMovie": "Film abspielen: {{name}}",
+      "playEpisode": "Episode abspielen: {{name}}",
+      "play": "Abspielen: {{name}}"
+    }
+  },
   "login": {
     "api_key": "Jellyfin API Key",
     "server_address": "Jellyfin Server Adresse",
@@ -59,7 +83,11 @@
     "end": "Ende",
     "type": "Segment Typ",
     "edit": "Segment bearbeiten",
-    "duration": "Dauer"
+    "duration": "Dauer",
+    "sliderGroup": "{{type}} Segment Bereichsregler",
+    "sliderDescription": "{{type}} Segment von {{start}} bis {{end}}, Dauer {{duration}}. Verwende Pfeiltasten zum Anpassen.",
+    "startHandle": "{{type}} Segment Startgriff",
+    "endHandle": "{{type}} Segment Endgriff"
   },
   "validation": {
     "StartEnd": "Start liegt immer vor dem Ende"
@@ -99,6 +127,7 @@
     "mute": "Stumm",
     "unmute": "Ton an",
     "retry": "Erneut versuchen",
+    "selectEpisode": "Episode auswählen",
     "error": {
       "network": "Netzwerkfehler. Überprüfe deine Verbindung.",
       "media": "Wiedergabefehler. Wiederherstellung wird versucht...",
@@ -111,6 +140,7 @@
     "noEpisodes": "Keine Episoden gefunden",
     "loadingEpisodes": "Lade Episoden für {{season}}...",
     "episodeLoadError": "Episoden konnten nicht geladen werden",
-    "seasonNumber": "Staffel {{number}}"
+    "seasonNumber": "Staffel {{number}}",
+    "episodes": "Episoden"
   }
 }

@@ -1,4 +1,28 @@
 {
+  "accessibility": {
+    "copySegment": "Copier le segment dans le presse-papiers",
+    "deleteSegment": "Supprimer le segment",
+    "seekToStart": "Aller au temps de début",
+    "seekToEnd": "Aller au temps de fin",
+    "playPause": "Lire ou mettre en pause la vidéo",
+    "keyboardShortcuts": "Voir les raccourcis clavier",
+    "skipTimeSelector": "Sélectionner l'intervalle de saut",
+    "dragHandle": "Glisser pour réorganiser",
+    "closeDialog": "Fermer le dialogue",
+    "pagination": {
+      "previous": "Aller à la page précédente",
+      "next": "Aller à la page suivante",
+      "page": "Aller à la page {{page}}"
+    },
+    "mediaCard": {
+      "viewSeries": "Voir la série : {{name}}",
+      "viewArtist": "Voir l'artiste : {{name}}",
+      "viewAlbum": "Voir l'album : {{name}}",
+      "playMovie": "Lire le film : {{name}}",
+      "playEpisode": "Lire l'épisode : {{name}}",
+      "play": "Lire : {{name}}"
+    }
+  },
   "login": {
     "api_key": "Clé d'API Jellyfin",
     "server_address": "Adresse du serveur Jellyfin",
@@ -59,7 +83,11 @@
     "end": "Fin",
     "type": "Type de segment",
     "edit": "Éditer le segment",
-    "duration": "Durée"
+    "duration": "Durée",
+    "sliderGroup": "Curseur de plage du segment {{type}}",
+    "sliderDescription": "Segment {{type}} de {{start}} à {{end}}, durée {{duration}}. Utilisez les touches fléchées pour ajuster.",
+    "startHandle": "Poignée de début du segment {{type}}",
+    "endHandle": "Poignée de fin du segment {{type}}"
   },
   "validation": {
     "StartEnd": "Le début est toujours avant la fin"
@@ -99,6 +127,7 @@
     "mute": "Muet",
     "unmute": "Activer le son",
     "retry": "Réessayer",
+    "selectEpisode": "Sélectionner un épisode",
     "error": {
       "network": "Erreur réseau. Vérifiez votre connexion.",
       "media": "Erreur de lecture. Tentative de récupération...",
@@ -111,6 +140,7 @@
     "noEpisodes": "Aucun épisode trouvé",
     "loadingEpisodes": "Chargement des épisodes pour {{season}}...",
     "episodeLoadError": "Échec du chargement des épisodes",
-    "seasonNumber": "Saison {{number}}"
+    "seasonNumber": "Saison {{number}}",
+    "episodes": "Épisodes"
   }
 }

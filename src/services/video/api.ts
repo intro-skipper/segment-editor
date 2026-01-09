@@ -3,71 +3,29 @@
  * Handles video streaming URLs and image URLs for Jellyfin media.
  */
 
-import { generateUUID } from '../../lib/segment-utils'
 import type { BaseItemDto, ImageType } from '@/types/jellyfin'
-import { buildUrl } from '@/services/jellyfin/client'
+import { generateUUID } from '@/lib/segment-utils'
+import { buildUrl, getOrCreateDeviceId } from '@/services/jellyfin/sdk'
 
-/**
- * Options for generating a video stream URL.
- */
 export interface VideoStreamOptions {
-  /** Item ID to stream */
   itemId: string
-  /** Container format (e.g., 'ts', 'mp4') */
   container?: string
-  /** Audio codec */
   audioCodec?: string
-  /** Video codec */
-  videoCodec?: string
-  /** Maximum streaming bitrate */
   maxStreamingBitrate?: number
-  /** Start position in ticks */
   startTimeTicks?: number
-  /** Whether to enable transcoding */
-  enableTranscoding?: boolean
 }
 
-/**
- * Options for generating an image URL.
- */
 export interface ImageUrlOptions {
-  /** Item ID for the image */
   itemId: string
-  /** Image type */
   imageType?: ImageType
-  /** Maximum width */
   maxWidth?: number
-  /** Maximum height */
   maxHeight?: number
-  /** Image quality (0-100) */
   quality?: number
-  /** Image tag for cache busting */
   tag?: string
-  /** Fill width */
   fillWidth?: number
-  /** Fill height */
   fillHeight?: number
 }
 
-/**
- * Generates a unique device ID for this browser session.
- * Persists to localStorage so transcoding sessions can be tracked.
- */
-function getDeviceId(): string {
-  const storageKey = 'segment-editor-device-id'
-  let deviceId = localStorage.getItem(storageKey)
-  if (!deviceId) {
-    deviceId = generateUUID()
-    localStorage.setItem(storageKey, deviceId)
-  }
-  return deviceId
-}
-
-/**
- * Generates an HLS video stream URL for playback.
- * @param options - Video stream options
- * @returns HLS stream URL
- */
 export function getVideoStreamUrl(options: VideoStreamOptions): string {
   const {
     itemId,
@@ -77,61 +35,35 @@ export function getVideoStreamUrl(options: VideoStreamOptions): string {
     startTimeTicks = 0,
   } = options
 
-  const query = new URLSearchParams()
-  // Required device identification for transcoding
-  query.set('DeviceId', getDeviceId())
-  // MediaSourceId is the itemId without hyphens
-  query.set('MediaSourceId', itemId.replace(/-/g, ''))
-  query.set('PlaySessionId', generateUUID())
-
-  // Video codec preferences - prefer modern codecs for better quality
-  query.set('VideoCodec', 'av1,hevc,h264,vp9')
-  query.set('AudioCodec', audioCodec)
-
-  // Bitrate settings - use high values for quality
-  query.set('VideoBitrate', String(maxStreamingBitrate))
-  query.set('AudioBitrate', '384000')
-  query.set('AudioSampleRate', '48000')
-  query.set('MaxStreamingBitrate', String(maxStreamingBitrate))
-
-  // Transcoding settings
-  query.set('StartTimeTicks', String(startTimeTicks))
-  query.set('TranscodingProtocol', 'hls')
-  query.set('SegmentContainer', container)
-  query.set('MinSegments', '1')
-  query.set('BreakOnNonKeyFrames', 'True')
-  query.set('RequireAvc', 'false')
-  query.set('EnableAudioVbrEncoding', 'true')
-  query.set('TranscodingMaxAudioChannels', '6')
-
-  // Codec profiles for quality
-  query.set('h264-profile', 'high')
-  query.set('h264-level', '51')
-  query.set('hevc-profile', 'main,main10')
-  query.set('hevc-level', '186')
-  query.set('av1-profile', 'main')
+  const query = new URLSearchParams({
+    DeviceId: getOrCreateDeviceId(),
+    MediaSourceId: itemId.replace(/-/g, ''),
+    PlaySessionId: generateUUID(),
+    VideoCodec: 'av1,hevc,h264,vp9',
+    AudioCodec: audioCodec,
+    VideoBitrate: String(maxStreamingBitrate),
+    AudioBitrate: '384000',
+    AudioSampleRate: '48000',
+    MaxStreamingBitrate: String(maxStreamingBitrate),
+    StartTimeTicks: String(startTimeTicks),
+    TranscodingProtocol: 'hls',
+    SegmentContainer: container,
+    MinSegments: '1',
+    BreakOnNonKeyFrames: 'True',
+    RequireAvc: 'false',
+    EnableAudioVbrEncoding: 'true',
+    TranscodingMaxAudioChannels: '6',
+    'h264-profile': 'high',
+    'h264-level': '51',
+    'hevc-profile': 'main,main10',
+    'hevc-level': '186',
+    'av1-profile': 'main',
+  })
 
   return buildUrl(`Videos/${itemId}/master.m3u8`, query)
 }
 
-/**
- * Generates a direct video stream URL (no transcoding).
- * @param itemId - Item ID to stream
- * @returns Direct stream URL
- */
-export function getDirectStreamUrl(itemId: string): string {
-  const query = new URLSearchParams()
-  query.set('Static', 'true')
-
-  return buildUrl(`Videos/${itemId}/stream`, query)
-}
-
-/**
- * Generates an image URL for a media item.
- * @param options - Image URL options
- * @returns Image URL
- */
-export function getImageUrl(options: ImageUrlOptions): string {
+function getImageUrl(options: ImageUrlOptions): string {
   const {
     itemId,
     imageType = 'Primary',
@@ -143,173 +75,67 @@ export function getImageUrl(options: ImageUrlOptions): string {
     fillHeight,
   } = options
 
-  const query = new URLSearchParams()
-  query.set('quality', String(quality))
-
-  if (maxWidth != null) {
-    query.set('maxWidth', String(maxWidth))
-  }
-
-  if (maxHeight != null) {
-    query.set('maxHeight', String(maxHeight))
-  }
-
-  if (fillWidth != null) {
-    query.set('fillWidth', String(fillWidth))
-  }
-
-  if (fillHeight != null) {
-    query.set('fillHeight', String(fillHeight))
-  }
-
-  if (tag) {
-    query.set('tag', tag)
-  }
+  const query = new URLSearchParams({ quality: String(quality) })
+  if (maxWidth != null) query.set('maxWidth', String(maxWidth))
+  if (maxHeight != null) query.set('maxHeight', String(maxHeight))
+  if (fillWidth != null) query.set('fillWidth', String(fillWidth))
+  if (fillHeight != null) query.set('fillHeight', String(fillHeight))
+  if (tag) query.set('tag', tag)
 
   return buildUrl(`Items/${itemId}/Images/${imageType}`, query)
 }
 
-/**
- * Generates a primary image URL for an item.
- * Convenience function for the most common use case.
- * @param itemId - Item ID
- * @param maxWidth - Maximum width
- * @param maxHeight - Maximum height
- * @returns Primary image URL
- */
-export function getPrimaryImageUrl(
-  itemId: string,
-  maxWidth?: number,
-  maxHeight?: number,
-): string {
-  return getImageUrl({
-    itemId,
-    imageType: 'Primary',
-    maxWidth,
-    maxHeight,
-  })
-}
+type ImageCandidate = { itemId: string; imageType: ImageType; tag?: string }
 
-/**
- * Generates a backdrop image URL for an item.
- * @param itemId - Item ID
- * @param maxWidth - Maximum width
- * @returns Backdrop image URL
- */
-export function getBackdropImageUrl(itemId: string, maxWidth?: number): string {
-  return getImageUrl({
-    itemId,
-    imageType: 'Backdrop',
-    maxWidth,
-  })
-}
-
-/**
- * Generates a thumbnail image URL for an item.
- * @param itemId - Item ID
- * @param maxWidth - Maximum width
- * @param maxHeight - Maximum height
- * @returns Thumbnail image URL
- */
-export function getThumbnailImageUrl(
-  itemId: string,
-  maxWidth?: number,
-  maxHeight?: number,
-): string {
-  return getImageUrl({
-    itemId,
-    imageType: 'Thumb',
-    maxWidth,
-    maxHeight,
-  })
-}
-
-/**
- * Gets the best available image URL for an item.
- * Tries primary image first, then falls back to other types.
- * @param item - Base item with image tags
- * @param maxWidth - Maximum width
- * @param maxHeight - Maximum height
- * @returns Best available image URL or undefined
- */
 export function getBestImageUrl(
   item: BaseItemDto,
   maxWidth?: number,
   maxHeight?: number,
 ): string | undefined {
-  if (!item.Id) {
-    return undefined
-  }
+  if (!item.Id) return undefined
 
-  // Try primary image first
-  if (item.ImageTags?.Primary) {
-    return getImageUrl({
-      itemId: item.Id,
-      imageType: 'Primary',
-      maxWidth,
-      maxHeight,
-      tag: item.ImageTags.Primary,
-    })
-  }
+  const candidates: Array<ImageCandidate | null> = [
+    item.ImageTags?.Primary
+      ? { itemId: item.Id, imageType: 'Primary', tag: item.ImageTags.Primary }
+      : null,
+    item.BackdropImageTags?.[0]
+      ? {
+          itemId: item.Id,
+          imageType: 'Backdrop',
+          tag: item.BackdropImageTags[0],
+        }
+      : null,
+    item.ImageTags?.Thumb
+      ? { itemId: item.Id, imageType: 'Thumb', tag: item.ImageTags.Thumb }
+      : null,
+    item.ParentThumbItemId
+      ? { itemId: item.ParentThumbItemId, imageType: 'Thumb' }
+      : null,
+    item.SeriesId && item.SeriesPrimaryImageTag
+      ? {
+          itemId: item.SeriesId,
+          imageType: 'Primary',
+          tag: item.SeriesPrimaryImageTag,
+        }
+      : null,
+  ]
 
-  // Try backdrop
-  if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
-    return getImageUrl({
-      itemId: item.Id,
-      imageType: 'Backdrop',
-      maxWidth,
-      maxHeight,
-      tag: item.BackdropImageTags[0],
-    })
-  }
-
-  // Try thumb
-  if (item.ImageTags?.Thumb) {
-    return getImageUrl({
-      itemId: item.Id,
-      imageType: 'Thumb',
-      maxWidth,
-      maxHeight,
-      tag: item.ImageTags.Thumb,
-    })
-  }
-
-  // Try parent images for episodes
-  if (item.ParentThumbItemId) {
-    return getImageUrl({
-      itemId: item.ParentThumbItemId,
-      imageType: 'Thumb',
-      maxWidth,
-      maxHeight,
-    })
-  }
-
-  if (item.SeriesId && item.SeriesPrimaryImageTag) {
-    return getImageUrl({
-      itemId: item.SeriesId,
-      imageType: 'Primary',
-      maxWidth,
-      maxHeight,
-      tag: item.SeriesPrimaryImageTag,
-    })
-  }
-
-  return undefined
-}
-
-/**
- * Gets the blurhash for an item's primary image.
- * @param item - Base item with image blur hashes
- * @returns Blurhash string or undefined
- */
-export function getImageBlurhash(item: BaseItemDto): string | undefined {
-  if (item.ImageBlurHashes?.Primary) {
-    // Get the first available blurhash
-    const hashes = item.ImageBlurHashes.Primary
-    const keys = Object.keys(hashes)
-    if (keys.length > 0) {
-      return hashes[keys[0]]
+  for (const c of candidates) {
+    if (c) {
+      const url = getImageUrl({
+        itemId: c.itemId,
+        imageType: c.imageType,
+        maxWidth,
+        maxHeight,
+        tag: c.tag,
+      })
+      if (url) return url
     }
   }
   return undefined
+}
+
+export function getImageBlurhash(item: BaseItemDto): string | undefined {
+  const hashes = item.ImageBlurHashes?.Primary
+  return hashes ? Object.values(hashes)[0] : undefined
 }

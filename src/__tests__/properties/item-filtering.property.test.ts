@@ -7,26 +7,7 @@
 
 import { describe, it } from 'vitest'
 import * as fc from 'fast-check'
-import type { BaseItemDto } from '@/types/jellyfin'
-
-/**
- * Filters items by name (case-insensitive).
- * This is the same logic used in use-items.ts hook.
- * @param items - Array of items to filter
- * @param filter - Filter string to match against item names
- * @returns Filtered array of items
- */
-function filterItemsByName(
-  items: Array<BaseItemDto>,
-  filter: string | undefined,
-): Array<BaseItemDto> {
-  if (!filter || filter.trim() === '') {
-    return items
-  }
-
-  const lowerFilter = filter.toLowerCase()
-  return items.filter((item) => item.Name?.toLowerCase().includes(lowerFilter))
-}
+import { filterItemsByName } from '@/lib/utils'
 
 /**
  * Arbitrary generator for BaseItemDto with a Name property.
@@ -50,13 +31,18 @@ describe('Item Filtering by Name', () => {
         fc.string({ minLength: 1, maxLength: 20 }),
         (items, filter) => {
           const filtered = filterItemsByName(items, filter)
-          const lowerFilter = filter.toLowerCase()
+          const normalizedFilter = filter.trim().toLowerCase()
+
+          // Whitespace-only filters are treated as "no filter"
+          if (!normalizedFilter) {
+            return filtered.length === items.length
+          }
 
           // All filtered items must have names containing the filter
           return filtered.every(
             (item) =>
               item.Name != null &&
-              item.Name.toLowerCase().includes(lowerFilter),
+              item.Name.toLowerCase().includes(normalizedFilter),
           )
         },
       ),
@@ -163,13 +149,17 @@ describe('Item Filtering by Name', () => {
 
   /**
    * Property: Items with undefined names are excluded when filtering
-   * Items without a Name property should not appear in filtered results.
+   * Items without a Name property should not appear in filtered results
+   * when a non-empty filter is applied.
    */
   it('items with undefined names are excluded when filtering', () => {
     fc.assert(
       fc.property(
         fc.array(baseItemDtoArb, { minLength: 0, maxLength: 50 }),
-        fc.string({ minLength: 1, maxLength: 20 }),
+        // Use a filter that is not empty or whitespace-only
+        fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => s.trim() !== ''),
         (items, filter) => {
           const filtered = filterItemsByName(items, filter)
 

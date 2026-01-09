@@ -157,11 +157,13 @@ export function ItemImage({
         />
       )}
 
-      {/* Actual image */}
+      {/* Actual image with native lazy loading */}
       <img
         ref={imgRef}
         src={imageUrl}
         alt={displayAlt}
+        loading="lazy"
+        decoding="async"
         onLoad={handleLoad}
         onError={handleError}
         className={cn(

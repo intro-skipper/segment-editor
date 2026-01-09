@@ -1,16 +1,4 @@
-import type { MediaSegmentDto, MediaSegmentType } from './jellyfin'
-
-/**
- * Extended segment type for UI editing.
- * StartTicks and EndTicks are in seconds for UI display,
- * while the server uses ticks (100-nanosecond intervals).
- */
-export interface EditableSegment extends MediaSegmentDto {
-  /** Start time in seconds (converted from ticks for UI) */
-  StartTicks: number
-  /** End time in seconds (converted from ticks for UI) */
-  EndTicks: number
-}
+import type { MediaSegmentType } from './jellyfin'
 
 /**
  * Data required to create a new segment from the player.

@@ -9,6 +9,9 @@ export {
   type ApiStore,
 } from './api-store'
 
+/** Selector for checking if user is authenticated - use in query hooks */
+export const selectValidAuth = (s: { validAuth: boolean }) => s.validAuth
+
 export {
   useAppStore,
   getEffectiveLocale,

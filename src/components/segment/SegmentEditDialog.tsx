@@ -1,18 +1,13 @@
 /**
- * SegmentEditDialog component.
- * Dialog for editing segment details with validation.
- * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+ * SegmentEditDialog - Dialog for editing segment details with validation.
  */
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Save, Trash2 } from 'lucide-react'
 
-import type {
-  BaseItemDto,
-  MediaSegmentDto,
-  MediaSegmentType,
-} from '@/types/jellyfin'
+import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { SessionStore } from '@/stores/session-store'
 import { formatTime, parseTimeString } from '@/lib/time-utils'
 import {
   SEGMENT_TYPES,
@@ -52,105 +47,108 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+// Stable selector to prevent re-renders
+const selectSaveToClipboard = (state: SessionStore) => state.saveToClipboard
+
 export interface SegmentEditDialogProps {
-  /** Whether the dialog is open */
   open: boolean
-  /** The segment to edit */
   segment: MediaSegmentDto
-  /** The media item this segment belongs to */
-  item: BaseItemDto
-  /** Callback when dialog is closed */
   onClose: () => void
-  /** Callback when segment is saved */
   onSave: (segment: MediaSegmentDto) => void
-  /** Callback when segment is deleted */
   onDelete: (segment: MediaSegmentDto) => void
 }
 
-/**
- * SegmentEditDialog component.
- * Provides a form for editing segment details with validation.
- */
 export function SegmentEditDialog({
   open,
   segment,
-  item: _item, // Reserved for future use
   onClose,
   onSave,
   onDelete,
 }: SegmentEditDialogProps) {
   const { t } = useTranslation()
-  const { saveToClipboard } = useSessionStore()
+  const saveToClipboard = useSessionStore(selectSaveToClipboard)
+  const startInputRef = React.useRef<HTMLInputElement>(null)
+  const triggerRef = React.useRef<HTMLElement | null>(null)
 
-  // Suppress unused variable warning
-  void _item
-
-  // Local editing state
   const [localSegment, setLocalSegment] =
     React.useState<MediaSegmentDto>(segment)
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
+  const [startText, setStartText] = React.useState('')
+  const [endText, setEndText] = React.useState('')
 
   // Sync local state when segment prop changes
   React.useEffect(() => {
     setLocalSegment(segment)
+    setStartText(String(segment.StartTicks ?? 0))
+    setEndText(String(segment.EndTicks ?? 0))
   }, [segment])
 
+  // Store the trigger element when dialog opens for focus restoration
+  React.useEffect(() => {
+    if (open) {
+      triggerRef.current = document.activeElement as HTMLElement
+    }
+  }, [open])
+
+  // Auto-focus start input when dialog opens
+  React.useEffect(() => {
+    if (!open) return
+    const timeoutId = window.setTimeout(() => startInputRef.current?.focus(), 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [open])
+
+  // Handle dialog close with focus restoration
+  const handleClose = React.useCallback(() => {
+    onClose()
+    // Restore focus to the element that triggered the dialog
+    // Use requestAnimationFrame for better timing than setTimeout
+    requestAnimationFrame(() => {
+      triggerRef.current?.focus()
+    })
+  }, [onClose])
+
   // Computed values
-  const startSeconds = localSegment.StartTicks ?? 0
-  const endSeconds = localSegment.EndTicks ?? 0
-  const duration = endSeconds - startSeconds
-  const validation = validateSegment(localSegment)
-
-  // Handle type change
-  const handleTypeChange = React.useCallback(
-    (value: MediaSegmentType | null) => {
-      if (value) {
-        setLocalSegment((prev) => ({
-          ...prev,
-          Type: value,
-        }))
+  const { startSeconds, endSeconds, duration, validation } =
+    React.useMemo(() => {
+      const start = localSegment.StartTicks ?? 0
+      const end = localSegment.EndTicks ?? 0
+      return {
+        startSeconds: start,
+        endSeconds: end,
+        duration: end - start,
+        validation: validateSegment(localSegment),
       }
+    }, [localSegment])
+
+  const commitTime = React.useCallback(
+    (field: 'start' | 'end', text: string) => {
+      const value = parseTimeString(text)
+      if (value < 0) return
+      setLocalSegment((prev) => ({
+        ...prev,
+        [field === 'start' ? 'StartTicks' : 'EndTicks']: value,
+      }))
     },
     [],
   )
 
-  // Handle start time change
-  const handleStartChange = React.useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseTimeString(e.target.value)
-      if (!isNaN(value) && value >= 0) {
-        setLocalSegment((prev) => ({
-          ...prev,
-          StartTicks: value,
-        }))
-      }
-    },
-    [],
-  )
-
-  // Handle end time change
-  const handleEndChange = React.useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseTimeString(e.target.value)
-      if (!isNaN(value) && value >= 0) {
-        setLocalSegment((prev) => ({
-          ...prev,
-          EndTicks: value,
-        }))
-      }
-    },
-    [],
-  )
-
-  // Handle save
   const handleSave = React.useCallback(() => {
+    commitTime('start', startText)
+    commitTime('end', endText)
     if (validation.valid) {
       onSave(localSegment)
-      onClose()
+      handleClose()
     }
-  }, [validation.valid, localSegment, onSave, onClose])
+  }, [
+    commitTime,
+    startText,
+    endText,
+    validation.valid,
+    localSegment,
+    onSave,
+    handleClose,
+  ])
 
-  // Handle copy to clipboard
   const handleCopy = React.useCallback(() => {
     saveToClipboard(localSegment)
     showNotification({
@@ -159,28 +157,17 @@ export function SegmentEditDialog({
     })
   }, [localSegment, saveToClipboard, t])
 
-  // Handle delete confirmation
-  const handleDeleteClick = React.useCallback(() => {
-    setShowDeleteConfirm(true)
-  }, [])
-
-  // Handle confirmed delete
   const handleConfirmDelete = React.useCallback(() => {
     onDelete(localSegment)
     setShowDeleteConfirm(false)
-    onClose()
-  }, [localSegment, onDelete, onClose])
-
-  // Handle cancel delete
-  const handleCancelDelete = React.useCallback(() => {
-    setShowDeleteConfirm(false)
-  }, [])
+    handleClose()
+  }, [localSegment, onDelete, handleClose])
 
   const segmentColor = getSegmentColor(localSegment.Type)
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -195,7 +182,12 @@ export function SegmentEditDialog({
             <DialogDescription>{t('editor.slider.title')}</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div
+            className="grid gap-4 py-4"
+            aria-describedby={
+              !validation.valid ? 'segment-validation-error' : undefined
+            }
+          >
             {/* Segment Type */}
             <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
               <Label htmlFor="segment-type" className="sm:text-right">
@@ -204,7 +196,13 @@ export function SegmentEditDialog({
               <div className="sm:col-span-3">
                 <Select
                   value={localSegment.Type ?? 'Unknown'}
-                  onValueChange={handleTypeChange}
+                  onValueChange={(v) =>
+                    v &&
+                    setLocalSegment((prev) => ({
+                      ...prev,
+                      Type: v as MediaSegmentType,
+                    }))
+                  }
                 >
                   <SelectTrigger id="segment-type">
                     <SelectValue />
@@ -236,11 +234,12 @@ export function SegmentEditDialog({
               <div className="sm:col-span-3 flex items-center gap-2">
                 <Input
                   id="segment-start"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={startSeconds.toFixed(3)}
-                  onChange={handleStartChange}
+                  ref={startInputRef}
+                  type="text"
+                  inputMode="decimal"
+                  value={startText}
+                  onChange={(e) => setStartText(e.target.value)}
+                  onBlur={() => commitTime('start', startText)}
                   className="font-mono flex-1"
                 />
                 <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -257,11 +256,11 @@ export function SegmentEditDialog({
               <div className="sm:col-span-3 flex items-center gap-2">
                 <Input
                   id="segment-end"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={endSeconds.toFixed(3)}
-                  onChange={handleEndChange}
+                  type="text"
+                  inputMode="decimal"
+                  value={endText}
+                  onChange={(e) => setEndText(e.target.value)}
+                  onBlur={() => commitTime('end', endText)}
                   className="font-mono flex-1"
                 />
                 <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -285,11 +284,13 @@ export function SegmentEditDialog({
 
             {/* Validation Error */}
             {!validation.valid && (
-              <div className="col-span-full">
-                <p className="text-sm text-destructive text-center">
-                  {validation.error ?? t('validation.StartEnd')}
-                </p>
-              </div>
+              <p
+                id="segment-validation-error"
+                role="alert"
+                className="text-sm text-destructive text-center col-span-full"
+              >
+                {validation.error ?? t('validation.StartEnd')}
+              </p>
             )}
           </div>
 
@@ -307,7 +308,7 @@ export function SegmentEditDialog({
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={handleDeleteClick}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="flex-1 sm:flex-none"
               >
                 <Trash2 className="size-4 mr-2" />
@@ -317,7 +318,7 @@ export function SegmentEditDialog({
             <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
               <Button
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 sm:flex-none"
               >
                 {t('close')}
@@ -345,7 +346,7 @@ export function SegmentEditDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDelete}>
+            <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)}>
               {t('no')}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete}>

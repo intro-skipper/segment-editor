@@ -52,7 +52,7 @@ function PaginationLink({
     <Button
       variant={isActive ? 'outline' : 'ghost'}
       size={size}
-      className={cn(className)}
+      className={cn('min-h-11 min-w-11', className)}
       nativeButton={false}
       render={
         <a
@@ -109,12 +109,12 @@ function PaginationEllipsis({
       aria-hidden
       data-slot="pagination-ellipsis"
       className={cn(
-        "size-9 items-center justify-center [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center",
+        "min-h-11 min-w-11 items-center justify-center [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center",
         className,
       )}
       {...props}
     >
-      <MoreHorizontalIcon />
+      <MoreHorizontalIcon aria-hidden="true" />
       <span className="sr-only">More pages</span>
     </span>
   )

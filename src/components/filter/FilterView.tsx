@@ -1,30 +1,26 @@
 /**
- * FilterView component for browsing media collections.
- * Displays a collection dropdown, search input, pagination, and responsive media grid.
- * Requirements: 2.1, 2.2, 2.3
+ * FilterView - Main media browsing interface.
+ * Displays library picker, search, and paginated media grid.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
   Film,
   Library,
+  Loader2,
   Mic2,
   RefreshCw,
   Search,
+  Settings2,
   Tv,
+  Unplug,
 } from 'lucide-react'
 
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
+import type { SessionStore } from '@/stores/session-store'
+import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
 import {
   Pagination,
@@ -45,123 +41,172 @@ import {
 } from '@/components/ui/empty'
 import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
+import { usePluginMode } from '@/hooks/use-plugin-mode'
+import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { useSessionStore } from '@/stores/session-store'
+import { getBestImageUrl } from '@/services/video/api'
+import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
+import { cn } from '@/lib/utils'
+import { getGridColumns } from '@/lib/responsive-utils'
+import { COLUMN_BREAKPOINTS } from '@/lib/constants'
+import { getNavigationRoute } from '@/lib/navigation-utils'
 
-/** Available page size options */
-const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
-type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+// Stable selectors to prevent re-renders - defined outside component
+const selectPageSize = (state: SessionStore) => state.pageSize
+const selectSetSelectedCollectionId = (state: SessionStore) =>
+  state.setSelectedCollectionId
+const selectSetSearchFilter = (state: SessionStore) => state.setSearchFilter
 
-/** Get icon for collection type based on name */
-function getCollectionIcon(name: string) {
-  const lowerName = name.toLowerCase()
-  if (lowerName.includes('movie') || lowerName.includes('film')) {
-    return Film
-  }
-  if (
-    lowerName.includes('series') ||
-    lowerName.includes('tv') ||
-    lowerName.includes('show')
-  ) {
-    return Tv
-  }
-  if (lowerName.includes('music') || lowerName.includes('artist')) {
-    return Mic2
-  }
-  return Library
+/** Icon mapping for collection types */
+const COLLECTION_ICONS: Record<string, typeof Library> = {
+  movie: Film,
+  film: Film,
+  series: Tv,
+  tv: Tv,
+  show: Tv,
+  music: Mic2,
+  artist: Mic2,
 }
 
-/**
- * Skeleton loader for media cards.
- * Displays a placeholder while media items are loading.
- */
-function MediaCardSkeleton() {
+const getCollectionIcon = (name: string) => {
+  const lower = name.toLowerCase()
   return (
-    <div className="flex flex-col gap-2">
-      <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-      <Skeleton className="h-4 w-3/4" />
-    </div>
+    Object.entries(COLLECTION_ICONS).find(([key]) =>
+      lower.includes(key),
+    )?.[1] ?? Library
   )
 }
 
-/**
- * Grid of skeleton loaders for the media grid.
- */
-function MediaGridSkeleton({ count = 12 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-      {Array.from({ length: count }).map((_, index) => (
-        <MediaCardSkeleton key={index} />
-      ))}
-    </div>
-  )
+const GRID_CLASS =
+  'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
+
+/** Hook to get current column count based on viewport width */
+function useGridColumns(): number {
+  const [columns, setColumns] = useState<number>(COLUMN_BREAKPOINTS.default)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const updateColumns = () => {
+      setColumns(getGridColumns(window.innerWidth))
+    }
+
+    updateColumns()
+    window.addEventListener(
+      'resize',
+      () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        timeoutId = setTimeout(updateColumns, 150)
+      },
+      { signal: controller.signal },
+    )
+
+    return () => {
+      controller.abort()
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [])
+
+  return columns
 }
 
-/**
- * Generate page numbers to display with ellipsis for large page counts.
- */
-function getPageNumbers(
-  currentPage: number,
-  totalPages: number,
+/** Builds the middle section of page numbers with ellipsis */
+function buildMiddlePages(
+  current: number,
+  total: number,
 ): Array<number | 'ellipsis'> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1)
-  }
-
   const pages: Array<number | 'ellipsis'> = []
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
 
-  // Always show first page
-  pages.push(1)
-
-  if (currentPage > 3) {
-    pages.push('ellipsis')
-  }
-
-  // Show pages around current
-  const start = Math.max(2, currentPage - 1)
-  const end = Math.min(totalPages - 1, currentPage + 1)
-
-  for (let i = start; i <= end; i++) {
-    pages.push(i)
-  }
-
-  if (currentPage < totalPages - 2) {
-    pages.push('ellipsis')
-  }
-
-  // Always show last page
-  if (totalPages > 1) {
-    pages.push(totalPages)
-  }
+  if (current > 3) pages.push('ellipsis')
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (current < total - 2) pages.push('ellipsis')
 
   return pages
 }
 
+function getPageNumbers(
+  current: number,
+  total: number,
+): Array<number | 'ellipsis'> {
+  // For small page counts, show all pages
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  // For larger counts, show first, middle section with ellipsis, and last
+  const pages: Array<number | 'ellipsis'> = [1]
+  pages.push(...buildMiddlePages(current, total))
+  if (total > 1) pages.push(total)
+
+  return pages
+}
+
+const routeApi = getRouteApi('/')
+
 /**
  * FilterView provides the main browsing interface for media collections.
  * Users can select a collection, filter by name, and view items in a paginated grid.
+ * State is stored in URL search params for shareability.
  */
 export function FilterView() {
   const { t } = useTranslation()
-  const selectedCollection = useSessionStore(
-    (state) => state.selectedCollectionId,
-  )
-  const setSelectedCollection = useSessionStore(
-    (state) => state.setSelectedCollectionId,
-  )
-  const [searchFilter, setSearchFilter] = useState<string>('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(24)
+  const navigate = useNavigate()
 
-  // Fetch collections from the server
+  // Get URL search params for shareable state
+  const {
+    collection: selectedCollection,
+    page,
+    search: searchFilter,
+  } = routeApi.useSearch()
+  const currentPage = page ?? 1
+
+  // Page size is kept in session store as it's a user preference
+  // Use individual selectors instead of useShallow to avoid object creation
+  const pageSize = useSessionStore(selectPageSize)
+  const setSelectedCollectionId = useSessionStore(selectSetSelectedCollectionId)
+  const setStoreSearchFilter = useSessionStore(selectSetSearchFilter)
+
+  // Sync URL state to session store for Header and other components
+  useEffect(() => {
+    setSelectedCollectionId(selectedCollection ?? null)
+    setStoreSearchFilter(searchFilter ?? '')
+  }, [
+    selectedCollection,
+    searchFilter,
+    setSelectedCollectionId,
+    setStoreSearchFilter,
+  ])
+
+  const setCurrentPage = useCallback(
+    (pageNum: number) => {
+      navigate({
+        to: '/',
+        search: (prev) => ({
+          ...prev,
+          page: pageNum > 1 ? pageNum : undefined,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const columns = useGridColumns()
+
+  // Plugin mode and connection state
+  const { isPlugin, hasCredentials, isConnected, isConnecting } =
+    usePluginMode()
+  const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
+
+  // Fetch collections and items
   const {
     data: collections,
     isLoading: collectionsLoading,
     error: collectionsError,
     refetch: refetchCollections,
   } = useCollections()
-
-  // Fetch items for the selected collection with name filtering
   const {
     data: items,
     isLoading: itemsLoading,
@@ -176,142 +221,219 @@ export function FilterView() {
   // Memoize the collection options for the dropdown
   const collectionOptions = useMemo(() => {
     if (!collections) return []
-    return collections.map((collection) => ({
-      id: collection.ItemId || '',
-      name: collection.Name || 'Unknown',
+    return collections.map((c) => ({
+      id: c.ItemId || '',
+      name: c.Name || 'Unknown',
     }))
   }, [collections])
 
-  // Calculate pagination
+  // Calculate pagination with bounds checking
   const totalItems = items?.length ?? 0
-  const totalPages = Math.ceil(totalItems / pageSize)
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
   // Get paginated items
   const paginatedItems = useMemo(() => {
     if (!items) return []
-    const startIndex = (currentPage - 1) * pageSize
+    const startIndex = (validCurrentPage - 1) * pageSize
     return items.slice(startIndex, startIndex + pageSize)
-  }, [items, currentPage, pageSize])
+  }, [items, validCurrentPage, pageSize])
 
-  // Reset to page 1 when filter/collection changes
+  // Grid keyboard navigation using the shared hook
+  const handleItemActivate = useCallback(
+    (index: number) => {
+      const item = paginatedItems[index]
+      navigate(
+        getNavigationRoute(item) as unknown as Parameters<typeof navigate>[0],
+      )
+    },
+    [paginatedItems, navigate],
+  )
+
+  const { setFocusedIndex, gridProps, getItemProps, gridRef } =
+    useGridKeyboardNavigation({
+      itemCount: paginatedItems.length,
+      columns,
+      enabled: paginatedItems.length > 0,
+      onActivate: handleItemActivate,
+    })
+
+  // Track URLs already requested for preloading
+  const preloadedUrlsRef = useRef(new Set<string>())
+
+  // Clear preload cache when collection changes
   useEffect(() => {
-    setCurrentPage(1)
-  }, [selectedCollection, searchFilter, pageSize])
+    preloadedUrlsRef.current.clear()
+  }, [selectedCollection])
 
-  const handleCollectionChange = (value: string | null) => {
-    setSelectedCollection(value)
-    setSearchFilter('')
-  }
+  // Preload vibrant colors for visible items
+  useEffect(() => {
+    if (paginatedItems.length === 0) return
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchFilter(e.target.value)
-  }
+    // Use AbortController to prevent state updates after unmount
+    const controller = new AbortController()
 
-  const handlePageSizeChange = (value: string | null) => {
-    if (value) {
-      setPageSize(Number(value) as PageSize)
+    const timeoutId = setTimeout(() => {
+      // Check if aborted before processing
+      if (controller.signal.aborted) return
+
+      const imageUrls = paginatedItems
+        .map((item) => getBestImageUrl(item, 200))
+        .filter(
+          (url): url is string => !!url && !preloadedUrlsRef.current.has(url),
+        )
+      if (imageUrls.length > 0) {
+        imageUrls.forEach((url) => preloadedUrlsRef.current.add(url))
+        preloadVibrantColors(imageUrls)
+      }
+    }, 100)
+
+    return () => {
+      controller.abort()
+      clearTimeout(timeoutId)
     }
-  }
+  }, [paginatedItems])
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    // Scroll to top of content area
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  // Sync URL page to valid bounds
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages)
+  }, [currentPage, totalPages, setCurrentPage])
 
-  // Get display text for the selected collection
-  const selectedCollectionName = useMemo(() => {
-    if (!selectedCollection) return null
-    const collection = collectionOptions.find(
-      (c) => c.id === selectedCollection,
-    )
-    return collection?.name
-  }, [selectedCollection, collectionOptions])
+  // Reset focus when page changes
+  useEffect(() => {
+    setFocusedIndex(-1)
+  }, [validCurrentPage, setFocusedIndex])
 
-  const pageNumbers = getPageNumbers(currentPage, totalPages)
+  const handleCollectionChange = useCallback(
+    (value: string | null) => {
+      navigate({
+        to: '/',
+        search: {
+          collection: value ?? undefined,
+          page: undefined,
+          search: undefined,
+        },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      setCurrentPage(newPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    },
+    [setCurrentPage],
+  )
+
+  const handleRetry = useCallback(() => {
+    if (collectionsError) refetchCollections()
+    else refetchItems()
+  }, [collectionsError, refetchCollections, refetchItems])
+
+  const pageNumbers = useMemo(
+    () => getPageNumbers(validCurrentPage, totalPages),
+    [validCurrentPage, totalPages],
+  )
+
+  // Derived state
+  const showLoading =
+    collectionsLoading ||
+    (selectedCollection && !itemsError && itemsLoading && !items)
+  const showError = collectionsError || itemsError
+  const showEmpty =
+    selectedCollection && !itemsLoading && !itemsError && items?.length === 0
+
+  // Not connected state (standalone mode only)
+  const showNotConnected = !isPlugin && !hasCredentials
+
+  // Connecting state (plugin mode waiting for parent ApiClient)
+  const showConnecting = isPlugin && !isConnected && isConnecting
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Filter Controls */}
-      <div className="p-4 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex flex-col sm:flex-row gap-3 max-w-7xl mx-auto">
-          {/* Collection Dropdown */}
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <Library className="size-4 text-muted-foreground shrink-0" />
-            <Select
-              value={selectedCollection}
-              onValueChange={handleCollectionChange}
-              disabled={collectionsLoading}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {selectedCollectionName || t('items.filter.collection')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {collectionOptions.map((collection) => (
-                  <SelectItem key={collection.id} value={collection.id}>
-                    {collection.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="px-4 pb-8 sm:px-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Not Connected State - standalone mode without credentials */}
+        {showNotConnected && (
+          <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+            <Empty className="border-none bg-transparent">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Unplug className="size-12" aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle className="text-2xl">
+                  {t('connection.notConnected', {
+                    defaultValue: 'Not Connected',
+                  })}
+                </EmptyTitle>
+                <EmptyDescription className="text-base">
+                  {t('connection.notConnectedDescription', {
+                    defaultValue:
+                      'Configure your Jellyfin server connection to get started',
+                  })}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button
+                  size="lg"
+                  className="gap-2 rounded-2xl"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings2 className="size-5" aria-hidden="true" />
+                  {t('connection.openSettings', {
+                    defaultValue: 'Open Settings',
+                  })}
+                </Button>
+              </EmptyContent>
+            </Empty>
           </div>
+        )}
 
-          {/* Search Input */}
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Search className="size-4 text-muted-foreground shrink-0" />
-            <Input
-              type="text"
-              placeholder={t('items.filter.name')}
-              value={searchFilter}
-              onChange={handleSearchChange}
-              disabled={!selectedCollection}
-              className="w-full"
-            />
+        {/* Connecting State - plugin mode waiting for credentials */}
+        {showConnecting && (
+          <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+            <Empty className="border-none bg-transparent">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Loader2
+                    className="size-12 animate-spin"
+                    aria-hidden="true"
+                  />
+                </EmptyMedia>
+                <EmptyTitle className="text-2xl">
+                  {t('connection.connecting', {
+                    defaultValue: 'Connecting...',
+                  })}
+                </EmptyTitle>
+                <EmptyDescription className="text-base">
+                  {t('connection.connectingDescription', {
+                    defaultValue: 'Establishing connection to Jellyfin server',
+                  })}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </div>
+        )}
 
-          {/* Page Size Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {t('items.perPage', { defaultValue: 'Per page' })}:
-            </span>
-            <Select
-              value={String(pageSize)}
-              onValueChange={handlePageSizeChange}
-            >
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Area */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Library Picker - shown when no collection selected */}
-          {!selectedCollection && !collectionsLoading && !collectionsError && (
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <Empty className="border-none">
+        {/* Library Picker - shown when no collection selected */}
+        {!showNotConnected &&
+          !showConnecting &&
+          !selectedCollection &&
+          !collectionsLoading &&
+          !collectionsError && (
+            <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
+              <Empty className="border-none bg-transparent">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <Library />
+                    <Library className="size-12" aria-hidden="true" />
                   </EmptyMedia>
-                  <EmptyTitle>
+                  <EmptyTitle className="text-2xl">
                     {t('items.selectLibrary', {
                       defaultValue: 'Select a Library',
                     })}
                   </EmptyTitle>
-                  <EmptyDescription>
+                  <EmptyDescription className="text-base">
                     {t('items.selectLibraryDescription', {
                       defaultValue:
                         'Choose a library to browse your media collection',
@@ -319,18 +441,34 @@ export function FilterView() {
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
-                  <div className="flex flex-wrap gap-3 justify-center">
+                  <div
+                    className="flex flex-wrap gap-3 justify-center mt-4"
+                    role="group"
+                    aria-label={t('items.selectLibrary', {
+                      defaultValue: 'Select a Library',
+                    })}
+                  >
                     {collectionOptions.map((collection) => {
                       const Icon = getCollectionIcon(collection.name)
                       return (
                         <Button
                           key={collection.id}
-                          variant="outline"
+                          variant="secondary"
                           size="lg"
-                          className="gap-2 min-w-[140px]"
+                          className={cn(
+                            'gap-3 min-w-[var(--spacing-library-button-min)] h-14',
+                            'rounded-2xl text-base font-medium',
+                            'border border-border/50',
+                            'transition-all duration-200',
+                            'hover:scale-[1.02] active:scale-[0.98]',
+                          )}
                           onClick={() => handleCollectionChange(collection.id)}
+                          aria-label={t('items.selectLibraryButton', {
+                            name: collection.name,
+                            defaultValue: `Browse ${collection.name} library`,
+                          })}
                         >
-                          <Icon className="size-4" />
+                          <Icon className="size-5" aria-hidden="true" />
                           {collection.name}
                         </Button>
                       )
@@ -341,126 +479,166 @@ export function FilterView() {
             </div>
           )}
 
-          {/* Loading State */}
-          {(collectionsLoading || (selectedCollection && itemsLoading)) && (
-            <MediaGridSkeleton count={pageSize} />
-          )}
+        {/* Loading State */}
+        {showLoading && (
+          <MediaGridSkeleton count={pageSize} gridClassName={GRID_CLASS} />
+        )}
 
-          {/* Error State */}
-          {(collectionsError || itemsError) && (
-            <div className="flex flex-col items-center justify-center py-12 gap-4">
-              <AlertCircle className="size-12 text-destructive/70" />
-              <p className="text-destructive text-center">
-                {collectionsError?.message || itemsError?.message}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (collectionsError) {
-                    refetchCollections()
-                  } else {
-                    refetchItems()
-                  }
-                }}
-              >
-                <RefreshCw className="size-4 mr-2" />
-                {t('common.retry')}
-              </Button>
+        {/* Error State */}
+        {showError && (
+          <div
+            className="flex flex-col items-center justify-center py-16 gap-4"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="size-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertCircle
+                className="size-8 text-destructive"
+                aria-hidden="true"
+              />
             </div>
-          )}
+            <p className="text-destructive text-center text-lg">
+              {collectionsError?.message || itemsError?.message}
+            </p>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="rounded-full px-6"
+              onClick={handleRetry}
+            >
+              <RefreshCw className="size-4 mr-2" aria-hidden="true" />
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
 
-          {/* Empty State */}
-          {selectedCollection &&
-            !itemsLoading &&
-            items &&
-            items.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Search className="size-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">No items found</p>
+        {/* Empty State */}
+        {showEmpty && (
+          <div
+            className="flex flex-col items-center justify-center py-16 text-center"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="size-20 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Search
+                className="size-10 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
+            <p className="text-muted-foreground text-lg">
+              {t('items.noItems', { defaultValue: 'No items found' })}
+            </p>
+          </div>
+        )}
+
+        {/* Media Grid */}
+        {paginatedItems.length > 0 && (
+          <>
+            {/* Item count with aria-live for screen readers */}
+            <div className="flex justify-between items-center mb-6">
+              <p
+                className="text-sm text-muted-foreground"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {t('items.showing', {
+                  start: (validCurrentPage - 1) * pageSize + 1,
+                  end: Math.min(validCurrentPage * pageSize, totalItems),
+                  total: totalItems,
+                  defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
+                })}
+              </p>
+            </div>
+
+            <div
+              ref={gridRef}
+              className={GRID_CLASS}
+              {...gridProps}
+              aria-label={t('items.mediaGrid', { defaultValue: 'Media items' })}
+            >
+              {paginatedItems.map((item, index) => (
+                <MediaCard
+                  key={item.Id}
+                  item={item}
+                  index={index}
+                  {...getItemProps(index)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10">
+                <Pagination>
+                  <PaginationContent className="gap-2">
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() =>
+                          handlePageChange(Math.max(1, validCurrentPage - 1))
+                        }
+                        aria-disabled={validCurrentPage === 1}
+                        aria-label={t('accessibility.pagination.previous')}
+                        className={cn(
+                          'rounded-full',
+                          validCurrentPage === 1
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer',
+                        )}
+                      />
+                    </PaginationItem>
+
+                    {pageNumbers.map((pageNum, idx) =>
+                      pageNum === 'ellipsis' ? (
+                        <PaginationItem key={`ellipsis-${idx}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(pageNum)}
+                            isActive={validCurrentPage === pageNum}
+                            aria-label={t('accessibility.pagination.page', {
+                              page: pageNum,
+                            })}
+                            aria-current={
+                              validCurrentPage === pageNum ? 'page' : undefined
+                            }
+                            className={cn(
+                              'cursor-pointer rounded-full',
+                              validCurrentPage === pageNum &&
+                                'bg-primary text-primary-foreground',
+                            )}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() =>
+                          handlePageChange(
+                            Math.min(totalPages, validCurrentPage + 1),
+                          )
+                        }
+                        aria-disabled={validCurrentPage === totalPages}
+                        aria-label={t('accessibility.pagination.next')}
+                        className={cn(
+                          'rounded-full',
+                          validCurrentPage === totalPages
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer',
+                        )}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
             )}
-
-          {/* Media Grid */}
-          {paginatedItems.length > 0 && (
-            <>
-              {/* Item count */}
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {t('items.showing', {
-                    start: (currentPage - 1) * pageSize + 1,
-                    end: Math.min(currentPage * pageSize, totalItems),
-                    total: totalItems,
-                    defaultValue: `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`,
-                  })}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {paginatedItems.map((item) => (
-                  <MediaCard key={item.Id} item={item} />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            handlePageChange(Math.max(1, currentPage - 1))
-                          }
-                          aria-disabled={currentPage === 1}
-                          className={
-                            currentPage === 1
-                              ? 'pointer-events-none opacity-50'
-                              : 'cursor-pointer'
-                          }
-                        />
-                      </PaginationItem>
-
-                      {pageNumbers.map((page, index) =>
-                        page === 'ellipsis' ? (
-                          <PaginationItem key={`ellipsis-${index}`}>
-                            <PaginationEllipsis />
-                          </PaginationItem>
-                        ) : (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ),
-                      )}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            handlePageChange(
-                              Math.min(totalPages, currentPage + 1),
-                            )
-                          }
-                          aria-disabled={currentPage === totalPages}
-                          className={
-                            currentPage === totalPages
-                              ? 'pointer-events-none opacity-50'
-                              : 'cursor-pointer'
-                          }
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   )

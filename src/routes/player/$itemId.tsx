@@ -1,19 +1,43 @@
 /**
  * Player route - Video player with segment editing.
  * Renders the PlayerEditor component for a specific media item.
- * Requirements: 2.4, 3.1, 4.1
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { PlayerEditor } from '@/components/player/PlayerEditor'
-import { itemsKeys, useItem } from '@/hooks/queries/use-items'
+import {
+  QUERY_STALE_TIMES,
+  itemsKeys,
+  segmentsKeys,
+  useItem,
+} from '@/hooks/queries'
 import { Skeleton } from '@/components/ui/skeleton'
-
-import { segmentsKeys } from '@/hooks/queries/use-segments'
+import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
+import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getItemById } from '@/services/items/api'
 import { getSegmentsById } from '@/services/segments/api'
+import { getBestImageUrl } from '@/services/video/api'
+import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { useSessionStore } from '@/stores/session-store'
+
+/**
+ * Route params schema - validates itemId is a valid Jellyfin ID.
+ * Accepts both standard UUID format and Jellyfin's 32-char hex format.
+ * Security: Prevents injection attacks via malformed IDs.
+ */
+const jellyfinIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i,
+    'Invalid item ID format',
+  )
+
+const playerParamsSchema = z.object({
+  itemId: jellyfinIdSchema,
+})
 
 /**
  * Search params schema for the player route.
@@ -33,22 +57,30 @@ const playerSearchSchema = z.object({
 
 /**
  * Loading skeleton for the player page.
+ * Uses consistent height variables and ARIA attributes.
  */
 function PlayerSkeleton() {
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
-      <div className="max-w-6xl mx-auto space-y-4">
-        {/* Back button and title skeleton */}
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-24" />
-          <Skeleton className="h-8 w-64" />
-        </div>
+    <main
+      className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading player</span>
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Video player skeleton */}
-        <Skeleton className="aspect-video w-full rounded-lg" />
+        <Skeleton className="aspect-video w-full rounded-2xl" />
         {/* Segment controls skeleton */}
-        <div className="space-y-3">
-          <Skeleton className="h-16 w-full rounded-lg" />
-          <Skeleton className="h-16 w-full rounded-lg" />
+        <div className="space-y-4">
+          <Skeleton
+            className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
+            style={{ animationDelay: '50ms' }}
+          />
+          <Skeleton
+            className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
+            style={{ animationDelay: '100ms' }}
+          />
         </div>
       </div>
     </main>
@@ -56,6 +88,10 @@ function PlayerSkeleton() {
 }
 
 export const Route = createFileRoute('/player/$itemId')({
+  params: {
+    parse: (params) => playerParamsSchema.parse(params),
+    stringify: (params) => params,
+  },
   validateSearch: playerSearchSchema,
   loader: async ({ params, context }) => {
     const { itemId } = params
@@ -65,15 +101,19 @@ export const Route = createFileRoute('/player/$itemId')({
     await queryClient.ensureQueryData({
       queryKey: itemsKeys.detail(itemId),
       queryFn: () => getItemById(itemId),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: QUERY_STALE_TIMES.LONG,
     })
 
     // Prefetch segments data
     await queryClient.ensureQueryData({
       queryKey: segmentsKeys.list(itemId),
       queryFn: () => getSegmentsById(itemId),
-      staleTime: 30 * 1000, // 30 seconds
+      staleTime: QUERY_STALE_TIMES.SHORT,
     })
+  },
+  onError: () => {
+    // Throw notFound for invalid params (e.g., malformed UUID)
+    throw notFound()
   },
   pendingComponent: PlayerSkeleton,
   component: PlayerPage,
@@ -86,23 +126,47 @@ function PlayerPage() {
   // Fetch item data using the hook (will use cached data from loader)
   const { data: item, isLoading, error } = useItem(itemId)
 
+  // Extract vibrant color from item poster
+  const imageUrl = item ? getBestImageUrl(item, 300) : null
+  const vibrantColors = useVibrantColor(imageUrl || null)
+
+  // Sync vibrant colors to session store for header
+  const setVibrantColors = useSessionStore((s) => s.setVibrantColors)
+  useEffect(() => {
+    setVibrantColors(vibrantColors)
+    return () => setVibrantColors(null)
+  }, [vibrantColors, setVibrantColors])
+
   if (isLoading) {
     return <PlayerSkeleton />
   }
 
   if (error || !item) {
     return (
-      <main className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-destructive">
-          {error?.message || 'Item not found'}
-        </div>
-      </main>
+      <RouteErrorFallback
+        message={error?.message || 'Item not found'}
+        minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
+      />
     )
   }
 
   return (
-    <main className="h-[calc(100vh-3.5rem)] p-6 overflow-auto">
-      <PlayerEditor item={item} fetchSegments={fetchSegments} />
-    </main>
+    <>
+      {/* Full-screen background that extends behind header */}
+      {vibrantColors && (
+        <div
+          className="fixed inset-0 -z-10 transition-colors duration-700"
+          style={{ backgroundColor: vibrantColors.background }}
+        />
+      )}
+      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto">
+        <FeatureErrorBoundary
+          featureName="Player"
+          minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
+        >
+          <PlayerEditor item={item} fetchSegments={fetchSegments} />
+        </FeatureErrorBoundary>
+      </main>
+    </>
   )
 }

@@ -1,13 +1,11 @@
 /**
  * PlayerEditor component.
  * Integrates Player with segment editing functionality.
- * Requirements: 3.2, 3.3, 4.5
  */
 
 import * as React from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ClipboardPaste, Save } from 'lucide-react'
+import { ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -20,17 +18,29 @@ import type {
   SegmentUpdate,
   TimestampUpdate,
 } from '@/types/segment'
+import type { SessionStore } from '@/stores/session-store'
 import { useSegments } from '@/hooks/queries/use-segments'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
 import { useSessionStore } from '@/stores/session-store'
 import { ticksToSeconds } from '@/lib/time-utils'
-import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
+import {
+  generateUUID,
+  sortSegmentsByStart,
+  validateSegment,
+} from '@/lib/segment-utils'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
+import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { Button } from '@/components/ui/button'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
+import { SegmentLoadingState } from '@/components/ui/async-state'
+
+// Stable selectors to prevent re-renders - defined outside component
+const selectClipboardSegment = (state: SessionStore): MediaSegmentDto | null =>
+  state.clipboardSegment
+const selectVibrantColors = (state: SessionStore) => state.vibrantColors
 
 export interface PlayerEditorProps {
   /** Media item to edit segments for */
@@ -51,50 +61,65 @@ export function PlayerEditor({
   className,
 }: PlayerEditorProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
-  const { getFromClipboard } = useSessionStore()
+
+  // Use individual selectors instead of useShallow to avoid object creation
+  const clipboardSegment = useSessionStore(selectClipboardSegment)
+  const vibrantColors = useSessionStore(selectVibrantColors)
+  const { getButtonStyle, iconColor, hasColors } =
+    useVibrantButtonStyle(vibrantColors)
   const batchSaveMutation = useBatchSaveSegments()
 
   // Fetch segments from server
-  const { data: serverSegments = [] } = useSegments(item.Id ?? '', {
-    enabled: fetchSegments && !!item.Id,
-  })
+  const { data: serverSegments = [], isLoading: isLoadingSegments } =
+    useSegments(item.Id ?? '', {
+      enabled: fetchSegments && !!item.Id,
+    })
 
-  // Local editing state - segments in seconds for UI
+  // Local editing state
   const [editingSegments, setEditingSegments] = React.useState<
     Array<MediaSegmentDto>
   >([])
   const [activeIndex, setActiveIndex] = React.useState(0)
-  const [playerTimestamp, setPlayerTimestamp] = React.useState<
-    number | undefined
-  >()
+  const [playerTimestamp, setPlayerTimestamp] = React.useState<number>()
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
     number | null
   >(null)
 
-  // Runtime in seconds
-  const runtimeSeconds = React.useMemo(() => {
-    return ticksToSeconds(item.RunTimeTicks) || 0
-  }, [item.RunTimeTicks])
+  // Track if save is in progress to prevent concurrent operations
+  const isSaving = batchSaveMutation.isPending
 
-  // Initialize editing segments from server data
-  // Note: serverSegments already have times in seconds (converted by the API layer)
+  // AbortController ref for cancelling in-flight save operations
+  const saveAbortRef = React.useRef<AbortController | null>(null)
+
+  // Keep a ref to the latest editing segments for async operations
+  const editingSegmentsRef = React.useRef(editingSegments)
+  React.useEffect(() => {
+    editingSegmentsRef.current = editingSegments
+  }, [editingSegments])
+  const timestampTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
+
+  // Cleanup timeout and abort controller on unmount
+  React.useEffect(
+    () => () => {
+      if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
+      saveAbortRef.current?.abort()
+    },
+    [],
+  )
+
+  const runtimeSeconds = React.useMemo(
+    () => ticksToSeconds(item.RunTimeTicks) || 0,
+    [item.RunTimeTicks],
+  )
+
+  // Sync editing segments from server when segment data changes
   React.useEffect(() => {
     if (serverSegments.length > 0) {
-      const sorted = [...serverSegments].sort(sortSegmentsByStart)
-      setEditingSegments(sorted)
+      setEditingSegments([...serverSegments].sort(sortSegmentsByStart))
     }
   }, [serverSegments])
-
-  // Format item title
-  const itemTitle = React.useMemo(() => {
-    if (item.SeriesName) {
-      return `${item.SeriesName} S${item.ParentIndexNumber}E${item.IndexNumber}: ${item.Name}`
-    }
-    return item.Name ?? 'Unknown'
-  }, [item])
 
   // Handle segment creation from player
   const handleCreateSegment = React.useCallback(
@@ -167,9 +192,12 @@ export function PlayerEditor({
 
   // Handle player timestamp request (seek video to segment time)
   const handlePlayerTimestamp = React.useCallback((timestamp: number) => {
+    if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
     setPlayerTimestamp(timestamp)
-    // Reset after a short delay
-    setTimeout(() => setPlayerTimestamp(undefined), 100)
+    timestampTimeoutRef.current = setTimeout(
+      () => setPlayerTimestamp(undefined),
+      100,
+    )
   }, [])
 
   // Open edit dialog for a segment
@@ -206,75 +234,79 @@ export function PlayerEditor({
     [],
   )
 
-  // Paste from clipboard
+  // Paste from clipboard with validation
   const handlePasteFromClipboard = React.useCallback(() => {
-    const clipboardSegment = getFromClipboard()
-    if (clipboardSegment) {
-      // Clipboard stores segments in seconds (same as editingSegments)
-      const newSegment: MediaSegmentDto = {
-        ...clipboardSegment,
-        Id: generateUUID(),
-        ItemId: item.Id,
-      }
-
-      setEditingSegments((prev) => {
-        const updated = [...prev, newSegment].sort(sortSegmentsByStart)
-        const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
-        setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
-        return updated
-      })
-
-      showNotification({
-        type: 'positive',
-        message: 'Segment pasted from clipboard',
-      })
-    } else {
+    if (!clipboardSegment) {
       showNotification({
         type: 'negative',
         message: t('editor.noSegmentInClipboard'),
       })
+      return
     }
-  }, [getFromClipboard, item.Id, t])
 
-  // Save all segments
+    // Validate clipboard segment before pasting
+    const validation = validateSegment(clipboardSegment, runtimeSeconds)
+    if (!validation.valid) {
+      showNotification({
+        type: 'negative',
+        message: validation.error ?? 'Invalid segment data',
+      })
+      return
+    }
+
+    const newSegment: MediaSegmentDto = {
+      ...clipboardSegment,
+      Id: generateUUID(),
+      ItemId: item.Id,
+    }
+
+    setEditingSegments((prev) => {
+      const updated = [...prev, newSegment].sort(sortSegmentsByStart)
+      const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
+      setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
+      return updated
+    })
+
+    showNotification({
+      type: 'positive',
+      message: 'Segment pasted from clipboard',
+    })
+  }, [clipboardSegment, item.Id, t, runtimeSeconds])
+
+  // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
-    if (!item.Id) return
+    if (!item.Id || isSaving) return
 
-    // Note: editingSegments are in seconds, the API layer handles conversion to ticks
+    // Cancel any previous in-flight save
+    saveAbortRef.current?.abort()
+    const controller = new AbortController()
+    saveAbortRef.current = controller
+
+    // Use ref to get latest segments at the moment of save
+    const currentSegments = editingSegmentsRef.current
+
     try {
       await batchSaveMutation.mutateAsync({
         itemId: item.Id,
         existingSegments: serverSegments,
-        newSegments: editingSegments,
+        newSegments: currentSegments,
       })
 
-      showNotification({
-        type: 'positive',
-        message: t('editor.saveSegment'),
-      })
-    } catch (error) {
-      showNotification({
-        type: 'negative',
-        message: 'Failed to save segments',
-      })
+      // Only show notification if not aborted
+      if (!controller.signal.aborted) {
+        showNotification({
+          type: 'positive',
+          message: t('editor.saveSegment'),
+        })
+      }
+    } catch {
+      // Error notification is handled by the mutation's onError handler
+      // No additional notification needed here to avoid duplicate toasts
     }
-  }, [item.Id, editingSegments, serverSegments, batchSaveMutation, t, navigate])
-
-  // Navigate back
-  const handleBack = React.useCallback(() => {
-    navigate({ to: '/' })
-  }, [navigate])
+  }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
 
   return (
-    <div className={cn('flex flex-col gap-6', className)}>
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={handleBack}>
-          <ChevronLeft className="size-5" />
-        </Button>
-        <h1 className="text-xl font-semibold truncate">{itemTitle}</h1>
-      </div>
-
+    <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
       {/* Player */}
       {showVideoPlayer && (
         <Player
@@ -304,7 +336,9 @@ export function PlayerEditor({
 
       {/* Segments list */}
       <div className="space-y-4">
-        {editingSegments.length === 0 ? (
+        {isLoadingSegments ? (
+          <SegmentLoadingState count={2} />
+        ) : editingSegments.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             {t('editor.noSegments')}
           </p>
@@ -317,7 +351,6 @@ export function PlayerEditor({
               >
                 <SegmentSlider
                   segment={segment}
-                  item={item}
                   index={index}
                   activeIndex={activeIndex}
                   runtimeSeconds={runtimeSeconds}
@@ -337,38 +370,65 @@ export function PlayerEditor({
         <SegmentEditDialog
           open={editDialogOpen}
           segment={editingSegments[editingSegmentIndex]}
-          item={item}
           onClose={handleCloseEditDialog}
           onSave={handleSaveSegmentFromDialog}
           onDelete={handleDeleteSegmentFromDialog}
         />
       )}
 
-      {/* Action buttons */}
-      <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-        <Button
-          onClick={handleSaveAll}
-          disabled={batchSaveMutation.isPending}
-          className="w-full sm:w-auto"
-        >
-          <Save className="size-4 mr-2" />
-          {t('editor.saveSegment')}
-        </Button>
-        <Button
-          variant="outline"
+      <div
+        className="flex flex-row justify-center gap-4"
+        role="group"
+        aria-label={t('editor.actions', 'Segment actions')}
+      >
+        <button
           onClick={handlePasteFromClipboard}
-          className="w-full sm:w-auto"
+          aria-label={t('editor.paste', 'Paste segment from clipboard')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
+            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
+            'transition-all duration-200 ease-out border-2',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            !hasColors &&
+              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
+          )}
+          style={getButtonStyle(false)}
         >
-          <ClipboardPaste className="size-4 mr-2" />
-          Paste
-        </Button>
-        <Button
-          variant="outline"
-          onClick={handleBack}
-          className="w-full sm:w-auto"
+          <ClipboardPaste
+            className="size-4 sm:size-5"
+            aria-hidden="true"
+            style={iconColor ? { color: iconColor } : undefined}
+          />
+          {t('editor.paste', 'Paste')}
+        </button>
+        <button
+          onClick={handleSaveAll}
+          disabled={isSaving}
+          aria-label={t('editor.saveSegment', 'Save all segments')}
+          aria-busy={isSaving}
+          aria-live="polite"
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
+            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
+            'transition-all duration-200 ease-out border-2',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            !hasColors &&
+              'bg-primary/20 text-primary border-primary/40 hover:bg-primary/30',
+          )}
+          style={getButtonStyle(true)}
         >
-          {t('back')}
-        </Button>
+          {isSaving ? (
+            <Loader2
+              className="size-4 sm:size-5 animate-spin"
+              aria-hidden="true"
+            />
+          ) : (
+            <Save className="size-4 sm:size-5" aria-hidden="true" />
+          )}
+          {isSaving && <span className="sr-only">Saving segments</span>}
+          {t('editor.saveSegment')}
+        </button>
       </div>
     </div>
   )

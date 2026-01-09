@@ -1,6 +1,6 @@
 /**
  * Feature: Settings Persistence Round-Trip
- * For any settings change (theme, locale, provider, server address, API key),
+ * For any settings change (theme, locale, provider, server address),
  * the value SHALL be persisted to local storage immediately.
  * When the application loads, for any previously persisted settings,
  * the state SHALL be restored to match the persisted values exactly.
@@ -128,8 +128,9 @@ describe('Settings Persistence Round-Trip', () => {
 
   /**
    * Property: API settings round-trip through localStorage
-   * For any valid API settings (server address, API key), persisting to
-   * localStorage and reading back should produce equivalent values.
+   * For any valid API settings, persisting to localStorage and reading back
+   * should preserve the server address.
+   * API keys SHALL NOT be persisted to reduce exposure to XSS.
    */
   it('round-trips API settings through localStorage', () => {
     fc.assert(
@@ -138,7 +139,6 @@ describe('Settings Persistence Round-Trip', () => {
         const persistedState = {
           state: {
             serverAddress: settings.serverAddress,
-            apiKey: settings.apiKey,
           },
           version: 0,
         }
@@ -153,7 +153,7 @@ describe('Settings Persistence Round-Trip', () => {
 
         // Verify settings match exactly
         expect(restored.serverAddress).toBe(settings.serverAddress)
-        expect(restored.apiKey).toBe(settings.apiKey)
+        expect(restored.apiKey).toBeUndefined()
 
         return true
       }),

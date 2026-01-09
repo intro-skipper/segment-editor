@@ -1,132 +1,159 @@
-/**
- * TanStack Query hook for fetching Jellyfin media items.
- * Provides cached access to items within collections with filtering support.
- */
+/** TanStack Query hooks for fetching Jellyfin media items. */
 
+import { useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { createQueryKey } from './query-error-handling'
+import { createStandardQueryOptions } from './create-query-hook'
+import type { CacheDuration } from './create-query-hook'
 import type { BaseItemDto } from '@/types/jellyfin'
-import type { ApiStore } from '@/stores/api-store'
-import { getItemById, getItems } from '@/services/items/api'
-import { useApiStore } from '@/stores/api-store'
+import { filterItemsByName } from '@/lib/utils'
+import {
+  getAlbums,
+  getEpisodes,
+  getItemById,
+  getItems,
+  getSeasons,
+  getTracks,
+} from '@/services/items/api'
+import { selectValidAuth, useApiStore } from '@/stores'
 
-/**
- * Query key factory for items.
- */
+// Query Keys
 export const itemsKeys = {
-  all: ['items'] as const,
-  lists: () => [...itemsKeys.all, 'list'] as const,
-  list: (parentId: string) => [...itemsKeys.lists(), parentId] as const,
-  details: () => [...itemsKeys.all, 'detail'] as const,
-  detail: (itemId: string) => [...itemsKeys.details(), itemId] as const,
-}
+  all: createQueryKey('items'),
+  list: (parentId: string) => createQueryKey('items', 'list', parentId),
+  detail: (itemId: string) => createQueryKey('items', 'detail', itemId),
+  episodes: (seriesId: string) => createQueryKey('items', 'episodes', seriesId),
+} as const
 
-/**
- * Options for the useItems hook.
- */
-export interface UseItemsOptions {
-  /** Parent collection ID to fetch items from */
-  parentId: string
-  /** Filter items by name (case-insensitive, client-side) */
-  nameFilter?: string
-  /** Include media streams in response */
-  includeMediaStreams?: boolean
-  /** Maximum number of items to return */
-  limit?: number
-  /** Starting index for pagination */
-  startIndex?: number
-  /** Whether the query is enabled */
+export const seriesKeys = {
+  all: createQueryKey('series'),
+  seasons: (seriesId: string) => createQueryKey('series', 'seasons', seriesId),
+  episodes: (seriesId: string, seasonId: string) =>
+    createQueryKey('series', 'episodes', seriesId, seasonId),
+} as const
+
+export const albumKeys = {
+  all: createQueryKey('album'),
+  tracks: (albumId: string) => createQueryKey('album', 'tracks', albumId),
+} as const
+
+export const artistKeys = {
+  all: createQueryKey('artist'),
+  albums: (artistId: string) => createQueryKey('artist', 'albums', artistId),
+} as const
+
+interface UseEntityOptions {
   enabled?: boolean
 }
 
-/**
- * Filters items by name (case-insensitive).
- * @param items - Array of items to filter
- * @param filter - Filter string to match against item names
- * @returns Filtered array of items
- */
-function filterItemsByName(
-  items: Array<BaseItemDto>,
-  filter: string | undefined,
-): Array<BaseItemDto> {
-  if (!filter || filter.trim() === '') {
-    return items
-  }
+/** Generic hook factory for simple entity queries */
+const useEntityQuery = <T>(
+  queryKey: ReturnType<typeof createQueryKey>,
+  queryFn: () => Promise<T>,
+  ids: string | Array<string>,
+  operation: string,
+  options?: UseEntityOptions,
+  cacheDuration: CacheDuration = 'LONG',
+) => {
+  const validAuth = useApiStore(selectValidAuth)
+  const idsValid = Array.isArray(ids) ? ids.every(Boolean) : !!ids
 
-  const lowerFilter = filter.toLowerCase()
-  return items.filter((item) => item.Name?.toLowerCase().includes(lowerFilter))
+  return useQuery(
+    createStandardQueryOptions<T>({
+      queryKey,
+      queryFn,
+      enabled: validAuth && idsValid && (options?.enabled ?? true),
+      cacheDuration,
+      operation,
+    }),
+  )
 }
 
-/**
- * Hook to fetch items from a collection with optional name filtering.
- * Filtering is performed client-side after fetching.
- *
- * @param options - Options for fetching and filtering items
- * @returns TanStack Query result with filtered items data
- *
- * @example
- * ```tsx
- * const { data: items, isLoading } = useItems({
- *   parentId: collectionId,
- *   nameFilter: searchTerm,
- * })
- *
- * return (
- *   <div className="grid">
- *     {items?.map(item => (
- *       <MediaCard key={item.Id} item={item} />
- *     ))}
- *   </div>
- * )
- * ```
- */
-export function useItems(options: UseItemsOptions) {
-  const { parentId, nameFilter, enabled = true, ...fetchOptions } = options
-  const validConnection = useApiStore(
-    (state: ApiStore) => state.validConnection,
+// Hooks
+export interface UseItemsOptions {
+  parentId: string
+  nameFilter?: string
+  includeMediaStreams?: boolean
+  limit?: number
+  startIndex?: number
+  enabled?: boolean
+}
+
+export function useItems({
+  parentId,
+  nameFilter,
+  includeMediaStreams,
+  limit,
+  startIndex,
+  enabled = true,
+}: UseItemsOptions) {
+  const validAuth = useApiStore(selectValidAuth)
+  const select = useMemo(
+    () => (data: Array<BaseItemDto>) => filterItemsByName(data, nameFilter),
+    [nameFilter],
+  )
+  const queryFn = useCallback(
+    () => getItems({ parentId, includeMediaStreams, limit, startIndex }),
+    [parentId, includeMediaStreams, limit, startIndex],
   )
 
-  return useQuery<Array<BaseItemDto>, Error>({
-    queryKey: itemsKeys.list(parentId),
-    queryFn: () =>
-      getItems({
-        parentId,
-        ...fetchOptions,
-      }),
-    enabled: validConnection && enabled && !!parentId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    select: (data: Array<BaseItemDto>) => filterItemsByName(data, nameFilter),
+  return useQuery({
+    ...createStandardQueryOptions<Array<BaseItemDto>>({
+      queryKey: itemsKeys.list(parentId),
+      queryFn,
+      enabled: validAuth && enabled && !!parentId,
+      cacheDuration: 'MEDIUM',
+      operation: 'Fetch items',
+    }),
+    select,
   })
 }
 
-/**
- * Hook to fetch a single item by ID.
- *
- * @param itemId - The item ID to fetch
- * @param options - Additional query options
- * @returns TanStack Query result with item data
- *
- * @example
- * ```tsx
- * const { data: item, isLoading } = useItem(itemId)
- *
- * if (isLoading) return <Spinner />
- * if (!item) return <NotFound />
- *
- * return <ItemDetails item={item} />
- * ```
- */
-export function useItem(itemId: string, options?: { enabled?: boolean }) {
-  const validConnection = useApiStore(
-    (state: ApiStore) => state.validConnection,
+export const useItem = (itemId: string, opts?: UseEntityOptions) =>
+  useEntityQuery(
+    itemsKeys.detail(itemId),
+    () => getItemById(itemId),
+    itemId,
+    'Fetch item',
+    opts,
   )
-  const enabled = options?.enabled ?? true
 
-  return useQuery<BaseItemDto | null, Error>({
-    queryKey: itemsKeys.detail(itemId),
-    queryFn: () => getItemById(itemId),
-    enabled: validConnection && enabled && !!itemId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-  })
-}
+export const useSeasons = (seriesId: string, opts?: UseEntityOptions) =>
+  useEntityQuery(
+    seriesKeys.seasons(seriesId),
+    () => getSeasons(seriesId),
+    seriesId,
+    'Fetch seasons',
+    opts,
+  )
+
+export const useTracks = (albumId: string, opts?: UseEntityOptions) =>
+  useEntityQuery(
+    albumKeys.tracks(albumId),
+    () => getTracks(albumId),
+    albumId,
+    'Fetch tracks',
+    opts,
+  )
+
+export const useAlbums = (artistId: string, opts?: UseEntityOptions) =>
+  useEntityQuery(
+    artistKeys.albums(artistId),
+    () => getAlbums(artistId),
+    artistId,
+    'Fetch albums',
+    opts,
+  )
+
+export const useEpisodes = (
+  seriesId: string,
+  seasonId: string,
+  opts?: UseEntityOptions,
+) =>
+  useEntityQuery(
+    seriesKeys.episodes(seriesId, seasonId),
+    () => getEpisodes(seriesId, seasonId),
+    [seriesId, seasonId],
+    'Fetch episodes',
+    opts,
+  )
