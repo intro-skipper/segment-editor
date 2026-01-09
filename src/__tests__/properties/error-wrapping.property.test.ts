@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 1: Error Wrapping Consistency
+ * Feature: codebase-audit-refactor, Property: Error Wrapping Consistency
  * For any error value (Error instance, string, object, or unknown), wrapping it
  * with AppError.from() SHALL produce a valid AppError instance with a defined
  * error code and recoverable flag.

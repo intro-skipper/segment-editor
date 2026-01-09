@@ -177,10 +177,53 @@
     "selectEpisode": "Select episode",
     "controls": "Video player controls",
     "recovering": "Recovering playback",
+    "directPlay": "Direct play",
+    "hlsFallback": "Transcoded playback",
+    "direct": "Direct",
+    "hls": "HLS",
+    "strategy": {
+      "direct": "Direct Play - Original quality, no transcoding",
+      "hls": "HLS Streaming - Transcoded for compatibility"
+    },
+    "notification": {
+      "switchedToTranscode": "Switched to transcoded playback"
+    },
     "error": {
       "network": "Network error. Check your connection.",
       "media": "Media playback error. Attempting recovery...",
-      "unknown": "Unable to play video."
+      "unknown": "Unable to play video.",
+      "directPlayFailed": "Direct playback failed. Switching to transcoded stream...",
+      "trackSwitch": "Failed to switch track",
+      "trackUnavailable": "Track is not available",
+      "subtitleLoadFailed": "Failed to load subtitles"
+    },
+    "subtitle": {
+      "error": {
+        "jassubInit": "Failed to initialize subtitle renderer",
+        "loadFailed": "Failed to load subtitle file",
+        "wasmFailed": "Failed to load subtitle renderer module",
+        "webgpuRequired": "WebGPU required for ASS/SSA subtitles",
+        "timeout": "Subtitle renderer initialization timed out"
+      }
+    },
+    "tracks": {
+      "audio": "Audio",
+      "subtitle": "Subtitles",
+      "off": "Off",
+      "unknown": "Unknown",
+      "selector": "Audio and subtitle tracks",
+      "noTracks": "No tracks available",
+      "channels": {
+        "mono": "Mono",
+        "stereo": "Stereo",
+        "surround51": "5.1",
+        "surround71": "7.1"
+      },
+      "error": {
+        "noVideo": "Video element not available",
+        "trackNotFound": "Track not found",
+        "switchFailed": "Failed to switch track"
+      }
     }
   },
   "series": {

@@ -5,12 +5,12 @@
  * Security: All URL parameters are properly encoded to prevent injection attacks.
  */
 
-import type { ApiOptions } from '@/services/jellyfin/sdk'
+import type { ApiOptions } from '@/services/jellyfin'
 import {
   getRequestConfig,
   getServerBaseUrl,
   withApi,
-} from '@/services/jellyfin/sdk'
+} from '@/services/jellyfin'
 import { AppError, logApiError } from '@/lib/unified-error'
 import {
   UrlSafeStringSchema,

@@ -35,47 +35,27 @@ const mockAxiosInstance = {
   defaults: { headers: { common: {} } },
 }
 
-// Mock the SDK module - must provide both getTypedApis and api accessor structure
-vi.mock('@/services/jellyfin/sdk', () => ({
-  getTypedApis: vi.fn(() => ({
-    itemsApi: {},
-    libraryApi: {},
-    tvShowsApi: {},
-    imageApi: {},
-    videosApi: {},
-    pluginsApi: {},
-    mediaSegmentsApi: {},
-    systemApi: {},
-    api: {
-      basePath: 'http://localhost:8096',
-      axiosInstance: mockAxiosInstance,
-    },
-  })),
-  withApi: vi.fn((fn) => {
-    const apis = {
-      itemsApi: {},
-      libraryApi: {},
-      tvShowsApi: {},
-      imageApi: {},
-      videosApi: {},
-      pluginsApi: {},
-      mediaSegmentsApi: {},
-      systemApi: {},
-      api: {
-        basePath: 'http://localhost:8096',
-        axiosInstance: mockAxiosInstance,
-      },
-    }
-    return fn(apis)
-  }),
-  buildUrl: vi.fn((path: string) => `http://localhost:8096${path}`),
-  getApi: vi.fn(() => ({
+// Mock APIs object for withApi
+const mockApis = {
+  itemsApi: {},
+  libraryApi: {},
+  tvShowsApi: {},
+  imageApi: {},
+  videosApi: {},
+  pluginsApi: {},
+  mediaSegmentsApi: {},
+  systemApi: {},
+  api: {
     basePath: 'http://localhost:8096',
     axiosInstance: mockAxiosInstance,
-  })),
-  getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
-  getAccessToken: vi.fn(() => 'test-token'),
-  resetSdkState: vi.fn(),
+  },
+}
+
+// Mock the jellyfin service module (main entry point)
+vi.mock('@/services/jellyfin', () => ({
+  withApi: vi.fn(async (fn: (apis: typeof mockApis) => Promise<unknown>) => {
+    return fn(mockApis)
+  }),
   getRequestConfig: vi.fn(
     (
       options?: { signal?: AbortSignal; timeout?: number },
@@ -85,6 +65,10 @@ vi.mock('@/services/jellyfin/sdk', () => ({
       timeout: options?.timeout ?? defaultTimeout,
     }),
   ),
+  isAborted: vi.fn((signal?: AbortSignal) => signal?.aborted === true),
+  clearApiCache: vi.fn(),
+  getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
+  getAccessToken: vi.fn(() => 'test-token'),
 }))
 
 // Custom arbitrary for hex strings

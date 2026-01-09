@@ -128,10 +128,51 @@
     "unmute": "Ton an",
     "retry": "Erneut versuchen",
     "selectEpisode": "Episode auswählen",
+    "directPlay": "Direktwiedergabe",
+    "hlsFallback": "Transkodierte Wiedergabe",
+    "direct": "Direkt",
+    "hls": "HLS",
+    "strategy": {
+      "direct": "Direktwiedergabe - Originalqualität, keine Transkodierung",
+      "hls": "HLS-Streaming - Transkodiert für Kompatibilität"
+    },
+    "notification": {
+      "switchedToTranscode": "Zu transkodierter Wiedergabe gewechselt"
+    },
     "error": {
       "network": "Netzwerkfehler. Überprüfe deine Verbindung.",
       "media": "Wiedergabefehler. Wiederherstellung wird versucht...",
-      "unknown": "Video kann nicht abgespielt werden."
+      "unknown": "Video kann nicht abgespielt werden.",
+      "directPlayFailed": "Direktwiedergabe fehlgeschlagen. Wechsle zu transkodiertem Stream...",
+      "trackSwitch": "Spurwechsel fehlgeschlagen",
+      "trackUnavailable": "Spur ist nicht verfügbar",
+      "subtitleLoadFailed": "Untertitel konnten nicht geladen werden"
+    },
+    "subtitle": {
+      "error": {
+        "jassubInit": "Untertitel-Renderer konnte nicht initialisiert werden",
+        "loadFailed": "Untertiteldatei konnte nicht geladen werden",
+        "wasmFailed": "Untertitel-Renderer-Modul konnte nicht geladen werden"
+      }
+    },
+    "tracks": {
+      "audio": "Audio",
+      "subtitle": "Untertitel",
+      "off": "Aus",
+      "unknown": "Unbekannt",
+      "selector": "Audio- und Untertitelspuren",
+      "noTracks": "Keine Spuren verfügbar",
+      "channels": {
+        "mono": "Mono",
+        "stereo": "Stereo",
+        "surround51": "5.1",
+        "surround71": "7.1"
+      },
+      "error": {
+        "noVideo": "Videoelement nicht verfügbar",
+        "trackNotFound": "Spur nicht gefunden",
+        "switchFailed": "Spurwechsel fehlgeschlagen"
+      }
     }
   },
   "series": {

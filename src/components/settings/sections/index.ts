@@ -1,0 +1,6 @@
+export { ServerConnectionSection } from './ServerConnectionSection'
+export { AppearanceSection } from './AppearanceSection'
+export { LanguageSection } from './LanguageSection'
+export { ProviderSection } from './ProviderSection'
+export { PageSizeSection } from './PageSizeSection'
+export { CodecCompatibilitySection } from './CodecCompatibilitySection'

@@ -5,8 +5,8 @@
 
 import { PluginStatus } from '@jellyfin/sdk/lib/generated-client'
 import type { PluginInfo } from '@jellyfin/sdk/lib/generated-client'
-import type { ApiOptions } from '@/services/jellyfin/sdk'
-import { getRequestConfig, withApi } from '@/services/jellyfin/sdk'
+import type { ApiOptions } from '@/services/jellyfin'
+import { getRequestConfig, withApi } from '@/services/jellyfin'
 import {
   AppError,
   ErrorCodes,

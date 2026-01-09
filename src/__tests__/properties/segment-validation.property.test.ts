@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 6: Segment Timestamp Validation
+ * Feature: codebase-audit-refactor, Property: Segment Timestamp Validation
  * For any segment where StartTicks >= EndTicks, the validateSegment function
  * SHALL return { valid: false } with an appropriate error message.
  * For any segment where StartTicks < EndTicks and both are non-negative,

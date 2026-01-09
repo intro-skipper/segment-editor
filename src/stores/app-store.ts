@@ -6,6 +6,22 @@ export type Theme = 'auto' | 'dark' | 'light'
 export type Locale = 'en-US' | 'de' | 'fr' | 'auto'
 export type ResolvedLocale = Exclude<Locale, 'auto'>
 
+/**
+ * Track preferences for audio and subtitle selection.
+ * These preferences are persisted and used to auto-select tracks
+ * when loading new media items.
+ *
+ * Requirements: 7.1, 7.3
+ */
+export interface TrackPreferences {
+  /** Preferred audio track language (ISO 639-1 code, e.g., 'en', 'de') */
+  preferredAudioLanguage: string | null
+  /** Preferred subtitle track language (ISO 639-1 code, e.g., 'en', 'de') */
+  preferredSubtitleLanguage: string | null
+  /** Whether subtitles should be enabled by default */
+  subtitlesEnabled: boolean
+}
+
 export interface AppState {
   theme: Theme
   locale: Locale
@@ -13,6 +29,8 @@ export interface AppState {
   showVideoPlayer: boolean
   enableEdl: boolean
   enableChapter: boolean
+  /** Track preferences for audio and subtitle auto-selection */
+  trackPreferences: TrackPreferences
 }
 
 export interface AppActions {
@@ -22,6 +40,12 @@ export interface AppActions {
   setShowVideoPlayer: (show: boolean) => void
   setEnableEdl: (enable: boolean) => void
   setEnableChapter: (enable: boolean) => void
+  /** Set preferred audio track language */
+  setPreferredAudioLanguage: (language: string | null) => void
+  /** Set preferred subtitle track language */
+  setPreferredSubtitleLanguage: (language: string | null) => void
+  /** Set whether subtitles should be enabled by default */
+  setSubtitlesEnabled: (enabled: boolean) => void
 }
 
 export type AppStore = AppState & AppActions
@@ -56,6 +80,11 @@ const initialState: AppState = {
   showVideoPlayer: true,
   enableEdl: false,
   enableChapter: false,
+  trackPreferences: {
+    preferredAudioLanguage: null,
+    preferredSubtitleLanguage: null,
+    subtitlesEnabled: false,
+  },
 }
 
 export const useAppStore = create<AppStore>()(
@@ -73,6 +102,27 @@ export const useAppStore = create<AppStore>()(
       setShowVideoPlayer: (showVideoPlayer) => set({ showVideoPlayer }),
       setEnableEdl: (enableEdl) => set({ enableEdl }),
       setEnableChapter: (enableChapter) => set({ enableChapter }),
+      setPreferredAudioLanguage: (language) =>
+        set((state) => ({
+          trackPreferences: {
+            ...state.trackPreferences,
+            preferredAudioLanguage: language,
+          },
+        })),
+      setPreferredSubtitleLanguage: (language) =>
+        set((state) => ({
+          trackPreferences: {
+            ...state.trackPreferences,
+            preferredSubtitleLanguage: language,
+          },
+        })),
+      setSubtitlesEnabled: (enabled) =>
+        set((state) => ({
+          trackPreferences: {
+            ...state.trackPreferences,
+            subtitlesEnabled: enabled,
+          },
+        })),
     }),
     {
       name: 'segment-editor-app',

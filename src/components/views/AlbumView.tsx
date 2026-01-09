@@ -12,7 +12,7 @@ import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { EmptyState } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
-import { formatReadableTime } from '@/lib/time-utils'
+import { formatReadableTime, ticksToSeconds } from '@/lib/time-utils'
 
 export interface AlbumViewProps {
   /** The album item */
@@ -38,7 +38,7 @@ const TrackRow = React.memo(function TrackRow({
 }: TrackRowProps) {
   const trackNumber = track.IndexNumber ?? index
   const duration = track.RunTimeTicks
-    ? formatReadableTime(track.RunTimeTicks / 10_000_000)
+    ? formatReadableTime(ticksToSeconds(track.RunTimeTicks))
     : '--:--'
 
   return (

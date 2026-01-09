@@ -13,8 +13,8 @@ import {
   getAccessToken,
   getServerBaseUrl,
   isPluginMode,
-} from '@/services/jellyfin/sdk'
-import { testConnection } from '@/services/jellyfin/client'
+  testConnection,
+} from '@/services/jellyfin'
 import { useApiStore } from '@/stores/api-store'
 
 interface PluginModeState {

@@ -33,6 +33,39 @@ export const PLAYER_CONFIG = {
   RECOVERY_TIMEOUT_MS: 2000,
   /** Color extraction timeout in milliseconds */
   COLOR_EXTRACTION_TIMEOUT_MS: 5000,
+  /** Resize debounce delay in milliseconds */
+  RESIZE_DEBOUNCE_MS: 100,
+  /** Video metadata wait timeout in milliseconds */
+  VIDEO_METADATA_TIMEOUT_MS: 15_000,
+} as const
+
+/**
+ * Subtitle/JASSUB configuration constants.
+ */
+export const SUBTITLE_CONFIG = {
+  /** JASSUB initialization timeout in milliseconds */
+  JASSUB_READY_TIMEOUT_MS: 10_000,
+  /** Default frame rate fallback */
+  DEFAULT_TARGET_FPS: 24,
+  /** ASS/SSA codec identifiers (case-insensitive) */
+  ASS_CODECS: ['ass', 'ssa'] as const,
+  /** Supported font MIME types for embedded fonts */
+  SUPPORTED_FONT_TYPES: [
+    'application/vnd.ms-opentype',
+    'application/x-truetype-font',
+    'font/otf',
+    'font/ttf',
+    'font/woff',
+    'font/woff2',
+  ] as const,
+} as const
+
+/**
+ * Jellyfin API constants.
+ */
+export const JELLYFIN_CONFIG = {
+  /** Ticks per second for Jellyfin time conversion */
+  TICKS_PER_SECOND: 10_000_000,
 } as const
 
 /**

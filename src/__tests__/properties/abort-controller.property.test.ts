@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 3: AbortController Cancellation Safety
+ * Feature: codebase-audit-refactor, Property: AbortController Cancellation Safety
  * For any async operation that accepts an AbortSignal, when the signal is aborted
  * before or during execution, the operation SHALL return early (with a cancelled/empty
  * result) without throwing unhandled exceptions.

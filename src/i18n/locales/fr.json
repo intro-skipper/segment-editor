@@ -128,10 +128,51 @@
     "unmute": "Activer le son",
     "retry": "Réessayer",
     "selectEpisode": "Sélectionner un épisode",
+    "directPlay": "Lecture directe",
+    "hlsFallback": "Lecture transcodée",
+    "direct": "Direct",
+    "hls": "HLS",
+    "strategy": {
+      "direct": "Lecture directe - Qualité originale, sans transcodage",
+      "hls": "Streaming HLS - Transcodé pour la compatibilité"
+    },
+    "notification": {
+      "switchedToTranscode": "Basculé vers la lecture transcodée"
+    },
     "error": {
       "network": "Erreur réseau. Vérifiez votre connexion.",
       "media": "Erreur de lecture. Tentative de récupération...",
-      "unknown": "Impossible de lire la vidéo."
+      "unknown": "Impossible de lire la vidéo.",
+      "directPlayFailed": "Échec de la lecture directe. Passage au flux transcodé...",
+      "trackSwitch": "Échec du changement de piste",
+      "trackUnavailable": "Piste non disponible",
+      "subtitleLoadFailed": "Échec du chargement des sous-titres"
+    },
+    "subtitle": {
+      "error": {
+        "jassubInit": "Échec de l'initialisation du moteur de sous-titres",
+        "loadFailed": "Échec du chargement du fichier de sous-titres",
+        "wasmFailed": "Échec du chargement du module de sous-titres"
+      }
+    },
+    "tracks": {
+      "audio": "Audio",
+      "subtitle": "Sous-titres",
+      "off": "Désactivé",
+      "unknown": "Inconnu",
+      "selector": "Pistes audio et sous-titres",
+      "noTracks": "Aucune piste disponible",
+      "channels": {
+        "mono": "Mono",
+        "stereo": "Stéréo",
+        "surround51": "5.1",
+        "surround71": "7.1"
+      },
+      "error": {
+        "noVideo": "Élément vidéo non disponible",
+        "trackNotFound": "Piste non trouvée",
+        "switchFailed": "Échec du changement de piste"
+      }
     }
   },
   "series": {

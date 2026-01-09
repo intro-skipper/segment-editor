@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowLeftFromLine,
   ArrowRightFromLine,
+  Maximize,
+  Minimize,
   MoreVertical,
   Pause,
   Play,
@@ -16,8 +18,11 @@ import {
   VolumeX,
 } from 'lucide-react'
 
+import { TrackSelector } from './TrackSelector'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
+import type { TrackState } from '@/services/video/tracks'
+import type { PlaybackStrategy } from '@/services/video/api'
 import { SEGMENT_TYPES } from '@/lib/segment-utils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -62,6 +67,20 @@ export interface PlayerControlsProps {
   onPushStartTimestamp: () => void
   onPushEndTimestamp: () => void
   onSkipTimeChange: (index: number) => void
+  /** Track state for audio/subtitle selection */
+  trackState?: TrackState
+  /** Callback when an audio track is selected */
+  onSelectAudioTrack?: (index: number) => void
+  /** Callback when a subtitle track is selected (null for off) */
+  onSelectSubtitleTrack?: (index: number | null) => void
+  /** Whether the track selector is disabled */
+  isTrackSelectorDisabled?: boolean
+  /** Current playback strategy */
+  strategy?: PlaybackStrategy
+  /** Whether the player is in fullscreen mode */
+  isFullscreen?: boolean
+  /** Callback to toggle fullscreen */
+  onToggleFullscreen?: () => void
 }
 
 /** Shared button class for controls */
@@ -88,6 +107,13 @@ export const PlayerControls = memo(function PlayerControls({
   onPushStartTimestamp,
   onPushEndTimestamp,
   onSkipTimeChange,
+  trackState,
+  onSelectAudioTrack,
+  onSelectSubtitleTrack,
+  isTrackSelectorDisabled,
+  strategy,
+  isFullscreen,
+  onToggleFullscreen,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
 
@@ -261,9 +287,54 @@ export const PlayerControls = memo(function PlayerControls({
             style={getIconStyle(iconColor)}
           />
         </Button>
+
+        {/* Track selector for audio and subtitles */}
+        {trackState && onSelectAudioTrack && onSelectSubtitleTrack && (
+          <TrackSelector
+            trackState={trackState}
+            onSelectAudio={onSelectAudioTrack}
+            onSelectSubtitle={onSelectSubtitleTrack}
+            strategy={strategy}
+            disabled={isTrackSelectorDisabled}
+            getButtonStyle={getButtonStyle}
+            iconColor={iconColor}
+            hasColors={hasColors}
+          />
+        )}
       </div>
 
       <div className="flex-1" />
+
+      {/* Fullscreen button */}
+      {onToggleFullscreen && (
+        <Button
+          variant="outline"
+          onClick={onToggleFullscreen}
+          aria-label={
+            isFullscreen
+              ? t('player.exitFullscreen', 'Exit fullscreen')
+              : t('player.fullscreen', 'Fullscreen')
+          }
+          style={getButtonStyle()}
+          className={btnClass(false, hasColors)}
+        >
+          {isFullscreen ? (
+            <Minimize
+              className={ICON_CLASS}
+              strokeWidth={2.5}
+              aria-hidden="true"
+              style={getIconStyle(iconColor)}
+            />
+          ) : (
+            <Maximize
+              className={ICON_CLASS}
+              strokeWidth={2.5}
+              aria-hidden="true"
+              style={getIconStyle(iconColor)}
+            />
+          )}
+        </Button>
+      )}
 
       {/* Settings menu */}
       <DropdownMenu>

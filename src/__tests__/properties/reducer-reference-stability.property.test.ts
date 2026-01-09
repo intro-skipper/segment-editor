@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 11: Reducer Reference Stability
+ * Feature: codebase-audit-refactor, Property: Reducer Reference Stability
  * For any player state and action that does not change any state values, the reducer
  * SHALL return the exact same object reference (referential equality). For any action
  * that changes at least one value, the reducer SHALL return a new object reference.

@@ -3,6 +3,7 @@ import { decode } from 'blurhash'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { getBestImageUrl, getImageBlurhash } from '@/services/video/api'
+import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { cn } from '@/lib/utils'
 
 export interface ItemImageProps {
@@ -84,11 +85,12 @@ export function ItemImage({
   const [hasError, setHasError] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
 
-  // Get the image URL
-  const imageUrl = useMemo(
-    () => getBestImageUrl(item, maxWidth, maxHeight),
+  // Get the image URL and convert to blob URL to bypass COEP restrictions
+  const rawImageUrl = useMemo(
+    () => getBestImageUrl(item, maxWidth, maxHeight) ?? null,
     [item, maxWidth, maxHeight],
   )
+  const imageUrl = useBlobUrl(rawImageUrl)
 
   // Get and decode the blurhash
   const blurhashDataUrl = useMemo(() => {
