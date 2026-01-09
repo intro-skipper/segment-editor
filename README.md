@@ -1,4 +1,21 @@
-Welcome to your new TanStack app!
+# Jellyfin Segment Editor
+
+Manage Jellyfin Media Segment positions the simple way. This tool is in early stages of development.
+
+- Create/Edit/Delete all kind of Segments (Intro, Outro, ...)
+- Player to copy timestamps while you watch
+
+## Requirements
+
+- Jellyfin 10.10
+- Jellyfin Plugin [MediaSegments API](https://github.com/intro-skipper/jellyfin-plugin-ms-api)
+- Jellyfin Server API Key (created by you)
+
+## Related projects
+
+- Jellyfin Plugin: [.EDL Creator](https://github.com/intro-skipper/jellyfin-plugin-edl)
+- Jellyfin Plugin: [Chapter Creator](https://github.com/intro-skipper/jellyfin-plugin-ms-chapter)
+- Jellyfin Plugin: [MediaSegments API](https://github.com/intro-skipper/jellyfin-plugin-ms-api)
 
 # Getting Started
 
