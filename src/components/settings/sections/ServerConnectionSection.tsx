@@ -1,55 +1,29 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle, Loader2, LogOut, Server, XCircle } from 'lucide-react'
+import { CheckCircle, LogOut, Server, XCircle } from 'lucide-react'
 import { useShallow } from 'zustand/shallow'
 
-import { SettingsField, SettingsSection } from '../primitives'
-import { useConnectionTest } from '../hooks'
+import { SettingsSection } from '../primitives'
 import { useApiStore } from '@/stores/api-store'
 import { showNotification } from '@/lib/notifications'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ConnectionWizard } from '@/components/connection'
 
 export function ServerConnectionSection() {
   const { t } = useTranslation()
   const [wizardOpen, setWizardOpen] = useState(false)
 
-  const {
-    serverAddress,
-    setServerAddress,
-    apiKey,
-    setApiKey,
-    validConnection,
-    validAuth,
-    serverVersion,
-    username,
-    clearAuth,
-  } = useApiStore(
-    useShallow((s) => ({
-      serverAddress: s.serverAddress,
-      setServerAddress: s.setServerAddress,
-      apiKey: s.apiKey,
-      setApiKey: s.setApiKey,
-      validConnection: s.validConnection,
-      validAuth: s.validAuth,
-      serverVersion: s.serverVersion,
-      username: s.username,
-      clearAuth: s.clearAuth,
-    })),
-  )
-
-  const { isTesting, urlError, setUrlError, handleTestConnection } =
-    useConnectionTest({ serverAddress })
-
-  const handleServerAddressChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setServerAddress(e.target.value)
-      setUrlError(null) // Always clear error on input change
-    },
-    [setServerAddress, setUrlError],
-  )
+  const { serverAddress, validConnection, validAuth, serverVersion, username, clearAuth } =
+    useApiStore(
+      useShallow((s) => ({
+        serverAddress: s.serverAddress,
+        validConnection: s.validConnection,
+        validAuth: s.validAuth,
+        serverVersion: s.serverVersion,
+        username: s.username,
+        clearAuth: s.clearAuth,
+      })),
+    )
 
   const handleOpenWizard = useCallback(() => setWizardOpen(true), [])
 
@@ -96,16 +70,7 @@ export function ServerConnectionSection() {
             onDisconnect={handleDisconnect}
           />
         ) : (
-          <DisconnectedState
-            serverAddress={serverAddress}
-            apiKey={apiKey}
-            urlError={urlError}
-            isTesting={isTesting}
-            onServerAddressChange={handleServerAddressChange}
-            onApiKeyChange={(e) => setApiKey(e.target.value || undefined)}
-            onTestConnection={handleTestConnection}
-            onConnect={handleOpenWizard}
-          />
+          <DisconnectedState onConnect={handleOpenWizard} />
         )}
       </SettingsSection>
 
@@ -166,93 +131,21 @@ function ConnectedState({
 }
 
 interface DisconnectedStateProps {
-  serverAddress: string
-  apiKey: string | undefined
-  urlError: string | null
-  isTesting: boolean
-  onServerAddressChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onApiKeyChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onTestConnection: () => void
   onConnect: () => void
 }
 
-function DisconnectedState({
-  serverAddress,
-  apiKey,
-  urlError,
-  isTesting,
-  onServerAddressChange,
-  onApiKeyChange,
-  onTestConnection,
-  onConnect,
-}: DisconnectedStateProps) {
+function DisconnectedState({ onConnect }: DisconnectedStateProps) {
   const { t } = useTranslation()
 
   return (
     <div className="space-y-3">
-      <SettingsField label={t('login.server_address')} htmlFor="server-address">
-        <Input
-          id="server-address"
-          type="text"
-          inputMode="url"
-          placeholder="https://jellyfin.example.com"
-          value={serverAddress}
-          onChange={onServerAddressChange}
-          aria-invalid={!!urlError}
-          aria-describedby={urlError ? 'server-url-error' : undefined}
-          className={cn(
-            'bg-muted/60 border-0 focus-visible:ring-ring/50',
-            urlError && 'ring-2 ring-destructive/50',
-          )}
-        />
-        {urlError && (
-          <p
-            id="server-url-error"
-            className="text-xs text-destructive mt-1"
-            role="alert"
-          >
-            {urlError}
-          </p>
-        )}
-      </SettingsField>
-
-      <SettingsField label={t('login.api_key')} htmlFor="api-key">
-        <Input
-          id="api-key"
-          type="password"
-          placeholder="••••••••••••••••"
-          value={apiKey || ''}
-          onChange={onApiKeyChange}
-          className="bg-muted/60 border-0 focus-visible:ring-ring/50"
-        />
-      </SettingsField>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={onTestConnection}
-          disabled={isTesting || !serverAddress}
-          className="flex-1 h-9 rounded-lg"
-          aria-busy={isTesting}
-          aria-live="polite"
-        >
-          {isTesting && (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              <span className="sr-only">Testing connection</span>
-            </>
-          )}
-          {t('login.test_conn')}
-        </Button>
-        <Button
-          variant="default"
-          onClick={onConnect}
-          className="h-9 rounded-lg"
-        >
-          <Server className="size-4" aria-hidden />
-          Connect
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('login.not_connected', 'Not connected to any server')}
+      </p>
+      <Button variant="default" onClick={onConnect} className="w-full h-9 rounded-lg">
+        <Server className="size-4" aria-hidden />
+        {t('login.connect', 'Connect to Server')}
+      </Button>
     </div>
   )
 }
