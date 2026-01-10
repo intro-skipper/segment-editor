@@ -13,17 +13,23 @@ export function ServerConnectionSection() {
   const { t } = useTranslation()
   const [wizardOpen, setWizardOpen] = useState(false)
 
-  const { serverAddress, validConnection, validAuth, serverVersion, username, clearAuth } =
-    useApiStore(
-      useShallow((s) => ({
-        serverAddress: s.serverAddress,
-        validConnection: s.validConnection,
-        validAuth: s.validAuth,
-        serverVersion: s.serverVersion,
-        username: s.username,
-        clearAuth: s.clearAuth,
-      })),
-    )
+  const {
+    serverAddress,
+    validConnection,
+    validAuth,
+    serverVersion,
+    username,
+    clearAuth,
+  } = useApiStore(
+    useShallow((s) => ({
+      serverAddress: s.serverAddress,
+      validConnection: s.validConnection,
+      validAuth: s.validAuth,
+      serverVersion: s.serverVersion,
+      username: s.username,
+      clearAuth: s.clearAuth,
+    })),
+  )
 
   const handleOpenWizard = useCallback(() => setWizardOpen(true), [])
 
@@ -142,7 +148,11 @@ function DisconnectedState({ onConnect }: DisconnectedStateProps) {
       <p className="text-sm text-muted-foreground">
         {t('login.not_connected', 'Not connected to any server')}
       </p>
-      <Button variant="default" onClick={onConnect} className="w-full h-9 rounded-lg">
+      <Button
+        variant="default"
+        onClick={onConnect}
+        className="w-full h-9 rounded-lg"
+      >
         <Server className="size-4" aria-hidden />
         {t('login.connect', 'Connect to Server')}
       </Button>
