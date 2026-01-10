@@ -66,6 +66,10 @@
     "api_key": "Jellyfin API Key",
     "server_address": "Jellyfin Server Address",
     "test_conn": "Test Connection",
+    "connect": "Connect to Server",
+    "connect_success": "Successfully connected to server",
+    "disconnected": "Disconnected from server",
+    "not_connected": "Not connected to any server",
     "validation": {
       "api_key_invalid": "API Key Invalid",
       "url_invalid": "URL invalid. Should start with http:// or https://"
@@ -90,8 +94,16 @@
     "plugins": {
       "title": "Installed Server Plugins"
     },
+    "name": "Segment Editor",
     "title": "Segment Editor",
     "showVideoPlayer": "Show Video Player"
+  },
+  "connection": {
+    "notConnected": "Not Connected",
+    "notConnectedDescription": "Configure your Jellyfin server connection to get started",
+    "openSettings": "Open Settings",
+    "connecting": "Connecting...",
+    "connectingDescription": "Establishing connection to Jellyfin server"
   },
   "items": {
     "select_collection": "Select a collection to browse",
@@ -116,6 +128,7 @@
     "deleteSegments": "Are you sure to delete all segments for '{{item}}'?",
     "newSegment": "New Segment",
     "actions": "Segment actions",
+    "paste": "Paste",
     "slider": {
       "title": "Slider Editor"
     },
@@ -159,12 +172,17 @@
   },
   "error": {
     "not_found": "Page Not Found",
-    "not_found_description": "The page you're looking for doesn't exist or has been moved."
+    "not_found_description": "The page you're looking for doesn't exist or has been moved.",
+    "something_went_wrong": "Something went wrong",
+    "generic_description": "An unexpected error occurred. Please try again.",
+    "feature_error": "{{feature}} Error",
+    "feature_description": "This feature encountered an error. You can try again or navigate elsewhere."
   },
   "common": {
     "go_back": "Go Back",
     "goBack": "Go back",
     "home": "Home",
+    "reload": "Reload",
     "retry": "Retry"
   },
   "player": {
@@ -173,6 +191,8 @@
     "volumeSlider": "Volume slider",
     "mute": "Mute",
     "unmute": "Unmute",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
     "retry": "Retry",
     "selectEpisode": "Select episode",
     "controls": "Video player controls",
@@ -183,7 +203,9 @@
     "hls": "HLS",
     "strategy": {
       "direct": "Direct Play - Original quality, no transcoding",
-      "hls": "HLS Streaming - Transcoded for compatibility"
+      "hls": "HLS Streaming - Transcoded for compatibility",
+      "directLabel": "Direct Play",
+      "hlsLabel": "HLS Transcode"
     },
     "notification": {
       "switchedToTranscode": "Switched to transcoded playback"
