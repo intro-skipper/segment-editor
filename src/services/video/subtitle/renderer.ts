@@ -12,11 +12,9 @@ import {
   fetchFallbackFontUrls,
 } from './font-loader'
 import {
-  applyJassubOverlayStyles,
   calculateTimeOffset,
   fetchSubtitleContent,
   getSubtitleUrl,
-  isWebGPUAvailable,
 } from './utils'
 import type {
   CreateJassubOptions,
@@ -26,13 +24,14 @@ import type {
 } from './types'
 import { getCredentials } from '@/services/jellyfin'
 
-/** Empty ASS track used to clear subtitles while keeping renderer alive */
-const EMPTY_ASS_TRACK = `[Script Info]
+/** Empty ASS track used to initialize renderer and clear subtitles */
+const EMPTY_ASS_HEADER = `[Script Info]
 Title: Empty
 ScriptType: v4.00+
 WrapStyle: 0
 PlayResX: 1920
 PlayResY: 1080
+ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -46,21 +45,13 @@ Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,
  *
  * @param options - Renderer creation options
  * @returns Promise resolving to renderer result with control methods
- * @throws Error if WebGPU unavailable or initialization fails
+ * @throws Error if initialization fails
  */
 export async function createJassubRenderer(
   options: CreateJassubOptions,
 ): Promise<JassubRendererResult> {
   const { videoElement, track, item, transcodingOffsetTicks, userOffset } =
     options
-
-  // Validate WebGPU support
-  if (!(await isWebGPUAvailable())) {
-    throw new Error(
-      'WebGPU is not available. ASS/SSA subtitles require WebGPU support. ' +
-        'Please use a browser with WebGPU enabled (Chrome 113+, Edge 113+, or Firefox with flags).',
-    )
-  }
 
   const { serverAddress, accessToken } = getCredentials()
   const itemId = item.Id ?? ''
@@ -86,9 +77,11 @@ export async function createJassubRenderer(
   // Dynamic import JASSUB
   const JASSUB = (await import('jassub')).default
 
+  // Initialize with empty header first (JASSUB 2.2.0 pattern)
+  // This ensures WebGL context is properly set up before loading real content
   const instance = new JASSUB({
     video: videoElement,
-    subContent,
+    subContent: EMPTY_ASS_HEADER,
     fonts: embeddedFonts,
     availableFonts,
     timeOffset,
@@ -110,7 +103,9 @@ export async function createJassubRenderer(
     throw err
   })
 
-  applyJassubOverlayStyles(videoElement)
+  // Now set the actual subtitle track and resize
+  await instance.renderer.setTrack(subContent)
+  instance.resize()
 
   // Track disposal state to prevent operations on destroyed instance
   let isDisposed = false
@@ -134,7 +129,6 @@ export async function createJassubRenderer(
       if (isDisposed) return
       try {
         instance.resize()
-        instance.resetRenderAheadCache()
       } catch {
         // Ignore resize errors
       }
@@ -147,11 +141,13 @@ export async function createJassubRenderer(
       )
       if (isDisposed) return
       await instance.renderer.setTrack(content)
+      instance.resize()
     },
     clearTrack: async () => {
       if (isDisposed) return
       try {
-        await instance.renderer.setTrack(EMPTY_ASS_TRACK)
+        await instance.renderer.setTrack(EMPTY_ASS_HEADER)
+        instance.resize()
       } catch {
         // Ignore errors if renderer is already disposed
       }

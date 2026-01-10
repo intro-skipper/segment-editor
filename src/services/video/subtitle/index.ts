@@ -29,10 +29,6 @@ export {
   // URL building
   getSubtitleUrl,
   fetchSubtitleContent,
-  // WebGPU detection
-  isWebGPUAvailable,
-  // DOM utilities
-  applyJassubOverlayStyles,
 } from './utils'
 
 // Font loading

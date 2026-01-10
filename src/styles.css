@@ -709,11 +709,6 @@ kbd {
 }
 
 /* JASSUB subtitle canvas overlay styling */
-/* JASSUB creates a wrapper div with class "JASSUB" containing the canvas */
-/* The wrapper is inserted after the video element inside the aspect-video container */
-/* We need to override JASSUB's default positioning to make it overlay the video */
-
-/* Target JASSUB wrapper - use high specificity to override inline styles */
 div.JASSUB {
   position: absolute !important;
   top: 0 !important;
@@ -725,18 +720,12 @@ div.JASSUB {
 }
 
 div.JASSUB canvas {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  background: transparent !important;
 }
 
-/* Ensure the video container allows the canvas to be visible */
 .aspect-video {
   position: relative !important;
-  overflow: visible !important;
 }

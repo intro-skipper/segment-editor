@@ -13,7 +13,6 @@ import type { BaseItemDto } from '@/types/jellyfin'
 export interface JassubInstance {
   destroy: () => void
   resize: () => void
-  resetRenderAheadCache: () => void
   ready: Promise<void>
   renderer: {
     timeOffset: number

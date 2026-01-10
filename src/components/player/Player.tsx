@@ -546,10 +546,7 @@ export function Player({
       {/* Video container */}
       <div
         ref={containerRef}
-        className={cn(
-          'relative bg-black rounded-2xl overflow-hidden',
-          isFullscreen && 'rounded-none',
-        )}
+        className="relative"
       >
         <div
           className="relative cursor-pointer aspect-video"

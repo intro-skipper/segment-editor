@@ -42,6 +42,10 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
+  optimizeDeps: {
+    exclude: ['jassub'],
+    include: ['jassub > throughput'],
+  },
   build: {
     rollupOptions: {
       output: {

@@ -86,9 +86,6 @@ function classifyError(error: unknown, t: (key: string) => string): string {
   const message =
     error instanceof Error ? error.message.toLowerCase() : String(error)
 
-  if (message.includes('webgpu') || message.includes('navigator.gpu')) {
-    return t('player.subtitle.error.webgpuRequired')
-  }
   if (message.includes('timeout')) {
     return t('player.subtitle.error.timeout')
   }
