@@ -71,7 +71,8 @@ export const useSessionStore = create<SessionStore>()(
     }),
     {
       name: 'segment-editor-session',
-      partialize: ({ playerVolume, playerMuted }) => ({
+      partialize: ({ pageSize, playerVolume, playerMuted }) => ({
+        pageSize,
         playerVolume,
         playerMuted,
       }),
