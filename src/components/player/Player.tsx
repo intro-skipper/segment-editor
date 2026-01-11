@@ -544,10 +544,7 @@ export function Player({
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {/* Video container */}
-      <div
-        ref={containerRef}
-        className="relative"
-      >
+      <div ref={containerRef} className="relative">
         <div
           className="relative cursor-pointer aspect-video"
           onClick={togglePlay}

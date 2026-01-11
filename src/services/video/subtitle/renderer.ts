@@ -1,93 +1,130 @@
 /**
  * JASSUB ASS/SSA Subtitle Renderer.
- * Composes focused modules for a clean, maintainable implementation.
  *
  * @module services/video/subtitle/renderer
  */
 
-import { JASSUB_READY_TIMEOUT_MS } from './constants'
-import {
-  buildAvailableFonts,
-  extractEmbeddedFontUrls,
-  fetchFallbackFontUrls,
-} from './font-loader'
-import {
-  calculateTimeOffset,
-  fetchSubtitleContent,
-  getSubtitleUrl,
-} from './utils'
-import type {
-  CreateJassubOptions,
-  JassubInstance,
-  JassubRendererResult,
-  SetTrackOptions,
-} from './types'
-import { getCredentials } from '@/services/jellyfin'
+import type JASSUB from 'jassub'
+import type { SubtitleTrackInfo } from '../tracks'
+import type { BaseItemDto } from '@/types/jellyfin'
+import { buildApiUrl, getCredentials } from '@/services/jellyfin'
+import { JELLYFIN_CONFIG, SUBTITLE_CONFIG } from '@/lib/constants'
 
-/** Empty ASS track used to initialize renderer and clear subtitles */
-const EMPTY_ASS_HEADER = `[Script Info]
-Title: Empty
-ScriptType: v4.00+
-WrapStyle: 0
-PlayResX: 1920
-PlayResY: 1080
-ScaledBorderAndShadow: yes
+const { TICKS_PER_SECOND } = JELLYFIN_CONFIG
+const { SUPPORTED_FONT_TYPES, JASSUB_READY_TIMEOUT_MS } = SUBTITLE_CONFIG
 
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+// ============================================================================
+// Types
+// ============================================================================
 
-[Events]
-`
+export type JassubInstance = JASSUB
+
+export interface JassubRendererResult {
+  instance: JassubInstance
+  destroy: () => void
+  setTimeOffset: (transcodingTicks: number, userOffset: number) => void
+  setTrack: (url: string) => Promise<void>
+}
+
+export interface CreateRendererOptions {
+  video: HTMLVideoElement
+  track: SubtitleTrackInfo
+  item: BaseItemDto
+  transcodingOffsetTicks?: number
+  userOffset?: number
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Builds subtitle URL for a track. */
+function getSubtitleUrl(track: SubtitleTrackInfo, itemId: string): string {
+  const { serverAddress, accessToken } = getCredentials()
+
+  if (track.deliveryUrl) {
+    const endpoint = track.deliveryUrl.startsWith('/')
+      ? track.deliveryUrl.slice(1)
+      : track.deliveryUrl
+    return buildApiUrl({ serverAddress, accessToken, endpoint })
+  }
+
+  const mediaSourceId = itemId.replace(/-/g, '')
+  const ext = track.format.toLowerCase() === 'ssa' ? 'ssa' : 'ass'
+
+  return buildApiUrl({
+    serverAddress,
+    accessToken,
+    endpoint: `Videos/${itemId}/${mediaSourceId}/Subtitles/${track.index}/Stream.${ext}`,
+  })
+}
+
+/** Extracts embedded font URLs from media source. */
+function getEmbeddedFonts(item: BaseItemDto): Array<string> {
+  const { serverAddress } = getCredentials()
+  const mediaSource = item.MediaSources?.[0]
+  if (!mediaSource?.MediaAttachments?.length) return []
+
+  const itemId = item.Id ?? ''
+  const mediaSourceId = mediaSource.Id ?? itemId.replace(/-/g, '')
+  const cleanServer = serverAddress.replace(/\/+$/, '')
+
+  return mediaSource.MediaAttachments.filter((att) => {
+    const mime = att.MimeType?.toLowerCase()
+    return mime && SUPPORTED_FONT_TYPES.some((t) => t.toLowerCase() === mime)
+  }).flatMap((att) => {
+    if (att.DeliveryUrl) return [`${cleanServer}${att.DeliveryUrl}`]
+    if (att.Index != null) {
+      return [
+        `${cleanServer}/Videos/${itemId}/${mediaSourceId}/Attachments/${att.Index}`,
+      ]
+    }
+    return []
+  })
+}
+
+/** Calculates time offset combining transcoding and user offset. */
+function calcTimeOffset(transcodingTicks: number, userOffset: number): number {
+  return transcodingTicks / TICKS_PER_SECOND + userOffset
+}
+
+// ============================================================================
+// Main API
+// ============================================================================
 
 /**
  * Creates a JASSUB renderer for ASS/SSA subtitles.
- *
- * @param options - Renderer creation options
- * @returns Promise resolving to renderer result with control methods
- * @throws Error if initialization fails
  */
 export async function createJassubRenderer(
-  options: CreateJassubOptions,
+  options: CreateRendererOptions,
 ): Promise<JassubRendererResult> {
-  const { videoElement, track, item, transcodingOffsetTicks, userOffset } =
-    options
+  const {
+    video,
+    track,
+    item,
+    transcodingOffsetTicks = 0,
+    userOffset = 0,
+  } = options
 
-  const { serverAddress, accessToken } = getCredentials()
   const itemId = item.Id ?? ''
-  const mediaSource = item.MediaSources?.[0]
-
-  // Load subtitle content and fallback fonts in parallel
-  const [subContent, fallbackFontUrls] = await Promise.all([
-    fetchSubtitleContent(
-      getSubtitleUrl(track, itemId, serverAddress, accessToken),
-    ),
-    fetchFallbackFontUrls(serverAddress, accessToken).catch(() => []),
-  ])
-
-  // Extract fonts from already-loaded MediaSource (no API call needed)
-  const embeddedFonts = extractEmbeddedFontUrls(
-    mediaSource,
-    itemId,
-    serverAddress,
-  )
-  const availableFonts = buildAvailableFonts(fallbackFontUrls)
-  const timeOffset = calculateTimeOffset(transcodingOffsetTicks, userOffset)
+  const subUrl = getSubtitleUrl(track, itemId)
+  const fonts = getEmbeddedFonts(item)
+  const timeOffset = calcTimeOffset(transcodingOffsetTicks, userOffset)
 
   // Dynamic import JASSUB
   const JASSUB = (await import('jassub')).default
 
-  // Initialize with empty header first (JASSUB 2.2.0 pattern)
-  // This ensures WebGL context is properly set up before loading real content
+  // JASSUB assets are served from node_modules via Vite's dev server
+  // In dev: /node_modules/.vite/deps/... or direct node_modules path
+  // The library handles this internally when no URLs are provided
   const instance = new JASSUB({
-    video: videoElement,
-    subContent: EMPTY_ASS_HEADER,
-    fonts: embeddedFonts,
-    availableFonts,
+    video,
+    subUrl,
+    fonts,
     timeOffset,
     useLocalFonts: true,
     debug: import.meta.env.DEV,
-  }) as unknown as JassubInstance
+  })
 
   // Wait for ready with timeout
   await Promise.race([
@@ -99,67 +136,37 @@ export async function createJassubRenderer(
       ),
     ),
   ]).catch((err) => {
-    safeDestroy(instance)
+    instance.destroy()
     throw err
   })
 
-  // Now set the actual subtitle track and resize
-  await instance.renderer.setTrack(subContent)
-  instance.resize()
-
-  // Track disposal state to prevent operations on destroyed instance
-  let isDisposed = false
+  let destroyed = false
 
   return {
     instance,
-    dispose: () => {
-      if (isDisposed) return
-      isDisposed = true
-      safeDestroy(instance)
-    },
-    setTimeOffset: (ticks: number, offset: number) => {
-      if (isDisposed) return
+    destroy: () => {
+      if (destroyed) return
+      destroyed = true
       try {
-        instance.renderer.timeOffset = calculateTimeOffset(ticks, offset)
+        instance.destroy()
       } catch {
-        // Ignore if renderer proxy is released
+        // Ignore
       }
     },
-    resize: () => {
-      if (isDisposed) return
+    setTimeOffset: (ticks, offset) => {
+      if (destroyed) return
       try {
-        instance.resize()
+        instance.timeOffset = calcTimeOffset(ticks, offset)
       } catch {
-        // Ignore resize errors
+        // Ignore
       }
     },
-    setTrack: async (opts: SetTrackOptions) => {
-      if (isDisposed) return
-      const newItemId = opts.item.Id ?? ''
-      const content = await fetchSubtitleContent(
-        getSubtitleUrl(opts.track, newItemId, serverAddress, accessToken),
-      )
-      if (isDisposed) return
+    setTrack: async (url) => {
+      if (destroyed) return
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Failed to fetch subtitle: ${res.status}`)
+      const content = await res.text()
       await instance.renderer.setTrack(content)
-      instance.resize()
     },
-    clearTrack: async () => {
-      if (isDisposed) return
-      try {
-        await instance.renderer.setTrack(EMPTY_ASS_HEADER)
-        instance.resize()
-      } catch {
-        // Ignore errors if renderer is already disposed
-      }
-    },
-  }
-}
-
-/** Safely destroys a JASSUB instance. */
-export function safeDestroy(instance: JassubInstance): void {
-  try {
-    instance.destroy()
-  } catch {
-    // Ignore destruction errors
   }
 }

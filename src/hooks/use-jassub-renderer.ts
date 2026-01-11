@@ -9,10 +9,10 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
 import type { JassubRendererResult } from '@/services/video/subtitle'
 import {
-  RESIZE_DEBOUNCE_MS,
   createJassubRenderer,
   requiresJassubRenderer,
 } from '@/services/video/subtitle'
+import { PLAYER_CONFIG } from '@/lib/constants'
 import { showError } from '@/lib/notifications'
 
 // ============================================================================
@@ -43,67 +43,52 @@ export interface UseJassubRendererReturn {
 const VIDEO_METADATA_TIMEOUT_MS = 15_000
 
 // ============================================================================
-// Helper: Wait for video metadata
+// Helpers
 // ============================================================================
 
 function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
-  if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0) {
+  if (video.readyState >= 1 && video.videoWidth > 0) {
     return Promise.resolve()
   }
 
   return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
+    const timeout = setTimeout(() => {
       cleanup()
       reject(new Error('Timeout waiting for video metadata'))
     }, VIDEO_METADATA_TIMEOUT_MS)
 
     const cleanup = () => {
-      clearTimeout(timeoutId)
-      video.removeEventListener('loadedmetadata', onMetadata)
+      clearTimeout(timeout)
+      video.removeEventListener('loadedmetadata', onLoad)
       video.removeEventListener('error', onError)
     }
 
-    const onMetadata = () => {
+    const onLoad = () => {
       cleanup()
       resolve()
     }
-
     const onError = () => {
       cleanup()
-      reject(new Error('Video error while waiting for metadata'))
+      reject(new Error('Video error'))
     }
 
-    video.addEventListener('loadedmetadata', onMetadata)
+    video.addEventListener('loadedmetadata', onLoad)
     video.addEventListener('error', onError)
   })
 }
 
-// ============================================================================
-// Helper: Classify error for user-friendly messages
-// ============================================================================
-
-function classifyError(error: unknown, t: (key: string) => string): string {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error)
-
-  if (message.includes('timeout')) {
-    return t('player.subtitle.error.timeout')
-  }
-  if (message.includes('wasm') || message.includes('worker')) {
+function getErrorMessage(error: unknown, t: (key: string) => string): string {
+  const msg = error instanceof Error ? error.message.toLowerCase() : ''
+  if (msg.includes('timeout')) return t('player.subtitle.error.timeout')
+  if (msg.includes('wasm') || msg.includes('worker'))
     return t('player.subtitle.error.wasmFailed')
-  }
-  if (
-    message.includes('fetch') ||
-    message.includes('load') ||
-    message.includes('network')
-  ) {
+  if (msg.includes('fetch') || msg.includes('network'))
     return t('player.subtitle.error.loadFailed')
-  }
   return t('player.subtitle.error.jassubInit')
 }
 
 // ============================================================================
-// Main Hook
+// Hook
 // ============================================================================
 
 export function useJassubRenderer({
@@ -120,136 +105,51 @@ export function useJassubRenderer({
 
   const rendererRef = useRef<JassubRendererResult | null>(null)
   const userOffsetRef = useRef(userOffset)
-  const transcodingOffsetRef = useRef(transcodingOffsetTicks)
-  const prevTrackIndexRef = useRef<number | null>(null)
-  const prevItemIdRef = useRef<string | null>(null)
+  const transcodingRef = useRef(transcodingOffsetTicks)
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Keep refs in sync
   userOffsetRef.current = userOffset
-  transcodingOffsetRef.current = transcodingOffsetTicks
+  transcodingRef.current = transcodingOffsetTicks
 
-  // ============================================================================
-  // Disposal
-  // ============================================================================
-
-  const disposeRenderer = useCallback(() => {
-    rendererRef.current?.dispose()
+  // Cleanup helper
+  const destroyRenderer = useCallback(() => {
+    rendererRef.current?.destroy()
     rendererRef.current = null
     setIsActive(false)
   }, [])
 
-  // ============================================================================
-  // Resize handling
-  // ============================================================================
-
-  const handleResize = useCallback(() => {
+  // Debounced resize
+  const resize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
-
     resizeTimerRef.current = setTimeout(() => {
-      rendererRef.current?.resize()
-    }, RESIZE_DEBOUNCE_MS)
+      rendererRef.current?.instance.resize()
+    }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
   }, [])
 
-  const resize = useCallback(() => handleResize(), [handleResize])
-
-  // ============================================================================
   // User offset update
-  // ============================================================================
-
   const setUserOffset = useCallback((offset: number) => {
     userOffsetRef.current = offset
-    rendererRef.current?.setTimeOffset(transcodingOffsetRef.current, offset)
+    rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
   }, [])
 
-  // ============================================================================
-  // Initialization effect
-  // ============================================================================
-
+  // Main effect: create/destroy renderer based on track
   useEffect(() => {
     const video = videoRef.current
-    const currentItemId = item?.Id ?? null
-    const currentTrackIndex = activeTrack?.index ?? null
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
-    const hasRenderer = rendererRef.current !== null
-    const sameItem = currentItemId === prevItemIdRef.current
-    const sameTrack = currentTrackIndex === prevTrackIndexRef.current
 
-    // Detect HLS reload (same track/item, existing renderer)
-    const isHlsReload = needsJassub && hasRenderer && sameTrack && sameItem
-
-    // Dynamic track switch: same item, different ASS track, renderer exists
-    const canSwitchDynamically =
-      needsJassub && hasRenderer && sameItem && !sameTrack && item
-
-    prevTrackIndexRef.current = currentTrackIndex
-    prevItemIdRef.current = currentItemId
-
-    if (isHlsReload) {
-      rendererRef.current?.setTimeOffset(
-        transcodingOffsetTicks,
-        userOffsetRef.current,
-      )
-      return
-    }
-
-    // Dynamic subtitle switch - reuse existing renderer
-    if (canSwitchDynamically) {
-      let cancelled = false
-
-      const switchTrack = async () => {
-        setIsLoading(true)
-        try {
-          await rendererRef.current?.setTrack({ track: activeTrack, item })
-          if (!cancelled) {
-            rendererRef.current?.setTimeOffset(
-              transcodingOffsetTicks,
-              userOffsetRef.current,
-            )
-          }
-        } catch (err) {
-          if (!cancelled) {
-            const errorMessage =
-              err instanceof Error ? err.message : String(err)
-            setError(errorMessage)
-            showError(classifyError(err, t), errorMessage)
-            console.error('[JASSUB] Track switch error:', err)
-          }
-        } finally {
-          if (!cancelled) setIsLoading(false)
-        }
-      }
-
-      switchTrack()
-      return () => {
-        cancelled = true
-      }
-    }
-
-    // Clear subtitles if renderer exists but no longer needed
-    if (hasRenderer && !needsJassub) {
-      // Clear track async - errors are caught inside clearTrack
-      void rendererRef.current?.clearTrack()
-      setIsActive(false)
-      setError(null)
-      // Don't dispose - keep renderer alive for potential reuse
-      return
-    }
-
-    // Full disposal needed: item changed
-    if (hasRenderer && !sameItem) {
-      disposeRenderer()
-    }
-
-    // Exit if no JASSUB needed
+    // Cleanup if no longer needed
     if (!needsJassub || !video || !item?.Id) {
+      destroyRenderer()
       setError(null)
       return
     }
 
     let cancelled = false
 
-    const initialize = async () => {
+    const init = async () => {
+      // Destroy previous renderer first
+      destroyRenderer()
+
       setIsLoading(true)
       setError(null)
 
@@ -258,76 +158,58 @@ export function useJassubRenderer({
         if (cancelled) return
 
         const result = await createJassubRenderer({
-          videoElement: video,
+          video,
           track: activeTrack,
           item,
           transcodingOffsetTicks,
           userOffset: userOffsetRef.current,
         })
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled can be set by cleanup during async
-        if (cancelled) {
-          result.dispose()
-          return
-        }
-
         rendererRef.current = result
         setIsActive(true)
-        setError(null)
       } catch (err) {
         if (cancelled) return
-
-        const errorMessage = err instanceof Error ? err.message : String(err)
-        setError(errorMessage)
-        showError(classifyError(err, t), errorMessage)
-        console.error('[JASSUB] Initialization error:', err)
-        setIsActive(false)
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(msg)
+        showError(getErrorMessage(err, t), msg)
+        console.error('[JASSUB] Init error:', err)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
     }
 
-    initialize()
+    init()
 
     return () => {
       cancelled = true
     }
-  }, [activeTrack, item, videoRef, transcodingOffsetTicks, disposeRenderer, t])
+  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer, t])
 
-  // ============================================================================
-  // Resize listeners effect
-  // ============================================================================
-
+  // Resize observer
   useEffect(() => {
     const video = videoRef.current
     if (!video || !isActive) return
 
-    const resizeObserver = new ResizeObserver(handleResize)
-    resizeObserver.observe(video)
+    const observer = new ResizeObserver(resize)
+    observer.observe(video)
 
-    const onFullscreenChange = () => setTimeout(handleResize, 150)
-    document.addEventListener('fullscreenchange', onFullscreenChange)
+    const onFullscreen = () => setTimeout(resize, 150)
+    document.addEventListener('fullscreenchange', onFullscreen)
 
     return () => {
-      resizeObserver.disconnect()
-      document.removeEventListener('fullscreenchange', onFullscreenChange)
-      if (resizeTimerRef.current) {
-        clearTimeout(resizeTimerRef.current)
-        resizeTimerRef.current = null
-      }
-    }
-  }, [videoRef, isActive, handleResize])
-
-  // ============================================================================
-  // Cleanup on unmount
-  // ============================================================================
-
-  useEffect(() => {
-    return () => {
-      disposeRenderer()
+      observer.disconnect()
+      document.removeEventListener('fullscreenchange', onFullscreen)
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
     }
-  }, [disposeRenderer])
+  }, [videoRef, isActive, resize])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      destroyRenderer()
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+    }
+  }, [destroyRenderer])
 
   return { isActive, isLoading, error, setUserOffset, resize }
 }
