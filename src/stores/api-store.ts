@@ -1,12 +1,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type AuthMethod = 'apiKey' | 'userPass'
+
 export interface ApiState {
   serverAddress: string
   apiKey: string | undefined
   serverVersion: string
   validConnection: boolean
   validAuth: boolean
+  authMethod: AuthMethod
+  userId: string | undefined
+  username: string | undefined
 }
 
 export interface ApiActions {
@@ -15,6 +20,9 @@ export interface ApiActions {
   setServerVersion: (version: string) => void
   setConnectionStatus: (valid: boolean, auth: boolean) => void
   resetConnection: () => void
+  setAuthMethod: (method: AuthMethod) => void
+  setUserInfo: (userId: string, username: string) => void
+  clearAuth: () => void
 }
 
 export type ApiStore = ApiState & ApiActions
@@ -25,46 +33,63 @@ const initialState: ApiState = {
   serverVersion: '',
   validConnection: false,
   validAuth: false,
+  authMethod: 'apiKey',
+  userId: undefined,
+  username: undefined,
 }
 
-const sanitize = (val: string | undefined): string | undefined =>
-  val?.trim().replace(/\/+$/, '') || undefined
-
-/** Clears SDK API cache when credentials change */
-const clearApiCache = () => {
-  // Dynamic import to avoid circular dependency
-  import('@/services/jellyfin/sdk').then((sdk) => sdk.clearApiCache())
-}
+/** Sanitizes API key by trimming whitespace */
+const sanitizeKey = (val: string | undefined): string | undefined =>
+  val?.trim() || undefined
 
 export const useApiStore = create<ApiStore>()(
   persist(
     (set) => ({
       ...initialState,
-      setServerAddress: (serverAddress) => {
-        clearApiCache()
-        set({ serverAddress: sanitize(serverAddress) ?? '' })
-      },
-      setApiKey: (apiKey) => {
-        clearApiCache()
-        set({ apiKey: sanitize(apiKey) })
-      },
+      setServerAddress: (serverAddress) =>
+        set({ serverAddress: serverAddress.trim() }),
+      setApiKey: (apiKey) => set({ apiKey: sanitizeKey(apiKey) }),
       setServerVersion: (serverVersion) => set({ serverVersion }),
       setConnectionStatus: (validConnection, validAuth) =>
         set({ validConnection, validAuth }),
-      resetConnection: () => {
-        clearApiCache()
-        set({ validConnection: false, validAuth: false, serverVersion: '' })
-      },
+      resetConnection: () =>
+        set({ validConnection: false, validAuth: false, serverVersion: '' }),
+      setAuthMethod: (authMethod) => set({ authMethod }),
+      setUserInfo: (userId, username) => set({ userId, username }),
+      clearAuth: () =>
+        set({
+          apiKey: undefined,
+          userId: undefined,
+          username: undefined,
+          validConnection: false,
+          validAuth: false,
+          serverVersion: '',
+        }),
     }),
     {
       name: 'segment-editor-api',
-      partialize: ({ serverAddress, apiKey }) => ({ serverAddress, apiKey }),
+      partialize: ({
+        serverAddress,
+        apiKey,
+        authMethod,
+        userId,
+        username,
+      }) => ({
+        serverAddress,
+        apiKey,
+        authMethod,
+        userId,
+        username,
+      }),
       merge: (persisted, current) => {
         const p = persisted as Partial<ApiState> | null
         return {
           ...current,
-          serverAddress: sanitize(p?.serverAddress) ?? '',
-          apiKey: sanitize(p?.apiKey),
+          serverAddress: p?.serverAddress?.trim() ?? '',
+          apiKey: sanitizeKey(p?.apiKey),
+          authMethod: p?.authMethod ?? 'apiKey',
+          userId: p?.userId,
+          username: p?.username,
         }
       },
     },

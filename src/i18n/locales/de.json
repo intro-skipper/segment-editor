@@ -9,10 +9,25 @@
     "skipTimeSelector": "Sprungzeit auswählen",
     "dragHandle": "Zum Neuordnen ziehen",
     "closeDialog": "Dialog schließen",
+    "skipToMain": "Zum Hauptinhalt springen",
+    "mainContent": "Hauptinhalt",
+    "navigation": "Hauptnavigation",
+    "loading": "Inhalt wird geladen",
+    "loadingComplete": "Inhalt geladen",
+    "searchResults": "{{count}} Ergebnisse gefunden",
+    "noResults": "Keine Ergebnisse gefunden",
+    "currentPage": "Seite {{page}} von {{total}}",
+    "expandMenu": "Menü ausklappen",
+    "collapseMenu": "Menü einklappen",
+    "required": "Pflichtfeld",
+    "optional": "Optionales Feld",
+    "error": "Fehler: {{message}}",
+    "success": "Erfolg: {{message}}",
     "pagination": {
       "previous": "Zur vorherigen Seite",
       "next": "Zur nächsten Seite",
-      "page": "Zu Seite {{page}}"
+      "page": "Zu Seite {{page}}",
+      "current": "Aktuelle Seite, Seite {{page}}"
     },
     "mediaCard": {
       "viewSeries": "Serie anzeigen: {{name}}",
@@ -21,12 +36,40 @@
       "playMovie": "Film abspielen: {{name}}",
       "playEpisode": "Episode abspielen: {{name}}",
       "play": "Abspielen: {{name}}"
+    },
+    "player": {
+      "videoProgress": "Videofortschritt: {{current}} von {{total}}",
+      "volumeLevel": "Lautstärke: {{level}}%",
+      "muted": "Audio stummgeschaltet",
+      "unmuted": "Audio aktiviert",
+      "playing": "Video wird abgespielt",
+      "paused": "Video pausiert",
+      "buffering": "Video wird gepuffert",
+      "controls": "Steuerung des Videoplayers"
+    },
+    "segment": {
+      "selected": "Segment {{index}} ausgewählt",
+      "created": "Neues Segment erstellt",
+      "deleted": "Segment gelöscht",
+      "updated": "Segment aktualisiert"
+    },
+    "form": {
+      "invalidInput": "Ungültige Eingabe",
+      "fieldRequired": "Dieses Feld ist erforderlich",
+      "characterCount": "{{current}} von {{max}} Zeichen"
+    },
+    "settings": {
+      "description": "Anwendungseinstellungen konfigurieren, einschließlich Serververbindung, Design, Sprache und Anzeigeoptionen"
     }
   },
   "login": {
     "api_key": "Jellyfin API Key",
     "server_address": "Jellyfin Server Adresse",
     "test_conn": "Verbindung testen",
+    "connect": "Mit Server verbinden",
+    "connect_success": "Erfolgreich mit Server verbunden",
+    "disconnected": "Vom Server getrennt",
+    "not_connected": "Mit keinem Server verbunden",
     "validation": {
       "api_key_invalid": "Ungültiger API Key",
       "url_invalid": "URL Fehler. Sollte mit http:// oder https:// beginnen"
@@ -51,15 +94,30 @@
     "plugins": {
       "title": "Installierte Server Plugins"
     },
+    "name": "Segment Editor",
     "title": "Segment Editor",
     "showVideoPlayer": "Videoplayer anzeigen"
+  },
+  "connection": {
+    "notConnected": "Nicht verbunden",
+    "notConnectedDescription": "Konfiguriere deine Jellyfin-Serververbindung, um zu starten",
+    "openSettings": "Einstellungen öffnen",
+    "connecting": "Verbinde...",
+    "connectingDescription": "Verbindung zum Jellyfin-Server wird hergestellt"
   },
   "items": {
     "select_collection": "Wähle eine Sammlung zum Durchsuchen",
     "filter": {
       "name": "Suchen",
-      "collection": "Sammlung"
-    }
+      "collection": "Sammlung",
+      "selectCollection": "Sammlung auswählen"
+    },
+    "mediaGrid": "Medienelemente",
+    "selectLibrary": "Bibliothek auswählen",
+    "selectLibraryDescription": "Wähle eine Bibliothek, um deine Mediensammlung zu durchsuchen",
+    "selectLibraryButton": "{{name}}-Bibliothek durchsuchen",
+    "showing": "Zeige {{start}}–{{end}} von {{total}}",
+    "noItems": "Keine Elemente gefunden"
   },
   "editor": {
     "saveSegment": "Speichern",
@@ -69,6 +127,8 @@
     "time": "Zeit",
     "deleteSegments": "Möchtest du wirklich alle Segmente für '{{item}}' entfernen?",
     "newSegment": "Neues Segment",
+    "actions": "Segmentaktionen",
+    "paste": "Einfügen",
     "slider": {
       "title": "Slider Editor"
     },
@@ -112,12 +172,17 @@
   },
   "error": {
     "not_found": "Seite nicht gefunden",
-    "not_found_description": "Die gesuchte Seite existiert nicht oder wurde verschoben."
+    "not_found_description": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
+    "something_went_wrong": "Etwas ist schiefgelaufen",
+    "generic_description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "feature_error": "{{feature}} Fehler",
+    "feature_description": "Diese Funktion hat einen Fehler verursacht. Du kannst es erneut versuchen oder woanders hin navigieren."
   },
   "common": {
     "go_back": "Zurück",
     "goBack": "Zurück",
     "home": "Startseite",
+    "reload": "Neu laden",
     "retry": "Erneut versuchen"
   },
   "player": {
@@ -126,12 +191,61 @@
     "volumeSlider": "Lautstärkeregler",
     "mute": "Stumm",
     "unmute": "Ton an",
+    "fullscreen": "Vollbild",
+    "exitFullscreen": "Vollbild verlassen",
     "retry": "Erneut versuchen",
     "selectEpisode": "Episode auswählen",
+    "controls": "Steuerung des Videoplayers",
+    "recovering": "Wiedergabe wird wiederhergestellt",
+    "directPlay": "Direktwiedergabe",
+    "hlsFallback": "Transkodierte Wiedergabe",
+    "direct": "Direkt",
+    "hls": "HLS",
+    "strategy": {
+      "direct": "Direktwiedergabe - Originalqualität, keine Transkodierung",
+      "hls": "HLS-Streaming - Transkodiert für Kompatibilität",
+      "directLabel": "Direktwiedergabe",
+      "hlsLabel": "HLS-Transkodierung"
+    },
+    "notification": {
+      "switchedToTranscode": "Zu transkodierter Wiedergabe gewechselt"
+    },
     "error": {
       "network": "Netzwerkfehler. Überprüfe deine Verbindung.",
       "media": "Wiedergabefehler. Wiederherstellung wird versucht...",
-      "unknown": "Video kann nicht abgespielt werden."
+      "unknown": "Video kann nicht abgespielt werden.",
+      "directPlayFailed": "Direktwiedergabe fehlgeschlagen. Wechsle zu transkodiertem Stream...",
+      "trackSwitch": "Spurwechsel fehlgeschlagen",
+      "trackUnavailable": "Spur ist nicht verfügbar",
+      "subtitleLoadFailed": "Untertitel konnten nicht geladen werden"
+    },
+    "subtitle": {
+      "error": {
+        "jassubInit": "Untertitel-Renderer konnte nicht initialisiert werden",
+        "loadFailed": "Untertiteldatei konnte nicht geladen werden",
+        "wasmFailed": "Untertitel-Renderer-Modul konnte nicht geladen werden",
+        "webgpuRequired": "WebGPU wird für ASS/SSA-Untertitel benötigt",
+        "timeout": "Initialisierung des Untertitel-Renderers hat zu lange gedauert"
+      }
+    },
+    "tracks": {
+      "audio": "Audio",
+      "subtitle": "Untertitel",
+      "off": "Aus",
+      "unknown": "Unbekannt",
+      "selector": "Audio- und Untertitelspuren",
+      "noTracks": "Keine Spuren verfügbar",
+      "channels": {
+        "mono": "Mono",
+        "stereo": "Stereo",
+        "surround51": "5.1",
+        "surround71": "7.1"
+      },
+      "error": {
+        "noVideo": "Videoelement nicht verfügbar",
+        "trackNotFound": "Spur nicht gefunden",
+        "switchFailed": "Spurwechsel fehlgeschlagen"
+      }
     }
   },
   "series": {
@@ -141,6 +255,23 @@
     "loadingEpisodes": "Lade Episoden für {{season}}...",
     "episodeLoadError": "Episoden konnten nicht geladen werden",
     "seasonNumber": "Staffel {{number}}",
-    "episodes": "Episoden"
+    "episodes": "Episoden",
+    "loadError": "Episoden konnten nicht geladen werden",
+    "episode": "Episode"
+  },
+  "search": {
+    "open": "Suche öffnen",
+    "title": "Suche",
+    "placeholder": "Medien suchen...",
+    "clear": "Suche löschen",
+    "results": "Suchergebnisse",
+    "no_results": "Keine Ergebnisse gefunden",
+    "start_typing": "Zum Suchen tippen..."
+  },
+  "settings": {
+    "open": "Einstellungen öffnen"
+  },
+  "navigation": {
+    "back": "Zurück"
   }
 }

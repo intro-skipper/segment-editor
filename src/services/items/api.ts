@@ -12,7 +12,7 @@
 
 import { ItemFields, SortOrder } from '@jellyfin/sdk/lib/generated-client'
 import type { BaseItemDto, VirtualFolderInfo } from '@/types/jellyfin'
-import { withApi } from '@/services/jellyfin/sdk'
+import { withApi } from '@/services/jellyfin'
 import { AppError, logValidationWarning } from '@/lib/unified-error'
 import {
   BaseItemArraySchema,
@@ -63,6 +63,7 @@ const requireParam = (value: unknown, name: string): void => {
 
 const DETAIL_FIELDS = [
   ItemFields.MediaStreams,
+  ItemFields.MediaSources,
   ItemFields.Overview,
   ItemFields.People,
   ItemFields.Genres,
@@ -81,7 +82,7 @@ export async function getCollections(): Promise<Array<VirtualFolderInfo>> {
     if (!validation.success) {
       logValidationWarning('[Items] Collections', validation.error)
     }
-    return data.filter((folder => folder.CollectionType !== 'homevideos'))
+    return data.filter((folder) => folder.CollectionType !== 'homevideos')
   })
   return result ?? []
 }
@@ -101,7 +102,9 @@ export async function getItems({
       sortBy: ['AiredEpisodeOrder', 'SortName'],
       sortOrder: [...SORT_ASCENDING],
       isMissing: false,
-      fields: includeMediaStreams ? [ItemFields.MediaStreams] : undefined,
+      fields: includeMediaStreams
+        ? [ItemFields.MediaStreams, ItemFields.MediaSources]
+        : undefined,
       limit,
       startIndex,
     })
@@ -157,7 +160,7 @@ export async function getEpisodes(
       seriesId,
       seasonId,
       isMissing: false,
-      fields: [ItemFields.MediaStreams],
+      fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
       limit: options?.limit,
       startIndex: options?.startIndex,
     })
@@ -195,7 +198,7 @@ export async function getTracks(
       parentId: albumId,
       sortBy: ['ParentIndexNumber', 'IndexNumber'],
       sortOrder: [...SORT_ASCENDING],
-      fields: [ItemFields.MediaStreams],
+      fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
       limit: options?.limit,
       startIndex: options?.startIndex,
     })

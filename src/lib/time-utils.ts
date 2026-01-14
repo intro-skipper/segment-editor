@@ -5,14 +5,13 @@
  * 1 second = 10,000,000 ticks
  */
 
-/** Ticks per second constant for .NET tick conversion */
-const TICKS_PER_SECOND = 10_000_000
+import { JELLYFIN_CONFIG } from './constants'
 
 /** Maximum safe tick value to prevent overflow */
 const MAX_SAFE_TICKS = Number.MAX_SAFE_INTEGER
 
 /** Maximum safe seconds value (roughly 285 years) */
-const MAX_SAFE_SECONDS = MAX_SAFE_TICKS / TICKS_PER_SECOND
+const MAX_SAFE_SECONDS = MAX_SAFE_TICKS / JELLYFIN_CONFIG.TICKS_PER_SECOND
 
 /** Minimum valid time value (0) */
 const MIN_TIME_VALUE = 0
@@ -54,7 +53,7 @@ export function ticksToSeconds(ticks: number | null | undefined): number {
   const safeTicks = toSafeNumber(ticks)
   if (safeTicks < MIN_TIME_VALUE) return 0
   if (safeTicks > MAX_SAFE_TICKS) return MAX_SAFE_SECONDS
-  return safeTicks / TICKS_PER_SECOND
+  return safeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
 }
 
 /**
@@ -68,7 +67,7 @@ export function secondsToTicks(seconds: number | null | undefined): number {
   const safeSeconds = toSafeNumber(seconds)
   if (safeSeconds < MIN_TIME_VALUE) return 0
   if (safeSeconds > MAX_SAFE_SECONDS) return MAX_SAFE_TICKS
-  return Math.round(safeSeconds * TICKS_PER_SECOND)
+  return Math.round(safeSeconds * JELLYFIN_CONFIG.TICKS_PER_SECOND)
 }
 
 /**

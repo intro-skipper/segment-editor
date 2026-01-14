@@ -1,10 +1,9 @@
 import { URL, fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import tailwindcss from '@tailwindcss/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import viteReact from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -25,6 +24,26 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  server: {
+    // JASSUB benefits from SharedArrayBuffer for multi-threading
+    // Using 'credentialless' instead of 'require-corp' to allow cross-origin fetches
+    // while still enabling SharedArrayBuffer support
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    },
+  },
+  preview: {
+    // Same headers for preview server
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+    },
+  },
+  optimizeDeps: {
+    exclude: ['jassub'],
+    include: ['jassub > throughput'],
   },
   build: {
     rollupOptions: {

@@ -11,7 +11,7 @@ import { formatHex, oklch, parse } from 'culori'
 
 import type { Theme } from '@/stores/app-store'
 import type { VibrantColors } from '@/lib/cache-manager'
-import { LRUCache, blobCache } from '@/lib/cache-manager'
+import { LRUCache, blobCache, fetchBlobUrl } from '@/lib/cache-manager'
 import { selectTheme, useAppStore } from '@/stores/app-store'
 
 export type { VibrantColors } from '@/lib/cache-manager'
@@ -115,20 +115,6 @@ const buildColors = (
 // Extraction pipeline
 const EXTRACTION_TIMEOUT_MS = 5000
 
-async function fetchBlob(url: string): Promise<string | null> {
-  const cached = blobCache.get(url)
-  if (cached) return cached
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const blobUrl = URL.createObjectURL(await res.blob())
-    blobCache.set(url, blobUrl)
-    return blobUrl
-  } catch {
-    return null
-  }
-}
-
 async function extractPalette(
   url: string,
   blobUrl: string,
@@ -178,7 +164,7 @@ function getPalette(url: string): Promise<Palette | null> {
 
   let promise = pending.get(url)
   if (!promise) {
-    promise = fetchBlob(url).then((blob) =>
+    promise = fetchBlobUrl(url).then((blob) =>
       blob ? extractPaletteWithTimeout(url, blob) : null,
     )
     pending.set(url, promise)

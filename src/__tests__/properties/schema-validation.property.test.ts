@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 2: Zod Schema Validation Round-Trip
+ * Feature: codebase-audit-refactor, Property: Zod Schema Validation Round-Trip
  * For any valid MediaSegmentDto object, parsing with the Zod schema SHALL succeed
  * and produce an equivalent object. For any object missing required fields or with
  * invalid types, parsing SHALL fail with a descriptive error.

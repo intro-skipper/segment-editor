@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 12: Exponential Backoff Calculation
+ * Feature: codebase-audit-refactor, Property: Exponential Backoff Calculation
  * For any sequence of retry attempts (0, 1, 2, ..., n), the calculated backoff delay
  * SHALL increase exponentially (approximately doubling each attempt) while remaining
  * within the configured bounds [baseDelay, maxDelay]. The delay SHALL include jitter

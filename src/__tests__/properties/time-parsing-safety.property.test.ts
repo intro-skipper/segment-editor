@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 8: Time String Parsing Safety
+ * Feature: codebase-audit-refactor, Property: Time String Parsing Safety
  * For any input value (string, number, null, undefined),
  * parseTimeString SHALL return a finite non-negative number without
  * throwing an exception.

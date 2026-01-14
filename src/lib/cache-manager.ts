@@ -184,3 +184,41 @@ export const blobCache = new LRUCache<string, string>(
     },
   },
 )
+
+// Track pending fetches to deduplicate concurrent requests
+const pendingBlobFetches = new Map<string, Promise<string | null>>()
+
+/**
+ * Fetches a URL and returns a blob URL, with caching and request deduplication.
+ * Used by both useBlobUrl hook and useVibrantColor to share blob URLs.
+ *
+ * @param url - The URL to fetch
+ * @returns Promise resolving to blob URL or null on failure
+ */
+export function fetchBlobUrl(url: string): Promise<string | null> {
+  // Return cached immediately
+  const cached = blobCache.get(url)
+  if (cached) return Promise.resolve(cached)
+
+  // Return pending request if one exists
+  let promise = pendingBlobFetches.get(url)
+  if (promise) return promise
+
+  // Start new fetch
+  promise = (async () => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const blobUrl = URL.createObjectURL(await res.blob())
+      blobCache.set(url, blobUrl)
+      return blobUrl
+    } catch {
+      return null
+    }
+  })()
+
+  pendingBlobFetches.set(url, promise)
+  void promise.finally(() => pendingBlobFetches.delete(url))
+
+  return promise
+}

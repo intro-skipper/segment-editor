@@ -29,6 +29,7 @@ export interface UseHlsPlayerOptions {
 
 export interface UseHlsPlayerReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>
+  hlsRef: React.RefObject<Hls | null>
   retry: () => void
 }
 
@@ -175,5 +176,5 @@ export function useHlsPlayer({
     hlsRef.current?.loadSource(videoUrl)
   }, [videoUrl])
 
-  return { videoRef, retry }
+  return { videoRef, hlsRef, retry }
 }

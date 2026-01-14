@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 9: Authentication Header Generation
+ * Feature: codebase-audit-refactor, Property: Authentication Header Generation
  * For any non-null, non-empty token string, the authentication header generator
  * SHALL return an object containing an Authorization header with the format
  * `MediaBrowser Token="<token>"`. For any null or undefined token, it SHALL

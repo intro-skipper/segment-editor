@@ -707,3 +707,25 @@ kbd {
     color: black !important;
   }
 }
+
+/* JASSUB subtitle canvas overlay styling */
+div.JASSUB {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+}
+
+div.JASSUB canvas {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: transparent !important;
+}
+
+.aspect-video {
+  position: relative !important;
+}

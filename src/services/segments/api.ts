@@ -11,8 +11,13 @@
  */
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import type { ApiOptions } from '@/services/jellyfin/sdk'
 import type { RetryOptions } from '@/lib/retry-utils'
+import type { ApiOptions } from '@/services/jellyfin'
+import {
+  getRequestConfig,
+  getServerBaseUrl,
+  withApi,
+} from '@/services/jellyfin'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
 import { API_CONFIG } from '@/lib/constants'
@@ -25,11 +30,6 @@ import {
 } from '@/lib/schemas'
 import { logValidationWarning } from '@/lib/unified-error'
 import { useAppStore } from '@/stores/app-store'
-import {
-  getRequestConfig,
-  getServerBaseUrl,
-  withApi,
-} from '@/services/jellyfin/sdk'
 
 export interface CreateSegmentInput {
   itemId: string

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Link,
   Outlet,
@@ -14,7 +14,8 @@ import { ArrowLeft, Home } from 'lucide-react'
 import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Toaster } from '../components/ui/sonner'
-import { SettingsDialog } from '../components/settings/SettingsDialog'
+import { SettingsDialog } from '../components/settings'
+import { ConnectionWizard } from '../components/connection'
 import { Button } from '../components/ui/button'
 import {
   Card,
@@ -28,7 +29,8 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import { usePluginMode } from '../hooks/use-plugin-mode'
 import { useApiStore } from '../stores/api-store'
-import { testConnection } from '../services/jellyfin/client'
+import { testConnection } from '../services/jellyfin'
+import { validateStoredCredentials } from '../services/jellyfin/auth'
 
 // Initialize i18next
 import '../i18n/config'
@@ -128,7 +130,8 @@ function NotFoundComponent() {
 /**
  * Root layout component that initializes the application.
  * - Auto-connects in plugin mode when parent ApiClient is available
- * - Tests server connection on startup for standalone mode
+ * - Validates persisted credentials on startup for standalone mode
+ * - Shows connection wizard if credentials are invalid/expired
  * - Renders global UI elements (Header, Settings, Toaster)
  */
 function RootComponent() {
@@ -136,19 +139,64 @@ function RootComponent() {
   const serverAddress = useApiStore((state) => state.serverAddress)
   const apiKey = useApiStore((state) => state.apiKey)
 
+  // State for connection wizard
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [hasValidated, setHasValidated] = useState(false)
+
   // Plugin mode handles its own auto-connection
   const { isPlugin } = usePluginMode()
 
-  // Test connection on app start for standalone mode (non-plugin)
-  // Only when both server address AND api key are configured
+  // Validate persisted credentials on app start for standalone mode
+  // Shows wizard if credentials are invalid or expired
   useEffect(() => {
-    if (isPlugin || !serverAddress || !apiKey) return
+    if (isPlugin || hasValidated) return
+
+    const controller = new AbortController()
+
+    const validateOnStartup = async () => {
+      // If no credentials stored, show wizard immediately
+      if (!serverAddress || !apiKey) {
+        setHasValidated(true)
+        setWizardOpen(true)
+        return
+      }
+
+      // Validate stored credentials
+      const result = await validateStoredCredentials(serverAddress, apiKey, {
+        signal: controller.signal,
+      })
+
+      // Check if cancelled
+      if (controller.signal.aborted) return
+
+      setHasValidated(true)
+
+      // Show wizard if credentials are invalid
+      if (!result.valid) {
+        setWizardOpen(true)
+      }
+    }
+
+    validateOnStartup()
+
+    return () => controller.abort()
+  }, [isPlugin, serverAddress, apiKey, hasValidated])
+
+  // Legacy: Test connection on app start (kept for backward compatibility)
+  // This runs after validation to update connection status
+  useEffect(() => {
+    if (isPlugin || !serverAddress || !apiKey || !hasValidated) return
 
     const controller = new AbortController()
     testConnection({ signal: controller.signal })
 
     return () => controller.abort()
-  }, [isPlugin, serverAddress, apiKey])
+  }, [isPlugin, serverAddress, apiKey, hasValidated])
+
+  // Handle wizard completion
+  const handleWizardComplete = useCallback(() => {
+    // Wizard completed successfully, connection is established
+  }, [])
 
   return (
     <div className="min-h-screen">
@@ -175,6 +223,11 @@ function RootComponent() {
         </ErrorBoundary>
       </main>
       <SettingsDialog />
+      <ConnectionWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onComplete={handleWizardComplete}
+      />
       <Toaster />
       <TanStackDevtools
         config={{

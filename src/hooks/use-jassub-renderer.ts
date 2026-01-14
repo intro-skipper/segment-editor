@@ -1,0 +1,215 @@
+/**
+ * useJassubRenderer - Hook for managing JASSUB ASS/SSA subtitle rendering.
+ * @module hooks/use-jassub-renderer
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import type { BaseItemDto } from '@/types/jellyfin'
+import type { SubtitleTrackInfo } from '@/services/video/tracks'
+import type { JassubRendererResult } from '@/services/video/subtitle'
+import {
+  createJassubRenderer,
+  requiresJassubRenderer,
+} from '@/services/video/subtitle'
+import { PLAYER_CONFIG } from '@/lib/constants'
+import { showError } from '@/lib/notifications'
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface UseJassubRendererOptions {
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  activeTrack: SubtitleTrackInfo | null
+  item: BaseItemDto | null
+  transcodingOffsetTicks: number
+  userOffset: number
+  t: (key: string) => string
+}
+
+export interface UseJassubRendererReturn {
+  isActive: boolean
+  isLoading: boolean
+  error: string | null
+  setUserOffset: (offset: number) => void
+  resize: () => void
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const VIDEO_METADATA_TIMEOUT_MS = 15_000
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 1 && video.videoWidth > 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error('Timeout waiting for video metadata'))
+    }, VIDEO_METADATA_TIMEOUT_MS)
+
+    const cleanup = () => {
+      clearTimeout(timeout)
+      video.removeEventListener('loadedmetadata', onLoad)
+      video.removeEventListener('error', onError)
+    }
+
+    const onLoad = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('Video error'))
+    }
+
+    video.addEventListener('loadedmetadata', onLoad)
+    video.addEventListener('error', onError)
+  })
+}
+
+function getErrorMessage(error: unknown, t: (key: string) => string): string {
+  const msg = error instanceof Error ? error.message.toLowerCase() : ''
+  if (msg.includes('timeout')) return t('player.subtitle.error.timeout')
+  if (msg.includes('wasm') || msg.includes('worker'))
+    return t('player.subtitle.error.wasmFailed')
+  if (msg.includes('fetch') || msg.includes('network'))
+    return t('player.subtitle.error.loadFailed')
+  return t('player.subtitle.error.jassubInit')
+}
+
+// ============================================================================
+// Hook
+// ============================================================================
+
+export function useJassubRenderer({
+  videoRef,
+  activeTrack,
+  item,
+  transcodingOffsetTicks,
+  userOffset,
+  t,
+}: UseJassubRendererOptions): UseJassubRendererReturn {
+  const [isActive, setIsActive] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const rendererRef = useRef<JassubRendererResult | null>(null)
+  const userOffsetRef = useRef(userOffset)
+  const transcodingRef = useRef(transcodingOffsetTicks)
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  userOffsetRef.current = userOffset
+  transcodingRef.current = transcodingOffsetTicks
+
+  // Cleanup helper
+  const destroyRenderer = useCallback(() => {
+    rendererRef.current?.destroy()
+    rendererRef.current = null
+    setIsActive(false)
+  }, [])
+
+  // Debounced resize
+  const resize = useCallback(() => {
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+    resizeTimerRef.current = setTimeout(() => {
+      rendererRef.current?.instance.resize()
+    }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
+  }, [])
+
+  // User offset update
+  const setUserOffset = useCallback((offset: number) => {
+    userOffsetRef.current = offset
+    rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
+  }, [])
+
+  // Main effect: create/destroy renderer based on track
+  useEffect(() => {
+    const video = videoRef.current
+    const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
+
+    // Cleanup if no longer needed
+    if (!needsJassub || !video || !item?.Id) {
+      destroyRenderer()
+      setError(null)
+      return
+    }
+
+    let cancelled = false
+
+    const init = async () => {
+      // Destroy previous renderer first
+      destroyRenderer()
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        await waitForVideoMetadata(video)
+        if (cancelled) return
+
+        const result = await createJassubRenderer({
+          video,
+          track: activeTrack,
+          item,
+          transcodingOffsetTicks,
+          userOffset: userOffsetRef.current,
+        })
+
+        rendererRef.current = result
+        setIsActive(true)
+      } catch (err) {
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(msg)
+        showError(getErrorMessage(err, t), msg)
+        console.error('[JASSUB] Init error:', err)
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    init()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer, t])
+
+  // Resize observer
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !isActive) return
+
+    const observer = new ResizeObserver(resize)
+    observer.observe(video)
+
+    const onFullscreen = () => setTimeout(resize, 150)
+    document.addEventListener('fullscreenchange', onFullscreen)
+
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('fullscreenchange', onFullscreen)
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+    }
+  }, [videoRef, isActive, resize])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      destroyRenderer()
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+    }
+  }, [destroyRenderer])
+
+  return { isActive, isLoading, error, setUserOffset, resize }
+}

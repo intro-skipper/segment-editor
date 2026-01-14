@@ -1,5 +1,5 @@
 /**
- * Feature: codebase-audit-refactor, Property 13: Grid Column Breakpoint Calculation
+ * Feature: codebase-audit-refactor, Property: Grid Column Breakpoint Calculation
  * For any viewport width, the grid column count SHALL match the expected breakpoint:
  * 2 columns for width < 640px, 3 for 640-767px, 4 for 768-1023px, 5 for 1024-1279px,
  * and 6 for width >= 1280px.

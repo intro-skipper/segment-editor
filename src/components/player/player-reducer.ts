@@ -22,6 +22,8 @@ export interface PlayerState {
   skipTimeIndex: number
   playerError: HlsPlayerError | null
   isRecovering: boolean
+  /** User-configured subtitle offset in seconds (positive = delay, negative = advance) */
+  subtitleOffset: number
 }
 
 /** Consolidated action types for better efficiency */
@@ -35,6 +37,7 @@ export type PlayerAction =
   | { type: 'ERROR_STATE'; error: HlsPlayerError | null; isRecovering: boolean }
   | { type: 'RECOVERY_START' }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
+  | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
 
 export const initialPlayerState: PlayerState = {
   isPlaying: false,
@@ -46,6 +49,7 @@ export const initialPlayerState: PlayerState = {
   skipTimeIndex: DEFAULT_SKIP_TIME_INDEX,
   playerError: null,
   isRecovering: false,
+  subtitleOffset: 0,
 }
 
 /**
@@ -106,5 +110,10 @@ export function playerReducer(
         ? state
         : { ...state, skipTimeIndex: newIndex }
     }
+
+    case 'SUBTITLE_OFFSET_CHANGE':
+      return state.subtitleOffset === action.offset
+        ? state
+        : { ...state, subtitleOffset: action.offset }
   }
 }
