@@ -1,5 +1,5 @@
 /**
- * Hook for initializing connection on app startup.
+ * Connection initialization hook.
  *
  * Handles both plugin mode (credentials from parent window) and
  * standalone mode (credentials from persisted store).
@@ -15,8 +15,7 @@ import {
 } from '@/services/jellyfin'
 import { useApiStore } from '@/stores/api-store'
 
-interface ConnectionInitState {
-  /** Whether running inside Jellyfin as a plugin iframe */
+interface ConnectionState {
   isPlugin: boolean
   /** Whether credentials are available */
   hasCredentials: boolean
@@ -31,10 +30,10 @@ interface ConnectionInitState {
 }
 
 /**
- * Connection initialization hook.
- * Automatically validates credentials on startup for both plugin and standalone modes.
+ * Initializes connection on app startup.
+ * Call once in root component — other components should use `usePluginMode`.
  */
-export function useConnectionInit(): ConnectionInitState {
+export function useConnectionInit(): ConnectionState {
   const [isValidating, setIsValidating] = useState(false)
   const [hasValidated, setHasValidated] = useState(false)
   const hasAttemptedRef = useRef(false)
@@ -44,26 +43,21 @@ export function useConnectionInit(): ConnectionInitState {
   const apiKey = useApiStore((s) => s.apiKey)
 
   const isPlugin = isPluginMode()
-  const pluginCreds = isPlugin ? getPluginCredentials() : null
 
-  const hasCredentials = isPlugin
-    ? pluginCreds !== null
-    : !!(serverAddress && apiKey)
-
-  // Initialize connection on mount
   useEffect(() => {
     if (validAuth || hasAttemptedRef.current) return
 
     hasAttemptedRef.current = true
     const controller = new AbortController()
 
-    const initConnection = async () => {
-      // Determine credentials source
-      const creds = isPlugin
-        ? pluginCreds
-        : serverAddress && apiKey
+    const init = async () => {
+      // Get credentials based on mode
+      const pluginCreds = isPlugin ? getPluginCredentials() : null
+      const standaloneCreds =
+        !isPlugin && serverAddress && apiKey
           ? { serverAddress, accessToken: apiKey }
           : null
+      const creds = pluginCreds ?? standaloneCreds
 
       // No credentials available
       if (!creds) {
@@ -71,17 +65,20 @@ export function useConnectionInit(): ConnectionInitState {
         return
       }
 
-      setIsValidating(true)
-
-      // Store plugin credentials if in plugin mode
+      // In plugin mode, trust the parent's credentials immediately
       if (isPlugin) {
         const store = useApiStore.getState()
         store.setServerAddress(creds.serverAddress)
         store.setApiKey(creds.accessToken)
         store.setAuthMethod('apiKey')
+        store.setConnectionStatus(true, true)
+        setHasValidated(true)
+        return
       }
 
-      // Validate connection
+      // Standalone mode: validate credentials before marking as connected
+      setIsValidating(true)
+
       const result = await testConnectionWithCredentials(creds, {
         signal: controller.signal,
       })
@@ -89,7 +86,6 @@ export function useConnectionInit(): ConnectionInitState {
       if (controller.signal.aborted) return
 
       const store = useApiStore.getState()
-
       if (result.valid && result.authenticated) {
         store.setServerVersion(result.serverVersion)
         store.setConnectionStatus(true, true)
@@ -101,10 +97,14 @@ export function useConnectionInit(): ConnectionInitState {
       setHasValidated(true)
     }
 
-    initConnection()
-
+    init()
     return () => controller.abort()
-  }, [isPlugin, validAuth, serverAddress, apiKey, pluginCreds])
+  }, [isPlugin, validAuth, serverAddress, apiKey])
+
+  // Derive hasCredentials after effect to ensure consistency
+  const hasCredentials = isPlugin
+    ? getPluginCredentials() !== null
+    : !!(serverAddress && apiKey)
 
   return {
     isPlugin,
@@ -116,13 +116,22 @@ export function useConnectionInit(): ConnectionInitState {
   }
 }
 
-/** Alias for components using the old hook name */
+/**
+ * Hook for components that need connection state.
+ * Does NOT initialize connection - use after `useConnectionInit` in root.
+ */
 export function usePluginMode() {
-  const state = useConnectionInit()
+  const validAuth = useApiStore((s) => s.validAuth)
+  const serverAddress = useApiStore((s) => s.serverAddress)
+  const apiKey = useApiStore((s) => s.apiKey)
+
+  const isPlugin = isPluginMode()
+
   return {
-    isPlugin: state.isPlugin,
-    hasCredentials: state.hasCredentials,
-    isConnected: state.isConnected,
-    isConnecting: state.isValidating,
+    isPlugin,
+    hasCredentials: isPlugin
+      ? getPluginCredentials() !== null
+      : !!(serverAddress && apiKey),
+    isConnected: validAuth,
   }
 }

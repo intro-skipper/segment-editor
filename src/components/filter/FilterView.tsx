@@ -206,8 +206,7 @@ export function FilterView() {
   const columns = useGridColumns()
 
   // Plugin mode and connection state
-  const { isPlugin, hasCredentials, isConnected, isConnecting } =
-    usePluginMode()
+  const { isPlugin, hasCredentials, isConnected } = usePluginMode()
   const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
   // Fetch collections and items
@@ -356,10 +355,11 @@ export function FilterView() {
     selectedCollection && !itemsLoading && !itemsError && items?.length === 0
 
   // Not connected state (standalone mode only)
-  const showNotConnected = !isPlugin && !hasCredentials
+  const showNotConnected = !isPlugin && !hasCredentials && !isConnected
 
-  // Connecting state (plugin mode waiting for parent ApiClient)
-  const showConnecting = isPlugin && !isConnected && isConnecting
+  // Connecting state - only in plugin mode before credentials are processed
+  // With immediate trust of plugin credentials, this should rarely show
+  const showConnecting = isPlugin && !isConnected
 
   return (
     <div className="px-4 pb-8 sm:px-6">
