@@ -107,6 +107,8 @@ export function useJassubRenderer({
   const userOffsetRef = useRef(userOffset)
   const transcodingRef = useRef(transcodingOffsetTicks)
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevActiveTrackRef = useRef(activeTrack)
+  const prevItemIdRef = useRef(item?.Id)
 
   userOffsetRef.current = userOffset
   transcodingRef.current = transcodingOffsetTicks
@@ -133,6 +135,7 @@ export function useJassubRenderer({
   }, [])
 
   // Main effect: create/destroy renderer based on track
+  /* eslint-disable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
   useEffect(() => {
     const video = videoRef.current
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
@@ -143,6 +146,18 @@ export function useJassubRenderer({
       setError(null)
       return
     }
+
+    // Skip if track and item haven't changed
+    if (
+      activeTrack === prevActiveTrackRef.current &&
+      item.Id === prevItemIdRef.current &&
+      rendererRef.current
+    ) {
+      return
+    }
+
+    prevActiveTrackRef.current = activeTrack
+    prevItemIdRef.current = item.Id
 
     let cancelled = false
 
@@ -184,6 +199,7 @@ export function useJassubRenderer({
       cancelled = true
     }
   }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer, t])
+  /* eslint-enable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
 
   // Resize observer
   useEffect(() => {

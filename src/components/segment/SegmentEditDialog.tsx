@@ -69,19 +69,25 @@ export function SegmentEditDialog({
   const saveToClipboard = useSessionStore(selectSaveToClipboard)
   const startInputRef = React.useRef<HTMLInputElement>(null)
   const triggerRef = React.useRef<HTMLElement | null>(null)
+  const prevSegmentRef = React.useRef(segment)
 
   const [localSegment, setLocalSegment] =
     React.useState<MediaSegmentDto>(segment)
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
-  const [startText, setStartText] = React.useState('')
-  const [endText, setEndText] = React.useState('')
+  const [startText, setStartText] = React.useState(() =>
+    String(segment.StartTicks ?? 0),
+  )
+  const [endText, setEndText] = React.useState(() =>
+    String(segment.EndTicks ?? 0),
+  )
 
   // Sync local state when segment prop changes
-  React.useEffect(() => {
+  if (segment !== prevSegmentRef.current) {
+    prevSegmentRef.current = segment
     setLocalSegment(segment)
     setStartText(String(segment.StartTicks ?? 0))
     setEndText(String(segment.EndTicks ?? 0))
-  }, [segment])
+  }
 
   // Store the trigger element when dialog opens for focus restoration
   React.useEffect(() => {

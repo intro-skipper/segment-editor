@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   Link,
   Outlet,
@@ -27,10 +27,7 @@ import {
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
-import { usePluginMode } from '../hooks/use-plugin-mode'
-import { useApiStore } from '../stores/api-store'
-import { testConnection } from '../services/jellyfin'
-import { validateStoredCredentials } from '../services/jellyfin/auth'
+import { useConnectionInit } from '../hooks/use-connection-init'
 
 // Initialize i18next
 import '../i18n/config'
@@ -136,62 +133,17 @@ function NotFoundComponent() {
  */
 function RootComponent() {
   const { t } = useTranslation()
-  const serverAddress = useApiStore((state) => state.serverAddress)
-  const apiKey = useApiStore((state) => state.apiKey)
 
-  // State for connection wizard
+  // Unified connection initialization for both plugin and standalone modes
+  const { showWizard: initialShowWizard } = useConnectionInit()
+
+  // Local state for wizard (allows closing after initial show)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [hasValidated, setHasValidated] = useState(false)
 
-  // Plugin mode handles its own auto-connection
-  const { isPlugin } = usePluginMode()
-
-  // Validate persisted credentials on app start for standalone mode
-  // Shows wizard if credentials are invalid or expired
-  useEffect(() => {
-    if (isPlugin || hasValidated) return
-
-    const controller = new AbortController()
-
-    const validateOnStartup = async () => {
-      // If no credentials stored, show wizard immediately
-      if (!serverAddress || !apiKey) {
-        setHasValidated(true)
-        setWizardOpen(true)
-        return
-      }
-
-      // Validate stored credentials
-      const result = await validateStoredCredentials(serverAddress, apiKey, {
-        signal: controller.signal,
-      })
-
-      // Check if cancelled
-      if (controller.signal.aborted) return
-
-      setHasValidated(true)
-
-      // Show wizard if credentials are invalid
-      if (!result.valid) {
-        setWizardOpen(true)
-      }
-    }
-
-    validateOnStartup()
-
-    return () => controller.abort()
-  }, [isPlugin, serverAddress, apiKey, hasValidated])
-
-  // Legacy: Test connection on app start (kept for backward compatibility)
-  // This runs after validation to update connection status
-  useEffect(() => {
-    if (isPlugin || !serverAddress || !apiKey || !hasValidated) return
-
-    const controller = new AbortController()
-    testConnection({ signal: controller.signal })
-
-    return () => controller.abort()
-  }, [isPlugin, serverAddress, apiKey, hasValidated])
+  // Sync initial wizard state
+  if (initialShowWizard && !wizardOpen) {
+    setWizardOpen(true)
+  }
 
   // Handle wizard completion
   const handleWizardComplete = useCallback(() => {

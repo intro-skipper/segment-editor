@@ -66,20 +66,29 @@ export function useGridKeyboardNavigation({
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   // Reset focus when items change
-  useEffect(() => {
-    if (itemCount === 0) setFocusedIndex(-1)
-    else if (focusedIndex >= itemCount) setFocusedIndex(itemCount - 1)
-  }, [itemCount, focusedIndex])
+  const validFocusedIndex =
+    itemCount === 0
+      ? -1
+      : focusedIndex >= itemCount
+        ? itemCount - 1
+        : focusedIndex
 
-  // Focus the item element when focusedIndex changes
+  // Sync state if computed value differs
+  if (validFocusedIndex !== focusedIndex) {
+    setFocusedIndex(validFocusedIndex)
+  }
+
+  // Focus management requires DOM manipulation via effect
+  /* eslint-disable react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-ref-to-parent */
   useEffect(() => {
-    if (!enabled || focusedIndex < 0 || !gridRef.current) return
+    if (!enabled || validFocusedIndex < 0 || !gridRef.current) return
     const item = gridRef.current.querySelector<HTMLElement>(
-      `[data-grid-index="${focusedIndex}"]`,
+      `[data-grid-index="${validFocusedIndex}"]`,
     )
     if (item && document.activeElement !== item)
       item.focus({ preventScroll: true })
-  }, [focusedIndex, enabled])
+  }, [validFocusedIndex, enabled])
+  /* eslint-enable react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-ref-to-parent */
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

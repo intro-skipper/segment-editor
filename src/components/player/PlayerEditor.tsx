@@ -99,6 +99,7 @@ export function PlayerEditor({
     editingSegmentsRef.current = editingSegments
   }, [editingSegments])
   const timestampTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
+  const prevServerSegmentsRef = React.useRef(serverSegments)
 
   // Cleanup timeout and abort controller on unmount
   React.useEffect(
@@ -115,11 +116,17 @@ export function PlayerEditor({
   )
 
   // Sync editing segments from server when segment data changes
-  React.useEffect(() => {
-    if (serverSegments.length > 0) {
-      setEditingSegments([...serverSegments].sort(sortSegmentsByStart))
+  if (
+    serverSegments.length > 0 &&
+    serverSegments !== prevServerSegmentsRef.current
+  ) {
+    prevServerSegmentsRef.current = serverSegments
+    const sorted = [...serverSegments].sort(sortSegmentsByStart)
+    // Only update if different to avoid infinite loop
+    if (JSON.stringify(sorted) !== JSON.stringify(editingSegments)) {
+      setEditingSegments(sorted)
     }
-  }, [serverSegments])
+  }
 
   // Handle segment creation from player
   const handleCreateSegment = React.useCallback(

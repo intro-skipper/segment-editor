@@ -113,9 +113,4 @@ export type {
 // Public API - Authentication
 // ─────────────────────────────────────────────────────────────────────────────
 
-export {
-  authenticate,
-  validateStoredCredentials,
-  validateCredentials,
-  isValidPassword,
-} from './auth'
+export { authenticate, validateCredentials, isValidPassword } from './auth'

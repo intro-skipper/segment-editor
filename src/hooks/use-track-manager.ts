@@ -11,7 +11,7 @@
  * @module hooks/use-track-manager
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
@@ -168,6 +168,10 @@ export function useTrackManager({
   // Get track preferences from app store
   const trackPreferences = useAppStore((state) => state.trackPreferences)
 
+  // Track previous item to detect changes
+  const prevItemRef = useRef(item)
+  const prevPreferencesRef = useRef(trackPreferences)
+
   // ============================================================================
   // Track State Initialization
   // ============================================================================
@@ -178,37 +182,44 @@ export function useTrackManager({
    *
    * Requirements: 1.1, 2.1, 7.2, 7.4, 7.5
    */
-  useEffect(() => {
+  if (
+    item !== prevItemRef.current ||
+    trackPreferences !== prevPreferencesRef.current
+  ) {
+    prevItemRef.current = item
+    prevPreferencesRef.current = trackPreferences
+
     if (!item) {
-      setTrackState(EMPTY_TRACK_STATE)
+      if (trackState !== EMPTY_TRACK_STATE) {
+        setTrackState(EMPTY_TRACK_STATE)
+        setError(null)
+      }
+    } else {
+      // extractTracks handles null/undefined MediaSources internally
+      const { audioTracks, subtitleTracks } = extractTracks(
+        item as Parameters<typeof extractTracks>[0],
+      )
+
+      // Find preferred track indices based on user preferences
+      const activeAudioIndex = findPreferredAudioIndex(
+        audioTracks,
+        trackPreferences.preferredAudioLanguage,
+      )
+      const activeSubtitleIndex = findPreferredSubtitleIndex(
+        subtitleTracks,
+        trackPreferences.preferredSubtitleLanguage,
+        trackPreferences.subtitlesEnabled,
+      )
+
+      setTrackState({
+        audioTracks,
+        subtitleTracks,
+        activeAudioIndex,
+        activeSubtitleIndex,
+      })
       setError(null)
-      return
     }
-
-    // extractTracks handles null/undefined MediaSources internally
-    const { audioTracks, subtitleTracks } = extractTracks(
-      item as Parameters<typeof extractTracks>[0],
-    )
-
-    // Find preferred track indices based on user preferences
-    const activeAudioIndex = findPreferredAudioIndex(
-      audioTracks,
-      trackPreferences.preferredAudioLanguage,
-    )
-    const activeSubtitleIndex = findPreferredSubtitleIndex(
-      subtitleTracks,
-      trackPreferences.preferredSubtitleLanguage,
-      trackPreferences.subtitlesEnabled,
-    )
-
-    setTrackState({
-      audioTracks,
-      subtitleTracks,
-      activeAudioIndex,
-      activeSubtitleIndex,
-    })
-    setError(null)
-  }, [item, trackPreferences])
+  }
 
   // ============================================================================
   // Track Switching Options
