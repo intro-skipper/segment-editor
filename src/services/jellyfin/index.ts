@@ -57,6 +57,7 @@ export {
   getTypedApis,
   createApi,
   getRequestConfig,
+  getAuthenticatedRequestConfig,
   clearApiCache,
   isAborted,
   isPluginMode,

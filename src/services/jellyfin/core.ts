@@ -189,6 +189,33 @@ export function getRequestConfig(
   }
 }
 
+/**
+ * Gets request config with authentication headers for direct axios calls.
+ * Use this when making calls with apis.api.axiosInstance directly.
+ */
+export function getAuthenticatedRequestConfig(
+  accessToken: string | undefined,
+  options?: ApiOptions,
+  defaultTimeout: number = API_CONFIG.DEFAULT_TIMEOUT_MS,
+): { signal?: AbortSignal; timeout: number; headers?: Record<string, string> } {
+  const config: {
+    signal?: AbortSignal
+    timeout: number
+    headers?: Record<string, string>
+  } = {
+    signal: options?.signal,
+    timeout: options?.timeout ?? defaultTimeout,
+  }
+
+  if (accessToken) {
+    config.headers = {
+      Authorization: `MediaBrowser Token="${accessToken}"`,
+    }
+  }
+
+  return config
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified API Wrapper
 // ─────────────────────────────────────────────────────────────────────────────

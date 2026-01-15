@@ -14,6 +14,7 @@ import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import type { RetryOptions } from '@/lib/retry-utils'
 import type { ApiOptions } from '@/services/jellyfin'
 import {
+  getAuthenticatedRequestConfig,
   getRequestConfig,
   getServerBaseUrl,
   withApi,
@@ -182,7 +183,11 @@ export async function createSegment(
       const { data } = await apis.api.axiosInstance.post<MediaSegmentDto>(
         url,
         toServerSegment(segment),
-        getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
+        getAuthenticatedRequestConfig(
+          apis.api.accessToken,
+          options,
+          API_CONFIG.SEGMENT_TIMEOUT_MS,
+        ),
       )
       return toUiSegment(data)
     }, options)
@@ -235,7 +240,11 @@ export async function deleteSegment(
     return withSegmentRetry(async () => {
       await apis.api.axiosInstance.delete(
         url,
-        getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
+        getAuthenticatedRequestConfig(
+          apis.api.accessToken,
+          options,
+          API_CONFIG.SEGMENT_TIMEOUT_MS,
+        ),
       )
       return true
     }, options)

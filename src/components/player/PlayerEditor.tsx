@@ -87,6 +87,12 @@ export function PlayerEditor({
     number | null
   >(null)
 
+  // Track previous server segments to detect changes
+  // Use a ref to track the data identity, not the array reference
+  const prevServerSegmentsRef = React.useRef<Array<MediaSegmentDto> | null>(
+    null,
+  )
+
   // Track if save is in progress to prevent concurrent operations
   const isSaving = batchSaveMutation.isPending
 
@@ -99,7 +105,6 @@ export function PlayerEditor({
     editingSegmentsRef.current = editingSegments
   }, [editingSegments])
   const timestampTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
-  const prevServerSegmentsRef = React.useRef(serverSegments)
 
   // Cleanup timeout and abort controller on unmount
   React.useEffect(
@@ -116,16 +121,13 @@ export function PlayerEditor({
   )
 
   // Sync editing segments from server when segment data changes
+  // Compare by reference - React Query maintains stable references when data hasn't changed
   if (
-    serverSegments.length > 0 &&
-    serverSegments !== prevServerSegmentsRef.current
+    serverSegments !== prevServerSegmentsRef.current &&
+    serverSegments.length > 0
   ) {
     prevServerSegmentsRef.current = serverSegments
-    const sorted = [...serverSegments].sort(sortSegmentsByStart)
-    // Only update if different to avoid infinite loop
-    if (JSON.stringify(sorted) !== JSON.stringify(editingSegments)) {
-      setEditingSegments(sorted)
-    }
+    setEditingSegments([...serverSegments].sort(sortSegmentsByStart))
   }
 
   // Handle segment creation from player

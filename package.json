@@ -12,7 +12,7 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
-    "@base-ui/react": "^1.0.0",
+    "@base-ui/react": "^1.1.0",
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@jellyfin/sdk": "^0.13.0",
     "@tanstack/react-query": "^5.90.17",
@@ -26,7 +26,7 @@
     "culori": "^4.0.2",
     "hls.js": "^1.6.15",
     "i18next": "^25.7.4",
-    "jassub": "2.2.1",
+    "jassub": "2.2.2",
     "lucide-react": "^0.562.0",
     "next-themes": "^0.4.6",
     "node-vibrant": "^4.0.3",
@@ -48,7 +48,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.1",
     "@types/culori": "^4.0.1",
-    "@types/node": "^25.0.8",
+    "@types/node": "^25.0.9",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
