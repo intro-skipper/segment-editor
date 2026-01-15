@@ -37,7 +37,6 @@ interface ConnectionInitState {
 export function useConnectionInit(): ConnectionInitState {
   const [isValidating, setIsValidating] = useState(false)
   const [hasValidated, setHasValidated] = useState(false)
-  const [showWizard, setShowWizard] = useState(false)
   const hasAttemptedRef = useRef(false)
 
   const validAuth = useApiStore((s) => s.validAuth)
@@ -69,7 +68,6 @@ export function useConnectionInit(): ConnectionInitState {
       // No credentials available
       if (!creds) {
         setHasValidated(true)
-        if (!isPlugin) setShowWizard(true)
         return
       }
 
@@ -97,7 +95,6 @@ export function useConnectionInit(): ConnectionInitState {
         store.setConnectionStatus(true, true)
       } else {
         store.setConnectionStatus(false, false)
-        if (!isPlugin) setShowWizard(true)
       }
 
       setIsValidating(false)
@@ -115,7 +112,7 @@ export function useConnectionInit(): ConnectionInitState {
     isConnected: validAuth,
     isValidating,
     hasValidated,
-    showWizard,
+    showWizard: hasValidated && !validAuth && !isPlugin,
   }
 }
 

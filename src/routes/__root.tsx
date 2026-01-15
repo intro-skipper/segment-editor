@@ -135,19 +135,21 @@ function RootComponent() {
   const { t } = useTranslation()
 
   // Unified connection initialization for both plugin and standalone modes
-  const { showWizard: initialShowWizard } = useConnectionInit()
+  const { showWizard } = useConnectionInit()
 
-  // Local state for wizard (allows closing after initial show)
-  const [wizardOpen, setWizardOpen] = useState(false)
+  // Local override to allow manually closing the wizard
+  const [wizardDismissed, setWizardDismissed] = useState(false)
 
-  // Sync initial wizard state
-  if (initialShowWizard && !wizardOpen) {
-    setWizardOpen(true)
-  }
+  // Show wizard if hook says so AND user hasn't dismissed it
+  const wizardOpen = showWizard && !wizardDismissed
+
+  const handleWizardOpenChange = useCallback((open: boolean) => {
+    if (!open) setWizardDismissed(true)
+  }, [])
 
   // Handle wizard completion
   const handleWizardComplete = useCallback(() => {
-    // Wizard completed successfully, connection is established
+    setWizardDismissed(true)
   }, [])
 
   return (
@@ -177,7 +179,7 @@ function RootComponent() {
       <SettingsDialog />
       <ConnectionWizard
         open={wizardOpen}
-        onOpenChange={setWizardOpen}
+        onOpenChange={handleWizardOpenChange}
         onComplete={handleWizardComplete}
       />
       <Toaster />
