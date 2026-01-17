@@ -9,7 +9,7 @@ Manage Jellyfin Media Segment positions the simple way. This tool is in early st
 
 - Jellyfin version 10.10 or higher
 - [Intro Skipper](https://github.com/intro-skipper/intro-skipper) for Jellyfin 10.10.2+
-- [MediaSegments API](https://github.com/intro-skipper/jellyfin-plugin-ms-api) for Jellyfin 10.10
+  - [MediaSegments API](https://github.com/intro-skipper/jellyfin-plugin-ms-api) for 10.10.0 / 10.10.1
 - Jellyfin Server API Key (created by you)
 
 ## Related projects
