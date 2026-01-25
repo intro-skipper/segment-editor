@@ -2,7 +2,7 @@
  * EpisodeSwitcher - Responsive episode selector for video player header.
  */
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
@@ -314,9 +314,10 @@ export function EpisodeSwitcher({
     enabled: !!seriesId && !!selectedSeasonId,
   })
 
-  useEffect(() => {
-    if (currentSeasonId) setSelectedSeasonId(currentSeasonId)
-  }, [currentSeasonId])
+  // Sync selectedSeasonId when currentSeasonId changes
+  if (currentSeasonId && currentSeasonId !== selectedSeasonId) {
+    setSelectedSeasonId(currentSeasonId)
+  }
 
   const handleEpisodeSelect = useCallback(
     (episodeId: string) => {

@@ -81,9 +81,18 @@ export function AuthStep({
     }
   }, [authMethod])
 
-  useEffect(() => {
-    setValidationError(null)
-  }, [apiKey, username, password, authMethod])
+  const prevInputsRef = useRef({ apiKey, username, password, authMethod })
+  if (
+    prevInputsRef.current.apiKey !== apiKey ||
+    prevInputsRef.current.username !== username ||
+    prevInputsRef.current.password !== password ||
+    prevInputsRef.current.authMethod !== authMethod
+  ) {
+    prevInputsRef.current = { apiKey, username, password, authMethod }
+    if (validationError !== null) {
+      setValidationError(null)
+    }
+  }
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {

@@ -57,6 +57,7 @@ export {
   getTypedApis,
   createApi,
   getRequestConfig,
+  getAuthenticatedRequestConfig,
   clearApiCache,
   isAborted,
   isPluginMode,
@@ -113,9 +114,4 @@ export type {
 // Public API - Authentication
 // ─────────────────────────────────────────────────────────────────────────────
 
-export {
-  authenticate,
-  validateStoredCredentials,
-  validateCredentials,
-  isValidPassword,
-} from './auth'
+export { authenticate, validateCredentials, isValidPassword } from './auth'

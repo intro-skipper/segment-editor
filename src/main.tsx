@@ -28,7 +28,8 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
-  defaultViewTransition: true,
+  // Disabled: ViewTransitions conflict with rapid state changes in plugin mode
+  defaultViewTransition: false,
 })
 
 // Register the router instance for type safety

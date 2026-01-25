@@ -152,28 +152,3 @@ function handleAuthError(error: unknown, options?: ApiOptions): AuthResult {
     error: AUTH_ERROR_MESSAGES[appError.code] ?? appError.message,
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Credential Validation
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function validateStoredCredentials(
-  serverAddress: string,
-  accessToken: string,
-  options?: ApiOptions,
-): Promise<{ valid: boolean; serverVersion?: string }> {
-  if (isAborted(options?.signal)) return { valid: false }
-  if (!serverAddress.trim() || !accessToken.trim()) return { valid: false }
-
-  try {
-    const api = createApi(serverAddress, accessToken)
-    if (!api) return { valid: false }
-    const { data } = await getSystemApi(api).getSystemInfo(
-      getRequestConfig(options),
-    )
-    return { valid: true, serverVersion: data.Version ?? undefined }
-  } catch (error) {
-    if (isAbortError(error)) return { valid: false }
-    return { valid: false }
-  }
-}

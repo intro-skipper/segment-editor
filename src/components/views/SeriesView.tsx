@@ -362,23 +362,29 @@ export function SeriesView({
 
   const selectedSeason = seasons.find((s) => s.Id === selectedSeasonId)
 
-  // Keep selection in sync when `seasons` prop changes (e.g. navigating to
-  // another series). If the previously selected season is not present in the
-  // new list, pick the first season (or null if none).
-  React.useEffect(() => {
+  // Keep selection in sync when `seasons` prop changes - compute during render
+  // If the previously selected season is not present in the new list, pick the first season
+  const prevSeasonsRef = React.useRef(seasons)
+  if (seasons !== prevSeasonsRef.current) {
+    prevSeasonsRef.current = seasons
+
     if (seasons.length === 0) {
-      setSelectedSeasonId(null)
-      return
-    }
+      if (selectedSeasonId !== null) {
+        setSelectedSeasonId(null)
+      }
+    } else {
+      const hasSelected = selectedSeasonId
+        ? seasons.some((s) => s.Id === selectedSeasonId)
+        : false
 
-    const hasSelected = selectedSeasonId
-      ? seasons.some((s) => s.Id === selectedSeasonId)
-      : false
-
-    if (!hasSelected) {
-      setSelectedSeasonId(findDefaultSeasonId())
+      if (!hasSelected) {
+        const defaultId = findDefaultSeasonId()
+        if (defaultId !== selectedSeasonId) {
+          setSelectedSeasonId(defaultId)
+        }
+      }
     }
-  }, [seasons, selectedSeasonId, findDefaultSeasonId])
+  }
 
   if (seasons.length === 0) {
     return (

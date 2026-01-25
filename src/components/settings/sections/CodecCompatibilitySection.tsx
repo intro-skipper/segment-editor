@@ -6,7 +6,7 @@
  * @module components/settings/sections/CodecCompatibilitySection
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
 
 import { SettingsSection } from '../primitives'
@@ -32,6 +32,7 @@ export function CodecCompatibilitySection() {
   const [videoCodecs, setVideoCodecs] = useState<Array<CodecSupport>>([])
   const [audioCodecs, setAudioCodecs] = useState<Array<CodecSupport>>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const hasInitializedRef = useRef(false)
 
   const checkCodecSupport = async () => {
     // Initialize with loading state
@@ -76,9 +77,14 @@ export function CodecCompatibilitySection() {
     setIsRefreshing(false)
   }
 
+  // Initialize codec check on mount - async operation requires effect
+  /* eslint-disable react-you-might-not-need-an-effect/no-initialize-state */
   useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
     checkCodecSupport()
   }, [])
+  /* eslint-enable react-you-might-not-need-an-effect/no-initialize-state */
 
   const CodecList = ({
     title,

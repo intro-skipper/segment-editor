@@ -11,7 +11,7 @@
  * @module hooks/use-track-manager
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
@@ -70,20 +70,6 @@ export interface UseTrackManagerReturn {
   isLoading: boolean
   /** Current error message, if any */
   error: string | null
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Default empty track state.
- */
-const EMPTY_TRACK_STATE: TrackState = {
-  audioTracks: [],
-  subtitleTracks: [],
-  activeAudioIndex: 0,
-  activeSubtitleIndex: null,
 }
 
 // ============================================================================
@@ -161,7 +147,11 @@ export function useTrackManager({
   t,
   onReloadHls,
 }: UseTrackManagerOptions): UseTrackManagerReturn {
-  const [trackState, setTrackState] = useState<TrackState>(EMPTY_TRACK_STATE)
+  // Only store user-selected active indices in state
+  const [activeAudioIndex, setActiveAudioIndex] = useState(0)
+  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number | null>(
+    null,
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -169,46 +159,61 @@ export function useTrackManager({
   const trackPreferences = useAppStore((state) => state.trackPreferences)
 
   // ============================================================================
-  // Track State Initialization
+  // Track Lists
   // ============================================================================
 
   /**
-   * Extract tracks from item when it changes.
-   * Sets initial active indices based on user preferences, falling back to defaults.
-   *
-   * Requirements: 1.1, 2.1, 7.2, 7.4, 7.5
+   * Extract tracks from item - computed directly during render.
    */
-  useEffect(() => {
+  const { audioTracks, subtitleTracks } = useMemo(() => {
     if (!item) {
-      setTrackState(EMPTY_TRACK_STATE)
-      setError(null)
-      return
+      return { audioTracks: [], subtitleTracks: [] }
     }
+    return extractTracks(item as Parameters<typeof extractTracks>[0])
+  }, [item])
 
-    // extractTracks handles null/undefined MediaSources internally
-    const { audioTracks, subtitleTracks } = extractTracks(
-      item as Parameters<typeof extractTracks>[0],
-    )
+  /**
+   * Track the previous item to detect changes and reset indices.
+   * Using "adjusting state during render" pattern instead of useEffect.
+   */
+  const [prevItem, setPrevItem] = useState(item)
 
-    // Find preferred track indices based on user preferences
-    const activeAudioIndex = findPreferredAudioIndex(
-      audioTracks,
-      trackPreferences.preferredAudioLanguage,
-    )
-    const activeSubtitleIndex = findPreferredSubtitleIndex(
-      subtitleTracks,
-      trackPreferences.preferredSubtitleLanguage,
-      trackPreferences.subtitlesEnabled,
-    )
+  if (item !== prevItem) {
+    setPrevItem(item)
+    setError(null)
 
-    setTrackState({
+    if (item) {
+      // Recompute preferred indices for the new item
+      const newAudioIndex = findPreferredAudioIndex(
+        audioTracks,
+        trackPreferences.preferredAudioLanguage,
+      )
+      const newSubtitleIndex = findPreferredSubtitleIndex(
+        subtitleTracks,
+        trackPreferences.preferredSubtitleLanguage,
+        trackPreferences.subtitlesEnabled,
+      )
+      setActiveAudioIndex(newAudioIndex)
+      setActiveSubtitleIndex(newSubtitleIndex)
+    } else {
+      setActiveAudioIndex(0)
+      setActiveSubtitleIndex(null)
+    }
+  }
+
+  /**
+   * Combine track lists and active indices into trackState.
+   * This is computed directly during render, not stored in state.
+   */
+  const trackState: TrackState = useMemo(
+    () => ({
       audioTracks,
       subtitleTracks,
       activeAudioIndex,
       activeSubtitleIndex,
-    })
-    setError(null)
-  }, [item, trackPreferences])
+    }),
+    [audioTracks, subtitleTracks, activeAudioIndex, activeSubtitleIndex],
+  )
 
   // ============================================================================
   // Track Switching Options
@@ -217,8 +222,6 @@ export function useTrackManager({
   /**
    * Memoized track switch options to avoid recreating on every render.
    * Includes audioTracks and subtitleTracks for proper index mapping.
-   *
-   * Requirements: 5.4
    */
   const switchOptions = useMemo(
     () => ({
@@ -288,10 +291,7 @@ export function useTrackManager({
         })
 
         if (result.success) {
-          setTrackState((prev) => ({
-            ...prev,
-            activeAudioIndex: index,
-          }))
+          setActiveAudioIndex(index)
         } else if (result.error) {
           const errorMsg =
             result.error.message || t('player.tracks.error.switchFailed')
@@ -368,10 +368,7 @@ export function useTrackManager({
         })
 
         if (result.success) {
-          setTrackState((prev) => ({
-            ...prev,
-            activeSubtitleIndex: index,
-          }))
+          setActiveSubtitleIndex(index)
         } else if (result.error) {
           const errorMsg =
             result.error.message || t('player.tracks.error.switchFailed')

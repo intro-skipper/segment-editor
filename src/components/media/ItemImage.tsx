@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { decode } from 'blurhash'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -99,18 +99,8 @@ export function ItemImage({
     return decodeBlurhashToDataUrl(blurhash)
   }, [item])
 
-  // Reset state when item changes
-  useEffect(() => {
-    setIsLoaded(false)
-    setHasError(false)
-  }, [item.Id])
-
-  // Check if image is already cached
-  useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      setIsLoaded(true)
-    }
-  }, [imageUrl])
+  // Reset state when imageUrl changes using key pattern
+  const imageKey = imageUrl || item.Id
 
   const handleLoad = () => {
     setIsLoaded(true)
@@ -119,6 +109,13 @@ export function ItemImage({
   const handleError = () => {
     setHasError(true)
   }
+
+  // Check if image is already cached on initial render
+  const checkCached = useCallback(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setIsLoaded(true)
+    }
+  }, [])
 
   const displayAlt = alt || item.Name || 'Media item'
 
@@ -143,6 +140,7 @@ export function ItemImage({
 
   return (
     <div
+      key={imageKey}
       className={cn(
         'relative overflow-hidden rounded-lg bg-muted',
         aspectRatio,
@@ -161,7 +159,13 @@ export function ItemImage({
 
       {/* Actual image with native lazy loading */}
       <img
-        ref={imgRef}
+        ref={(el) => {
+          imgRef.current = el
+          // Check if already cached when ref is set
+          if (el?.complete && el.naturalWidth > 0) {
+            checkCached()
+          }
+        }}
         src={imageUrl}
         alt={displayAlt}
         loading="lazy"

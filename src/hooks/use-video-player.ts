@@ -305,6 +305,7 @@ export function useVideoPlayer({
   /**
    * Initializes playback with the appropriate strategy.
    */
+  /* eslint-disable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
   useEffect(() => {
     if (!item?.Id) {
       setIsLoading(false)
@@ -365,9 +366,11 @@ export function useVideoPlayer({
       stopPlaybackSession(getPositionTicks(video))
     }
   }, [item, preferredAudioStreamIndex, hlsPlayer.videoRef])
+  /* eslint-enable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
 
   /**
    * Sets up direct play video element with error handling.
+   * Video element manipulation requires effect for DOM event binding.
    */
   useEffect(() => {
     if (strategy !== 'direct' || !videoUrl) return
@@ -401,7 +404,9 @@ export function useVideoPlayer({
   /**
    * Restores state when HLS player is ready after URL change.
    * This handles both initial load and audio track switching reloads.
+   * Video element event binding requires effect.
    */
+  /* eslint-disable react-you-might-not-need-an-effect/no-pass-ref-to-parent, react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-derived-state */
   useEffect(() => {
     if (strategy !== 'hls' || !hlsPlayer.videoRef.current || !videoUrl) return
 
@@ -421,6 +426,7 @@ export function useVideoPlayer({
       }
     }
   }, [strategy, hlsPlayer.videoRef, videoUrl])
+  /* eslint-enable react-you-might-not-need-an-effect/no-pass-ref-to-parent, react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-derived-state */
 
   /**
    * Retry playback after an error.

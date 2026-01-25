@@ -3,7 +3,14 @@
  * Accessible via Cmd/Ctrl+K or / keyboard shortcuts
  */
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +27,6 @@ import { BaseItemKind } from '@/types/jellyfin'
 
 const ITEM_HEIGHT = 64
 const MAX_VISIBLE_ITEMS = 8
-const SEARCH_DEBOUNCE_MS = 150
 
 interface CommandPaletteProps {
   open: boolean
@@ -113,23 +119,6 @@ const SearchResultItem = memo(function SearchResultItem({
   )
 })
 
-// Custom hook for debounced search
-const useDebouncedSearch = (search: string, delay: number) => {
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  useEffect(() => {
-    const trimmed = search.trim()
-    if (!trimmed) {
-      setDebouncedSearch('')
-      return
-    }
-    const timer = setTimeout(() => setDebouncedSearch(trimmed), delay)
-    return () => clearTimeout(timer)
-  }, [search, delay])
-
-  return debouncedSearch
-}
-
 export const CommandPalette = memo(function CommandPalette({
   open,
   onOpenChange,
@@ -144,12 +133,10 @@ export const CommandPalette = memo(function CommandPalette({
     null,
   )
   const triggerRef = useRef<HTMLElement | null>(null)
-
-  const debouncedSearch = useDebouncedSearch(search, SEARCH_DEBOUNCE_MS)
-
+  const deferredSearch = useDeferredValue(search.trim())
   const { data: items = [], isFetching } = useItems({
     parentId: selectedCollection ?? '',
-    nameFilter: debouncedSearch || undefined,
+    nameFilter: deferredSearch || undefined,
     enabled: open && !!selectedCollection,
   })
 
@@ -170,25 +157,33 @@ export const CommandPalette = memo(function CommandPalette({
     if (open) triggerRef.current = document.activeElement as HTMLElement
   }, [open])
 
-  // Reset on close
-  useEffect(() => {
-    if (!open) {
-      setSearch('')
-      setSelectedIndex(0)
-    }
-  }, [open])
+  const prevOpenRef = useRef(open)
+  if (prevOpenRef.current && !open) {
+    // Dialog just closed, reset state synchronously
+    if (search !== '') setSearch('')
+
+    if (selectedIndex !== 0) setSelectedIndex(0)
+  }
+  prevOpenRef.current = open
 
   // Reset selection when items change
-  useEffect(() => setSelectedIndex(0), [items])
+  const prevItemsLengthRef = useRef(items.length)
 
-  // Scroll selected into view
+  if (prevItemsLengthRef.current !== items.length && selectedIndex !== 0) {
+    setSelectedIndex(0)
+  }
+  prevItemsLengthRef.current = items.length
+
+  // Scroll selected into view - syncs with TanStack Virtual (external system)
   const prevIndex = useRef(selectedIndex)
+  /* eslint-disable react-you-might-not-need-an-effect/no-event-handler */
   useEffect(() => {
     if (!open || items.length === 0 || prevIndex.current === selectedIndex)
       return
     virtualizer.scrollToIndex(selectedIndex, { align: 'auto' })
     prevIndex.current = selectedIndex
   }, [selectedIndex, items.length, virtualizer, open])
+  /* eslint-enable react-you-might-not-need-an-effect/no-event-handler */
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -243,7 +238,7 @@ export const CommandPalette = memo(function CommandPalette({
   const activeDescendantId = items[safeIndex]?.Id
     ? `search-result-${items[safeIndex].Id}`
     : undefined
-  const showLoading = isFetching && debouncedSearch
+  const showLoading = isFetching && deferredSearch
   const showEmpty = !isFetching && items.length === 0
 
   return (

@@ -3,7 +3,13 @@
  * Displays library picker, search, and paginated media grid.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
@@ -41,7 +47,7 @@ import {
 } from '@/components/ui/empty'
 import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
-import { usePluginMode } from '@/hooks/use-plugin-mode'
+import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { useSessionStore } from '@/stores/session-store'
@@ -81,35 +87,39 @@ const getCollectionIcon = (name: string) => {
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
 
-/** Hook to get current column count based on viewport width */
+/** Subscribe to window resize events */
+function subscribeToResize(callback: () => void) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  const debouncedCallback = () => {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(callback, 150)
+  }
+  window.addEventListener('resize', debouncedCallback)
+  return () => {
+    window.removeEventListener('resize', debouncedCallback)
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+/** Get current column count snapshot */
+function getColumnsSnapshot() {
+  return typeof window !== 'undefined'
+    ? getGridColumns(window.innerWidth)
+    : COLUMN_BREAKPOINTS.default
+}
+
+/** Server snapshot for SSR */
+function getServerColumnsSnapshot() {
+  return COLUMN_BREAKPOINTS.default
+}
+
+/** Hook to get current column count based on viewport width using useSyncExternalStore */
 function useGridColumns(): number {
-  const [columns, setColumns] = useState<number>(COLUMN_BREAKPOINTS.default)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-    const updateColumns = () => {
-      setColumns(getGridColumns(window.innerWidth))
-    }
-
-    updateColumns()
-    window.addEventListener(
-      'resize',
-      () => {
-        if (timeoutId) clearTimeout(timeoutId)
-        timeoutId = setTimeout(updateColumns, 150)
-      },
-      { signal: controller.signal },
-    )
-
-    return () => {
-      controller.abort()
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [])
-
-  return columns
+  return useSyncExternalStore(
+    subscribeToResize,
+    getColumnsSnapshot,
+    getServerColumnsSnapshot,
+  )
 }
 
 /** Builds the middle section of page numbers with ellipsis */
@@ -196,8 +206,7 @@ export function FilterView() {
   const columns = useGridColumns()
 
   // Plugin mode and connection state
-  const { isPlugin, hasCredentials, isConnected, isConnecting } =
-    usePluginMode()
+  const { isPlugin, hasCredentials, isConnected } = usePluginMode()
   const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
   // Fetch collections and items
@@ -346,10 +355,11 @@ export function FilterView() {
     selectedCollection && !itemsLoading && !itemsError && items?.length === 0
 
   // Not connected state (standalone mode only)
-  const showNotConnected = !isPlugin && !hasCredentials
+  const showNotConnected = !isPlugin && !hasCredentials && !isConnected
 
-  // Connecting state (plugin mode waiting for parent ApiClient)
-  const showConnecting = isPlugin && !isConnected && isConnecting
+  // Connecting state - only in plugin mode before credentials are processed
+  // With immediate trust of plugin credentials, this should rarely show
+  const showConnecting = isPlugin && !isConnected
 
   return (
     <div className="px-4 pb-8 sm:px-6">
