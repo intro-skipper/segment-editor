@@ -79,12 +79,11 @@ const getEventTimingMs = (
     maxDurationSeconds?: number
   },
 ): { startMs: number; endMs: number } | null => {
-  const interval0 = event.intervals?.[0]
-
-  const startMsRaw = event.startTimeMs ?? interval0?.startTimeMs
+  // Intentionally ignore `intervals` for import.
+  const startMsRaw = event.startTimeMs
   if (!isNumber(startMsRaw)) return null
 
-  const endMsRaw = event.endTimeMs ?? interval0?.endTimeMs
+  const endMsRaw = event.endTimeMs
 
   // END_CREDITS typically runs until media end; if duration is known, use it.
   if (!isNumber(endMsRaw)) {
