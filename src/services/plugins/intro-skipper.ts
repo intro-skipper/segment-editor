@@ -35,6 +35,20 @@ interface IntroSkipperPayload {
   events?: Array<IntroSkipperEvent>
 }
 
+interface SecondsBasedMarker {
+  start?: number
+  end?: number
+  type?: string
+}
+
+interface SecondsBasedMarkersPayload {
+  intro?: SecondsBasedMarker
+  recap?: SecondsBasedMarker
+  credits?: SecondsBasedMarker
+  preview?: SecondsBasedMarker
+  [key: string]: unknown
+}
+
 interface IntroSkipperExportInterval {
   startTimeMs: number
   endTimeMs?: number
@@ -137,6 +151,67 @@ export function introSkipperClipboardTextToSegments(
     parsed = JSON.parse(text)
   } catch {
     return { segments: [], skipped: 0, error: 'Clipboard is not valid JSON' }
+  }
+
+  // Alternative format: seconds-based markers object
+  // Example:
+  // { "intro": {"start": 392, "end": 483}, "credits": {"start": 1331, "end": 1422}, "preview": {...} }
+  if (isRecord(parsed)) {
+    const markers = parsed as SecondsBasedMarkersPayload
+    const hasKnownKey =
+      'intro' in markers ||
+      'credits' in markers ||
+      'preview' in markers ||
+      'recap' in markers
+
+    if (hasKnownKey) {
+      const markerToSegment = (
+        marker: SecondsBasedMarker | undefined,
+        type: MediaSegmentType,
+      ): MediaSegmentDto | null => {
+        if (!marker) return null
+        if (!isNumber(marker.start)) return null
+
+        const startSeconds = marker.start
+        const endSecondsRaw = marker.end
+        const endSeconds = isNumber(endSecondsRaw)
+          ? endSecondsRaw
+          : type === 'Outro' &&
+              typeof options.maxDurationSeconds === 'number' &&
+              Number.isFinite(options.maxDurationSeconds) &&
+              options.maxDurationSeconds > 0
+            ? options.maxDurationSeconds
+            : startSeconds + 1
+
+        const segment: MediaSegmentDto = {
+          Id: generateUUID(),
+          ItemId: options.itemId,
+          Type: type,
+          StartTicks: startSeconds,
+          EndTicks: endSeconds,
+        }
+
+        const validation = validateSegment(segment, options.maxDurationSeconds)
+        if (!validation.valid) return null
+        return segment
+      }
+
+      const candidates: Array<MediaSegmentDto | null> = [
+        markerToSegment(markers.recap, 'Recap'),
+        markerToSegment(markers.intro, 'Intro'),
+        markerToSegment(markers.credits, 'Outro'),
+        markerToSegment(markers.preview, 'Preview'),
+      ]
+
+      const segments = candidates.filter(Boolean) as Array<MediaSegmentDto>
+      const skipped = candidates.length - segments.length
+
+      return {
+        segments: segments.sort(sortSegmentsByStart),
+        skipped,
+        error: segments.length === 0 ? 'No importable markers found' : undefined,
+      }
+    }
   }
 
   // `events` is optional: accept wrapper object, raw array, or a single event object

@@ -98,6 +98,47 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments[0]?.Type).toBe('Intro')
   })
 
+  it('imports seconds-based markers object (intro/credits/preview)', () => {
+    const text = JSON.stringify({
+      credits: {
+        end: 1422,
+        start: 1331,
+        type: 'credits',
+      },
+      intro: {
+        end: 483,
+        start: 392,
+        type: 'intro',
+      },
+      preview: {
+        end: 1437,
+        start: 1422,
+        type: 'preview',
+      },
+    })
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.segments).toHaveLength(3)
+
+    // Sorted by start time
+    expect(result.segments[0]?.Type).toBe('Intro')
+    expect(result.segments[0]?.StartTicks).toBeCloseTo(392, 5)
+    expect(result.segments[0]?.EndTicks).toBeCloseTo(483, 5)
+
+    expect(result.segments[1]?.Type).toBe('Outro')
+    expect(result.segments[1]?.StartTicks).toBeCloseTo(1331, 5)
+    expect(result.segments[1]?.EndTicks).toBeCloseTo(1422, 5)
+
+    expect(result.segments[2]?.Type).toBe('Preview')
+    expect(result.segments[2]?.StartTicks).toBeCloseTo(1422, 5)
+    expect(result.segments[2]?.EndTicks).toBeCloseTo(1437, 5)
+  })
+
   it('exports segments back into Intro Skipper JSON structure', () => {
     const segments = [
       {
