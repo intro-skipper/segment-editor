@@ -139,6 +139,52 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments[2]?.EndTicks).toBeCloseTo(1437, 5)
   })
 
+  it('imports when events array is deeply nested', () => {
+    const text = JSON.stringify({
+      transitionTimecodes: {
+        result: {
+          events: [
+            {
+              startTimeMs: 3673000,
+              eventType: 'END_CREDITS',
+              intervals: [{ startTimeMs: 3673000 }],
+            },
+            {
+              startTimeMs: 3673000,
+              eventType: 'NEXT_UP',
+              intervals: [{ startTimeMs: 3673000 }],
+            },
+            {
+              startTimeMs: 7000,
+              endTimeMs: 120000,
+              eventType: 'SKIP_RECAP',
+              intervals: [{ startTimeMs: 7000, endTimeMs: 120000 }],
+            },
+            {
+              startTimeMs: 121000,
+              endTimeMs: 174000,
+              eventType: 'SKIP_INTRO',
+              intervals: [{ startTimeMs: 121000, endTimeMs: 174000 }],
+            },
+          ],
+        },
+      },
+    })
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.segments).toHaveLength(3)
+    expect(result.skipped).toBe(1)
+
+    expect(result.segments[0]?.Type).toBe('Recap')
+    expect(result.segments[1]?.Type).toBe('Intro')
+    expect(result.segments[2]?.Type).toBe('Outro')
+  })
+
   it('exports segments back into Intro Skipper JSON structure', () => {
     const segments = [
       {

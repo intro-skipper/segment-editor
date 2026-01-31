@@ -120,6 +120,46 @@ const getEventSegmentType = (eventType: unknown): MediaSegmentType | null => {
   return EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType] ?? null
 }
 
+const looksLikeSingleEventObject = (value: unknown): boolean => {
+  if (!isRecord(value)) return false
+  return 'startTimeMs' in value || 'endTimeMs' in value || 'eventType' in value
+}
+
+const findNestedEventsArray = (
+  value: unknown,
+  options?: { maxDepth?: number; depth?: number },
+): Array<IntroSkipperEvent> | null => {
+  const maxDepth = options?.maxDepth ?? 12
+  const depth = options?.depth ?? 0
+  if (depth > maxDepth) return null
+
+  if (!isRecord(value)) return null
+
+  const direct = (value as IntroSkipperPayload).events
+  if (Array.isArray(direct)) return direct as Array<IntroSkipperEvent>
+
+  for (const child of Object.values(value)) {
+    if (Array.isArray(child)) {
+      // Recurse into array elements (in case objects are nested inside)
+      for (const element of child) {
+        const found = findNestedEventsArray(element, {
+          maxDepth,
+          depth: depth + 1,
+        })
+        if (found) return found
+      }
+      continue
+    }
+
+    if (isRecord(child)) {
+      const found = findNestedEventsArray(child, { maxDepth, depth: depth + 1 })
+      if (found) return found
+    }
+  }
+
+  return null
+}
+
 /**
  * Converts clipboard JSON text (Intro Skipper style) into UI segments.
  *
@@ -210,11 +250,12 @@ export function introSkipperClipboardTextToSegments(
   // `events` is optional: accept wrapper object, raw array, or a single event object
   const events: Array<IntroSkipperEvent> | null = Array.isArray(parsed)
     ? (parsed as Array<IntroSkipperEvent>)
-    : isRecord(parsed) && Array.isArray((parsed as IntroSkipperPayload).events)
-      ? ((parsed as IntroSkipperPayload).events as Array<IntroSkipperEvent>)
-      : isRecord(parsed)
-        ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
-        : null
+    : isRecord(parsed)
+      ? (findNestedEventsArray(parsed) ??
+          (looksLikeSingleEventObject(parsed)
+            ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
+            : null))
+      : null
 
   if (!events) {
     return {
