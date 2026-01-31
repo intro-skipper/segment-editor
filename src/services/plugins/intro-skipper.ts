@@ -49,16 +49,10 @@ interface SecondsBasedMarkersPayload {
   [key: string]: unknown
 }
 
-interface IntroSkipperExportInterval {
-  startTimeMs: number
-  endTimeMs?: number
-}
-
 interface IntroSkipperExportEvent {
   startTimeMs: number
   endTimeMs?: number
   eventType: IntroSkipperExportEventType
-  intervals: Array<IntroSkipperExportInterval>
 }
 
 type IntroSkipperExportPayload = Array<IntroSkipperExportEvent>
@@ -305,7 +299,6 @@ export function segmentsToIntroSkipperPayload(
       events.push({
         startTimeMs,
         eventType,
-        intervals: [{ startTimeMs }],
       })
       continue
     }
@@ -315,7 +308,6 @@ export function segmentsToIntroSkipperPayload(
       startTimeMs,
       endTimeMs,
       eventType,
-      intervals: [{ startTimeMs, endTimeMs }],
     })
   }
 

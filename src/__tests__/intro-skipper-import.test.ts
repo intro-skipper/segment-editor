@@ -179,21 +179,18 @@ describe('Intro Skipper clipboard import', () => {
       eventType: 'Recap',
       startTimeMs: 7000,
       endTimeMs: 120000,
-      intervals: [{ startTimeMs: 7000, endTimeMs: 120000 }],
     })
 
     expect(payload[1]).toMatchObject({
       eventType: 'Intro',
       startTimeMs: 121000,
       endTimeMs: 174000,
-      intervals: [{ startTimeMs: 121000, endTimeMs: 174000 }],
     })
 
     // Outro omits endTimeMs (assumed to run until end)
     expect(payload[2]).toMatchObject({
       eventType: 'Outro',
       startTimeMs: 3673000,
-      intervals: [{ startTimeMs: 3673000 }],
     })
     expect('endTimeMs' in payload[2]!).toBe(false)
 
