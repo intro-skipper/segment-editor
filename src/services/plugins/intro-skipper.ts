@@ -17,6 +17,8 @@ type IntroSkipperEventType =
   | 'SKIP_RECAP'
   | 'END_CREDITS'
 
+type IntroSkipperExportEventType = 'Intro' | 'Recap' | 'Outro'
+
 interface IntroSkipperInterval {
   startTimeMs?: number
   endTimeMs?: number
@@ -41,24 +43,16 @@ interface IntroSkipperExportInterval {
 interface IntroSkipperExportEvent {
   startTimeMs: number
   endTimeMs?: number
-  eventType: IntroSkipperEventType
+  eventType: IntroSkipperExportEventType
   intervals: Array<IntroSkipperExportInterval>
 }
 
-interface IntroSkipperExportPayload {
-  events: Array<IntroSkipperExportEvent>
-}
+type IntroSkipperExportPayload = Array<IntroSkipperExportEvent>
 
 const EVENT_TYPE_TO_SEGMENT_TYPE: Record<IntroSkipperEventType, MediaSegmentType> = {
   SKIP_INTRO: 'Intro',
   SKIP_RECAP: 'Recap',
   END_CREDITS: 'Outro',
-}
-
-const SEGMENT_TYPE_TO_EVENT_TYPE: Partial<Record<MediaSegmentType, IntroSkipperEventType>> = {
-  Intro: 'SKIP_INTRO',
-  Recap: 'SKIP_RECAP',
-  Outro: 'END_CREDITS',
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -111,9 +105,12 @@ const getEventSegmentType = (eventType: unknown): MediaSegmentType | null => {
   if (typeof eventType !== 'string') return null
   const normalized = eventType.trim().toUpperCase()
 
-  return (
-    EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType] ?? null
-  )
+  // Support importing both Intro Skipper event types and MediaSegmentType strings
+  if (normalized === 'INTRO') return 'Intro'
+  if (normalized === 'RECAP') return 'Recap'
+  if (normalized === 'OUTRO') return 'Outro'
+
+  return EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType] ?? null
 }
 
 /**
@@ -142,19 +139,20 @@ export function introSkipperClipboardTextToSegments(
     return { segments: [], skipped: 0, error: 'Clipboard is not valid JSON' }
   }
 
-  const payload: IntroSkipperPayload =
-    isRecord(parsed) && 'events' in parsed
-      ? (parsed as IntroSkipperPayload)
+  // `events` is optional: accept wrapper object, raw array, or a single event object
+  const events: Array<IntroSkipperEvent> | null = Array.isArray(parsed)
+    ? (parsed as Array<IntroSkipperEvent>)
+    : isRecord(parsed) && Array.isArray((parsed as IntroSkipperPayload).events)
+      ? ((parsed as IntroSkipperPayload).events as Array<IntroSkipperEvent>)
       : isRecord(parsed)
-        ? (parsed as IntroSkipperPayload)
-        : {}
+        ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
+        : null
 
-  const events = Array.isArray(payload.events) ? payload.events : null
   if (!events) {
     return {
       segments: [],
       skipped: 0,
-      error: 'JSON does not contain an events array',
+      error: 'Clipboard JSON has no events',
     }
   }
 
@@ -197,11 +195,13 @@ export function introSkipperClipboardTextToSegments(
   }
 }
 
-const toEventTypeForSegment = (
+const toExportEventTypeForSegment = (
   type: MediaSegmentType | null | undefined,
-): IntroSkipperEventType | null => {
-  if (!type) return null
-  return SEGMENT_TYPE_TO_EVENT_TYPE[type] ?? null
+): IntroSkipperExportEventType | null => {
+  if (type === 'Intro') return 'Intro'
+  if (type === 'Recap') return 'Recap'
+  if (type === 'Outro') return 'Outro'
+  return null
 }
 
 /**
@@ -218,7 +218,7 @@ export function segmentsToIntroSkipperPayload(
   const events: Array<IntroSkipperExportEvent> = []
 
   for (const segment of sorted) {
-    const eventType = toEventTypeForSegment(segment.Type)
+    const eventType = toExportEventTypeForSegment(segment.Type)
     if (!eventType) continue
 
     const startSeconds = typeof segment.StartTicks === 'number' ? segment.StartTicks : 0
@@ -226,7 +226,7 @@ export function segmentsToIntroSkipperPayload(
 
     const startTimeMs = secondsToMs(startSeconds)
 
-    if (eventType === 'END_CREDITS') {
+    if (eventType === 'Outro') {
       events.push({
         startTimeMs,
         eventType,
@@ -244,7 +244,7 @@ export function segmentsToIntroSkipperPayload(
     })
   }
 
-  return { events }
+  return events
 }
 
 /**

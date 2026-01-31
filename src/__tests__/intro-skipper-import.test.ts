@@ -60,6 +60,44 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments[2]?.EndTicks).toBeCloseTo(10_000, 5)
   })
 
+  it('imports when JSON is a raw events array (no wrapper)', () => {
+    const text = JSON.stringify([
+      {
+        startTimeMs: 7000,
+        endTimeMs: 120000,
+        eventType: 'SKIP_RECAP',
+        intervals: [{ startTimeMs: 7000, endTimeMs: 120000 }],
+      },
+    ])
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.segments).toHaveLength(1)
+    expect(result.segments[0]?.Type).toBe('Recap')
+  })
+
+  it('imports when JSON is a single event object (no wrapper)', () => {
+    const text = JSON.stringify({
+      startTimeMs: 121000,
+      endTimeMs: 174000,
+      eventType: 'SKIP_INTRO',
+      intervals: [{ startTimeMs: 121000, endTimeMs: 174000 }],
+    })
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.segments).toHaveLength(1)
+    expect(result.segments[0]?.Type).toBe('Intro')
+  })
+
   it('exports segments back into Intro Skipper JSON structure', () => {
     const segments = [
       {
@@ -94,33 +132,33 @@ describe('Intro Skipper clipboard import', () => {
     ] satisfies Array<MediaSegmentDto>
 
     const payload = segmentsToIntroSkipperPayload(segments)
-    expect(payload.events).toHaveLength(3)
+    expect(payload).toHaveLength(3)
 
-    expect(payload.events[0]).toMatchObject({
-      eventType: 'SKIP_RECAP',
+    expect(payload[0]).toMatchObject({
+      eventType: 'Recap',
       startTimeMs: 7000,
       endTimeMs: 120000,
       intervals: [{ startTimeMs: 7000, endTimeMs: 120000 }],
     })
 
-    expect(payload.events[1]).toMatchObject({
-      eventType: 'SKIP_INTRO',
+    expect(payload[1]).toMatchObject({
+      eventType: 'Intro',
       startTimeMs: 121000,
       endTimeMs: 174000,
       intervals: [{ startTimeMs: 121000, endTimeMs: 174000 }],
     })
 
-    // END_CREDITS omits endTimeMs
-    expect(payload.events[2]).toMatchObject({
-      eventType: 'END_CREDITS',
+    // Outro omits endTimeMs (assumed to run until end)
+    expect(payload[2]).toMatchObject({
+      eventType: 'Outro',
       startTimeMs: 3673000,
       intervals: [{ startTimeMs: 3673000 }],
     })
-    expect('endTimeMs' in payload.events[2]!).toBe(false)
+    expect('endTimeMs' in payload[2]!).toBe(false)
 
     // Clipboard text should be parseable JSON
     const text = segmentsToIntroSkipperClipboardText(segments)
-    const reparsed = JSON.parse(text) as { events: Array<unknown> }
-    expect(Array.isArray(reparsed.events)).toBe(true)
+    const reparsed = JSON.parse(text) as Array<unknown>
+    expect(Array.isArray(reparsed)).toBe(true)
   })
 })
