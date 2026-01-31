@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Loader2, Save } from 'lucide-react'
+import { ClipboardCopy, ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -29,6 +29,10 @@ import {
   sortSegmentsByStart,
   validateSegment,
 } from '@/lib/segment-utils'
+import {
+  introSkipperClipboardTextToSegments,
+  segmentsToIntroSkipperClipboardText,
+} from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
@@ -244,43 +248,78 @@ export function PlayerEditor({
   )
 
   // Paste from clipboard with validation
-  const handlePasteFromClipboard = React.useCallback(() => {
-    if (!clipboardSegment) {
+  const handlePasteFromClipboard = React.useCallback(async () => {
+    if (!item.Id) return
+
+    // 1) Prefer the in-app clipboard segment (no browser permission prompts)
+    if (clipboardSegment) {
+      const validation = validateSegment(clipboardSegment, runtimeSeconds)
+      if (!validation.valid) {
+        showNotification({
+          type: 'negative',
+          message: validation.error ?? 'Invalid segment data',
+        })
+        return
+      }
+
+      const newSegment: MediaSegmentDto = {
+        ...clipboardSegment,
+        Id: generateUUID(),
+        ItemId: item.Id,
+      }
+
+      setEditingSegments((prev) => {
+        const updated = [...prev, newSegment].sort(sortSegmentsByStart)
+        const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
+        setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
+        return updated
+      })
+
       showNotification({
-        type: 'negative',
-        message: t('editor.noSegmentInClipboard'),
+        type: 'positive',
+        message: t('editor.paste', 'Pasted'),
       })
       return
     }
 
-    // Validate clipboard segment before pasting
-    const validation = validateSegment(clipboardSegment, runtimeSeconds)
-    if (!validation.valid) {
+    // 2) Fallback: import Intro Skipper JSON from system clipboard text
+    try {
+      const text = await navigator.clipboard.readText()
+      const result = introSkipperClipboardTextToSegments(text, {
+        itemId: item.Id,
+        maxDurationSeconds: runtimeSeconds,
+      })
+
+      if (result.segments.length === 0) {
+        showNotification({
+          type: 'negative',
+          message: result.error ?? t('editor.noSegmentInClipboard'),
+        })
+        return
+      }
+
+      // Replace current segments with imported ones
+      setEditingSegments(() => {
+        const updated = [...result.segments].sort(sortSegmentsByStart)
+        setActiveIndex(updated.length > 0 ? 0 : 0)
+        return updated
+      })
+
+      const skippedInfo = result.skipped > 0 ? ` (${result.skipped} skipped)` : ''
+      showNotification({
+        type: 'positive',
+        message: `Imported ${result.segments.length} segments${skippedInfo}`,
+      })
+    } catch {
       showNotification({
         type: 'negative',
-        message: validation.error ?? 'Invalid segment data',
+        message: t(
+          'editor.noSegmentInClipboard',
+          'No segment in clipboard (and clipboard access was denied)',
+        ),
       })
-      return
     }
-
-    const newSegment: MediaSegmentDto = {
-      ...clipboardSegment,
-      Id: generateUUID(),
-      ItemId: item.Id,
-    }
-
-    setEditingSegments((prev) => {
-      const updated = [...prev, newSegment].sort(sortSegmentsByStart)
-      const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
-      setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
-      return updated
-    })
-
-    showNotification({
-      type: 'positive',
-      message: 'Segment pasted from clipboard',
-    })
-  }, [clipboardSegment, item.Id, t, runtimeSeconds])
+  }, [clipboardSegment, item.Id, runtimeSeconds, t])
 
   // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
@@ -313,6 +352,31 @@ export function PlayerEditor({
       // No additional notification needed here to avoid duplicate toasts
     }
   }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
+
+  const handleCopySegmentsAsJson = React.useCallback(async () => {
+    const segmentsToCopy = editingSegmentsRef.current
+    if (segmentsToCopy.length === 0) {
+      showNotification({
+        type: 'negative',
+        message: t('editor.noSegments', 'No segments to copy'),
+      })
+      return
+    }
+
+    try {
+      const text = segmentsToIntroSkipperClipboardText(segmentsToCopy)
+      await navigator.clipboard.writeText(text)
+      showNotification({
+        type: 'positive',
+        message: t('editor.copy', 'Copied JSON to clipboard'),
+      })
+    } catch {
+      showNotification({
+        type: 'negative',
+        message: t('editor.copyFailed', 'Clipboard access denied'),
+      })
+    }
+  }, [t])
 
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
@@ -390,6 +454,26 @@ export function PlayerEditor({
         role="group"
         aria-label={t('editor.actions', 'Segment actions')}
       >
+        <button
+          onClick={handleCopySegmentsAsJson}
+          aria-label={t('editor.copy', 'Copy segments as JSON')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
+            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
+            'transition-all duration-200 ease-out border-2',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            !hasColors &&
+              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
+          )}
+          style={getButtonStyle(false)}
+        >
+          <ClipboardCopy
+            className="size-4 sm:size-5"
+            aria-hidden="true"
+            style={iconColor ? { color: iconColor } : undefined}
+          />
+          {t('editor.copy', 'Copy JSON')}
+        </button>
         <button
           onClick={handlePasteFromClipboard}
           aria-label={t('editor.paste', 'Paste segment from clipboard')}
