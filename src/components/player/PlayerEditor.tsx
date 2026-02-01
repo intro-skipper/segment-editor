@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardPaste, Loader2, Save } from 'lucide-react'
+import { ClipboardCopy, ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -29,9 +29,23 @@ import {
   sortSegmentsByStart,
   validateSegment,
 } from '@/lib/segment-utils'
+import {
+  introSkipperClipboardTextToSegments,
+  segmentsToIntroSkipperClipboardText,
+} from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
@@ -86,6 +100,14 @@ export function PlayerEditor({
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
     number | null
   >(null)
+
+  // Import confirmation dialog state
+  const [importDialogOpen, setImportDialogOpen] = React.useState(false)
+  const pendingImportRef = React.useRef<{
+    segments: Array<MediaSegmentDto>
+    skipped: number
+    unknownTypes: Array<string>
+  } | null>(null)
 
   // Track previous server segments to detect changes
   // Use a ref to track the data identity, not the array reference
@@ -244,43 +266,94 @@ export function PlayerEditor({
   )
 
   // Paste from clipboard with validation
-  const handlePasteFromClipboard = React.useCallback(() => {
-    if (!clipboardSegment) {
+  const handlePasteFromClipboard = React.useCallback(async () => {
+    if (!item.Id) return
+
+    // 1) Prefer the in-app clipboard segment (no browser permission prompts)
+    if (clipboardSegment) {
+      const validation = validateSegment(clipboardSegment, runtimeSeconds)
+      if (!validation.valid) {
+        showNotification({
+          type: 'negative',
+          message: validation.error ?? 'Invalid segment data',
+        })
+        return
+      }
+
+      const newSegment: MediaSegmentDto = {
+        ...clipboardSegment,
+        Id: generateUUID(),
+        ItemId: item.Id,
+      }
+
+      setEditingSegments((prev) => {
+        const updated = [...prev, newSegment].sort(sortSegmentsByStart)
+        const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
+        setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
+        return updated
+      })
+
       showNotification({
-        type: 'negative',
-        message: t('editor.noSegmentInClipboard'),
+        type: 'positive',
+        message: t('editor.paste', 'Pasted'),
       })
       return
     }
 
-    // Validate clipboard segment before pasting
-    const validation = validateSegment(clipboardSegment, runtimeSeconds)
-    if (!validation.valid) {
+    // 2) Fallback: import Intro Skipper JSON from system clipboard text
+    try {
+      const text = await navigator.clipboard.readText()
+      const result = introSkipperClipboardTextToSegments(text, {
+        itemId: item.Id,
+        maxDurationSeconds: runtimeSeconds,
+      })
+
+      if (result.segments.length === 0) {
+        showNotification({
+          type: 'negative',
+          message: result.error ?? t('editor.noSegmentInClipboard'),
+        })
+        return
+      }
+
+      // If there are existing segments, show confirmation dialog
+      if (editingSegmentsRef.current.length > 0) {
+        pendingImportRef.current = result
+        setImportDialogOpen(true)
+        return
+      }
+
+      // No existing segments, replace directly
+      setEditingSegments(() => {
+        const updated = [...result.segments].sort(sortSegmentsByStart)
+        setActiveIndex(0)
+        return updated
+      })
+
+      // Build informative notification message
+      const infoParts: Array<string> = []
+      if (result.skipped > 0) {
+        infoParts.push(`${result.skipped} skipped`)
+      }
+      if (result.unknownTypes.length > 0) {
+        infoParts.push(`unknown: ${result.unknownTypes.join(', ')}`)
+      }
+      const infoSuffix =
+        infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+      showNotification({
+        type: 'positive',
+        message: `Imported ${result.segments.length} segments${infoSuffix}`,
+      })
+    } catch {
       showNotification({
         type: 'negative',
-        message: validation.error ?? 'Invalid segment data',
+        message: t(
+          'editor.noSegmentInClipboard',
+          'No segment in clipboard (and clipboard access was denied)',
+        ),
       })
-      return
     }
-
-    const newSegment: MediaSegmentDto = {
-      ...clipboardSegment,
-      Id: generateUUID(),
-      ItemId: item.Id,
-    }
-
-    setEditingSegments((prev) => {
-      const updated = [...prev, newSegment].sort(sortSegmentsByStart)
-      const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
-      setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
-      return updated
-    })
-
-    showNotification({
-      type: 'positive',
-      message: 'Segment pasted from clipboard',
-    })
-  }, [clipboardSegment, item.Id, t, runtimeSeconds])
+  }, [clipboardSegment, item.Id, runtimeSeconds, t])
 
   // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
@@ -313,6 +386,105 @@ export function PlayerEditor({
       // No additional notification needed here to avoid duplicate toasts
     }
   }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
+
+  const handleCopySegmentsAsJson = React.useCallback(async () => {
+    const segmentsToCopy = editingSegmentsRef.current
+    if (segmentsToCopy.length === 0) {
+      showNotification({
+        type: 'negative',
+        message: t('editor.noSegments', 'No segments to copy'),
+      })
+      return
+    }
+
+    try {
+      const result = segmentsToIntroSkipperClipboardText(segmentsToCopy)
+      await navigator.clipboard.writeText(result.text)
+
+      // Build informative notification message
+      if (result.excludedCount > 0) {
+        const excludedInfo = result.excludedTypes.join(', ')
+        showNotification({
+          type: 'positive',
+          message: t(
+            'editor.copyWithExcluded',
+            `Copied JSON (${result.excludedCount} ${excludedInfo} excluded)`,
+          ),
+        })
+      } else {
+        showNotification({
+          type: 'positive',
+          message: t('editor.copy', 'Copied JSON to clipboard'),
+        })
+      }
+    } catch {
+      showNotification({
+        type: 'negative',
+        message: t('editor.copyFailed', 'Clipboard access denied'),
+      })
+    }
+  }, [t])
+
+  // Handle import confirmation: replace all segments
+  const handleImportReplace = React.useCallback(() => {
+    const pending = pendingImportRef.current
+    if (!pending) return
+
+    setEditingSegments(() => {
+      const updated = [...pending.segments].sort(sortSegmentsByStart)
+      setActiveIndex(0)
+      return updated
+    })
+
+    const infoParts: Array<string> = []
+    if (pending.skipped > 0) {
+      infoParts.push(`${pending.skipped} skipped`)
+    }
+    if (pending.unknownTypes.length > 0) {
+      infoParts.push(`unknown: ${pending.unknownTypes.join(', ')}`)
+    }
+    const infoSuffix = infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+    showNotification({
+      type: 'positive',
+      message: `Replaced with ${pending.segments.length} segments${infoSuffix}`,
+    })
+
+    pendingImportRef.current = null
+    setImportDialogOpen(false)
+  }, [])
+
+  // Handle import confirmation: merge with existing segments
+  const handleImportMerge = React.useCallback(() => {
+    const pending = pendingImportRef.current
+    if (!pending) return
+
+    setEditingSegments((prev) => {
+      const merged = [...prev, ...pending.segments].sort(sortSegmentsByStart)
+      return merged
+    })
+
+    const infoParts: Array<string> = []
+    if (pending.skipped > 0) {
+      infoParts.push(`${pending.skipped} skipped`)
+    }
+    if (pending.unknownTypes.length > 0) {
+      infoParts.push(`unknown: ${pending.unknownTypes.join(', ')}`)
+    }
+    const infoSuffix = infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+    showNotification({
+      type: 'positive',
+      message: `Added ${pending.segments.length} segments${infoSuffix}`,
+    })
+
+    pendingImportRef.current = null
+    setImportDialogOpen(false)
+  }, [])
+
+  // Handle import dialog cancel
+  const handleImportCancel = React.useCallback(() => {
+    pendingImportRef.current = null
+    setImportDialogOpen(false)
+  }, [])
 
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
@@ -385,11 +557,59 @@ export function PlayerEditor({
         />
       )}
 
+      {/* Import Confirmation Dialog */}
+      <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('editor.importTitle', 'Import Segments')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                'editor.importDescription',
+                `You have ${editingSegments.length} existing segments. Would you like to replace them or merge with the imported segments?`,
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleImportCancel}>
+              {t('common.cancel', 'Cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="outline" onClick={handleImportMerge}>
+              {t('editor.importMerge', 'Merge')}
+            </AlertDialogAction>
+            <AlertDialogAction onClick={handleImportReplace}>
+              {t('editor.importReplace', 'Replace')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div
         className="flex flex-row justify-center gap-4"
         role="group"
         aria-label={t('editor.actions', 'Segment actions')}
       >
+        <button
+          onClick={handleCopySegmentsAsJson}
+          aria-label={t('editor.copy', 'Copy segments as JSON')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
+            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
+            'transition-all duration-200 ease-out border-2',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            !hasColors &&
+              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
+          )}
+          style={getButtonStyle(false)}
+        >
+          <ClipboardCopy
+            className="size-4 sm:size-5"
+            aria-hidden="true"
+            style={iconColor ? { color: iconColor } : undefined}
+          />
+          {t('editor.copy', 'Copy JSON')}
+        </button>
         <button
           onClick={handlePasteFromClipboard}
           aria-label={t('editor.paste', 'Paste segment from clipboard')}
