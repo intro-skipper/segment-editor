@@ -423,7 +423,7 @@ export const PlayerControls = memo(function PlayerControls({
                     aria-valuetext={t('player.subtitleOffsetValue', '{{offset}}s', { offset: subtitleOffset.toFixed(1) })}
                     className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
                   />
-                  <span className="text-sm font-mono min-w-[4ch] text-right">
+                  <span className="text-sm font-mono min-w-[6ch] text-right">
                     {subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s
                   </span>
                 </div>
