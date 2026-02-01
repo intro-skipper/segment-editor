@@ -3,15 +3,16 @@
  * Centralizes styling utilities to eliminate duplication across components.
  */
 
+import type { CSSProperties } from 'react'
+
 import { cn } from '@/lib/utils'
 
 /** Shared icon sizing class for player controls */
 export const ICON_CLASS = 'size-5 sm:size-6' as const
 
 /** Returns inline style for icon color, or undefined if no color provided */
-export const getIconStyle = (
-  color?: string,
-): React.CSSProperties | undefined => (color ? { color } : undefined)
+export const getIconStyle = (color?: string): CSSProperties | undefined =>
+  color ? { color } : undefined
 
 /** Shared button class generator for player control buttons */
 export const getButtonClass = (active: boolean, hasColors: boolean): string =>

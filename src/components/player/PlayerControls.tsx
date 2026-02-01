@@ -390,7 +390,9 @@ export const PlayerControls = memo(function PlayerControls({
                   )}
                   role="radio"
                   aria-checked={idx === skipTimeIndex}
-                  aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', { time })}
+                  aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', {
+                    time,
+                  })}
                 >
                   {time}s
                 </button>
@@ -420,11 +422,16 @@ export const PlayerControls = memo(function PlayerControls({
                     aria-valuemin={-10}
                     aria-valuemax={10}
                     aria-valuenow={subtitleOffset}
-                    aria-valuetext={t('player.subtitleOffsetValue', '{{offset}}s', { offset: subtitleOffset.toFixed(1) })}
+                    aria-valuetext={t(
+                      'player.subtitleOffsetValue',
+                      '{{offset}}s',
+                      { offset: subtitleOffset.toFixed(1) },
+                    )}
                     className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
                   />
                   <span className="text-sm font-mono min-w-[6ch] text-right">
-                    {subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s
+                    {subtitleOffset > 0 ? '+' : ''}
+                    {subtitleOffset.toFixed(1)}s
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -451,10 +458,11 @@ export const PlayerControls = memo(function PlayerControls({
             </p>
             <div className="space-y-1.5 text-sm">
               {SHORTCUT_KEYS.map(({ labelKey, keys }) => (
-                <div key={labelKey} className="flex justify-between items-center">
-                  <span className="text-muted-foreground">
-                    {t(labelKey)}
-                  </span>
+                <div
+                  key={labelKey}
+                  className="flex justify-between items-center"
+                >
+                  <span className="text-muted-foreground">{t(labelKey)}</span>
                   <span>
                     {keys.map((k) => (
                       <kbd

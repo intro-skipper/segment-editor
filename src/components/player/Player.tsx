@@ -553,18 +553,25 @@ export function Player({
   const toggleVideoFitMode = useCallback(() => {
     setVideoFitMode((prev) => {
       const next = prev === 'contain' ? 'cover' : 'contain'
-      // Cancel any pending resize
+
+      // Cancel any pending resize to avoid stale callbacks
       if (resizeRafRef.current !== null) {
         cancelAnimationFrame(resizeRafRef.current)
+        resizeRafRef.current = null
       }
-      // Resize JASSUB after the browser paints the new styles
-      // Double rAF ensures styles are applied before resize calculation
+
+      // Schedule resize after browser paints new styles.
+      // Double rAF pattern: outer frame waits for style recalc,
+      // inner frame ensures layout is complete before measuring.
+      // We only track the outer frame ID - cancelling it prevents
+      // the inner frame from ever being scheduled.
       resizeRafRef.current = requestAnimationFrame(() => {
-        resizeRafRef.current = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
           resizeRafRef.current = null
           resizeJassub()
         })
       })
+
       return next
     })
   }, [resizeJassub])
@@ -895,6 +902,8 @@ export function Player({
                 : 'opacity-0 pointer-events-none',
             )}
             aria-hidden={!showFullscreenControls}
+            // Prevent keyboard focus on hidden controls - inert removes from tab order and accessibility tree
+            inert={!showFullscreenControls || undefined}
             onClick={stopPropagation}
             onTouchEnd={stopPropagation}
           >
