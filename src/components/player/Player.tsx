@@ -18,7 +18,11 @@ import { useShallow } from 'zustand/shallow'
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerControls } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
-import type { BaseItemDto, MediaSegmentType } from '@/types/jellyfin'
+import type {
+  BaseItemDto,
+  MediaSegmentDto,
+  MediaSegmentType,
+} from '@/types/jellyfin'
 import type {
   VideoPlayerError,
   VideoPlayerErrorType,
@@ -95,6 +99,7 @@ function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
 export interface PlayerProps {
   item: BaseItemDto
   timestamp?: number
+  segments?: Array<MediaSegmentDto>
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   className?: string
@@ -109,6 +114,7 @@ export interface PlayerProps {
 export function Player({
   item,
   timestamp,
+  segments,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
@@ -949,7 +955,11 @@ export function Player({
             currentTime={currentTime}
             duration={duration}
             buffered={buffered}
+            chapters={item.Chapters}
+            segments={segments}
             onSeek={handleSeek}
+            itemId={item.Id}
+            trickplay={item.Trickplay}
           />
 
           <PlayerControls {...playerControlsProps} />

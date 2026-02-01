@@ -477,6 +477,7 @@ export function PlayerEditor({
         <Player
           item={item}
           timestamp={playerTimestamp}
+          segments={editingSegments}
           onCreateSegment={handleCreateSegment}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
           getCurrentTimeRef={getCurrentTimeRef}

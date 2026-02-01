@@ -67,6 +67,8 @@ const DETAIL_FIELDS = [
   ItemFields.Overview,
   ItemFields.People,
   ItemFields.Genres,
+  ItemFields.Chapters,
+  ItemFields.Trickplay,
 ] as const
 
 const SORT_ASCENDING = [SortOrder.Ascending] as const
