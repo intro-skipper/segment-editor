@@ -896,6 +896,7 @@ export function Player({
                 ? 'opacity-100'
                 : 'opacity-0 pointer-events-none',
             )}
+            aria-hidden={!showFullscreenControls}
             onClick={stopPropagation}
             onTouchEnd={stopPropagation}
           >
