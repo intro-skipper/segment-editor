@@ -407,9 +407,10 @@ export function PlayerEditor({
         showNotification({
           type: 'positive',
           message: t(
-            'editor.copyWithExcluded',
-            `Copied JSON (${result.excludedCount} ${excludedInfo} excluded)`,
-          ),
+            'editor.copyWithExcluded', {
+            excludedCount: result.excludedCount,
+            excludedInfo: excludedInfo,
+          }),
         })
       } else {
         showNotification({
@@ -567,7 +568,9 @@ export function PlayerEditor({
             <AlertDialogDescription>
               {t(
                 'editor.importDescription',
-                `You have ${editingSegments.length} existing segments. Would you like to replace them or merge with the imported segments?`,
+                {
+                  length: editingSegments.length,
+                }
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -599,7 +602,7 @@ export function PlayerEditor({
             'transition-all duration-200 ease-out border-2',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             !hasColors &&
-              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
+            'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
           )}
           style={getButtonStyle(false)}
         >
@@ -619,7 +622,7 @@ export function PlayerEditor({
             'transition-all duration-200 ease-out border-2',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             !hasColors &&
-              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
+            'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
           )}
           style={getButtonStyle(false)}
         >
@@ -643,7 +646,7 @@ export function PlayerEditor({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             !hasColors &&
-              'bg-primary/20 text-primary border-primary/40 hover:bg-primary/30',
+            'bg-primary/20 text-primary border-primary/40 hover:bg-primary/30',
           )}
           style={getButtonStyle(true)}
         >

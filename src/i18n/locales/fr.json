@@ -9,10 +9,25 @@
     "skipTimeSelector": "Sélectionner l'intervalle de saut",
     "dragHandle": "Glisser pour réorganiser",
     "closeDialog": "Fermer le dialogue",
+    "skipToMain": "Passer au contenu principal",
+    "mainContent": "Contenu principal",
+    "navigation": "Navigation",
+    "loading": "Chargement...",
+    "loadingComplete": "Contenu chargé",
+    "searchResults": "{{count}} résultats trouvés",
+    "noResults": "Aucun résultat trouvé",
+    "currentPage": "Page {{page}} sur {{total}}",
+    "expandMenu": "Développer le menu",
+    "collapseMenu": "Réduire le menu",
+    "required": "Champ obligatoire",
+    "optional": "Champ optionnel",
+    "error": "Erreur : {{message}}",
+    "success": "Succès : {{message}}",
     "pagination": {
       "previous": "Aller à la page précédente",
       "next": "Aller à la page suivante",
-      "page": "Aller à la page {{page}}"
+      "page": "Aller à la page {{page}}",
+      "current": "Page actuelle, page {{page}}"
     },
     "mediaCard": {
       "viewSeries": "Voir la série : {{name}}",
@@ -21,12 +36,47 @@
       "playMovie": "Lire le film : {{name}}",
       "playEpisode": "Lire l'épisode : {{name}}",
       "play": "Lire : {{name}}"
+    },
+    "player": {
+      "videoProgress": "Progression vidéo : {{current}} sur {{total}}",
+      "volumeLevel": "Volume : {{level}}%",
+      "play": "Lecture",
+      "pause": "Pause",
+      "next": "Suivant",
+      "previous": "Précédent",
+      "muted": "Audio coupé",
+      "unmuted": "Audio activé",
+      "playing": "Lecture vidéo",
+      "paused": "Vidéo en pause",
+      "buffering": "Mise en mémoire tampon",
+      "controls": "Contrôles du lecteur vidéo",
+      "volume": "Volume",
+      "mute": "Muet",
+      "unmute": "Activer le son"
+    },
+    "segment": {
+      "selected": "Segment {{index}} sélectionné",
+      "created": "Nouveau segment créé",
+      "deleted": "Segment supprimé",
+      "updated": "Segment mis à jour"
+    },
+    "form": {
+      "invalidInput": "Entrée invalide",
+      "fieldRequired": "Ce champ est obligatoire",
+      "characterCount": "{{current}} sur {{max}} caractères"
+    },
+    "settings": {
+      "description": "Configurer les paramètres de l'application, y compris la connexion au serveur, le thème, la langue et les préférences d'affichage"
     }
   },
   "login": {
     "api_key": "Clé d'API Jellyfin",
     "server_address": "Adresse du serveur Jellyfin",
     "test_conn": "Test de connexion",
+    "connect": "Se connecter au serveur",
+    "connect_success": "Connexion au serveur réussie",
+    "disconnected": "Déconnecté du serveur",
+    "not_connected": "Non connecté à un serveur",
     "validation": {
       "api_key_invalid": "Clé d'API invalide",
       "url_invalid": "URL invalide. Doit commencer par http:// ou https://"
@@ -46,35 +96,59 @@
       "en-US": "Anglais",
       "de": "Allemand",
       "fr": "Français",
-      "title": "Langues"
+      "title": "Langue"
     },
     "plugins": {
       "title": "Plugins de serveur installés"
     },
+    "name": "Éditeur de segment",
     "title": "Éditeur de segment",
     "showVideoPlayer": "Afficher le lecteur vidéo"
+  },
+  "connection": {
+    "notConnected": "Non connecté",
+    "notConnectedDescription": "Configurez votre connexion au serveur Jellyfin pour commencer",
+    "openSettings": "Ouvrir les paramètres",
+    "connecting": "Connexion en cours...",
+    "connectingDescription": "Établissement de la connexion au serveur Jellyfin"
   },
   "items": {
     "select_collection": "Sélectionnez une collection à parcourir",
     "filter": {
       "name": "Recherche",
-      "collection": "Collection"
-    }
+      "collection": "Collection",
+      "selectCollection": "Sélectionner une collection"
+    },
+    "mediaGrid": "Éléments multimédias",
+    "selectLibrary": "Sélectionner une bibliothèque",
+    "selectLibraryDescription": "Choisissez une bibliothèque pour parcourir votre collection multimédia",
+    "selectLibraryButton": "Parcourir la bibliothèque {{name}}",
+    "showing": "Affichage de {{start}}-{{end}} sur {{total}}",
+    "noItems": "Aucun élément trouvé"
   },
   "editor": {
     "saveSegment": "Sauvegarder",
-    "deleteSure": "Êtes-vous sûr de supprimer le segment '{{Type}}' ?",
+    "deleteSure": "Êtes-vous sûr de vouloir supprimer le segment '{{Type}}' ?",
     "deleteSureTitle": "Supprimer un segment",
     "deleteSureTitle_plural": "Supprimer {{count}} segments",
     "time": "Temps",
-    "deleteSegments": "Êtes-vous sûr de supprimer tous les segments pour '{{item}}' ?",
+    "deleteSegments": "Êtes-vous sûr de vouloir supprimer tous les segments pour '{{item}}' ?",
     "newSegment": "Nouveau segment",
+    "actions": "Actions du segment",
+    "paste": "Coller",
     "slider": {
-      "title": "Éditeur de Slider"
+      "title": "Éditeur de curseur"
     },
     "noSegments": "Aucun segment disponible, créez-en un avec '+'",
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
-    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers"
+    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
+    "copy": "Copier JSON",
+    "copyFailed": "Accès au presse-papiers refusé",
+    "importReplace": "Remplacer",
+    "copyWithExcluded": "JSON copié avec {{excludedCount}} {{excludedInfo}} exclus",
+    "importTitle": "Importer des segments",
+    "importDescription": "Vous avez {{length}} segments existants. Voulez-vous les remplacer ou les fusionner avec les segments importés ?",
+    "importMerge": "Fusionner"
   },
   "yes": "Oui",
   "no": "Non",
@@ -112,13 +186,23 @@
   },
   "error": {
     "not_found": "Page non trouvée",
-    "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée."
+    "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée.",
+    "something_went_wrong": "Une erreur s'est produite",
+    "generic_description": "Une erreur inattendue s'est produite. Veuillez réessayer.",
+    "feature_error": "Erreur {{feature}}",
+    "feature_description": "Cette fonctionnalité a rencontré une erreur. Vous pouvez réessayer ou naviguer ailleurs."
   },
   "common": {
     "go_back": "Retour",
     "goBack": "Retour",
     "home": "Accueil",
-    "retry": "Réessayer"
+    "reload": "Recharger",
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "close": "Fermer"
   },
   "player": {
     "videoPlayer": "Lecteur vidéo",
@@ -126,15 +210,23 @@
     "volumeSlider": "Curseur de volume",
     "mute": "Muet",
     "unmute": "Activer le son",
+    "fullscreen": "Plein écran",
+    "exitFullscreen": "Quitter le plein écran",
     "retry": "Réessayer",
     "selectEpisode": "Sélectionner un épisode",
+    "controls": "Contrôles du lecteur vidéo",
+    "recovering": "Récupération de la lecture...",
+    "error": "Erreur de lecture",
+    "buffering": "Mise en mémoire tampon...",
     "directPlay": "Lecture directe",
     "hlsFallback": "Lecture transcodée",
     "direct": "Direct",
     "hls": "HLS",
     "strategy": {
       "direct": "Lecture directe - Qualité originale, sans transcodage",
-      "hls": "Streaming HLS - Transcodé pour la compatibilité"
+      "hls": "Streaming HLS - Transcodé pour la compatibilité",
+      "directLabel": "Lecture directe",
+      "hlsLabel": "Transcodage HLS"
     },
     "notification": {
       "switchedToTranscode": "Basculé vers la lecture transcodée"
@@ -152,7 +244,9 @@
       "error": {
         "jassubInit": "Échec de l'initialisation du moteur de sous-titres",
         "loadFailed": "Échec du chargement du fichier de sous-titres",
-        "wasmFailed": "Échec du chargement du module de sous-titres"
+        "wasmFailed": "Échec du chargement du module de sous-titres",
+        "webgpuRequired": "WebGPU requis pour les sous-titres ASS/SSA",
+        "timeout": "Délai d'initialisation du moteur de sous-titres dépassé"
       }
     },
     "tracks": {
@@ -182,6 +276,23 @@
     "loadingEpisodes": "Chargement des épisodes pour {{season}}...",
     "episodeLoadError": "Échec du chargement des épisodes",
     "seasonNumber": "Saison {{number}}",
-    "episodes": "Épisodes"
+    "episodes": "Épisodes",
+    "loadError": "Échec du chargement des épisodes",
+    "episode": "Épisode"
+  },
+  "search": {
+    "open": "Ouvrir la recherche",
+    "title": "Recherche",
+    "placeholder": "Rechercher des médias...",
+    "clear": "Effacer la recherche",
+    "results": "Résultats de recherche",
+    "no_results": "Aucun résultat trouvé",
+    "start_typing": "Commencez à taper pour rechercher..."
+  },
+  "settings": {
+    "open": "Ouvrir les paramètres"
+  },
+  "navigation": {
+    "back": "Retour"
   }
 }

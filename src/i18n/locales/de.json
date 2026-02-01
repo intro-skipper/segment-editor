@@ -134,7 +134,14 @@
     },
     "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
-    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert"
+    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
+    "copy": "Kopieren",
+    "copyFailed": "Kopieren fehlgeschlagen",
+    "importReplace": "Importieren und ersetzen",
+    "copyWithExcluded": "Mit Ausschlüssen kopieren",
+    "importTitle": "Segmente importieren",
+    "importDescription": "Füge Segmente aus der Zwischenablage ein",
+    "importMerge": "Importieren und zusammenführen"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -183,7 +190,8 @@
     "goBack": "Zurück",
     "home": "Startseite",
     "reload": "Neu laden",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "cancel": "Abbrechen"
   },
   "player": {
     "videoPlayer": "Videoplayer",
@@ -192,11 +200,11 @@
     "mute": "Stumm",
     "unmute": "Ton an",
     "fullscreen": "Vollbild",
-    "exitFullscreen": "Vollbild verlassen",
+    "exitFullscreen": "Vollbild beenden",
     "retry": "Erneut versuchen",
     "selectEpisode": "Episode auswählen",
-    "controls": "Steuerung des Videoplayers",
-    "recovering": "Wiedergabe wird wiederhergestellt",
+    "controls": "Steuerung",
+    "recovering": "Wiedergabe wird wiederhergestellt...",
     "directPlay": "Direktwiedergabe",
     "hlsFallback": "Transkodierte Wiedergabe",
     "direct": "Direkt",

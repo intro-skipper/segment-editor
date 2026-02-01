@@ -134,7 +134,14 @@
     },
     "noSegments": "No Segments available, create one with '+'",
     "noSegmentInClipboard": "No segment in clipboard",
-    "segmentCopiedToClipboard": "Segment copied to clipboard"
+    "segmentCopiedToClipboard": "Segment copied to clipboard",
+    "copy": "Copy JSON",
+    "copyFailed": "Clipboard access denied",
+    "importReplace": "Replace",
+    "copyWithExcluded": "Copied JSON {{excludedCount}} {{excludedInfo}} excluded",
+    "importTitle": "Import Segments",
+    "importDescription": "You have {{length}} existing segments. Would you like to replace them or merge with the imported segments?",
+    "importMerge": "Merge"
   },
   "yes": "Yes",
   "no": "No",
@@ -183,7 +190,8 @@
     "goBack": "Go back",
     "home": "Home",
     "reload": "Reload",
-    "retry": "Retry"
+    "retry": "Retry",
+    "cancel": "Cancel"
   },
   "player": {
     "videoPlayer": "Video player",
