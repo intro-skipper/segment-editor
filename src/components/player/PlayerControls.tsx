@@ -113,17 +113,26 @@ export const PlayerControls = memo(function PlayerControls({
     (active?: boolean): React.CSSProperties | undefined => {
       const baseStyle = getButtonStyle(active)
       if (!baseStyle || buttonOpacity === undefined) return baseStyle
+      // Only apply alpha when a backgroundColor is present
+      if (!baseStyle.backgroundColor) {
+        return baseStyle
+      }
       // Active state gets higher opacity (closer to 1)
       const effectiveOpacity = active
         ? Math.min(buttonOpacity + 0.3, 1)
         : buttonOpacity
-      return {
-        ...baseStyle,
-        backgroundColor: applyAlphaToColor(
-          baseStyle.backgroundColor,
-          effectiveOpacity,
-        ),
-      }
+      const newBackgroundColor = applyAlphaToColor(
+        baseStyle.backgroundColor,
+        effectiveOpacity,
+      )
+      // applyAlphaToColor may return undefined for unsupported color formats
+      // Fall back to base style if alpha cannot be applied
+      return newBackgroundColor === undefined
+        ? baseStyle
+        : {
+            ...baseStyle,
+            backgroundColor: newBackgroundColor,
+          }
     },
     [getButtonStyle, buttonOpacity],
   )
