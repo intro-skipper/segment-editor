@@ -17,6 +17,12 @@ import {
 } from 'lucide-react'
 
 import { TrackSelector } from './TrackSelector'
+import {
+  ICON_CLASS,
+  applyAlphaToColor,
+  getButtonClass,
+  getIconStyle,
+} from './player-ui-constants'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrackState } from '@/services/video/tracks'
@@ -34,19 +40,14 @@ import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { SKIP_TIMES } = PLAYER_CONFIG
 
-/** Shared icon styling - extracted for consistency */
-const ICON_CLASS = 'size-5 sm:size-6' as const
-const getIconStyle = (color?: string): React.CSSProperties | undefined =>
-  color ? { color } : undefined
-
-/** Keyboard shortcut data - frozen for immutability */
-const SHORTCUTS = Object.freeze([
-  { label: 'Play/Pause', keys: ['Space'] },
-  { label: 'Skip back/forward', keys: ['A', 'D'] },
-  { label: 'Change skip time', keys: ['W', 'S'] },
-  { label: 'Set start time', keys: ['E'] },
-  { label: 'Set end time', keys: ['F'] },
-  { label: 'Toggle mute', keys: ['M'] },
+/** Keyboard shortcut keys - labels are localized in component */
+const SHORTCUT_KEYS = Object.freeze([
+  { labelKey: 'shortcuts.playPause', keys: ['Space'] },
+  { labelKey: 'shortcuts.skipBackForward', keys: ['A', 'D'] },
+  { labelKey: 'shortcuts.changeSkipTime', keys: ['W', 'S'] },
+  { labelKey: 'shortcuts.setStartTime', keys: ['E'] },
+  { labelKey: 'shortcuts.setEndTime', keys: ['F'] },
+  { labelKey: 'shortcuts.toggleMute', keys: ['M'] },
 ] as const)
 
 export interface PlayerControlsProps {
@@ -77,15 +78,15 @@ export interface PlayerControlsProps {
   isFullscreen?: boolean
   /** Callback to toggle fullscreen */
   onToggleFullscreen?: () => void
+  /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
+  buttonOpacity?: number
+  /** Current subtitle offset in seconds (positive = delay, negative = advance) */
+  subtitleOffset?: number
+  /** Callback when subtitle offset changes */
+  onSubtitleOffsetChange?: (offset: number) => void
+  /** Whether subtitles are currently active */
+  hasActiveSubtitle?: boolean
 }
-
-/** Shared button class for controls */
-const btnClass = (active: boolean, hasColors: boolean) =>
-  cn(
-    '!size-12 sm:!size-12 border-2 transition-all duration-200 ease-out',
-    active ? 'rounded-[30%] duration-300' : '',
-    !hasColors && (active ? 'border-primary' : 'border-border'),
-  )
 
 export const PlayerControls = memo(function PlayerControls({
   isPlaying,
@@ -108,8 +109,42 @@ export const PlayerControls = memo(function PlayerControls({
   strategy,
   isFullscreen,
   onToggleFullscreen,
+  buttonOpacity,
+  subtitleOffset = 0,
+  onSubtitleOffsetChange,
+  hasActiveSubtitle = false,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
+
+  // Wrap getButtonStyle to apply background opacity if provided
+  // Active buttons (like pause) get higher opacity for better visibility
+  const applyButtonStyle = useCallback(
+    (active?: boolean): React.CSSProperties | undefined => {
+      const baseStyle = getButtonStyle(active)
+      if (!baseStyle || buttonOpacity === undefined) return baseStyle
+      // Only apply alpha when a backgroundColor is present
+      if (!baseStyle.backgroundColor) {
+        return baseStyle
+      }
+      // Active state gets higher opacity (closer to 1)
+      const effectiveOpacity = active
+        ? Math.min(buttonOpacity + 0.3, 1)
+        : buttonOpacity
+      const newBackgroundColor = applyAlphaToColor(
+        baseStyle.backgroundColor,
+        effectiveOpacity,
+      )
+      // applyAlphaToColor may return undefined for unsupported color formats
+      // Fall back to base style if alpha cannot be applied
+      return newBackgroundColor === undefined
+        ? baseStyle
+        : {
+            ...baseStyle,
+            backgroundColor: newBackgroundColor,
+          }
+    },
+    [getButtonStyle, buttonOpacity],
+  )
 
   const handleVolumeSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,6 +152,18 @@ export const PlayerControls = memo(function PlayerControls({
     },
     [onVolumeChange],
   )
+
+  // Subtitle offset adjustment handlers
+  const handleSubtitleOffsetChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onSubtitleOffsetChange?.(parseFloat(e.target.value))
+    },
+    [onSubtitleOffsetChange],
+  )
+
+  const handleSubtitleOffsetReset = useCallback(() => {
+    onSubtitleOffsetChange?.(0)
+  }, [onSubtitleOffsetChange])
 
   return (
     <div
@@ -135,9 +182,9 @@ export const PlayerControls = memo(function PlayerControls({
               : t('accessibility.playPause', 'Play video')
           }
           aria-pressed={isPlaying}
-          style={getButtonStyle(isPlaying)}
+          style={applyButtonStyle(isPlaying)}
           className={cn(
-            btnClass(isPlaying, hasColors),
+            getButtonClass(isPlaying, hasColors),
             !isPlaying && 'rounded-full',
           )}
         >
@@ -170,8 +217,8 @@ export const PlayerControls = memo(function PlayerControls({
                     ? t('accessibility.player.muted', 'Volume muted')
                     : t('player.volume', 'Volume')
                 }
-                style={getButtonStyle()}
-                className={btnClass(false, hasColors)}
+                style={applyButtonStyle()}
+                className={getButtonClass(false, hasColors)}
               />
             }
           >
@@ -227,7 +274,7 @@ export const PlayerControls = memo(function PlayerControls({
             onSelectSubtitle={onSelectSubtitleTrack}
             strategy={strategy}
             disabled={isTrackSelectorDisabled}
-            getButtonStyle={getButtonStyle}
+            getButtonStyle={applyButtonStyle}
             iconColor={iconColor}
             hasColors={hasColors}
           />
@@ -240,8 +287,8 @@ export const PlayerControls = memo(function PlayerControls({
               <Button
                 variant="outline"
                 aria-label={t('editor.newSegment')}
-                style={getButtonStyle()}
-                className={btnClass(false, hasColors)}
+                style={applyButtonStyle()}
+                className={getButtonClass(false, hasColors)}
               />
             }
           >
@@ -277,8 +324,8 @@ export const PlayerControls = memo(function PlayerControls({
               ? t('player.exitFullscreen', 'Exit fullscreen')
               : t('player.fullscreen', 'Fullscreen')
           }
-          style={getButtonStyle()}
-          className={btnClass(false, hasColors)}
+          style={applyButtonStyle()}
+          className={getButtonClass(false, hasColors)}
         >
           {isFullscreen ? (
             <Minimize
@@ -305,8 +352,8 @@ export const PlayerControls = memo(function PlayerControls({
             <Button
               variant="outline"
               aria-label={t('accessibility.keyboardShortcuts')}
-              style={getButtonStyle()}
-              className={btnClass(false, hasColors)}
+              style={applyButtonStyle()}
+              className={getButtonClass(false, hasColors)}
             />
           }
         >
@@ -318,12 +365,13 @@ export const PlayerControls = memo(function PlayerControls({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="p-4 min-w-[280px]">
+          {/* Skip Duration */}
           <div className="mb-4 pb-4 border-b border-border">
             <p
               className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
               id="skip-duration-label"
             >
-              Skip Duration
+              {t('player.skipDuration', 'Skip Duration')}
             </p>
             <div
               className="flex flex-wrap gap-1.5"
@@ -342,21 +390,79 @@ export const PlayerControls = memo(function PlayerControls({
                   )}
                   role="radio"
                   aria-checked={idx === skipTimeIndex}
-                  aria-label={`Skip ${time} seconds`}
+                  aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', {
+                    time,
+                  })}
                 >
                   {time}s
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Subtitle Offset - only shown when subtitles are active */}
+          {hasActiveSubtitle && onSubtitleOffsetChange && (
+            <div className="mb-4 pb-4 border-b border-border">
+              <p
+                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
+                id="subtitle-offset-label"
+              >
+                {t('player.subtitleOffset', 'Subtitle Offset')}
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.1"
+                    value={subtitleOffset}
+                    onChange={handleSubtitleOffsetChange}
+                    aria-labelledby="subtitle-offset-label"
+                    aria-valuemin={-10}
+                    aria-valuemax={10}
+                    aria-valuenow={subtitleOffset}
+                    aria-valuetext={t(
+                      'player.subtitleOffsetValue',
+                      '{{offset}}s',
+                      { offset: subtitleOffset.toFixed(1) },
+                    )}
+                    className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
+                  />
+                  <span className="text-sm font-mono min-w-[6ch] text-right">
+                    {subtitleOffset > 0 ? '+' : ''}
+                    {subtitleOffset.toFixed(1)}s
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{t('player.subtitleEarlier', 'Earlier')}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSubtitleOffsetReset}
+                    className="h-6 px-2 text-xs"
+                    disabled={subtitleOffset === 0}
+                  >
+                    {t('player.subtitleReset', 'Reset')}
+                  </Button>
+                  <span>{t('player.subtitleLater', 'Later')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Keyboard Shortcuts */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-              Keyboard Shortcuts
+              {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
             </p>
             <div className="space-y-1.5 text-sm">
-              {SHORTCUTS.map(({ label, keys }) => (
-                <div key={label} className="flex justify-between items-center">
-                  <span className="text-muted-foreground">{label}</span>
+              {SHORTCUT_KEYS.map(({ labelKey, keys }) => (
+                <div
+                  key={labelKey}
+                  className="flex justify-between items-center"
+                >
+                  <span className="text-muted-foreground">{t(labelKey)}</span>
                   <span>
                     {keys.map((k) => (
                       <kbd

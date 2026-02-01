@@ -11,10 +11,11 @@
  * @module components/player/TrackSelector
  */
 
-import { memo, useCallback } from 'react'
+import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
+import { ICON_CLASS, getButtonClass, getIconStyle } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
 import { cn } from '@/lib/utils'
@@ -60,25 +61,6 @@ export interface TrackSelectorProps {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-/** Shared icon styling */
-const ICON_CLASS = 'size-5 sm:size-6' as const
-
-/** Helper to get icon style */
-const getIconStyle = (color?: string): React.CSSProperties | undefined =>
-  color ? { color } : undefined
-
-/** Shared button class for controls */
-const btnClass = (active: boolean, hasColors: boolean) =>
-  cn(
-    '!size-12 sm:!size-12 border-2 transition-all duration-200 ease-out',
-    active ? 'rounded-[30%] duration-300' : '',
-    !hasColors && (active ? 'border-primary' : 'border-border'),
-  )
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -117,32 +99,6 @@ export const TrackSelector = memo(function TrackSelector({
   const StrategyIcon = isDirect ? Zap : Monitor
 
   // ============================================================================
-  // Event Handlers
-  // ============================================================================
-
-  /**
-   * Handle audio track selection.
-   * Requirements: 1.4, 8.2
-   */
-  const handleAudioSelect = useCallback(
-    (index: number) => {
-      onSelectAudio(index)
-    },
-    [onSelectAudio],
-  )
-
-  /**
-   * Handle subtitle track selection.
-   * Requirements: 2.4, 2.5, 8.2
-   */
-  const handleSubtitleSelect = useCallback(
-    (index: number | null) => {
-      onSelectSubtitle(index)
-    },
-    [onSelectSubtitle],
-  )
-
-  // ============================================================================
   // Render
   // ============================================================================
 
@@ -158,7 +114,7 @@ export const TrackSelector = memo(function TrackSelector({
             )}
             disabled={disabled || !hasTracks}
             style={getButtonStyle?.()}
-            className={cn(btnClass(false, hasColors), className)}
+            className={cn(getButtonClass(false, hasColors), className)}
           />
         }
       >
@@ -224,7 +180,7 @@ export const TrackSelector = memo(function TrackSelector({
               return (
                 <DropdownMenuItem
                   key={`audio-${track.index}`}
-                  onClick={() => handleAudioSelect(track.index)}
+                  onClick={() => onSelectAudio(track.index)}
                   className={cn(
                     'flex items-center justify-between gap-2',
                     isActive && 'bg-accent',
@@ -257,7 +213,7 @@ export const TrackSelector = memo(function TrackSelector({
 
             {/* Off option */}
             <DropdownMenuItem
-              onClick={() => handleSubtitleSelect(null)}
+              onClick={() => onSelectSubtitle(null)}
               className={cn(
                 'flex items-center justify-between gap-2',
                 activeSubtitleIndex === null && 'bg-accent',
@@ -280,7 +236,7 @@ export const TrackSelector = memo(function TrackSelector({
               return (
                 <DropdownMenuItem
                   key={`subtitle-${track.index}`}
-                  onClick={() => handleSubtitleSelect(track.index)}
+                  onClick={() => onSelectSubtitle(track.index)}
                   className={cn(
                     'flex items-center justify-between gap-2',
                     isActive && 'bg-accent',

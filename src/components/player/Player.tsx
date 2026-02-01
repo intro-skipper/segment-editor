@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Expand, RefreshCw, Shrink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/shallow'
 
@@ -47,7 +47,12 @@ import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { extractTracks } from '@/services/video/tracks'
 
-const { SKIP_TIMES } = PLAYER_CONFIG
+const {
+  SKIP_TIMES,
+  CONTROLS_HIDE_DELAY_MS,
+  MOUSE_MOVE_THROTTLE_MS,
+  DOUBLE_TAP_THRESHOLD_MS,
+} = PLAYER_CONFIG
 
 const selectPlayerState = (state: SessionStore) => ({
   vibrantColors: state.vibrantColors,
@@ -77,6 +82,18 @@ function findPreferredAudioStreamIndex(
   )
 
   return matchingTrack?.index
+}
+
+/** Maps VideoPlayerErrorType to HlsPlayerError type */
+function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
+  switch (type) {
+    case 'media_error':
+      return 'media'
+    case 'network_error':
+      return 'network'
+    default:
+      return 'unknown'
+  }
 }
 
 export interface PlayerProps {
@@ -143,6 +160,22 @@ export function Player({
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
+  // Track controls visibility in fullscreen (auto-hide)
+  const [showFullscreenControls, setShowFullscreenControls] = useState(true)
+  const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  // Video fit mode: 'contain' shows entire video, 'cover' fills screen (may crop)
+  const [videoFitMode, setVideoFitMode] = useState<'contain' | 'cover'>(
+    'contain',
+  )
+  // Unified single/double click/tap detection (used for both mouse and touch)
+  const lastInteractionTimeRef = useRef(0)
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Throttle mouse move handler (only reset timer every 500ms)
+  const lastMouseMoveRef = useRef(0)
+  // Track rAF IDs for subtitle resize cleanup
+  const resizeRafRef = useRef<number | null>(null)
 
   useLayoutEffect(() => {
     currentTimeRef.current = currentTime
@@ -168,37 +201,19 @@ export function Player({
   )
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  // Helper to map VideoPlayerErrorType to HlsPlayerError type
-  const mapErrorType = useCallback(
-    (type: VideoPlayerErrorType): HlsPlayerError['type'] => {
-      switch (type) {
-        case 'media_error':
-          return 'media'
-        case 'network_error':
-          return 'network'
-        default:
-          return 'unknown'
-      }
-    },
-    [],
-  )
-
   // Video player error handler - memoized for stability
-  const handleVideoError = useCallback(
-    (error: VideoPlayerError | null) => {
-      if (error) {
-        const hlsError: HlsPlayerError = {
-          type: mapErrorType(error.type),
-          message: error.message,
-          recoverable: error.recoverable,
-        }
-        dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
-      } else {
-        dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+  const handleVideoError = useCallback((error: VideoPlayerError | null) => {
+    if (error) {
+      const hlsError: HlsPlayerError = {
+        type: mapVideoErrorType(error.type),
+        message: error.message,
+        recoverable: error.recoverable,
       }
-    },
-    [mapErrorType],
-  )
+      dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
+    } else {
+      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+    }
+  }, [])
 
   // Strategy change handler - shows notification on fallback
   const handleStrategyChange = useCallback(
@@ -281,16 +296,17 @@ export function Player({
   }, [trackState.activeSubtitleIndex, trackState.subtitleTracks])
 
   // Initialize JASSUB renderer for ASS/SSA subtitles
-  const { setUserOffset: setJassubUserOffset } = useJassubRenderer({
-    videoRef,
-    activeTrack: activeSubtitleTrack,
-    item,
-    transcodingOffsetTicks: 0, // TODO: Get from playback options when HLS transcoding offset is available
-    userOffset: subtitleOffset,
-    t,
-  })
+  const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
+    useJassubRenderer({
+      videoRef,
+      activeTrack: activeSubtitleTrack,
+      item,
+      transcodingOffsetTicks: 0, // TODO: Get from playback options when HLS transcoding offset is available
+      userOffset: subtitleOffset,
+      t,
+    })
 
-  // Handler for subtitle offset changes (ready for future UI integration)
+  // Handler for subtitle offset changes from UI controls
   const handleSubtitleOffsetChange = useCallback(
     (offset: number) => {
       dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
@@ -298,7 +314,6 @@ export function Player({
     },
     [setJassubUserOffset],
   )
-  void handleSubtitleOffsetChange
 
   // Sync video player error with reducer state
   useEffect(() => {
@@ -306,14 +321,14 @@ export function Player({
       dispatch({
         type: 'ERROR_STATE',
         error: {
-          type: mapErrorType(videoError.type),
+          type: mapVideoErrorType(videoError.type),
           message: videoError.message,
           recoverable: videoError.recoverable,
         },
         isRecovering: false,
       })
     }
-  }, [videoError, mapErrorType])
+  }, [videoError])
 
   // Handle external timestamp changes
   useEffect(() => {
@@ -499,17 +514,184 @@ export function Player({
     }
   }, [])
 
+  // Helper to clear the hide controls timer
+  const clearHideControlsTimer = useCallback(() => {
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current)
+      hideControlsTimeoutRef.current = null
+    }
+  }, [])
+
   // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      const isFs = !!document.fullscreenElement
+      setIsFullscreen(isFs)
+      // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
+      if (isFs) {
+        setShowFullscreenControls(true)
+        // Clear any existing timer before setting a new one
+        clearHideControlsTimer()
+        // Start auto-hide timer when entering fullscreen
+        hideControlsTimeoutRef.current = setTimeout(() => {
+          setShowFullscreenControls(false)
+        }, CONTROLS_HIDE_DELAY_MS)
+      } else {
+        setVideoFitMode('contain')
+        // Clear the hide timer to avoid it firing when not in fullscreen
+        clearHideControlsTimer()
+      }
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [])
+  }, [clearHideControlsTimer])
+
+  // Toggle video fit mode (contain <-> cover) and resize subtitles
+  const toggleVideoFitMode = useCallback(() => {
+    setVideoFitMode((prev) => {
+      const next = prev === 'contain' ? 'cover' : 'contain'
+
+      // Cancel any pending resize to avoid stale callbacks
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current)
+        resizeRafRef.current = null
+      }
+
+      // Schedule resize after browser paints new styles.
+      // Double rAF pattern: outer frame waits for style recalc,
+      // inner frame ensures layout is complete before measuring.
+      // We only track the outer frame ID - cancelling it prevents
+      // the inner frame from ever being scheduled.
+      resizeRafRef.current = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resizeRafRef.current = null
+          resizeJassub()
+        })
+      })
+
+      return next
+    })
+  }, [resizeJassub])
+
+  // Auto-hide controls in fullscreen after inactivity
+  const resetHideControlsTimer = useCallback(() => {
+    clearHideControlsTimer()
+    setShowFullscreenControls(true)
+    if (isFullscreen) {
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        setShowFullscreenControls(false)
+      }, CONTROLS_HIDE_DELAY_MS)
+    }
+  }, [isFullscreen, clearHideControlsTimer])
+
+  // Stable handler to stop event propagation (used in fullscreen OSD overlay)
+  const stopPropagation = useCallback(
+    (e: React.SyntheticEvent) => e.stopPropagation(),
+    [],
+  )
+
+  /**
+   * Handler for both mouse clicks and touch taps.
+   * Uses the same double-click/tap detection logic for consistency.
+   *
+   * Behavior:
+   * - Outside fullscreen: single tap/click toggles play, double tap/click toggles play
+   * - In fullscreen: single tap/click shows OSD, double tap/click toggles fit mode
+   */
+  const handleVideoInteraction = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      // For touch events, prevent the subsequent click event from firing
+      if ('changedTouches' in e) {
+        e.preventDefault()
+      } else {
+        // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
+        if (e.detail === 0) return
+      }
+
+      const now = Date.now()
+      const timeSinceLastInteraction = now - lastInteractionTimeRef.current
+      lastInteractionTimeRef.current = now
+
+      // Clear any pending single-tap/click action
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current)
+        singleTapTimerRef.current = null
+      }
+
+      if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
+        // Double-tap/click detected
+        if (isFullscreen) {
+          toggleVideoFitMode()
+          // Show controls/OSD after changing fit mode so user gets feedback
+          resetHideControlsTimer()
+        } else {
+          togglePlay()
+        }
+        // Set timestamp just before threshold window so the next tap
+        // won't be detected as another double-tap (prevents triple-tap)
+        lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
+      } else {
+        // Wait to see if this is a single tap/click or first of a double
+        singleTapTimerRef.current = setTimeout(() => {
+          singleTapTimerRef.current = null
+          if (isFullscreen) {
+            // In fullscreen: single tap/click shows controls
+            resetHideControlsTimer()
+          } else {
+            // Outside fullscreen: toggle play
+            togglePlay()
+          }
+        }, DOUBLE_TAP_THRESHOLD_MS)
+      }
+    },
+    [isFullscreen, toggleVideoFitMode, togglePlay, resetHideControlsTimer],
+  )
+
+  // Handle mouse movement in fullscreen to show/hide controls
+  // Throttled to avoid excessive timer resets during rapid mouse movement
+  const handleFullscreenMouseMove = useCallback(() => {
+    if (!isFullscreen) return
+
+    const now = Date.now()
+    // Only reset timer if controls are hidden OR enough time has passed (throttle)
+    if (
+      !showFullscreenControls ||
+      now - lastMouseMoveRef.current > MOUSE_MOVE_THROTTLE_MS
+    ) {
+      lastMouseMoveRef.current = now
+      resetHideControlsTimer()
+    }
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+
+  // Handle keyboard input in fullscreen to show controls (accessibility)
+  const handleFullscreenKeyDown = useCallback(() => {
+    if (isFullscreen && !showFullscreenControls) {
+      resetHideControlsTimer()
+    }
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+
+  // Handle mouse leave - don't immediately hide, let the timer handle it gracefully
+  const handleContainerMouseLeave = useCallback(() => {
+    if (isFullscreen && showFullscreenControls) {
+      resetHideControlsTimer()
+    }
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      clearHideControlsTimer()
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current)
+      }
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current)
+      }
+    }
+  }, [clearHideControlsTimer])
 
   // Handler for skip time changes from controls
   const handleSkipTimeChange = useCallback((index: number) => {
@@ -562,17 +744,100 @@ export function Player({
   const hasAnyTracks =
     trackState.audioTracks.length > 0 || trackState.subtitleTracks.length > 0
 
+  // Memoized props for PlayerControls to avoid duplication
+  const playerControlsProps = useMemo(
+    () => ({
+      isPlaying,
+      isMuted,
+      volume,
+      skipTimeIndex,
+      vibrantColors,
+      hasColors,
+      iconColor,
+      getButtonStyle,
+      onTogglePlay: togglePlay,
+      onToggleMute: toggleMute,
+      onVolumeChange: handleVolumeChange,
+      onCreateSegment: handleCreateSegment,
+      onSkipTimeChange: handleSkipTimeChange,
+      trackState,
+      onSelectAudioTrack: handleAudioTrackSelect,
+      onSelectSubtitleTrack: handleSubtitleTrackSelect,
+      isTrackSelectorDisabled: !hasAnyTracks || isTrackLoading,
+      strategy,
+      isFullscreen,
+      onToggleFullscreen: toggleFullscreen,
+      buttonOpacity: isFullscreen ? 0.3 : undefined,
+      subtitleOffset,
+      onSubtitleOffsetChange: handleSubtitleOffsetChange,
+      hasActiveSubtitle: activeSubtitleTrack !== null,
+    }),
+    [
+      isPlaying,
+      isMuted,
+      volume,
+      skipTimeIndex,
+      vibrantColors,
+      hasColors,
+      iconColor,
+      getButtonStyle,
+      togglePlay,
+      toggleMute,
+      handleVolumeChange,
+      handleCreateSegment,
+      handleSkipTimeChange,
+      trackState,
+      handleAudioTrackSelect,
+      handleSubtitleTrackSelect,
+      hasAnyTracks,
+      isTrackLoading,
+      strategy,
+      isFullscreen,
+      toggleFullscreen,
+      subtitleOffset,
+      handleSubtitleOffsetChange,
+      activeSubtitleTrack,
+    ],
+  )
+
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      {/* Video container */}
-      <div ref={containerRef} className="relative">
+      {/* Fullscreen container - wraps everything */}
+      <div
+        ref={containerRef}
+        className={cn(
+          'relative',
+          isFullscreen && 'fixed inset-0 z-50 bg-black outline-none',
+        )}
+        onMouseMove={handleFullscreenMouseMove}
+        onMouseLeave={handleContainerMouseLeave}
+        onKeyDown={handleFullscreenKeyDown}
+        tabIndex={isFullscreen ? 0 : -1}
+      >
+        {/* Video container */}
         <div
-          className="relative cursor-pointer aspect-video"
-          onClick={togglePlay}
+          className={cn(
+            'relative',
+            isFullscreen
+              ? cn(
+                  'w-full h-full',
+                  showFullscreenControls ? 'cursor-default' : 'cursor-none',
+                )
+              : 'aspect-video cursor-pointer',
+          )}
+          onClick={handleVideoInteraction}
+          onTouchEnd={handleVideoInteraction}
         >
           <video
             ref={videoRef}
-            className="w-full h-full object-contain"
+            className={cn(
+              'w-full h-full',
+              isFullscreen
+                ? videoFitMode === 'contain'
+                  ? 'object-contain'
+                  : 'object-cover'
+                : 'object-contain',
+            )}
             poster={posterUrl}
             crossOrigin="anonymous"
             playsInline
@@ -611,24 +876,8 @@ export function Player({
             </div>
           )}
 
-          {/* Loading indicator */}
-          {isVideoLoading && (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/60"
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-            >
-              <RefreshCw
-                className="size-8 text-white animate-spin"
-                aria-hidden="true"
-              />
-              <span className="sr-only">{t('accessibility.loading')}</span>
-            </div>
-          )}
-
-          {/* Recovery indicator */}
-          {isRecovering && (
+          {/* Loading/Recovery indicator */}
+          {(isVideoLoading || isRecovering) && (
             <div
               className="absolute inset-0 flex items-center justify-center bg-black/60"
               role="status"
@@ -640,46 +889,92 @@ export function Player({
                 aria-hidden="true"
               />
               <span className="sr-only">
-                {t('player.recovering', 'Recovering playback')}
+                {isRecovering
+                  ? t('player.recovering', 'Recovering playback')
+                  : t('accessibility.loading')}
               </span>
             </div>
           )}
         </div>
+
+        {/* Fullscreen OSD/Controls overlay */}
+        {isFullscreen && (
+          <div
+            className={cn(
+              'absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
+              showFullscreenControls
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none',
+            )}
+            aria-hidden={!showFullscreenControls}
+            // Prevent keyboard focus on hidden controls - inert removes from tab order and accessibility tree
+            inert={!showFullscreenControls || undefined}
+            onClick={stopPropagation}
+            onTouchEnd={stopPropagation}
+          >
+            <div className="max-w-[90%] mx-auto">
+              {/* Fit mode toggle hint */}
+              <div className="flex justify-end mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleVideoFitMode}
+                  className="text-white/70 hover:text-white hover:bg-white/10 text-xs gap-1.5"
+                  aria-label={
+                    videoFitMode === 'contain'
+                      ? t('player.fillScreen', 'Fill screen')
+                      : t('player.fitScreen', 'Fit to screen')
+                  }
+                >
+                  {videoFitMode === 'contain' ? (
+                    <>
+                      <Expand className="size-4" />
+                      {t('player.fill', 'Fill')}
+                    </>
+                  ) : (
+                    <>
+                      <Shrink className="size-4" />
+                      {t('player.fit', 'Fit')}
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <PlayerScrubber
+                currentTime={currentTime}
+                duration={duration}
+                buffered={buffered}
+                chapters={item.Chapters}
+                segments={segments}
+                onSeek={handleSeek}
+                itemId={item.Id}
+                trickplay={item.Trickplay}
+                className="mb-4"
+              />
+
+              <PlayerControls {...playerControlsProps} />
+            </div>
+          </div>
+        )}
       </div>
 
-      <PlayerScrubber
-        currentTime={currentTime}
-        duration={duration}
-        buffered={buffered}
-        chapters={item.Chapters}
-        segments={segments}
-        onSeek={handleSeek}
-        itemId={item.Id}
-        trickplay={item.Trickplay}
-      />
+      {/* Normal mode controls (outside fullscreen container) */}
+      {!isFullscreen && (
+        <>
+          <PlayerScrubber
+            currentTime={currentTime}
+            duration={duration}
+            buffered={buffered}
+            chapters={item.Chapters}
+            segments={segments}
+            onSeek={handleSeek}
+            itemId={item.Id}
+            trickplay={item.Trickplay}
+          />
 
-      <PlayerControls
-        isPlaying={isPlaying}
-        isMuted={isMuted}
-        volume={volume}
-        skipTimeIndex={skipTimeIndex}
-        vibrantColors={vibrantColors}
-        hasColors={hasColors}
-        iconColor={iconColor}
-        getButtonStyle={getButtonStyle}
-        onTogglePlay={togglePlay}
-        onToggleMute={toggleMute}
-        onVolumeChange={handleVolumeChange}
-        onCreateSegment={handleCreateSegment}
-        onSkipTimeChange={handleSkipTimeChange}
-        trackState={trackState}
-        onSelectAudioTrack={handleAudioTrackSelect}
-        onSelectSubtitleTrack={handleSubtitleTrackSelect}
-        isTrackSelectorDisabled={!hasAnyTracks || isTrackLoading}
-        strategy={strategy}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreen}
-      />
+          <PlayerControls {...playerControlsProps} />
+        </>
+      )}
     </div>
   )
 }

@@ -193,6 +193,10 @@
     "unmute": "Unmute",
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Exit fullscreen",
+    "fill": "Fill",
+    "fit": "Fit",
+    "fillScreen": "Fill screen",
+    "fitScreen": "Fit to screen",
     "retry": "Retry",
     "selectEpisode": "Select episode",
     "controls": "Video player controls",
@@ -246,7 +250,23 @@
         "trackNotFound": "Track not found",
         "switchFailed": "Failed to switch track"
       }
-    }
+    },
+    "skipDuration": "Skip Duration",
+    "skipSeconds": "Skip {{time}} seconds",
+    "subtitleOffset": "Subtitle Offset",
+    "subtitleOffsetValue": "{{offset}}s",
+    "subtitleEarlier": "Earlier",
+    "subtitleLater": "Later",
+    "subtitleReset": "Reset",
+    "keyboardShortcuts": "Keyboard Shortcuts"
+  },
+  "shortcuts": {
+    "playPause": "Play/Pause",
+    "skipBackForward": "Skip back/forward",
+    "changeSkipTime": "Change skip time",
+    "setStartTime": "Set start time",
+    "setEndTime": "Set end time",
+    "toggleMute": "Toggle mute"
   },
   "series": {
     "unknownSeries": "Unknown Series",

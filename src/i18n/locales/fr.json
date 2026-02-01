@@ -126,6 +126,12 @@
     "volumeSlider": "Curseur de volume",
     "mute": "Muet",
     "unmute": "Activer le son",
+    "fullscreen": "Plein écran",
+    "exitFullscreen": "Quitter le plein écran",
+    "fill": "Remplir",
+    "fit": "Ajuster",
+    "fillScreen": "Remplir l'écran",
+    "fitScreen": "Ajuster à l'écran",
     "retry": "Réessayer",
     "selectEpisode": "Sélectionner un épisode",
     "directPlay": "Lecture directe",
@@ -173,7 +179,23 @@
         "trackNotFound": "Piste non trouvée",
         "switchFailed": "Échec du changement de piste"
       }
-    }
+    },
+    "skipDuration": "Durée du saut",
+    "skipSeconds": "Sauter {{time}} secondes",
+    "subtitleOffset": "Décalage des sous-titres",
+    "subtitleOffsetValue": "{{offset}}s",
+    "subtitleEarlier": "Plus tôt",
+    "subtitleLater": "Plus tard",
+    "subtitleReset": "Réinitialiser",
+    "keyboardShortcuts": "Raccourcis clavier"
+  },
+  "shortcuts": {
+    "playPause": "Lecture/Pause",
+    "skipBackForward": "Reculer/Avancer",
+    "changeSkipTime": "Modifier le temps de saut",
+    "setStartTime": "Définir le temps de début",
+    "setEndTime": "Définir le temps de fin",
+    "toggleMute": "Activer/Désactiver le son"
   },
   "series": {
     "unknownSeries": "Série inconnue",

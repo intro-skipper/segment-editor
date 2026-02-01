@@ -37,6 +37,12 @@ export const PLAYER_CONFIG = {
   RESIZE_DEBOUNCE_MS: 100,
   /** Video metadata wait timeout in milliseconds */
   VIDEO_METADATA_TIMEOUT_MS: 15_000,
+  /** Fullscreen controls auto-hide delay in milliseconds */
+  CONTROLS_HIDE_DELAY_MS: 3000,
+  /** Mouse move throttle interval in milliseconds */
+  MOUSE_MOVE_THROTTLE_MS: 500,
+  /** Double-tap detection threshold in milliseconds */
+  DOUBLE_TAP_THRESHOLD_MS: 300,
 } as const
 
 /**

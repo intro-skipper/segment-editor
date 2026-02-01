@@ -73,7 +73,7 @@ const selectVibrantColors = (s: SessionStore): VibrantColors | null =>
 const selectServerAddress = (s: { serverAddress: string }) => s.serverAddress
 const selectApiKey = (s: { apiKey: string | undefined }) => s.apiKey
 
-export function PlayerScrubber({
+export const PlayerScrubber = React.memo(function PlayerScrubber({
   currentTime,
   duration,
   buffered = 0,
@@ -421,4 +421,4 @@ export function PlayerScrubber({
       </span>
     </div>
   )
-}
+})

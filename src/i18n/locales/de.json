@@ -193,6 +193,10 @@
     "unmute": "Ton an",
     "fullscreen": "Vollbild",
     "exitFullscreen": "Vollbild verlassen",
+    "fill": "Füllen",
+    "fit": "Einpassen",
+    "fillScreen": "Bildschirm füllen",
+    "fitScreen": "An Bildschirm anpassen",
     "retry": "Erneut versuchen",
     "selectEpisode": "Episode auswählen",
     "controls": "Steuerung des Videoplayers",
@@ -246,7 +250,23 @@
         "trackNotFound": "Spur nicht gefunden",
         "switchFailed": "Spurwechsel fehlgeschlagen"
       }
-    }
+    },
+    "skipDuration": "Sprungdauer",
+    "skipSeconds": "{{time}} Sekunden überspringen",
+    "subtitleOffset": "Untertitel-Versatz",
+    "subtitleOffsetValue": "{{offset}}s",
+    "subtitleEarlier": "Früher",
+    "subtitleLater": "Später",
+    "subtitleReset": "Zurücksetzen",
+    "keyboardShortcuts": "Tastaturkürzel"
+  },
+  "shortcuts": {
+    "playPause": "Abspielen/Pause",
+    "skipBackForward": "Vor-/Zurückspringen",
+    "changeSkipTime": "Sprungzeit ändern",
+    "setStartTime": "Startzeit setzen",
+    "setEndTime": "Endzeit setzen",
+    "toggleMute": "Stumm umschalten"
   },
   "series": {
     "unknownSeries": "Unbekannte Serie",
