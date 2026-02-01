@@ -618,6 +618,8 @@ export function Player({
         // Double-tap/click detected
         if (isFullscreen) {
           toggleVideoFitMode()
+          // Show controls/OSD after changing fit mode so user gets feedback
+          resetHideControlsTimer()
         } else {
           togglePlay()
         }
