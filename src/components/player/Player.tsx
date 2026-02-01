@@ -510,6 +510,14 @@ export function Player({
     }
   }, [])
 
+  // Helper to clear the hide controls timer
+  const clearHideControlsTimer = useCallback(() => {
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current)
+      hideControlsTimeoutRef.current = null
+    }
+  }, [])
+
   // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -519,9 +527,7 @@ export function Player({
       if (isFs) {
         setShowFullscreenControls(true)
         // Clear any existing timer before setting a new one
-        if (hideControlsTimeoutRef.current) {
-          clearTimeout(hideControlsTimeoutRef.current)
-        }
+        clearHideControlsTimer()
         // Start auto-hide timer when entering fullscreen
         hideControlsTimeoutRef.current = setTimeout(() => {
           setShowFullscreenControls(false)
@@ -529,10 +535,7 @@ export function Player({
       } else {
         setVideoFitMode('contain')
         // Clear the hide timer to avoid it firing when not in fullscreen
-        if (hideControlsTimeoutRef.current) {
-          clearTimeout(hideControlsTimeoutRef.current)
-          hideControlsTimeoutRef.current = null
-        }
+        clearHideControlsTimer()
       }
     }
 
@@ -540,7 +543,7 @@ export function Player({
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [])
+  }, [clearHideControlsTimer])
 
   // Toggle video fit mode (contain <-> cover) and resize subtitles
   const toggleVideoFitMode = useCallback(() => {
@@ -564,16 +567,20 @@ export function Player({
 
   // Auto-hide controls in fullscreen after inactivity
   const resetHideControlsTimer = useCallback(() => {
-    if (hideControlsTimeoutRef.current) {
-      clearTimeout(hideControlsTimeoutRef.current)
-    }
+    clearHideControlsTimer()
     setShowFullscreenControls(true)
     if (isFullscreen) {
       hideControlsTimeoutRef.current = setTimeout(() => {
         setShowFullscreenControls(false)
       }, CONTROLS_HIDE_DELAY_MS)
     }
-  }, [isFullscreen])
+  }, [isFullscreen, clearHideControlsTimer])
+
+  // Stable handler to stop event propagation (used in fullscreen OSD overlay)
+  const stopPropagation = useCallback(
+    (e: React.SyntheticEvent) => e.stopPropagation(),
+    [],
+  )
 
   /**
    * Handler for both mouse clicks and touch taps.
@@ -610,7 +617,8 @@ export function Player({
         } else {
           togglePlay()
         }
-        // Reset to prevent triple-tap/click while maintaining correct timing
+        // Set timestamp just before threshold window so the next tap
+        // won't be detected as another double-tap (prevents triple-tap)
         lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
       } else {
         // Wait to see if this is a single tap/click or first of a double
@@ -662,9 +670,7 @@ export function Player({
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (hideControlsTimeoutRef.current) {
-        clearTimeout(hideControlsTimeoutRef.current)
-      }
+      clearHideControlsTimer()
       if (singleTapTimerRef.current) {
         clearTimeout(singleTapTimerRef.current)
       }
@@ -672,7 +678,7 @@ export function Player({
         cancelAnimationFrame(resizeRafRef.current)
       }
     }
-  }, [])
+  }, [clearHideControlsTimer])
 
   // Handler for skip time changes from controls
   const handleSkipTimeChange = useCallback((index: number) => {
@@ -890,8 +896,8 @@ export function Player({
                 ? 'opacity-100'
                 : 'opacity-0 pointer-events-none',
             )}
-            onClick={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
+            onClick={stopPropagation}
+            onTouchEnd={stopPropagation}
           >
             <div className="max-w-[90%] mx-auto">
               {/* Fit mode toggle hint */}
