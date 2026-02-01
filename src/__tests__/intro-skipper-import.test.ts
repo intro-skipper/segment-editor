@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import type { MediaSegmentDto } from '@/types/jellyfin'
 import {
   introSkipperClipboardTextToSegments,
-  segmentsToIntroSkipperPayload,
   segmentsToIntroSkipperClipboardText,
+  segmentsToIntroSkipperPayload,
 } from '@/services/plugins/intro-skipper'
-import type { MediaSegmentDto } from '@/types/jellyfin'
 
 describe('Intro Skipper clipboard import', () => {
   it('converts events JSON into segments', () => {
@@ -218,31 +218,66 @@ describe('Intro Skipper clipboard import', () => {
       },
     ] satisfies Array<MediaSegmentDto>
 
-    const payload = segmentsToIntroSkipperPayload(segments)
-    expect(payload).toHaveLength(3)
+    const result = segmentsToIntroSkipperPayload(segments)
+    expect(result.payload).toHaveLength(3)
+    expect(result.excludedCount).toBe(1)
+    expect(result.excludedTypes).toContain('Preview')
 
-    expect(payload[0]).toMatchObject({
+    expect(result.payload[0]).toMatchObject({
       eventType: 'Recap',
       startTimeMs: 7000,
       endTimeMs: 120000,
     })
 
-    expect(payload[1]).toMatchObject({
+    expect(result.payload[1]).toMatchObject({
       eventType: 'Intro',
       startTimeMs: 121000,
       endTimeMs: 174000,
     })
 
     // Outro omits endTimeMs (assumed to run until end)
-    expect(payload[2]).toMatchObject({
+    expect(result.payload[2]).toMatchObject({
       eventType: 'Outro',
       startTimeMs: 3673000,
     })
-    expect('endTimeMs' in payload[2]!).toBe(false)
+    const outro = result.payload[2]
+    expect('endTimeMs' in outro).toBe(false)
 
     // Clipboard text should be parseable JSON
-    const text = segmentsToIntroSkipperClipboardText(segments)
-    const reparsed = JSON.parse(text) as Array<unknown>
+    const clipboardResult = segmentsToIntroSkipperClipboardText(segments)
+    const reparsed = JSON.parse(clipboardResult.text)
     expect(Array.isArray(reparsed)).toBe(true)
+    expect(clipboardResult.excludedCount).toBe(1)
+  })
+
+  it('tracks unknown event types during import', () => {
+    const text = JSON.stringify({
+      events: [
+        {
+          startTimeMs: 7000,
+          endTimeMs: 120000,
+          eventType: 'SKIP_INTRO',
+        },
+        {
+          startTimeMs: 3673000,
+          eventType: 'NEXT_UP',
+        },
+        {
+          startTimeMs: 5000000,
+          eventType: 'CUSTOM_EVENT',
+        },
+      ],
+    })
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.segments).toHaveLength(1)
+    expect(result.skipped).toBe(2)
+    expect(result.unknownTypes).toContain('NEXT_UP')
+    expect(result.unknownTypes).toContain('CUSTOM_EVENT')
+    expect(result.unknownTypes).toHaveLength(2)
   })
 })

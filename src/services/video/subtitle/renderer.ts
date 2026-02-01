@@ -122,7 +122,7 @@ export async function createJassubRenderer(
     subUrl,
     fonts,
     timeOffset,
-    useLocalFonts: true,
+    queryFonts: 'localandremote',
     debug: import.meta.env.DEV,
   })
 

@@ -176,7 +176,7 @@ export function useTrackManager({
    * Track the previous item to detect changes and reset indices.
    * Using "adjusting state during render" pattern instead of useEffect.
    */
-  const [prevItem, setPrevItem] = useState(item)
+  const [prevItem, setPrevItem] = useState<BaseItemDto | null>(null)
 
   if (item !== prevItem) {
     setPrevItem(item)

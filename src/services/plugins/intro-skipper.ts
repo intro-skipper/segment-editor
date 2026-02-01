@@ -10,12 +10,13 @@
  */
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import { generateUUID, sortSegmentsByStart, validateSegment } from '@/lib/segment-utils'
+import {
+  generateUUID,
+  sortSegmentsByStart,
+  validateSegment,
+} from '@/lib/segment-utils'
 
-type IntroSkipperEventType =
-  | 'SKIP_INTRO'
-  | 'SKIP_RECAP'
-  | 'END_CREDITS'
+type IntroSkipperEventType = 'SKIP_INTRO' | 'SKIP_RECAP' | 'END_CREDITS'
 
 type IntroSkipperExportEventType = 'Intro' | 'Recap' | 'Outro'
 
@@ -57,7 +58,10 @@ interface IntroSkipperExportEvent {
 
 type IntroSkipperExportPayload = Array<IntroSkipperExportEvent>
 
-const EVENT_TYPE_TO_SEGMENT_TYPE: Record<IntroSkipperEventType, MediaSegmentType> = {
+const EVENT_TYPE_TO_SEGMENT_TYPE: Record<
+  IntroSkipperEventType,
+  MediaSegmentType
+> = {
   SKIP_INTRO: 'Intro',
   SKIP_RECAP: 'Recap',
   END_CREDITS: 'Outro',
@@ -117,7 +121,11 @@ const getEventSegmentType = (eventType: unknown): MediaSegmentType | null => {
   if (normalized === 'RECAP') return 'Recap'
   if (normalized === 'OUTRO') return 'Outro'
 
-  return EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType] ?? null
+  if (normalized in EVENT_TYPE_TO_SEGMENT_TYPE) {
+    return EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType]
+  }
+
+  return null
 }
 
 const looksLikeSingleEventObject = (value: unknown): boolean => {
@@ -136,7 +144,7 @@ const findNestedEventsArray = (
   if (!isRecord(value)) return null
 
   const direct = (value as IntroSkipperPayload).events
-  if (Array.isArray(direct)) return direct as Array<IntroSkipperEvent>
+  if (Array.isArray(direct)) return direct
 
   for (const child of Object.values(value)) {
     if (Array.isArray(child)) {
@@ -175,15 +183,27 @@ export function introSkipperClipboardTextToSegments(
 ): {
   segments: Array<MediaSegmentDto>
   skipped: number
+  unknownTypes: Array<string>
   error?: string
 } {
-  if (!text.trim()) return { segments: [], skipped: 0, error: 'Clipboard is empty' }
+  if (!text.trim())
+    return {
+      segments: [],
+      skipped: 0,
+      unknownTypes: [],
+      error: 'Clipboard is empty',
+    }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch {
-    return { segments: [], skipped: 0, error: 'Clipboard is not valid JSON' }
+    return {
+      segments: [],
+      skipped: 0,
+      unknownTypes: [],
+      error: 'Clipboard is not valid JSON',
+    }
   }
 
   // Alternative format: seconds-based markers object
@@ -242,7 +262,9 @@ export function introSkipperClipboardTextToSegments(
       return {
         segments: segments.sort(sortSegmentsByStart),
         skipped,
-        error: segments.length === 0 ? 'No importable markers found' : undefined,
+        unknownTypes: [],
+        error:
+          segments.length === 0 ? 'No importable markers found' : undefined,
       }
     }
   }
@@ -252,20 +274,22 @@ export function introSkipperClipboardTextToSegments(
     ? (parsed as Array<IntroSkipperEvent>)
     : isRecord(parsed)
       ? (findNestedEventsArray(parsed) ??
-          (looksLikeSingleEventObject(parsed)
-            ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
-            : null))
+        (looksLikeSingleEventObject(parsed)
+          ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
+          : null))
       : null
 
   if (!events) {
     return {
       segments: [],
       skipped: 0,
+      unknownTypes: [],
       error: 'Clipboard JSON has no events',
     }
   }
 
   const segments: Array<MediaSegmentDto> = []
+  const unknownTypes: Array<string> = []
   let skipped = 0
 
   for (const event of events) {
@@ -275,7 +299,19 @@ export function introSkipperClipboardTextToSegments(
       maxDurationSeconds: options.maxDurationSeconds,
     })
 
-    if (!type || !timing) {
+    if (!type) {
+      skipped += 1
+      // Track unknown event types for user feedback
+      if (typeof event.eventType === 'string' && event.eventType.trim()) {
+        const normalizedType = event.eventType.trim()
+        if (!unknownTypes.includes(normalizedType)) {
+          unknownTypes.push(normalizedType)
+        }
+      }
+      continue
+    }
+
+    if (!timing) {
       skipped += 1
       continue
     }
@@ -300,6 +336,7 @@ export function introSkipperClipboardTextToSegments(
   return {
     segments: segments.sort(sortSegmentsByStart),
     skipped,
+    unknownTypes,
     error: segments.length === 0 ? 'No importable events found' : undefined,
   }
 }
@@ -313,25 +350,43 @@ const toExportEventTypeForSegment = (
   return null
 }
 
+interface IntroSkipperExportResult {
+  payload: IntroSkipperExportPayload
+  excludedTypes: Array<MediaSegmentType>
+  excludedCount: number
+}
+
 /**
  * Converts current UI segments into an Intro Skipper JSON payload.
  *
  * - Only exports: Intro, Recap, Outro
  * - Ignores: Preview, Commercial, Unknown
  * - END_CREDITS omits endTimeMs (it is assumed to run to the end)
+ *
+ * Returns the payload along with information about excluded segments.
  */
 export function segmentsToIntroSkipperPayload(
   segments: Array<MediaSegmentDto>,
-): IntroSkipperExportPayload {
+): IntroSkipperExportResult {
   const sorted = [...segments].sort(sortSegmentsByStart)
   const events: Array<IntroSkipperExportEvent> = []
+  const excludedTypes: Array<MediaSegmentType> = []
+  let excludedCount = 0
 
   for (const segment of sorted) {
     const eventType = toExportEventTypeForSegment(segment.Type)
-    if (!eventType) continue
+    if (!eventType) {
+      excludedCount += 1
+      if (segment.Type && !excludedTypes.includes(segment.Type)) {
+        excludedTypes.push(segment.Type)
+      }
+      continue
+    }
 
-    const startSeconds = typeof segment.StartTicks === 'number' ? segment.StartTicks : 0
-    const endSeconds = typeof segment.EndTicks === 'number' ? segment.EndTicks : 0
+    const startSeconds =
+      typeof segment.StartTicks === 'number' ? segment.StartTicks : 0
+    const endSeconds =
+      typeof segment.EndTicks === 'number' ? segment.EndTicks : 0
 
     const startTimeMs = secondsToMs(startSeconds)
 
@@ -351,16 +406,32 @@ export function segmentsToIntroSkipperPayload(
     })
   }
 
-  return events
+  return {
+    payload: events,
+    excludedTypes,
+    excludedCount,
+  }
+}
+
+interface IntroSkipperClipboardResult {
+  text: string
+  excludedTypes: Array<MediaSegmentType>
+  excludedCount: number
 }
 
 /**
  * Creates clipboard-ready JSON text for Intro Skipper.
  * Uses tab indentation to match typical clipboard snippets.
+ *
+ * Returns the JSON text along with information about excluded segments.
  */
 export function segmentsToIntroSkipperClipboardText(
   segments: Array<MediaSegmentDto>,
-): string {
-  const payload = segmentsToIntroSkipperPayload(segments)
-  return JSON.stringify(payload, null, '\t')
+): IntroSkipperClipboardResult {
+  const result = segmentsToIntroSkipperPayload(segments)
+  return {
+    text: JSON.stringify(result.payload, null, '\t'),
+    excludedTypes: result.excludedTypes,
+    excludedCount: result.excludedCount,
+  }
 }
