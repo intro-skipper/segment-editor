@@ -179,7 +179,23 @@
         "trackNotFound": "Piste non trouvée",
         "switchFailed": "Échec du changement de piste"
       }
-    }
+    },
+    "skipDuration": "Durée du saut",
+    "skipSeconds": "Sauter {{time}} secondes",
+    "subtitleOffset": "Décalage des sous-titres",
+    "subtitleOffsetValue": "{{offset}}s",
+    "subtitleEarlier": "Plus tôt",
+    "subtitleLater": "Plus tard",
+    "subtitleReset": "Réinitialiser",
+    "keyboardShortcuts": "Raccourcis clavier"
+  },
+  "shortcuts": {
+    "playPause": "Lecture/Pause",
+    "skipBackForward": "Reculer/Avancer",
+    "changeSkipTime": "Modifier le temps de saut",
+    "setStartTime": "Définir le temps de début",
+    "setEndTime": "Définir le temps de fin",
+    "toggleMute": "Activer/Désactiver le son"
   },
   "series": {
     "unknownSeries": "Série inconnue",

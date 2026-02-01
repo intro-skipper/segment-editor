@@ -306,16 +306,14 @@ export function Player({
       t,
     })
 
-  // Handler for subtitle offset changes (ready for future UI integration)
-  const _handleSubtitleOffsetChange = useCallback(
+  // Handler for subtitle offset changes from UI controls
+  const handleSubtitleOffsetChange = useCallback(
     (offset: number) => {
       dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
       setJassubUserOffset(offset)
     },
     [setJassubUserOffset],
   )
-  // Expose for future UI controls (e.g., subtitle sync adjustment)
-  void _handleSubtitleOffsetChange
 
   // Sync video player error with reducer state
   useEffect(() => {
@@ -761,6 +759,9 @@ export function Player({
       isFullscreen,
       onToggleFullscreen: toggleFullscreen,
       buttonOpacity: isFullscreen ? 0.3 : undefined,
+      subtitleOffset,
+      onSubtitleOffsetChange: handleSubtitleOffsetChange,
+      hasActiveSubtitle: activeSubtitleTrack !== null,
     }),
     [
       isPlaying,
@@ -784,6 +785,9 @@ export function Player({
       strategy,
       isFullscreen,
       toggleFullscreen,
+      subtitleOffset,
+      handleSubtitleOffsetChange,
+      activeSubtitleTrack,
     ],
   )
 
@@ -858,24 +862,8 @@ export function Player({
             </div>
           )}
 
-          {/* Loading indicator */}
-          {isVideoLoading && (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/60"
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-            >
-              <RefreshCw
-                className="size-8 text-white animate-spin"
-                aria-hidden="true"
-              />
-              <span className="sr-only">{t('accessibility.loading')}</span>
-            </div>
-          )}
-
-          {/* Recovery indicator */}
-          {isRecovering && (
+          {/* Loading/Recovery indicator */}
+          {(isVideoLoading || isRecovering) && (
             <div
               className="absolute inset-0 flex items-center justify-center bg-black/60"
               role="status"
@@ -887,7 +875,9 @@ export function Player({
                 aria-hidden="true"
               />
               <span className="sr-only">
-                {t('player.recovering', 'Recovering playback')}
+                {isRecovering
+                  ? t('player.recovering', 'Recovering playback')
+                  : t('accessibility.loading')}
               </span>
             </div>
           )}
@@ -938,7 +928,11 @@ export function Player({
                 currentTime={currentTime}
                 duration={duration}
                 buffered={buffered}
+                chapters={item.Chapters}
+                segments={segments}
                 onSeek={handleSeek}
+                itemId={item.Id}
+                trickplay={item.Trickplay}
                 className="mb-4"
               />
 

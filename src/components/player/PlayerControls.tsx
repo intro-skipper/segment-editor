@@ -40,14 +40,14 @@ import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { SKIP_TIMES } = PLAYER_CONFIG
 
-/** Keyboard shortcut data - frozen for immutability */
-const SHORTCUTS = Object.freeze([
-  { label: 'Play/Pause', keys: ['Space'] },
-  { label: 'Skip back/forward', keys: ['A', 'D'] },
-  { label: 'Change skip time', keys: ['W', 'S'] },
-  { label: 'Set start time', keys: ['E'] },
-  { label: 'Set end time', keys: ['F'] },
-  { label: 'Toggle mute', keys: ['M'] },
+/** Keyboard shortcut keys - labels are localized in component */
+const SHORTCUT_KEYS = Object.freeze([
+  { labelKey: 'shortcuts.playPause', keys: ['Space'] },
+  { labelKey: 'shortcuts.skipBackForward', keys: ['A', 'D'] },
+  { labelKey: 'shortcuts.changeSkipTime', keys: ['W', 'S'] },
+  { labelKey: 'shortcuts.setStartTime', keys: ['E'] },
+  { labelKey: 'shortcuts.setEndTime', keys: ['F'] },
+  { labelKey: 'shortcuts.toggleMute', keys: ['M'] },
 ] as const)
 
 export interface PlayerControlsProps {
@@ -80,6 +80,12 @@ export interface PlayerControlsProps {
   onToggleFullscreen?: () => void
   /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
   buttonOpacity?: number
+  /** Current subtitle offset in seconds (positive = delay, negative = advance) */
+  subtitleOffset?: number
+  /** Callback when subtitle offset changes */
+  onSubtitleOffsetChange?: (offset: number) => void
+  /** Whether subtitles are currently active */
+  hasActiveSubtitle?: boolean
 }
 
 export const PlayerControls = memo(function PlayerControls({
@@ -104,6 +110,9 @@ export const PlayerControls = memo(function PlayerControls({
   isFullscreen,
   onToggleFullscreen,
   buttonOpacity,
+  subtitleOffset = 0,
+  onSubtitleOffsetChange,
+  hasActiveSubtitle = false,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
 
@@ -143,6 +152,18 @@ export const PlayerControls = memo(function PlayerControls({
     },
     [onVolumeChange],
   )
+
+  // Subtitle offset adjustment handlers
+  const handleSubtitleOffsetChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onSubtitleOffsetChange?.(parseFloat(e.target.value))
+    },
+    [onSubtitleOffsetChange],
+  )
+
+  const handleSubtitleOffsetReset = useCallback(() => {
+    onSubtitleOffsetChange?.(0)
+  }, [onSubtitleOffsetChange])
 
   return (
     <div
@@ -344,12 +365,13 @@ export const PlayerControls = memo(function PlayerControls({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="p-4 min-w-[280px]">
+          {/* Skip Duration */}
           <div className="mb-4 pb-4 border-b border-border">
             <p
               className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
               id="skip-duration-label"
             >
-              Skip Duration
+              {t('player.skipDuration', 'Skip Duration')}
             </p>
             <div
               className="flex flex-wrap gap-1.5"
@@ -368,21 +390,71 @@ export const PlayerControls = memo(function PlayerControls({
                   )}
                   role="radio"
                   aria-checked={idx === skipTimeIndex}
-                  aria-label={`Skip ${time} seconds`}
+                  aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', { time })}
                 >
                   {time}s
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Subtitle Offset - only shown when subtitles are active */}
+          {hasActiveSubtitle && onSubtitleOffsetChange && (
+            <div className="mb-4 pb-4 border-b border-border">
+              <p
+                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
+                id="subtitle-offset-label"
+              >
+                {t('player.subtitleOffset', 'Subtitle Offset')}
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.1"
+                    value={subtitleOffset}
+                    onChange={handleSubtitleOffsetChange}
+                    aria-labelledby="subtitle-offset-label"
+                    aria-valuemin={-10}
+                    aria-valuemax={10}
+                    aria-valuenow={subtitleOffset}
+                    aria-valuetext={t('player.subtitleOffsetValue', '{{offset}}s', { offset: subtitleOffset.toFixed(1) })}
+                    className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
+                  />
+                  <span className="text-sm font-mono min-w-[4ch] text-right">
+                    {subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{t('player.subtitleEarlier', 'Earlier')}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSubtitleOffsetReset}
+                    className="h-6 px-2 text-xs"
+                    disabled={subtitleOffset === 0}
+                  >
+                    {t('player.subtitleReset', 'Reset')}
+                  </Button>
+                  <span>{t('player.subtitleLater', 'Later')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Keyboard Shortcuts */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-              Keyboard Shortcuts
+              {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
             </p>
             <div className="space-y-1.5 text-sm">
-              {SHORTCUTS.map(({ label, keys }) => (
-                <div key={label} className="flex justify-between items-center">
-                  <span className="text-muted-foreground">{label}</span>
+              {SHORTCUT_KEYS.map(({ labelKey, keys }) => (
+                <div key={labelKey} className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    {t(labelKey)}
+                  </span>
                   <span>
                     {keys.map((k) => (
                       <kbd
