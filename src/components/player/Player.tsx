@@ -593,7 +593,7 @@ export function Player({
   const handleVideoInteraction = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       // For touch events, prevent the subsequent click event from firing
-      if ('touches' in e) {
+      if ('changedTouches' in e) {
         e.preventDefault()
       } else {
         // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
