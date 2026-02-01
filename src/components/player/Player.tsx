@@ -518,6 +518,10 @@ export function Player({
       // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
       if (isFs) {
         setShowFullscreenControls(true)
+        // Clear any existing timer before setting a new one
+        if (hideControlsTimeoutRef.current) {
+          clearTimeout(hideControlsTimeoutRef.current)
+        }
         // Start auto-hide timer when entering fullscreen
         hideControlsTimeoutRef.current = setTimeout(() => {
           setShowFullscreenControls(false)
@@ -586,7 +590,7 @@ export function Player({
         e.preventDefault()
       } else {
         // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
-        if ((e).detail === 0) return
+        if (e.detail === 0) return
       }
 
       const now = Date.now()
@@ -606,8 +610,8 @@ export function Player({
         } else {
           togglePlay()
         }
-        // Reset to prevent triple-tap/click triggering
-        lastInteractionTimeRef.current = 0
+        // Reset to prevent triple-tap/click while maintaining correct timing
+        lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
       } else {
         // Wait to see if this is a single tap/click or first of a double
         singleTapTimerRef.current = setTimeout(() => {
@@ -887,6 +891,7 @@ export function Player({
                 : 'opacity-0 pointer-events-none',
             )}
             onClick={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
           >
             <div className="max-w-[90%] mx-auto">
               {/* Fit mode toggle hint */}
