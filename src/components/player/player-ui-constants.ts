@@ -42,16 +42,12 @@ export const applyAlphaToColor = (
   if (color.startsWith('#')) {
     const hex = color.slice(1)
     // Validate hex format: only 3 or 6 hex digits
-    if (!/^[0-9a-fA-F]{3}$/.test(hex) && !/^[0-9a-fA-F]{6}$/.test(hex)) {
+    if (!/^[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/.test(hex)) {
       return undefined
     }
     const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16)
     const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16)
     const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16)
-    // Check for NaN values from malformed hex
-    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-      return undefined
-    }
     return `rgba(${r}, ${g}, ${b}, ${alpha})`
   }
   // For named colors or other formats, use color-mix (modern browsers)
