@@ -2,45 +2,118 @@
  * PlayerScrubber component.
  * Timeline scrubber for video playback with seek functionality.
  * Supports mouse, touch, and keyboard interactions.
+ * Includes trickplay preview thumbnails on hover.
  */
 
 import * as React from 'react'
 
+import type { ChapterInfo } from '@jellyfin/sdk/lib/generated-client/models'
+
+import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { SessionStore } from '@/stores/session-store'
+import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import { cn } from '@/lib/utils'
-import { formatTime } from '@/lib/time-utils'
+import { formatTime, ticksToSeconds } from '@/lib/time-utils'
 import { useSessionStore } from '@/stores/session-store'
 import { handleRangeKeyboard } from '@/lib/keyboard-utils'
+import { DEFAULT_SEGMENT_COLOR, SEGMENT_COLORS } from '@/lib/constants'
+import {
+  getBestTrickplayInfo,
+  getTrickplayPosition,
+} from '@/lib/trickplay-utils'
+import { useApiStore } from '@/stores/api-store'
 
 /** Step sizes for scrubber keyboard navigation */
 const SCRUBBER_STEP_FINE = 5
 const SCRUBBER_STEP_COARSE = 10
 
+/** Trickplay thumbnail preview component */
+function TrickplayPreview({ position }: { position: TrickplayPosition }) {
+  return (
+    <div
+      className="rounded overflow-hidden shadow-lg mb-1 bg-black"
+      style={{
+        width: position.thumbnailWidth,
+        height: position.thumbnailHeight,
+      }}
+    >
+      <div
+        style={{
+          width: position.thumbnailWidth,
+          height: position.thumbnailHeight,
+          backgroundImage: `url(${position.tileUrl})`,
+          backgroundPosition: `-${position.offsetX}px -${position.offsetY}px`,
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+    </div>
+  )
+}
+
 export interface PlayerScrubberProps {
   currentTime: number
   duration: number
   buffered?: number
+  chapters?: Array<ChapterInfo> | null
+  segments?: Array<MediaSegmentDto>
   onSeek: (time: number) => void
   className?: string
+  /** Item ID for trickplay URL construction */
+  itemId?: string
+  /** Trickplay data from BaseItemDto.Trickplay */
+  trickplay?: TrickplayData | null
 }
 
 // Stable selector to prevent re-renders - returns primitive reference
 const selectVibrantColors = (s: SessionStore): VibrantColors | null =>
   s.vibrantColors
 
+// Stable selectors for API store
+const selectServerAddress = (s: { serverAddress: string }) => s.serverAddress
+const selectApiKey = (s: { apiKey: string | undefined }) => s.apiKey
+
 export function PlayerScrubber({
   currentTime,
   duration,
   buffered = 0,
+  chapters,
+  segments,
   onSeek,
   className,
+  itemId,
+  trickplay,
 }: PlayerScrubberProps) {
   const vibrantColors = useSessionStore(selectVibrantColors)
+  const serverAddress = useApiStore(selectServerAddress)
+  const apiKey = useApiStore(selectApiKey)
   const scrubberRef = React.useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
   const [hoverTime, setHoverTime] = React.useState<number | null>(null)
   const [hoverPosition, setHoverPosition] = React.useState(0)
+  const [hoveredChapter, setHoveredChapter] = React.useState<{
+    name: string
+    position: number
+  } | null>(null)
+
+  // Get best trickplay info
+  const trickplayInfo = React.useMemo(
+    () => getBestTrickplayInfo(trickplay),
+    [trickplay],
+  )
+
+  // Calculate trickplay position for hover time
+  const trickplayPosition = React.useMemo(() => {
+    if (!trickplayInfo || !itemId || hoverTime === null) return null
+    return getTrickplayPosition(
+      hoverTime,
+      trickplayInfo.info,
+      itemId,
+      trickplayInfo.mediaSourceId,
+      serverAddress,
+      apiKey ?? undefined,
+    )
+  }, [trickplayInfo, itemId, hoverTime, serverAddress, apiKey])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
   const bufferedProgress = duration > 0 ? (buffered / duration) * 100 : 0
@@ -151,6 +224,50 @@ export function PlayerScrubber({
     [hoverPosition],
   )
 
+  // Memoize chapter markers with position percentages
+  const chapterMarkers = React.useMemo(() => {
+    if (!chapters || chapters.length === 0 || duration <= 0) return []
+
+    return chapters
+      .map((chapter) => {
+        const positionSeconds = ticksToSeconds(chapter.StartPositionTicks)
+        const percentage = (positionSeconds / duration) * 100
+        return {
+          name: chapter.Name || '',
+          position: percentage,
+          time: positionSeconds,
+        }
+      })
+      .filter((marker) => marker.position >= 0 && marker.position <= 100)
+  }, [chapters, duration])
+
+  // Memoize segment regions with position and width percentages
+  // Note: editingSegments store StartTicks/EndTicks in SECONDS (not Jellyfin ticks)
+  // because the SegmentSlider works with seconds for the UI
+  const segmentRegions = React.useMemo(() => {
+    if (!segments || segments.length === 0 || duration <= 0) return []
+
+    return segments
+      .map((segment) => {
+        // StartTicks/EndTicks are already in seconds for editing segments
+        const startSeconds = segment.StartTicks ?? 0
+        const endSeconds = segment.EndTicks ?? 0
+        const startPercent = (startSeconds / duration) * 100
+        const endPercent = (endSeconds / duration) * 100
+        const colorConfig = segment.Type
+          ? SEGMENT_COLORS[segment.Type]
+          : DEFAULT_SEGMENT_COLOR
+        return {
+          id: segment.Id,
+          type: segment.Type,
+          start: Math.max(0, startPercent),
+          width: Math.min(100 - startPercent, endPercent - startPercent),
+          color: colorConfig.css,
+        }
+      })
+      .filter((region) => region.width > 0.1) // Only show segments wider than 0.1%
+  }, [segments, duration])
+
   return (
     <div className={cn('flex items-center gap-3', className)}>
       <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)]">
@@ -186,6 +303,21 @@ export function PlayerScrubber({
             className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full"
             style={bufferedStyle}
           />
+
+          {/* Segment regions */}
+          {segmentRegions.map((region) => (
+            <div
+              key={region.id}
+              className="absolute inset-y-0 opacity-70"
+              style={{
+                left: `${region.start}%`,
+                width: `${region.width}%`,
+                backgroundColor: region.color,
+              }}
+              title={region.type}
+            />
+          ))}
+
           <div
             className={cn(
               'absolute inset-y-0 left-0 rounded-full',
@@ -194,6 +326,43 @@ export function PlayerScrubber({
             style={progressStyle}
           />
         </div>
+
+        {/* Chapter markers */}
+        {chapterMarkers.map((marker, index) => (
+          <div
+            key={`chapter-${index}-${marker.position}`}
+            className="absolute top-1/2 w-1 h-3 rounded-sm bg-white/80 shadow-sm pointer-events-auto cursor-pointer transition-all hover:h-4 hover:bg-white z-10"
+            style={{
+              left: `${marker.position}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+            onPointerEnter={() =>
+              setHoveredChapter({
+                name: marker.name,
+                position: marker.position,
+              })
+            }
+            onPointerLeave={() => setHoveredChapter(null)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSeek(marker.time)
+            }}
+            title={marker.name || `Chapter ${index + 1}`}
+          />
+        ))}
+
+        {/* Chapter tooltip */}
+        {hoveredChapter && (
+          <div
+            className="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-20"
+            style={{
+              left: `${hoveredChapter.position}%`,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {hoveredChapter.name}
+          </div>
+        )}
 
         <div
           className={cn(
@@ -213,10 +382,17 @@ export function PlayerScrubber({
 
         {hoverTime !== null && (
           <div
-            className="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none"
+            className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none z-30"
             style={hoverIndicatorStyle}
           >
-            {formatTime(hoverTime)}
+            {/* Trickplay thumbnail preview */}
+            {trickplayPosition && (
+              <TrickplayPreview position={trickplayPosition} />
+            )}
+            {/* Time label */}
+            <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+              {formatTime(hoverTime)}
+            </div>
           </div>
         )}
       </div>
