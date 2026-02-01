@@ -28,7 +28,7 @@ export interface TrickplayPosition {
 
 /**
  * Gets the best available trickplay info for an item.
- * Prefers smaller widths for faster loading, returns the first media source.
+ * Prefers a width around 320px for a good quality/size balance (or the largest available width if none are ≥ 320), and returns the first media source.
  */
 export function getBestTrickplayInfo(
   trickplay: TrickplayData | null | undefined,

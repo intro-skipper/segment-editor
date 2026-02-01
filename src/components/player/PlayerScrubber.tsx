@@ -111,7 +111,7 @@ export function PlayerScrubber({
       itemId,
       trickplayInfo.mediaSourceId,
       serverAddress,
-      apiKey ?? undefined,
+      apiKey,
     )
   }, [trickplayInfo, itemId, hoverTime, serverAddress, apiKey])
 
@@ -263,9 +263,15 @@ export function PlayerScrubber({
           start: Math.max(0, startPercent),
           width: Math.min(100 - startPercent, endPercent - startPercent),
           color: colorConfig.css,
+          startPercent,
         }
       })
-      .filter((region) => region.width > 0.1) // Only show segments wider than 0.1%
+      .filter(
+        (region) =>
+          region.width > 0.1 && // Only show segments wider than 0.1%
+          region.startPercent < 100 && // Filter out segments starting beyond 100%
+          region.start < 100, // Filter out segments entirely outside valid range
+      )
   }, [segments, duration])
 
   return (
@@ -336,16 +342,27 @@ export function PlayerScrubber({
               left: `${marker.position}%`,
               transform: 'translate(-50%, -50%)',
             }}
-            onPointerEnter={() =>
+            role="button"
+            tabIndex={0}
+            aria-label={marker.name || `Chapter ${index + 1}`}
+            onPointerEnter={() => {
               setHoveredChapter({
                 name: marker.name,
                 position: marker.position,
               })
-            }
+              setHoverTime(null)
+            }}
             onPointerLeave={() => setHoveredChapter(null)}
             onClick={(e) => {
               e.stopPropagation()
               onSeek(marker.time)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                onSeek(marker.time)
+              }
             }}
             title={marker.name || `Chapter ${index + 1}`}
           />
