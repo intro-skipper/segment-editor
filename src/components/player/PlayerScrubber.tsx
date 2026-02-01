@@ -259,14 +259,17 @@ export function PlayerScrubber({
         const endSeconds = segment.EndTicks ?? 0
         const startPercent = (startSeconds / duration) * 100
         const endPercent = (endSeconds / duration) * 100
+        const clampedStart = Math.max(0, startPercent)
+        const clampedEnd = Math.min(100, endPercent)
+        const width = Math.max(0, clampedEnd - clampedStart)
         const colorConfig = segment.Type
           ? SEGMENT_COLORS[segment.Type]
           : DEFAULT_SEGMENT_COLOR
         return {
           id: segment.Id,
           type: segment.Type,
-          start: Math.max(0, startPercent),
-          width: Math.min(100 - startPercent, endPercent - startPercent),
+          start: clampedStart,
+          width,
           color: colorConfig.css,
         }
       })
