@@ -25,6 +25,7 @@ export interface SegmentUpdate {
 }
 
 /**
+/**
  * Data for updating a segment's timestamp from the player.
  */
 export interface TimestampUpdate {
@@ -32,6 +33,8 @@ export interface TimestampUpdate {
   currentTime: number
   /** Whether to update the start (true) or end (false) timestamp */
   start: boolean
+  /** Optional index of the segment to update (defaults to active segment) */
+  index?: number
 }
 
 /**

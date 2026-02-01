@@ -1,7 +1,7 @@
 /** TanStack Query hooks for fetching Jellyfin media items. */
 
 import { useCallback, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createQueryKey } from './query-error-handling'
 import { createStandardQueryOptions } from './create-query-hook'
 import type { CacheDuration } from './create-query-hook'
@@ -106,6 +106,8 @@ export function useItems({
       operation: 'Fetch items',
     }),
     select,
+    // Keep showing previous data during transitions to prevent flicker
+    placeholderData: keepPreviousData,
   })
 }
 

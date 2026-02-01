@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, GripVertical, Play, Trash2 } from 'lucide-react'
+import { Copy, Crosshair, GripVertical, Play, Trash2 } from 'lucide-react'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { SessionStore } from '@/stores/session-store'
@@ -16,12 +16,19 @@ import {
   getSegmentCssVar,
   validateSegment,
 } from '@/lib/segment-utils'
+import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
 import { useSessionStore } from '@/stores/session-store'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { SEGMENT_CONFIG } from '@/lib/constants'
 import {
   handleEndHandleKeyboard,
@@ -50,6 +57,12 @@ export interface SegmentSliderProps {
   onPlayerTimestamp: (timestamp: number) => void
   /** Callback to set this segment as active */
   onSetActive: (index: number) => void
+  /** Callback to set this segment's start time from current player position */
+  onSetStartFromPlayer?: (index: number) => void
+  /** Callback to set this segment's end time from current player position */
+  onSetEndFromPlayer?: (index: number) => void
+  /** Callback to copy all segments to system clipboard as JSON */
+  onCopyAllAsJson?: () => void
 }
 
 /**
@@ -57,7 +70,6 @@ export interface SegmentSliderProps {
  * Displays a segment with dual-handle range slider and numeric inputs.
  */
 // Stable selectors to prevent re-renders - defined outside component
-const selectSaveToClipboard = (state: SessionStore) => state.saveToClipboard
 const selectVibrantColors = (state: SessionStore) => state.vibrantColors
 
 export const SegmentSlider = React.memo(function SegmentSlider({
@@ -69,10 +81,12 @@ export const SegmentSlider = React.memo(function SegmentSlider({
   onDelete,
   onPlayerTimestamp,
   onSetActive,
+  onSetStartFromPlayer,
+  onSetEndFromPlayer,
+  onCopyAllAsJson,
 }: SegmentSliderProps) {
   const { t } = useTranslation()
   // Use individual selectors instead of useShallow to avoid object creation
-  const saveToClipboard = useSessionStore(selectSaveToClipboard)
   const vibrantColors = useSessionStore(selectVibrantColors)
   const sliderRef = React.useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
@@ -80,6 +94,7 @@ export const SegmentSlider = React.memo(function SegmentSlider({
   )
   const [localStart, setLocalStart] = React.useState(segment.StartTicks ?? 0)
   const [localEnd, setLocalEnd] = React.useState(segment.EndTicks ?? 0)
+  const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
 
   const localStartRef = React.useRef(localStart)
   const localEndRef = React.useRef(localEnd)
@@ -251,13 +266,29 @@ export const SegmentSlider = React.memo(function SegmentSlider({
     }
   }, [segment.Id, localStart, localEnd, validation.valid, onUpdate])
 
-  const handleCopy = React.useCallback(() => {
-    saveToClipboard(segment)
-    showNotification({
-      type: 'positive',
-      message: t('editor.segmentCopiedToClipboard'),
-    })
-  }, [segment, saveToClipboard, t])
+  // Copy segment to system clipboard as JSON
+  const handleCopy = React.useCallback(async () => {
+    setCopyMenuOpen(false)
+    try {
+      const result = segmentsToIntroSkipperClipboardText([segment])
+      await navigator.clipboard.writeText(result.text)
+      showNotification({
+        type: 'positive',
+        message: t('editor.segmentCopiedToClipboard'),
+      })
+    } catch {
+      showNotification({
+        type: 'negative',
+        message: t('editor.copyFailed', 'Clipboard access denied'),
+      })
+    }
+  }, [segment, t])
+
+  // Copy all segments to system clipboard as JSON
+  const handleCopyAllAsJson = React.useCallback(() => {
+    setCopyMenuOpen(false)
+    onCopyAllAsJson?.()
+  }, [onCopyAllAsJson])
 
   const handleDelete = React.useCallback(
     () => onDelete(index),
@@ -270,6 +301,16 @@ export const SegmentSlider = React.memo(function SegmentSlider({
   const handleSeekEnd = React.useCallback(
     () => onPlayerTimestamp(localEnd),
     [localEnd, onPlayerTimestamp],
+  )
+
+  // Set timestamp from current player position
+  const handleSetStartFromPlayer = React.useCallback(
+    () => onSetStartFromPlayer?.(index),
+    [index, onSetStartFromPlayer],
+  )
+  const handleSetEndFromPlayer = React.useCallback(
+    () => onSetEndFromPlayer?.(index),
+    [index, onSetEndFromPlayer],
   )
 
   const handleHandleBlur = React.useCallback(() => {
@@ -381,7 +422,7 @@ export const SegmentSlider = React.memo(function SegmentSlider({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <GripVertical
-            className="size-4 text-muted-foreground/50 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
+            className="size-4 text-muted-foreground/50 cursor-grab hidden sm:block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             aria-hidden="true"
           />
           <Badge
@@ -397,17 +438,32 @@ export const SegmentSlider = React.memo(function SegmentSlider({
             {formatTime(duration)}
           </span>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleCopy}
-            aria-label={t('accessibility.copySegment')}
-            title={t('editor.segmentCopiedToClipboard')}
-            className="hover:bg-primary/10"
-          >
-            <Copy className="size-4" aria-hidden="true" style={iconStyle} />
-          </Button>
+        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          {/* Copy dropdown menu */}
+          <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('accessibility.copySegment')}
+                  className="hover:bg-primary/10"
+                />
+              }
+            >
+              <Copy className="size-4" aria-hidden="true" style={iconStyle} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleCopy}>
+                {t('editor.copy', 'Copy')}
+              </DropdownMenuItem>
+              {onCopyAllAsJson && (
+                <DropdownMenuItem onClick={handleCopyAllAsJson}>
+                  {t('editor.copyAll', 'Copy all')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -511,6 +567,22 @@ export const SegmentSlider = React.memo(function SegmentSlider({
           >
             <Play className="size-3" aria-hidden="true" style={iconStyle} />
           </Button>
+          {onSetStartFromPlayer && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleSetStartFromPlayer}
+              aria-label={t('editor.setStartTime', 'Set start from player')}
+              title={`${t('editor.setStartTime', 'Set start from player')} (E)`}
+              className="shrink-0 hover:bg-primary/10"
+            >
+              <Crosshair
+                className="size-3"
+                aria-hidden="true"
+                style={iconStyle}
+              />
+            </Button>
+          )}
           <label
             htmlFor={`segment-${segment.Id}-start`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0"
@@ -549,6 +621,22 @@ export const SegmentSlider = React.memo(function SegmentSlider({
           >
             <Play className="size-3" aria-hidden="true" style={iconStyle} />
           </Button>
+          {onSetEndFromPlayer && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleSetEndFromPlayer}
+              aria-label={t('editor.setEndTime', 'Set end from player')}
+              title={`${t('editor.setEndTime', 'Set end from player')} (F)`}
+              className="shrink-0 hover:bg-primary/10"
+            >
+              <Crosshair
+                className="size-3"
+                aria-hidden="true"
+                style={iconStyle}
+              />
+            </Button>
+          )}
           <label
             htmlFor={`segment-${segment.Id}-end`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0"

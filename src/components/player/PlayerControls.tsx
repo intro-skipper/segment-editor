@@ -6,8 +6,6 @@
 import { memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeftFromLine,
-  ArrowRightFromLine,
   Maximize,
   Minimize,
   MoreVertical,
@@ -64,8 +62,6 @@ export interface PlayerControlsProps {
   onToggleMute: () => void
   onVolumeChange: (volume: number) => void
   onCreateSegment: (type: MediaSegmentType) => void
-  onPushStartTimestamp: () => void
-  onPushEndTimestamp: () => void
   onSkipTimeChange: (index: number) => void
   /** Track state for audio/subtitle selection */
   trackState?: TrackState
@@ -104,8 +100,6 @@ export const PlayerControls = memo(function PlayerControls({
   onToggleMute,
   onVolumeChange,
   onCreateSegment,
-  onPushStartTimestamp,
-  onPushEndTimestamp,
   onSkipTimeChange,
   trackState,
   onSelectAudioTrack,
@@ -225,6 +219,20 @@ export const PlayerControls = memo(function PlayerControls({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Track selector for audio and subtitles */}
+        {trackState && onSelectAudioTrack && onSelectSubtitleTrack && (
+          <TrackSelector
+            trackState={trackState}
+            onSelectAudio={onSelectAudioTrack}
+            onSelectSubtitle={onSelectSubtitleTrack}
+            strategy={strategy}
+            disabled={isTrackSelectorDisabled}
+            getButtonStyle={getButtonStyle}
+            iconColor={iconColor}
+            hasColors={hasColors}
+          />
+        )}
+
         {/* Create segment */}
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -255,52 +263,6 @@ export const PlayerControls = memo(function PlayerControls({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Timestamp buttons */}
-        <Button
-          variant="outline"
-          onClick={onPushStartTimestamp}
-          aria-label={t('accessibility.seekToStart')}
-          title={`${t('accessibility.seekToStart')} (E)`}
-          style={getButtonStyle()}
-          className={btnClass(false, hasColors)}
-        >
-          <ArrowRightFromLine
-            className={ICON_CLASS}
-            strokeWidth={3}
-            aria-hidden="true"
-            style={getIconStyle(iconColor)}
-          />
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onPushEndTimestamp}
-          aria-label={t('accessibility.seekToEnd')}
-          title={`${t('accessibility.seekToEnd')} (F)`}
-          style={getButtonStyle()}
-          className={btnClass(false, hasColors)}
-        >
-          <ArrowLeftFromLine
-            className={ICON_CLASS}
-            strokeWidth={3}
-            aria-hidden="true"
-            style={getIconStyle(iconColor)}
-          />
-        </Button>
-
-        {/* Track selector for audio and subtitles */}
-        {trackState && onSelectAudioTrack && onSelectSubtitleTrack && (
-          <TrackSelector
-            trackState={trackState}
-            onSelectAudio={onSelectAudioTrack}
-            onSelectSubtitle={onSelectSubtitleTrack}
-            strategy={strategy}
-            disabled={isTrackSelectorDisabled}
-            getButtonStyle={getButtonStyle}
-            iconColor={iconColor}
-            hasColors={hasColors}
-          />
-        )}
       </div>
 
       <div className="flex-1" />

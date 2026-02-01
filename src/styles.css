@@ -259,12 +259,160 @@ body {
   }
 }
 
+/* ============================================================================
+ * View Transitions - Native API for smooth page navigation
+ * Uses typed transitions for different navigation patterns:
+ * - forward: drilling down (library -> series -> episode -> player)
+ * - back: navigating up
+ * - instant: no animation (for rapid state changes)
+ * ============================================================================ */
+
+/* Default crossfade transition */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 ::view-transition-old(root) {
-  animation: page-fade-out 80ms ease-out;
+  animation-name: vt-fade-out;
 }
 
 ::view-transition-new(root) {
-  animation: page-fade-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation-name: vt-fade-in;
+}
+
+@keyframes vt-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Forward navigation - zoom in + fade (drilling down into content) */
+@keyframes vt-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes vt-zoom-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+:root:active-view-transition-type(forward) {
+  &::view-transition-old(root) {
+    animation-name: vt-zoom-out;
+    animation-duration: 150ms;
+  }
+
+  &::view-transition-new(root) {
+    animation-name: vt-zoom-in;
+    animation-duration: 200ms;
+  }
+}
+
+/* Back navigation - zoom out + fade (returning to parent) */
+@keyframes vt-shrink-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes vt-shrink-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+:root:active-view-transition-type(back) {
+  &::view-transition-old(root) {
+    animation-name: vt-shrink-out;
+    animation-duration: 150ms;
+  }
+
+  &::view-transition-new(root) {
+    animation-name: vt-shrink-in;
+    animation-duration: 200ms;
+  }
+}
+
+/* Player transition - expand from center */
+@keyframes vt-expand-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes vt-expand-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+:root:active-view-transition-type(to-player) {
+  &::view-transition-old(root) {
+    animation-name: vt-expand-out;
+    animation-duration: 180ms;
+  }
+
+  &::view-transition-new(root) {
+    animation-name: vt-expand-in;
+    animation-duration: 250ms;
+  }
+}
+
+/* Instant transition - no animation (for hash-only or rapid changes) */
+:root:active-view-transition-type(instant) {
+  &::view-transition-old(root),
+  &::view-transition-new(root) {
+    animation: none;
+  }
 }
 
 /* Enhanced focus ring with softer glow */

@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 
 export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
@@ -8,7 +7,6 @@ export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
 export interface SessionState {
   settingsOpen: boolean
-  clipboardSegment: MediaSegmentDto | null
   selectedCollectionId: string | null
   pageSize: PageSize
   searchExpanded: boolean
@@ -21,8 +19,6 @@ export interface SessionState {
 export interface SessionActions {
   toggleSettings: () => void
   setSettingsOpen: (open: boolean) => void
-  saveToClipboard: (segment: MediaSegmentDto) => void
-  clearClipboard: () => void
   setSelectedCollectionId: (id: string | null) => void
   setPageSize: (size: PageSize) => void
   toggleSearch: () => void
@@ -37,7 +33,6 @@ export type SessionStore = SessionState & SessionActions
 
 const initialState: SessionState = {
   settingsOpen: false,
-  clipboardSegment: null,
   selectedCollectionId: null,
   pageSize: 24,
   searchExpanded: false,
@@ -56,8 +51,6 @@ export const useSessionStore = create<SessionStore>()(
       ...initialState,
       toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
-      saveToClipboard: (clipboardSegment) => set({ clipboardSegment }),
-      clearClipboard: () => set({ clipboardSegment: null }),
       setSelectedCollectionId: (selectedCollectionId) =>
         set({ selectedCollectionId }),
       setPageSize: (pageSize) => set({ pageSize }),

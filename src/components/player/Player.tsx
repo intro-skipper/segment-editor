@@ -81,6 +81,8 @@ export interface PlayerProps {
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   className?: string
+  /** Ref callback to expose getCurrentTime function to parent */
+  getCurrentTimeRef?: React.MutableRefObject<(() => number) | null>
 }
 
 /**
@@ -93,6 +95,7 @@ export function Player({
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
+  getCurrentTimeRef,
 }: PlayerProps) {
   const { t } = useTranslation()
 
@@ -139,6 +142,18 @@ export function Player({
     currentTimeRef.current = currentTime
     durationRef.current = duration
   }, [currentTime, duration])
+
+  // Expose getCurrentTime function to parent component
+  useLayoutEffect(() => {
+    if (getCurrentTimeRef) {
+      getCurrentTimeRef.current = () => currentTimeRef.current
+    }
+    return () => {
+      if (getCurrentTimeRef) {
+        getCurrentTimeRef.current = null
+      }
+    }
+  }, [getCurrentTimeRef])
 
   // Memoized poster URL - use blob URL to bypass COEP restrictions
   const rawPosterUrl = useMemo(
@@ -646,8 +661,6 @@ export function Player({
         onToggleMute={toggleMute}
         onVolumeChange={handleVolumeChange}
         onCreateSegment={handleCreateSegment}
-        onPushStartTimestamp={pushStartTimestamp}
-        onPushEndTimestamp={pushEndTimestamp}
         onSkipTimeChange={handleSkipTimeChange}
         trackState={trackState}
         onSelectAudioTrack={handleAudioTrackSelect}
