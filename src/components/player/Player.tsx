@@ -817,8 +817,13 @@ export function Player({
         {/* Video container */}
         <div
           className={cn(
-            'relative cursor-pointer',
-            isFullscreen ? 'w-full h-full' : 'aspect-video',
+            'relative',
+            isFullscreen
+              ? cn(
+                  'w-full h-full',
+                  showFullscreenControls ? 'cursor-default' : 'cursor-none',
+                )
+              : 'aspect-video cursor-pointer',
           )}
           onClick={handleVideoInteraction}
           onTouchEnd={handleVideoInteraction}
