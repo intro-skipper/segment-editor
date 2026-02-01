@@ -41,8 +41,8 @@ export const applyAlphaToColor = (
   // If it's a hex color, convert to rgba
   if (color.startsWith('#')) {
     const hex = color.slice(1)
-    // Validate hex format: 3, 6, or 8 hex digits (8 = RRGGBBAA)
-    if (!/^[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?(?:[0-9a-fA-F]{2})?$/.test(hex)) {
+    // Validate hex format: exactly 3, 6, or 8 hex digits (8 = RRGGBBAA)
+    if (!/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(hex)) {
       return undefined
     }
     const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16)
