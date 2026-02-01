@@ -248,6 +248,11 @@ export function PlayerScrubber({
     if (!segments || segments.length === 0 || duration <= 0) return []
 
     return segments
+      .filter((segment) => {
+        const startSeconds = segment.StartTicks ?? 0
+        const startPercent = (startSeconds / duration) * 100
+        return startPercent < 100 // Filter out segments starting beyond 100%
+      })
       .map((segment) => {
         // StartTicks/EndTicks are already in seconds for editing segments
         const startSeconds = segment.StartTicks ?? 0
@@ -263,15 +268,9 @@ export function PlayerScrubber({
           start: Math.max(0, startPercent),
           width: Math.min(100 - startPercent, endPercent - startPercent),
           color: colorConfig.css,
-          startPercent,
         }
       })
-      .filter(
-        (region) =>
-          region.width > 0.1 && // Only show segments wider than 0.1%
-          region.startPercent < 100 && // Filter out segments starting beyond 100%
-          region.start < 100, // Filter out segments entirely outside valid range
-      )
+      .filter((region) => region.width > 0.1) // Only show segments wider than 0.1%
   }, [segments, duration])
 
   return (
