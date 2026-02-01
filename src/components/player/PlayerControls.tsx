@@ -17,6 +17,12 @@ import {
 } from 'lucide-react'
 
 import { TrackSelector } from './TrackSelector'
+import {
+  ICON_CLASS,
+  applyAlphaToColor,
+  getButtonClass,
+  getIconStyle,
+} from './player-ui-constants'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrackState } from '@/services/video/tracks'
@@ -33,11 +39,6 @@ import {
 import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { SKIP_TIMES } = PLAYER_CONFIG
-
-/** Shared icon styling - extracted for consistency */
-const ICON_CLASS = 'size-5 sm:size-6' as const
-const getIconStyle = (color?: string): React.CSSProperties | undefined =>
-  color ? { color } : undefined
 
 /** Keyboard shortcut data - frozen for immutability */
 const SHORTCUTS = Object.freeze([
@@ -77,15 +78,9 @@ export interface PlayerControlsProps {
   isFullscreen?: boolean
   /** Callback to toggle fullscreen */
   onToggleFullscreen?: () => void
+  /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
+  buttonOpacity?: number
 }
-
-/** Shared button class for controls */
-const btnClass = (active: boolean, hasColors: boolean) =>
-  cn(
-    '!size-12 sm:!size-12 border-2 transition-all duration-200 ease-out',
-    active ? 'rounded-[30%] duration-300' : '',
-    !hasColors && (active ? 'border-primary' : 'border-border'),
-  )
 
 export const PlayerControls = memo(function PlayerControls({
   isPlaying,
@@ -108,8 +103,30 @@ export const PlayerControls = memo(function PlayerControls({
   strategy,
   isFullscreen,
   onToggleFullscreen,
+  buttonOpacity,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
+
+  // Wrap getButtonStyle to apply background opacity if provided
+  // Active buttons (like pause) get higher opacity for better visibility
+  const applyButtonStyle = useCallback(
+    (active?: boolean): React.CSSProperties | undefined => {
+      const baseStyle = getButtonStyle(active)
+      if (!baseStyle || buttonOpacity === undefined) return baseStyle
+      // Active state gets higher opacity (closer to 1)
+      const effectiveOpacity = active
+        ? Math.min(buttonOpacity + 0.3, 1)
+        : buttonOpacity
+      return {
+        ...baseStyle,
+        backgroundColor: applyAlphaToColor(
+          baseStyle.backgroundColor,
+          effectiveOpacity,
+        ),
+      }
+    },
+    [getButtonStyle, buttonOpacity],
+  )
 
   const handleVolumeSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,9 +152,9 @@ export const PlayerControls = memo(function PlayerControls({
               : t('accessibility.playPause', 'Play video')
           }
           aria-pressed={isPlaying}
-          style={getButtonStyle(isPlaying)}
+          style={applyButtonStyle(isPlaying)}
           className={cn(
-            btnClass(isPlaying, hasColors),
+            getButtonClass(isPlaying, hasColors),
             !isPlaying && 'rounded-full',
           )}
         >
@@ -170,8 +187,8 @@ export const PlayerControls = memo(function PlayerControls({
                     ? t('accessibility.player.muted', 'Volume muted')
                     : t('player.volume', 'Volume')
                 }
-                style={getButtonStyle()}
-                className={btnClass(false, hasColors)}
+                style={applyButtonStyle()}
+                className={getButtonClass(false, hasColors)}
               />
             }
           >
@@ -227,7 +244,7 @@ export const PlayerControls = memo(function PlayerControls({
             onSelectSubtitle={onSelectSubtitleTrack}
             strategy={strategy}
             disabled={isTrackSelectorDisabled}
-            getButtonStyle={getButtonStyle}
+            getButtonStyle={applyButtonStyle}
             iconColor={iconColor}
             hasColors={hasColors}
           />
@@ -240,8 +257,8 @@ export const PlayerControls = memo(function PlayerControls({
               <Button
                 variant="outline"
                 aria-label={t('editor.newSegment')}
-                style={getButtonStyle()}
-                className={btnClass(false, hasColors)}
+                style={applyButtonStyle()}
+                className={getButtonClass(false, hasColors)}
               />
             }
           >
@@ -277,8 +294,8 @@ export const PlayerControls = memo(function PlayerControls({
               ? t('player.exitFullscreen', 'Exit fullscreen')
               : t('player.fullscreen', 'Fullscreen')
           }
-          style={getButtonStyle()}
-          className={btnClass(false, hasColors)}
+          style={applyButtonStyle()}
+          className={getButtonClass(false, hasColors)}
         >
           {isFullscreen ? (
             <Minimize
@@ -305,8 +322,8 @@ export const PlayerControls = memo(function PlayerControls({
             <Button
               variant="outline"
               aria-label={t('accessibility.keyboardShortcuts')}
-              style={getButtonStyle()}
-              className={btnClass(false, hasColors)}
+              style={applyButtonStyle()}
+              className={getButtonClass(false, hasColors)}
             />
           }
         >

@@ -29,7 +29,7 @@ export interface PlayerScrubberProps {
 const selectVibrantColors = (s: SessionStore): VibrantColors | null =>
   s.vibrantColors
 
-export function PlayerScrubber({
+export const PlayerScrubber = React.memo(function PlayerScrubber({
   currentTime,
   duration,
   buffered = 0,
@@ -226,4 +226,4 @@ export function PlayerScrubber({
       </span>
     </div>
   )
-}
+})

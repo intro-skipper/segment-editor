@@ -43,7 +43,12 @@ import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { extractTracks } from '@/services/video/tracks'
 
-const { SKIP_TIMES } = PLAYER_CONFIG
+const {
+  SKIP_TIMES,
+  CONTROLS_HIDE_DELAY_MS,
+  MOUSE_MOVE_THROTTLE_MS,
+  DOUBLE_TAP_THRESHOLD_MS,
+} = PLAYER_CONFIG
 
 const selectPlayerState = (state: SessionStore) => ({
   vibrantColors: state.vibrantColors,
@@ -73,6 +78,18 @@ function findPreferredAudioStreamIndex(
   )
 
   return matchingTrack?.index
+}
+
+/** Maps VideoPlayerErrorType to HlsPlayerError type */
+function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
+  switch (type) {
+    case 'media_error':
+      return 'media'
+    case 'network_error':
+      return 'network'
+    default:
+      return 'unknown'
+  }
 }
 
 export interface PlayerProps {
@@ -146,8 +163,13 @@ export function Player({
   const [videoFitMode, setVideoFitMode] = useState<'contain' | 'cover'>(
     'contain',
   )
-  // Double-tap detection
-  const lastTapTimeRef = useRef(0)
+  // Unified single/double click/tap detection (used for both mouse and touch)
+  const lastInteractionTimeRef = useRef(0)
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Throttle mouse move handler (only reset timer every 500ms)
+  const lastMouseMoveRef = useRef(0)
+  // Track rAF IDs for subtitle resize cleanup
+  const resizeRafRef = useRef<number | null>(null)
 
   useLayoutEffect(() => {
     currentTimeRef.current = currentTime
@@ -173,37 +195,19 @@ export function Player({
   )
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  // Helper to map VideoPlayerErrorType to HlsPlayerError type
-  const mapErrorType = useCallback(
-    (type: VideoPlayerErrorType): HlsPlayerError['type'] => {
-      switch (type) {
-        case 'media_error':
-          return 'media'
-        case 'network_error':
-          return 'network'
-        default:
-          return 'unknown'
-      }
-    },
-    [],
-  )
-
   // Video player error handler - memoized for stability
-  const handleVideoError = useCallback(
-    (error: VideoPlayerError | null) => {
-      if (error) {
-        const hlsError: HlsPlayerError = {
-          type: mapErrorType(error.type),
-          message: error.message,
-          recoverable: error.recoverable,
-        }
-        dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
-      } else {
-        dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+  const handleVideoError = useCallback((error: VideoPlayerError | null) => {
+    if (error) {
+      const hlsError: HlsPlayerError = {
+        type: mapVideoErrorType(error.type),
+        message: error.message,
+        recoverable: error.recoverable,
       }
-    },
-    [mapErrorType],
-  )
+      dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
+    } else {
+      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+    }
+  }, [])
 
   // Strategy change handler - shows notification on fallback
   const handleStrategyChange = useCallback(
@@ -297,14 +301,15 @@ export function Player({
     })
 
   // Handler for subtitle offset changes (ready for future UI integration)
-  const handleSubtitleOffsetChange = useCallback(
+  const _handleSubtitleOffsetChange = useCallback(
     (offset: number) => {
       dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
       setJassubUserOffset(offset)
     },
     [setJassubUserOffset],
   )
-  void handleSubtitleOffsetChange
+  // Expose for future UI controls (e.g., subtitle sync adjustment)
+  void _handleSubtitleOffsetChange
 
   // Sync video player error with reducer state
   useEffect(() => {
@@ -312,14 +317,14 @@ export function Player({
       dispatch({
         type: 'ERROR_STATE',
         error: {
-          type: mapErrorType(videoError.type),
+          type: mapVideoErrorType(videoError.type),
           message: videoError.message,
           recoverable: videoError.recoverable,
         },
         isRecovering: false,
       })
     }
-  }, [videoError, mapErrorType])
+  }, [videoError])
 
   // Handle external timestamp changes
   useEffect(() => {
@@ -510,11 +515,20 @@ export function Player({
     const handleFullscreenChange = () => {
       const isFs = !!document.fullscreenElement
       setIsFullscreen(isFs)
-      // Show controls when entering fullscreen, reset fit mode when exiting
+      // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
       if (isFs) {
         setShowFullscreenControls(true)
+        // Start auto-hide timer when entering fullscreen
+        hideControlsTimeoutRef.current = setTimeout(() => {
+          setShowFullscreenControls(false)
+        }, CONTROLS_HIDE_DELAY_MS)
       } else {
         setVideoFitMode('contain')
+        // Clear the hide timer to avoid it firing when not in fullscreen
+        if (hideControlsTimeoutRef.current) {
+          clearTimeout(hideControlsTimeoutRef.current)
+          hideControlsTimeoutRef.current = null
+        }
       }
     }
 
@@ -528,33 +542,21 @@ export function Player({
   const toggleVideoFitMode = useCallback(() => {
     setVideoFitMode((prev) => {
       const next = prev === 'contain' ? 'cover' : 'contain'
-      // Resize JASSUB after a short delay to allow CSS to update
-      setTimeout(resizeJassub, 50)
+      // Cancel any pending resize
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current)
+      }
+      // Resize JASSUB after the browser paints the new styles
+      // Double rAF ensures styles are applied before resize calculation
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null
+          resizeJassub()
+        })
+      })
       return next
     })
   }, [resizeJassub])
-
-  // Handle double-tap to toggle fit mode
-  const handleVideoDoubleTap = useCallback(() => {
-    const now = Date.now()
-    const timeSinceLastTap = now - lastTapTimeRef.current
-    lastTapTimeRef.current = now
-
-    if (timeSinceLastTap < 300) {
-      // Double-tap detected
-      if (isFullscreen) {
-        toggleVideoFitMode()
-      }
-      // Reset to prevent triple-tap
-      lastTapTimeRef.current = 0
-    }
-  }, [isFullscreen, toggleVideoFitMode])
-
-  // Combined click handler for video
-  const handleVideoClick = useCallback(() => {
-    handleVideoDoubleTap()
-    togglePlay()
-  }, [handleVideoDoubleTap, togglePlay])
 
   // Auto-hide controls in fullscreen after inactivity
   const resetHideControlsTimer = useCallback(() => {
@@ -565,22 +567,105 @@ export function Player({
     if (isFullscreen) {
       hideControlsTimeoutRef.current = setTimeout(() => {
         setShowFullscreenControls(false)
-      }, 3000)
+      }, CONTROLS_HIDE_DELAY_MS)
     }
   }, [isFullscreen])
 
+  /**
+   * Handler for both mouse clicks and touch taps.
+   * Uses the same double-click/tap detection logic for consistency.
+   *
+   * Behavior:
+   * - Outside fullscreen: single tap/click toggles play, double tap/click toggles play
+   * - In fullscreen: single tap/click shows OSD, double tap/click toggles fit mode
+   */
+  const handleVideoInteraction = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      // For touch events, prevent the subsequent click event from firing
+      if ('touches' in e) {
+        e.preventDefault()
+      } else {
+        // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
+        if ((e).detail === 0) return
+      }
+
+      const now = Date.now()
+      const timeSinceLastInteraction = now - lastInteractionTimeRef.current
+      lastInteractionTimeRef.current = now
+
+      // Clear any pending single-tap/click action
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current)
+        singleTapTimerRef.current = null
+      }
+
+      if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
+        // Double-tap/click detected
+        if (isFullscreen) {
+          toggleVideoFitMode()
+        } else {
+          togglePlay()
+        }
+        // Reset to prevent triple-tap/click triggering
+        lastInteractionTimeRef.current = 0
+      } else {
+        // Wait to see if this is a single tap/click or first of a double
+        singleTapTimerRef.current = setTimeout(() => {
+          singleTapTimerRef.current = null
+          if (isFullscreen) {
+            // In fullscreen: single tap/click shows controls
+            resetHideControlsTimer()
+          } else {
+            // Outside fullscreen: toggle play
+            togglePlay()
+          }
+        }, DOUBLE_TAP_THRESHOLD_MS)
+      }
+    },
+    [isFullscreen, toggleVideoFitMode, togglePlay, resetHideControlsTimer],
+  )
+
   // Handle mouse movement in fullscreen to show/hide controls
+  // Throttled to avoid excessive timer resets during rapid mouse movement
   const handleFullscreenMouseMove = useCallback(() => {
-    if (isFullscreen) {
+    if (!isFullscreen) return
+
+    const now = Date.now()
+    // Only reset timer if controls are hidden OR enough time has passed (throttle)
+    if (
+      !showFullscreenControls ||
+      now - lastMouseMoveRef.current > MOUSE_MOVE_THROTTLE_MS
+    ) {
+      lastMouseMoveRef.current = now
       resetHideControlsTimer()
     }
-  }, [isFullscreen, resetHideControlsTimer])
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+
+  // Handle keyboard input in fullscreen to show controls (accessibility)
+  const handleFullscreenKeyDown = useCallback(() => {
+    if (isFullscreen && !showFullscreenControls) {
+      resetHideControlsTimer()
+    }
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+
+  // Handle mouse leave - don't immediately hide, let the timer handle it gracefully
+  const handleContainerMouseLeave = useCallback(() => {
+    if (isFullscreen && showFullscreenControls) {
+      resetHideControlsTimer()
+    }
+  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current)
+      }
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current)
+      }
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current)
       }
     }
   }, [])
@@ -659,6 +744,7 @@ export function Player({
       strategy,
       isFullscreen,
       onToggleFullscreen: toggleFullscreen,
+      buttonOpacity: isFullscreen ? 0.3 : undefined,
     }),
     [
       isPlaying,
@@ -692,10 +778,12 @@ export function Player({
         ref={containerRef}
         className={cn(
           'relative',
-          isFullscreen && 'fixed inset-0 z-50 bg-black',
+          isFullscreen && 'fixed inset-0 z-50 bg-black outline-none',
         )}
         onMouseMove={handleFullscreenMouseMove}
-        onMouseLeave={() => isFullscreen && setShowFullscreenControls(false)}
+        onMouseLeave={handleContainerMouseLeave}
+        onKeyDown={handleFullscreenKeyDown}
+        tabIndex={isFullscreen ? 0 : -1}
       >
         {/* Video container */}
         <div
@@ -703,7 +791,8 @@ export function Player({
             'relative cursor-pointer',
             isFullscreen ? 'w-full h-full' : 'aspect-video',
           )}
-          onClick={handleVideoClick}
+          onClick={handleVideoInteraction}
+          onTouchEnd={handleVideoInteraction}
         >
           <video
             ref={videoRef}
