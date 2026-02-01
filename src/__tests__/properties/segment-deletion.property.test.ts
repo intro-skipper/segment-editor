@@ -65,6 +65,19 @@ vi.mock('@/services/jellyfin', () => ({
       timeout: options?.timeout ?? defaultTimeout,
     }),
   ),
+  getAuthenticatedRequestConfig: vi.fn(
+    (
+      accessToken: string | undefined,
+      options?: { signal?: AbortSignal; timeout?: number },
+      defaultTimeout = 30000,
+    ) => ({
+      signal: options?.signal,
+      timeout: options?.timeout ?? defaultTimeout,
+      headers: accessToken
+        ? { Authorization: `MediaBrowser Token="${accessToken}"` }
+        : undefined,
+    }),
+  ),
   isAborted: vi.fn((signal?: AbortSignal) => signal?.aborted === true),
   clearApiCache: vi.fn(),
   getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),

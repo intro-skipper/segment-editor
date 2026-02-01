@@ -217,7 +217,7 @@ export default function Header() {
     () =>
       vibrantColors
         ? ({
-            backgroundColor: `${vibrantColors.background}99`,
+            backgroundColor: `${vibrantColors.background}0`,
           } as React.CSSProperties)
         : undefined,
     [vibrantColors],

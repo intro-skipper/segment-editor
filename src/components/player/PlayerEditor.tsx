@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { ClipboardCopy, ClipboardPaste, Loader2, Save } from 'lucide-react'
+import { ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -24,11 +24,7 @@ import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
 import { useSessionStore } from '@/stores/session-store'
 import { ticksToSeconds } from '@/lib/time-utils'
-import {
-  generateUUID,
-  sortSegmentsByStart,
-  validateSegment,
-} from '@/lib/segment-utils'
+import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
@@ -52,8 +48,6 @@ import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
 import { SegmentLoadingState } from '@/components/ui/async-state'
 
 // Stable selectors to prevent re-renders - defined outside component
-const selectClipboardSegment = (state: SessionStore): MediaSegmentDto | null =>
-  state.clipboardSegment
 const selectVibrantColors = (state: SessionStore) => state.vibrantColors
 
 export interface PlayerEditorProps {
@@ -78,7 +72,6 @@ export function PlayerEditor({
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
 
   // Use individual selectors instead of useShallow to avoid object creation
-  const clipboardSegment = useSessionStore(selectClipboardSegment)
   const vibrantColors = useSessionStore(selectVibrantColors)
   const { getButtonStyle, iconColor, hasColors } =
     useVibrantButtonStyle(vibrantColors)
@@ -100,6 +93,9 @@ export function PlayerEditor({
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
     number | null
   >(null)
+
+  // Ref to get current player time
+  const getCurrentTimeRef = React.useRef<(() => number) | null>(null)
 
   // Import confirmation dialog state
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
@@ -180,8 +176,10 @@ export function PlayerEditor({
       setEditingSegments((prev) => {
         if (prev.length === 0) return prev
 
+        // Use provided index or fall back to activeIndex
+        const targetIndex = data.index ?? activeIndex
         const updated = [...prev]
-        const segment = updated[activeIndex] as MediaSegmentDto | undefined
+        const segment = updated[targetIndex] as MediaSegmentDto | undefined
         if (segment === undefined) return prev
 
         if (data.start) {
@@ -194,6 +192,26 @@ export function PlayerEditor({
       })
     },
     [activeIndex],
+  )
+
+  // Handle setting a segment's start time from current player position
+  const handleSetStartFromPlayer = React.useCallback(
+    (index: number) => {
+      const currentTime = getCurrentTimeRef.current?.()
+      if (currentTime === undefined) return
+      handleUpdateSegmentTimestamp({ currentTime, start: true, index })
+    },
+    [handleUpdateSegmentTimestamp],
+  )
+
+  // Handle setting a segment's end time from current player position
+  const handleSetEndFromPlayer = React.useCallback(
+    (index: number) => {
+      const currentTime = getCurrentTimeRef.current?.()
+      if (currentTime === undefined) return
+      handleUpdateSegmentTimestamp({ currentTime, start: false, index })
+    },
+    [handleUpdateSegmentTimestamp],
   )
 
   // Handle segment update from slider
@@ -269,38 +287,6 @@ export function PlayerEditor({
   const handlePasteFromClipboard = React.useCallback(async () => {
     if (!item.Id) return
 
-    // 1) Prefer the in-app clipboard segment (no browser permission prompts)
-    if (clipboardSegment) {
-      const validation = validateSegment(clipboardSegment, runtimeSeconds)
-      if (!validation.valid) {
-        showNotification({
-          type: 'negative',
-          message: validation.error ?? 'Invalid segment data',
-        })
-        return
-      }
-
-      const newSegment: MediaSegmentDto = {
-        ...clipboardSegment,
-        Id: generateUUID(),
-        ItemId: item.Id,
-      }
-
-      setEditingSegments((prev) => {
-        const updated = [...prev, newSegment].sort(sortSegmentsByStart)
-        const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
-        setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
-        return updated
-      })
-
-      showNotification({
-        type: 'positive',
-        message: t('editor.paste', 'Pasted'),
-      })
-      return
-    }
-
-    // 2) Fallback: import Intro Skipper JSON from system clipboard text
     try {
       const text = await navigator.clipboard.readText()
       const result = introSkipperClipboardTextToSegments(text, {
@@ -347,13 +333,10 @@ export function PlayerEditor({
     } catch {
       showNotification({
         type: 'negative',
-        message: t(
-          'editor.noSegmentInClipboard',
-          'No segment in clipboard (and clipboard access was denied)',
-        ),
+        message: t('editor.noSegmentInClipboard', 'No segment in clipboard'),
       })
     }
-  }, [clipboardSegment, item.Id, runtimeSeconds, t])
+  }, [item.Id, runtimeSeconds, t])
 
   // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
@@ -387,7 +370,8 @@ export function PlayerEditor({
     }
   }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
 
-  const handleCopySegmentsAsJson = React.useCallback(async () => {
+  // Copy all segments to system clipboard as JSON
+  const handleCopyAllAsJson = React.useCallback(async () => {
     const segmentsToCopy = editingSegmentsRef.current
     if (segmentsToCopy.length === 0) {
       showNotification({
@@ -408,13 +392,13 @@ export function PlayerEditor({
           type: 'positive',
           message: t(
             'editor.copyWithExcluded',
-            `Copied JSON (${result.excludedCount} ${excludedInfo} excluded)`,
+            `Copied all (${result.excludedCount} ${excludedInfo} excluded)`,
           ),
         })
       } else {
         showNotification({
           type: 'positive',
-          message: t('editor.copy', 'Copied JSON to clipboard'),
+          message: t('editor.copiedAllAsJson', 'Copied all segments as JSON'),
         })
       }
     } catch {
@@ -495,6 +479,7 @@ export function PlayerEditor({
           timestamp={playerTimestamp}
           onCreateSegment={handleCreateSegment}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
+          getCurrentTimeRef={getCurrentTimeRef}
         />
       )}
 
@@ -539,6 +524,13 @@ export function PlayerEditor({
                   onDelete={handleDeleteSegment}
                   onPlayerTimestamp={handlePlayerTimestamp}
                   onSetActive={setActiveIndex}
+                  onSetStartFromPlayer={
+                    showVideoPlayer ? handleSetStartFromPlayer : undefined
+                  }
+                  onSetEndFromPlayer={
+                    showVideoPlayer ? handleSetEndFromPlayer : undefined
+                  }
+                  onCopyAllAsJson={handleCopyAllAsJson}
                 />
               </div>
             ))}
@@ -590,26 +582,6 @@ export function PlayerEditor({
         role="group"
         aria-label={t('editor.actions', 'Segment actions')}
       >
-        <button
-          onClick={handleCopySegmentsAsJson}
-          aria-label={t('editor.copy', 'Copy segments as JSON')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-            'transition-all duration-200 ease-out border-2',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            !hasColors &&
-              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
-          )}
-          style={getButtonStyle(false)}
-        >
-          <ClipboardCopy
-            className="size-4 sm:size-5"
-            aria-hidden="true"
-            style={iconColor ? { color: iconColor } : undefined}
-          />
-          {t('editor.copy', 'Copy JSON')}
-        </button>
         <button
           onClick={handlePasteFromClipboard}
           aria-label={t('editor.paste', 'Paste segment from clipboard')}

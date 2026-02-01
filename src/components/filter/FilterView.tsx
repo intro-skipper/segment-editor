@@ -25,9 +25,10 @@ import {
   Unplug,
 } from 'lucide-react'
 
-import type { SessionStore } from '@/stores/session-store'
 import { AnimatePresence, motion } from 'motion/react'
+import type { SessionStore } from '@/stores/session-store'
 import { BlurFade } from '@/components/ui/blur-fade'
+import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
 import {
@@ -364,7 +365,15 @@ export function FilterView() {
   const showConnecting = isPlugin && !isConnected
 
   return (
-    <div className="px-4 pb-8 sm:px-6">
+    <div className="relative px-4 pb-8 sm:px-6">
+      <LightRays
+        className="fixed inset-0 -z-10"
+        count={5}
+        color="rgba(120, 180, 255, 0.15)"
+        blur={48}
+        speed={18}
+        length="60vh"
+      />
       <div className="max-w-7xl mx-auto">
         {/* Not Connected State - standalone mode without credentials */}
         {showNotConnected && (
@@ -554,126 +563,120 @@ export function FilterView() {
         )}
 
         {/* Media Grid */}
-        <AnimatePresence mode="wait">
-          {paginatedItems.length > 0 && (
-            <motion.div
-              key={`grid-${selectedCollection}-${validCurrentPage}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              {/* Item count with aria-live for screen readers */}
-              <div className="flex justify-between items-center mb-6">
-                <p
-                  className="text-sm text-muted-foreground"
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  {t('items.showing', {
-                    start: (validCurrentPage - 1) * pageSize + 1,
-                    end: Math.min(validCurrentPage * pageSize, totalItems),
-                    total: totalItems,
-                    defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
-                  })}
-                </p>
-              </div>
-
-              <div
-                ref={gridRef}
-                className={GRID_CLASS}
-                {...gridProps}
-                aria-label={t('items.mediaGrid', { defaultValue: 'Media items' })}
+        {paginatedItems.length > 0 && (
+          <>
+            {/* Item count with aria-live for screen readers */}
+            <div className="flex justify-between items-center mb-6">
+              <p
+                className="text-sm text-muted-foreground"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
               >
-                {paginatedItems.map((item, index) => (
-                  <BlurFade
-                    key={item.Id}
-                    delay={0.04 + index * 0.03}
-                    direction="up"
-                  >
-                    <MediaCard
-                      item={item}
-                      index={index}
-                      {...getItemProps(index)}
-                    />
-                  </BlurFade>
-                ))}
+                {t('items.showing', {
+                  start: (validCurrentPage - 1) * pageSize + 1,
+                  end: Math.min(validCurrentPage * pageSize, totalItems),
+                  total: totalItems,
+                  defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
+                })}
+              </p>
+            </div>
+
+            <div
+              ref={gridRef}
+              className={GRID_CLASS}
+              {...gridProps}
+              aria-label={t('items.mediaGrid', {
+                defaultValue: 'Media items',
+              })}
+            >
+              {paginatedItems.map((item, index) => (
+                <BlurFade
+                  key={item.Id}
+                  delay={0.04 + index * 0.03}
+                  direction="up"
+                >
+                  <MediaCard
+                    item={item}
+                    index={index}
+                    {...getItemProps(index)}
+                  />
+                </BlurFade>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10">
+                <Pagination>
+                  <PaginationContent className="gap-2">
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() =>
+                          handlePageChange(Math.max(1, validCurrentPage - 1))
+                        }
+                        aria-disabled={validCurrentPage === 1}
+                        aria-label={t('accessibility.pagination.previous')}
+                        className={cn(
+                          'rounded-full',
+                          validCurrentPage === 1
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer',
+                        )}
+                      />
+                    </PaginationItem>
+
+                    {pageNumbers.map((pageNum, idx) =>
+                      pageNum === 'ellipsis' ? (
+                        <PaginationItem key={`ellipsis-${idx}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(pageNum)}
+                            isActive={validCurrentPage === pageNum}
+                            aria-label={t('accessibility.pagination.page', {
+                              page: pageNum,
+                            })}
+                            aria-current={
+                              validCurrentPage === pageNum ? 'page' : undefined
+                            }
+                            className={cn(
+                              'cursor-pointer rounded-full',
+                              validCurrentPage === pageNum &&
+                                'bg-primary text-primary-foreground',
+                            )}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() =>
+                          handlePageChange(
+                            Math.min(totalPages, validCurrentPage + 1),
+                          )
+                        }
+                        aria-disabled={validCurrentPage === totalPages}
+                        aria-label={t('accessibility.pagination.next')}
+                        className={cn(
+                          'rounded-full',
+                          validCurrentPage === totalPages
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer',
+                        )}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-10">
-                  <Pagination>
-                    <PaginationContent className="gap-2">
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            handlePageChange(Math.max(1, validCurrentPage - 1))
-                          }
-                          aria-disabled={validCurrentPage === 1}
-                          aria-label={t('accessibility.pagination.previous')}
-                          className={cn(
-                            'rounded-full',
-                            validCurrentPage === 1
-                              ? 'pointer-events-none opacity-50'
-                              : 'cursor-pointer',
-                          )}
-                        />
-                      </PaginationItem>
-
-                      {pageNumbers.map((pageNum, idx) =>
-                        pageNum === 'ellipsis' ? (
-                          <PaginationItem key={`ellipsis-${idx}`}>
-                            <PaginationEllipsis />
-                          </PaginationItem>
-                        ) : (
-                          <PaginationItem key={pageNum}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(pageNum)}
-                              isActive={validCurrentPage === pageNum}
-                              aria-label={t('accessibility.pagination.page', {
-                                page: pageNum,
-                              })}
-                              aria-current={
-                                validCurrentPage === pageNum ? 'page' : undefined
-                              }
-                              className={cn(
-                                'cursor-pointer rounded-full',
-                                validCurrentPage === pageNum &&
-                                  'bg-primary text-primary-foreground',
-                              )}
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ),
-                      )}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            handlePageChange(
-                              Math.min(totalPages, validCurrentPage + 1),
-                            )
-                          }
-                          aria-disabled={validCurrentPage === totalPages}
-                          aria-label={t('accessibility.pagination.next')}
-                          className={cn(
-                            'rounded-full',
-                            validCurrentPage === totalPages
-                              ? 'pointer-events-none opacity-50'
-                              : 'cursor-pointer',
-                          )}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

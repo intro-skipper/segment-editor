@@ -7,14 +7,13 @@ import { useTranslation } from 'react-i18next'
 import { Copy, Save, Trash2 } from 'lucide-react'
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import type { SessionStore } from '@/stores/session-store'
 import { formatTime, parseTimeString } from '@/lib/time-utils'
 import {
   SEGMENT_TYPES,
   getSegmentColor,
   validateSegment,
 } from '@/lib/segment-utils'
-import { useSessionStore } from '@/stores/session-store'
+import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -47,9 +46,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-// Stable selector to prevent re-renders
-const selectSaveToClipboard = (state: SessionStore) => state.saveToClipboard
-
 export interface SegmentEditDialogProps {
   open: boolean
   segment: MediaSegmentDto
@@ -66,7 +62,6 @@ export function SegmentEditDialog({
   onDelete,
 }: SegmentEditDialogProps) {
   const { t } = useTranslation()
-  const saveToClipboard = useSessionStore(selectSaveToClipboard)
   const startInputRef = React.useRef<HTMLInputElement>(null)
   const triggerRef = React.useRef<HTMLElement | null>(null)
   const prevSegmentRef = React.useRef(segment)
@@ -155,13 +150,21 @@ export function SegmentEditDialog({
     handleClose,
   ])
 
-  const handleCopy = React.useCallback(() => {
-    saveToClipboard(localSegment)
-    showNotification({
-      type: 'positive',
-      message: t('editor.segmentCopiedToClipboard'),
-    })
-  }, [localSegment, saveToClipboard, t])
+  const handleCopy = React.useCallback(async () => {
+    try {
+      const result = segmentsToIntroSkipperClipboardText([localSegment])
+      await navigator.clipboard.writeText(result.text)
+      showNotification({
+        type: 'positive',
+        message: t('editor.segmentCopiedToClipboard'),
+      })
+    } catch {
+      showNotification({
+        type: 'negative',
+        message: t('editor.copyFailed', 'Clipboard access denied'),
+      })
+    }
+  }, [localSegment, t])
 
   const handleConfirmDelete = React.useCallback(() => {
     onDelete(localSegment)

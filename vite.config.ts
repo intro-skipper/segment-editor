@@ -64,6 +64,7 @@ export default defineConfig({
             'class-variance-authority',
             'clsx',
             'tailwind-merge',
+            'motion',
           ],
           // Media libraries
           'media-vendor': ['node-vibrant', 'culori', 'blurhash'],

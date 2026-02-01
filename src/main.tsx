@@ -28,8 +28,35 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
-  // Disabled: ViewTransitions conflict with rapid state changes in plugin mode
-  defaultViewTransition: false,
+  // Enable view transitions with typed navigation
+  defaultViewTransition: {
+    types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {
+      // Skip transition for hash-only changes (e.g., anchor links)
+      if (!pathChanged && hashChanged) return ['instant']
+
+      // No transition if path didn't change
+      if (!pathChanged) return false
+
+      const from = fromLocation?.pathname ?? ''
+      const to = toLocation.pathname
+
+      // Determine navigation direction based on route depth
+      const fromDepth = from.split('/').filter(Boolean).length
+      const toDepth = to.split('/').filter(Boolean).length
+
+      // Special case: navigating to player
+      if (to.includes('/player/')) return ['to-player']
+
+      // Forward navigation (drilling down)
+      if (toDepth > fromDepth) return ['forward']
+
+      // Back navigation (going up)
+      if (toDepth < fromDepth) return ['back']
+
+      // Same depth - use forward as default
+      return ['forward']
+    },
+  },
 })
 
 // Register the router instance for type safety
