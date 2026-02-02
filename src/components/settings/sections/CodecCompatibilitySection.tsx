@@ -12,9 +12,10 @@ import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
 import { SettingsSection } from '../primitives'
 import {
   DIRECT_PLAY_AUDIO_CODECS,
-  DIRECT_PLAY_CONTAINERS,
   DIRECT_PLAY_VIDEO_CODECS,
   clearCache,
+  getDirectPlayContainers,
+  isDirectPlayContainerSupported,
   isCodecSupported,
 } from '@/services/video/compatibility'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ export function CodecCompatibilitySection() {
   const [audioCodecs, setAudioCodecs] = useState<Array<CodecSupport>>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
   const hasInitializedRef = useRef(false)
+  const supportedContainers = getDirectPlayContainers()
 
   const checkCodecSupport = async () => {
     // Initialize with loading state
@@ -127,12 +129,16 @@ export function CodecCompatibilitySection() {
             Supported Containers
           </h4>
           <div className="flex gap-2 flex-wrap">
-            {DIRECT_PLAY_CONTAINERS.map((container) => (
+            {supportedContainers.map((container) => (
               <div
                 key={container}
                 className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/30"
               >
-                <CheckCircle className="size-3 text-green-500" />
+                {isDirectPlayContainerSupported(container) ? (
+                  <CheckCircle className="size-3 text-green-500" />
+                ) : (
+                  <XCircle className="size-3 text-red-500" />
+                )}
                 <span className="text-xs font-mono uppercase">{container}</span>
               </div>
             ))}

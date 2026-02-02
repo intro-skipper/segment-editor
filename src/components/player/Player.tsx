@@ -840,6 +840,7 @@ export function Player({
             )}
             poster={posterUrl}
             crossOrigin="anonymous"
+            preload="metadata"
             playsInline
             aria-label={t('player.videoPlayer')}
             onTimeUpdate={handleTimeUpdate}

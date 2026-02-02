@@ -131,6 +131,30 @@ function isSafari(): boolean {
 }
 
 /**
+ * Detects if the browser is Firefox.
+ */
+function isFirefox(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Firefox\//.test(navigator.userAgent)
+}
+
+/**
+ * Returns supported direct-play containers for the current browser.
+ */
+export function getDirectPlayContainers(): ReadonlyArray<string> {
+  return DIRECT_PLAY_CONTAINERS
+}
+
+/**
+ * Checks if a container is supported for direct play in the current browser.
+ */
+export function isDirectPlayContainerSupported(container: string): boolean {
+  const normalized = container.toLowerCase()
+  if (isFirefox() && normalized === 'mkv') return false
+  return (DIRECT_PLAY_CONTAINERS as ReadonlyArray<string>).includes(normalized)
+}
+
+/**
  * Checks codec support using the canPlayType fallback method.
  * Used when MediaCapabilities API is unavailable.
  */
@@ -254,8 +278,7 @@ export async function isCodecSupported(
  * Checks if a container format is supported for direct play.
  */
 function isContainerSupported(container: string): boolean {
-  const normalized = container.toLowerCase()
-  return (DIRECT_PLAY_CONTAINERS as ReadonlyArray<string>).includes(normalized)
+  return isDirectPlayContainerSupported(container)
 }
 
 /**

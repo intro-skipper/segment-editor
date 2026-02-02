@@ -21,9 +21,9 @@ const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 
 // Use memory history in plugin mode (iframe), browser history otherwise
 const history = isPluginMode()
-  ? createMemoryHistory({ initialEntries: ['/SegmentEditor'] })
+  ? createMemoryHistory({ initialEntries: ['/configurationpage'] })
   : createBrowserHistory()
-const basePath = isPluginMode() ? '/SegmentEditor' : '/'
+const basePath = isPluginMode() ? '/configurationpage' : '/'
 const router = createRouter({
   routeTree,
   basepath: basePath,
