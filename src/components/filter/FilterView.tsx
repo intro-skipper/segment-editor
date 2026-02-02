@@ -367,7 +367,7 @@ export function FilterView() {
   return (
     <div className="relative px-4 pb-8 sm:px-6">
       <LightRays
-        className="fixed inset-0 -z-10"
+        className="fixed inset-0 z-0"
         count={5}
         color="rgba(120, 180, 255, 0.15)"
         blur={48}

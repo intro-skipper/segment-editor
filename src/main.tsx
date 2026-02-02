@@ -2,7 +2,8 @@ import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   RouterProvider,
-  createHashHistory,
+  createBrowserHistory,
+  createMemoryHistory,
   createRouter,
 } from '@tanstack/react-router'
 
@@ -10,17 +11,23 @@ import * as TanStackQueryProvider from './integrations/tanstack-query/root-provi
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
+import { isPluginMode } from './services/jellyfin/core'
 
 import './styles.css'
 
 // Create a new router instance
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
-const hashHistory = createHashHistory()
+
+// Use memory history in plugin mode (iframe), browser history otherwise
+const history = isPluginMode()
+  ? createMemoryHistory({ initialEntries: ['/SegmentEditor'] })
+  : createBrowserHistory()
+const basePath = isPluginMode() ? '/SegmentEditor' : '/'
 const router = createRouter({
   routeTree,
-  basepath: '/SegmentEditor',
-  history: hashHistory,
+  basepath: basePath,
+  history: history,
   context: {
     ...TanStackQueryProviderContext,
   },
