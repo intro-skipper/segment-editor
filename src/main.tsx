@@ -19,9 +19,9 @@ import './styles.css'
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 
-// Use memory history in plugin mode (iframe), browser history otherwise
+// Use memory history in plugin mode, browser history otherwise
 const history = isPluginMode()
-  ? createMemoryHistory({ initialEntries: ['/configurationpage'] })
+  ? createMemoryHistory({ initialEntries: ['/'] })
   : createBrowserHistory()
 const basePath = isPluginMode() ? '/configurationpage' : '/'
 const router = createRouter({
