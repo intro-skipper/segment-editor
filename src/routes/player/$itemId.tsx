@@ -159,7 +159,7 @@ function PlayerPage() {
           style={{ backgroundColor: vibrantColors.background }}
         />
       )}
-      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto">
+      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
         <FeatureErrorBoundary
           featureName="Player"
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
