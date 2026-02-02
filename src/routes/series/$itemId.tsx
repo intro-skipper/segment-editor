@@ -165,11 +165,11 @@ function SeriesPage() {
       {vibrantColors && (
         <>
           <div
-            className="fixed inset-0 -z-10 transition-colors duration-700"
+            className="fixed inset-0 z-0 transition-colors duration-700"
             style={{ backgroundColor: vibrantColors.background }}
           />
           <LightRays
-            className="fixed inset-0 -z-10"
+            className="fixed inset-0 z-0"
             count={5}
             color={vibrantColors.primary}
             blur={48}

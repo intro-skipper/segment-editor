@@ -40,7 +40,8 @@ export interface UseJassubRendererReturn {
 // Constants
 // ============================================================================
 
-const VIDEO_METADATA_TIMEOUT_MS = 15_000
+const VIDEO_METADATA_SOFT_TIMEOUT_MS = 15_000
+const VIDEO_METADATA_HARD_TIMEOUT_MS = 60_000
 
 // ============================================================================
 // Helpers
@@ -52,27 +53,41 @@ function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
   }
 
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup()
-      reject(new Error('Timeout waiting for video metadata'))
-    }, VIDEO_METADATA_TIMEOUT_MS)
-
     const cleanup = () => {
-      clearTimeout(timeout)
+      clearTimeout(softTimeout)
+      clearTimeout(hardTimeout)
       video.removeEventListener('loadedmetadata', onLoad)
+      video.removeEventListener('loadeddata', onLoad)
+      video.removeEventListener('canplay', onLoad)
       video.removeEventListener('error', onError)
     }
 
     const onLoad = () => {
-      cleanup()
-      resolve()
+      if (video.videoWidth > 0 || video.readyState >= 1) {
+        cleanup()
+        resolve()
+      }
     }
+
     const onError = () => {
       cleanup()
       reject(new Error('Video error'))
     }
 
+    const softTimeout = setTimeout(() => {
+      if (video.readyState < 1) {
+        video.load()
+      }
+    }, VIDEO_METADATA_SOFT_TIMEOUT_MS)
+
+    const hardTimeout = setTimeout(() => {
+      cleanup()
+      reject(new Error('Timeout waiting for video metadata'))
+    }, VIDEO_METADATA_HARD_TIMEOUT_MS)
+
     video.addEventListener('loadedmetadata', onLoad)
+    video.addEventListener('loadeddata', onLoad)
+    video.addEventListener('canplay', onLoad)
     video.addEventListener('error', onError)
   })
 }
