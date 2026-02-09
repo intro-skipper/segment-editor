@@ -232,8 +232,7 @@ export function FilterView() {
   })
 
   // Memoize the collection options for the dropdown
-  // Note: collectionOptions is kept for potential use by Header dropdown or future features
-  // @ts-expect-error - Preserved for compatibility
+  //@ts-ignore noUnusedLocals (TS6133)
   const collectionOptions = useMemo(() => {
     if (!collections) return []
     return collections.map((c) => ({
