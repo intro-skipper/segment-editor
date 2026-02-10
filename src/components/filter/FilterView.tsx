@@ -53,6 +53,7 @@ import { useItems } from '@/hooks/queries/use-items'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { MediaCard } from '@/components/filter/MediaCard'
+import { LibraryCard } from '@/components/filter/LibraryCard'
 import { useSessionStore } from '@/stores/session-store'
 import { getBestImageUrl } from '@/services/video/api'
 import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
@@ -231,6 +232,7 @@ export function FilterView() {
   })
 
   // Memoize the collection options for the dropdown
+  //@ts-ignore noUnusedLocals (TS6133)
   const collectionOptions = useMemo(() => {
     if (!collections) return []
     return collections.map((c) => ({
@@ -443,60 +445,47 @@ export function FilterView() {
           !selectedCollection &&
           !collectionsLoading &&
           !collectionsError && (
-            <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
-              <Empty className="border-none bg-transparent">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Library className="size-12" aria-hidden="true" />
-                  </EmptyMedia>
-                  <EmptyTitle className="text-2xl">
+            <div className="flex items-center justify-center py-8">
+              <div className="w-full max-w-6xl">
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center justify-center size-16 rounded-full bg-primary/10 mb-4">
+                    <Library className="size-8 text-secondary" aria-hidden="true" />
+                  </div>
+                  <h2 className="text-2xl font-semibold mb-2">
                     {t('items.selectLibrary', {
                       defaultValue: 'Select a Library',
                     })}
-                  </EmptyTitle>
-                  <EmptyDescription className="text-base">
+                  </h2>
+                  <p className="text-base text-muted-foreground">
                     {t('items.selectLibraryDescription', {
                       defaultValue:
                         'Choose a library to browse your media collection',
                     })}
-                  </EmptyDescription>
-                </EmptyHeader>
-                <EmptyContent>
-                  <div
-                    className="flex flex-wrap gap-3 justify-center mt-4"
-                    role="group"
-                    aria-label={t('items.selectLibrary', {
-                      defaultValue: 'Select a Library',
-                    })}
-                  >
-                    {collectionOptions.map((collection) => {
-                      const Icon = getCollectionIcon(collection.name)
-                      return (
-                        <Button
-                          key={collection.id}
-                          variant="secondary"
-                          size="lg"
-                          className={cn(
-                            'gap-3 min-w-[var(--spacing-library-button-min)] h-14',
-                            'rounded-2xl text-base font-medium',
-                            'border border-border/50',
-                            'transition-all duration-200',
-                            'hover:scale-[1.02] active:scale-[0.98]',
-                          )}
-                          onClick={() => handleCollectionChange(collection.id)}
-                          aria-label={t('items.selectLibraryButton', {
-                            name: collection.name,
-                            defaultValue: `Browse ${collection.name} library`,
-                          })}
-                        >
-                          <Icon className="size-5" aria-hidden="true" />
-                          {collection.name}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                </EmptyContent>
-              </Empty>
+                  </p>
+                </div>
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6"
+                  role="group"
+                  aria-label={t('items.selectLibrary', {
+                    defaultValue: 'Select a Library',
+                  })}
+                >
+                  {collections?.map((collection, index) => {
+                    const Icon = getCollectionIcon(collection.Name || '')
+                    return (
+                      <LibraryCard
+                        key={collection.ItemId}
+                        collection={collection}
+                        Icon={Icon}
+                        onClick={() =>
+                          handleCollectionChange(collection.ItemId || null)
+                        }
+                        index={index}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
