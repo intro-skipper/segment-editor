@@ -52,7 +52,10 @@
       "title": "Plugins de serveur installés"
     },
     "title": "Éditeur de segment",
-    "showVideoPlayer": "Afficher le lecteur vidéo"
+    "showVideoPlayer": "Afficher le lecteur vidéo",
+    "pagessize": {
+      "unlimited": "Illimitée"
+    }
   },
   "items": {
     "select_collection": "Sélectionnez une collection à parcourir",

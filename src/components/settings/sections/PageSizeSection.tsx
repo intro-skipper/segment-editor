@@ -22,14 +22,15 @@ export function PageSizeSection() {
     () =>
       PAGE_SIZE_OPTIONS.map((size) => ({
         value: String(size),
-        label: String(size),
+        label: size == Number.MAX_SAFE_INTEGER ? t('app.pagesize.unlimited') : String(size),
       })),
     [],
   )
 
   const handleChange = useCallback(
     (value: string) => {
-      if (value) setPageSize(Number(value) as PageSize)
+      if (value === t('app.pagesize.unlimited')) setPageSize(Number.MAX_SAFE_INTEGER as PageSize)
+      else if (value) setPageSize(Number(value) as PageSize)
     },
     [setPageSize],
   )
@@ -39,7 +40,7 @@ export function PageSizeSection() {
       icon={Settings2}
       titleKey="items.perPage"
       defaultTitle="Items per page"
-      value={String(pageSize)}
+      value={pageSize == Number.MAX_SAFE_INTEGER ? t('app.pagesize.unlimited') : String(pageSize)}
       onValueChange={handleChange}
       options={options}
     />
