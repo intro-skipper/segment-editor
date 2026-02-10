@@ -20,7 +20,7 @@
     "@tanstack/react-router": "^1.157.18",
     "@tanstack/react-virtual": "^3.13.18",
     "@tanstack/router-plugin": "^1.157.18",
-    "axios": "^1.13.4",
+    "axios": "^1.13.5",
     "blurhash": "^2.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
