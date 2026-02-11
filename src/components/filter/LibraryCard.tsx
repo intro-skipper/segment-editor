@@ -45,7 +45,7 @@ export const LibraryCard = memo(function LibraryCard({
   const rawImageUrl = useMemo(() => {
     if (!collection.ItemId) return null
     const baseUrl = getServerBaseUrl()
-    return `${baseUrl}/Items/${collection.ItemId}/Images/Primary`
+    return `${baseUrl}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
   }, [collection.ItemId])
 
   // Convert to blob URL for COEP compliance
