@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 
-export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const
+export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96, Number.MAX_SAFE_INTEGER] as const
 export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
 export interface SessionState {

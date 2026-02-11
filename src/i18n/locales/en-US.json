@@ -96,7 +96,10 @@
     },
     "name": "Segment Editor",
     "title": "Segment Editor",
-    "showVideoPlayer": "Show Video Player"
+    "showVideoPlayer": "Show Video Player",
+    "pagesize": {
+      "unlimited": "Unlimited"
+    }
   },
   "connection": {
     "notConnected": "Not Connected",

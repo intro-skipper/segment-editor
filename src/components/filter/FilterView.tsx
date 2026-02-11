@@ -243,12 +243,13 @@ export function FilterView() {
 
   // Calculate pagination with bounds checking
   const totalItems = items?.length ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const totalPages = pageSize == Number.MAX_SAFE_INTEGER ? 1 : Math.max(1, Math.ceil(totalItems / pageSize))
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
   // Get paginated items
   const paginatedItems = useMemo(() => {
     if (!items) return []
+    if (pageSize == Number.MAX_SAFE_INTEGER) return items
     const startIndex = (validCurrentPage - 1) * pageSize
     return items.slice(startIndex, startIndex + pageSize)
   }, [items, validCurrentPage, pageSize])
@@ -499,7 +500,7 @@ export function FilterView() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <MediaGridSkeleton count={pageSize} gridClassName={GRID_CLASS} />
+              <MediaGridSkeleton count={pageSize == Number.MAX_SAFE_INTEGER ? 100 : pageSize} gridClassName={GRID_CLASS} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -564,9 +565,9 @@ export function FilterView() {
               >
                 {t('items.showing', {
                   start: (validCurrentPage - 1) * pageSize + 1,
-                  end: Math.min(validCurrentPage * pageSize, totalItems),
+                  end: pageSize == Number.MAX_SAFE_INTEGER ? totalItems : Math.min(validCurrentPage * pageSize, totalItems),
                   total: totalItems,
-                  defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
+                  defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Number.MAX_SAFE_INTEGER ? totalItems : Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
                 })}
               </p>
             </div>
