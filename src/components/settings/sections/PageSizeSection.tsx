@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Settings2 } from 'lucide-react'
 
 import { SelectSettingsSection } from '../primitives'
@@ -15,6 +16,7 @@ import type { PageSize } from '@/stores/session-store'
 import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
 
 export function PageSizeSection() {
+  const { t } = useTranslation()
   const pageSize = useSessionStore((s) => s.pageSize)
   const setPageSize = useSessionStore((s) => s.setPageSize)
 
@@ -24,7 +26,7 @@ export function PageSizeSection() {
         value: String(size),
         label: size == Number.MAX_SAFE_INTEGER ? t('app.pagesize.unlimited') : String(size),
       })),
-    [],
+    [t],
   )
 
   const handleChange = useCallback(

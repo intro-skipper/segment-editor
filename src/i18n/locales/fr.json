@@ -53,7 +53,7 @@
     },
     "title": "Éditeur de segment",
     "showVideoPlayer": "Afficher le lecteur vidéo",
-    "pagessize": {
+    "pagesize": {
       "unlimited": "Illimitée"
     }
   },

@@ -97,7 +97,7 @@
     "name": "Segment Editor",
     "title": "Segment Editor",
     "showVideoPlayer": "Videoplayer anzeigen",
-    "pagessize": {
+    "pagesize": {
       "unlimited": "Unbegrenzt"
     }
   },
