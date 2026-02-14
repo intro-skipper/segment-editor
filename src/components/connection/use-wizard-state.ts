@@ -12,6 +12,7 @@
 import { useCallback, useReducer } from 'react'
 import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import type { AuthMethod } from '@/stores/api-store'
+import { findBestServer } from '@/services/jellyfin'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -185,9 +186,8 @@ export function wizardReducer(
       return {
         ...state,
         servers: action.payload,
-        // Auto-select best server if only one found
-        selectedServer:
-          action.payload.length === 1 ? (action.payload[0] ?? null) : null,
+        // Auto-select best server (highest score, prefers HTTPS)
+        selectedServer: findBestServer(action.payload),
         step: 'select',
         isLoading: false,
         error: null,
