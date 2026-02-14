@@ -41,7 +41,8 @@ const inactiveStyle = (
   c: VibrantColors,
   textColor: string,
 ): VibrantButtonStyle => ({
-  backgroundColor: c.background,
+  // Use semi-transparent primary color instead of background to ensure visibility
+  backgroundColor: `${c.primary}30`, // ~19% opacity
   color: textColor,
   borderColor: c.primary,
 })
