@@ -6,6 +6,7 @@
 
 import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { getJellyfinClient, isAborted } from './core'
+import { normalizeServerAddress } from './security'
 import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import type { ApiOptions } from './types'
 import { AppError, isAbortError } from '@/lib/unified-error'
@@ -32,7 +33,10 @@ export async function discoverServers(
   address: string,
   options?: ApiOptions & { minimumScore?: RecommendedServerInfoScore },
 ): Promise<DiscoveryResult> {
-  const trimmed = address.trim()
+  // Normalize the address to extract only scheme, host and port
+  // This allows users to paste full URLs like "https://jellyfin.example.com/web/#/home"
+  const normalized = normalizeServerAddress(address)
+  const trimmed = normalized.trim()
 
   if (!trimmed) return { servers: [], error: 'Server address is required' }
   if (isAborted(options?.signal))

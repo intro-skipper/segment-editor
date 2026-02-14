@@ -78,6 +78,36 @@ export function sanitizeQueryParam(value: string | null | undefined): string {
     .replace(/on\w+\s*=/gi, '')
 }
 
+/**
+ * Normalizes a server address by extracting only scheme, host and port.
+ * This allows users to paste full URLs like "https://jellyfin.example.com/web/#/home"
+ * and automatically extracts just the origin part.
+ *
+ * @param address - The user-entered server address
+ * @returns Normalized address with only scheme, host and port, or the original trimmed address if not a valid URL
+ */
+export function normalizeServerAddress(address: string): string {
+  const trimmed = address.trim()
+  if (!trimmed) return trimmed
+
+  // Check if it looks like a URL with a scheme
+  const hasScheme = /^https?:\/\//i.test(trimmed)
+
+  if (hasScheme) {
+    try {
+      const parsed = new URL(trimmed)
+      // Return only the origin (scheme + host + port)
+      return parsed.origin
+    } catch {
+      // If URL parsing fails, return the trimmed address as-is
+      return trimmed
+    }
+  }
+
+  // No scheme - return as-is (discovery will handle adding scheme)
+  return trimmed
+}
+
 /** Validates an endpoint path for traversal attacks. */
 export function isValidEndpoint(endpoint: string): boolean {
   return !PATH_TRAVERSAL.test(endpoint) && !ENCODED_TRAVERSAL.test(endpoint)

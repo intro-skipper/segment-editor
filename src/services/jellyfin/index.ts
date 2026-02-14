@@ -90,6 +90,7 @@ export {
   sanitizeEndpoint,
   isValidEndpoint,
   buildApiUrl,
+  normalizeServerAddress,
 } from './security'
 
 // ─────────────────────────────────────────────────────────────────────────────
