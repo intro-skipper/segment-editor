@@ -178,7 +178,7 @@ function SeriesPage() {
           />
         </>
       )}
-      <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto">
+      <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
         <FeatureErrorBoundary
           featureName="Series"
           minHeightClass="min-h-[var(--spacing-page-min-height-header)]"

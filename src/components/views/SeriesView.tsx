@@ -63,7 +63,7 @@ const SeasonTabs = React.memo(function SeasonTabs({
 
   return (
     <div
-      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 scrollbar-hide"
+      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 scrollbar-hide relative z-10"
       role="tablist"
       aria-label="Seasons"
     >
@@ -398,7 +398,7 @@ export function SeriesView({
   }
 
   return (
-    <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto">
+    <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10">
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={selectedSeasonId}
