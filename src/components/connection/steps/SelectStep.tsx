@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
+  AlertTriangle,
   Check,
   Loader2,
   Server,
@@ -17,6 +18,7 @@ import {
   ShieldOff,
 } from 'lucide-react'
 import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
+import { useTranslation } from 'react-i18next'
 
 import { WizardActions } from '../WizardActions'
 import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
@@ -285,8 +287,17 @@ export function SelectStep({
   onBack,
   onContinue,
 }: SelectStepProps) {
+  const { t } = useTranslation()
   const serverCountText =
     servers.length === 1 ? 'Found 1 server' : `Found ${servers.length} servers`
+
+  // Check if the app is served over HTTPS and selected server uses HTTP (Mixed Content)
+  // This causes issues in Firefox, so we show a warning
+  const isMixedContent =
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    selectedServer &&
+    !selectedServer.address.toLowerCase().startsWith('https://')
 
   return (
     <div className="space-y-6">
@@ -303,6 +314,27 @@ export function SelectStep({
         isLoading={isLoading}
         error={error}
       />
+
+      {/* HTTP Warning for Firefox users - only when app is served over HTTPS */}
+      {isMixedContent && (
+        <div
+          className="flex items-start gap-3 p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10"
+          role="alert"
+        >
+          <AlertTriangle className="size-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-medium text-yellow-600 dark:text-yellow-400">
+              {t('login.http_warning.title')}
+            </p>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              {t('login.http_warning.message')}
+            </p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+              {t('login.http_warning.browser_recommendation')}
+            </p>
+          </div>
+        </div>
+      )}
 
       <WizardActions
         onBack={onBack}

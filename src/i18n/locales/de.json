@@ -75,7 +75,12 @@
       "url_invalid": "URL Fehler. Sollte mit http:// oder https:// beginnen"
     },
     "connect_fail": "Verbindung fehlgeschlagen!",
-    "auth_fail": "Authentifizierung fehlgeschlagen!"
+    "auth_fail": "Authentifizierung fehlgeschlagen!",
+    "http_warning": {
+      "title": "HTTP-Verbindungswarnung",
+      "message": "Firefox hat bekannte Probleme mit HTTP-Verbindungen. Für die beste Erfahrung verwenden Sie bitte Google Chrome oder Microsoft Edge.",
+      "browser_recommendation": "Empfohlene Browser: Chrome oder Edge"
+    }
   },
   "app": {
     "theme": {

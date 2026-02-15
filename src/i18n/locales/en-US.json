@@ -75,7 +75,12 @@
       "url_invalid": "URL invalid. Should start with http:// or https://"
     },
     "connect_fail": "Connection failed!",
-    "auth_fail": "Authentication failed!"
+    "auth_fail": "Authentication failed!",
+    "http_warning": {
+      "title": "HTTP Connection Warning",
+      "message": "Firefox has known issues with HTTP connections. For the best experience, please use Google Chrome or Microsoft Edge.",
+      "browser_recommendation": "Recommended browsers: Chrome or Edge"
+    }
   },
   "app": {
     "theme": {

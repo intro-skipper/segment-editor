@@ -32,7 +32,12 @@
       "url_invalid": "URL invalide. Doit commencer par http:// ou https://"
     },
     "connect_fail": "Connexion échouée !",
-    "auth_fail": "Échec d'authentification !"
+    "auth_fail": "Échec d'authentification !",
+    "http_warning": {
+      "title": "Avertissement de connexion HTTP",
+      "message": "Firefox a des problèmes connus avec les connexions HTTP. Pour une meilleure expérience, veuillez utiliser Google Chrome ou Microsoft Edge.",
+      "browser_recommendation": "Navigateurs recommandés : Chrome ou Edge"
+    }
   },
   "app": {
     "theme": {
