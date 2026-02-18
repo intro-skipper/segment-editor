@@ -57,7 +57,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint-plugin-react-you-might-not-need-an-effect": "^0.8.5",
     "fast-check": "^4.5.3",
-    "jsdom": "^28.0.0",
+    "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
     "shadcn": "^3.8.4",
     "tailwindcss": "^4.1.18",
