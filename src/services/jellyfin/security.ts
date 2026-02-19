@@ -67,7 +67,7 @@ export function sanitizeUrl(url: string | null | undefined): string | null {
 }
 
 /** Sanitizes a query parameter value. */
-export function sanitizeQueryParam(value: string | null | undefined): string {
+function sanitizeQueryParam(value: string | null | undefined): string {
   if (value == null) return ''
   const str = String(value)
   if (DANGEROUS_CHARS.test(str)) return ''
@@ -109,12 +109,12 @@ export function normalizeServerAddress(address: string): string {
 }
 
 /** Validates an endpoint path for traversal attacks. */
-export function isValidEndpoint(endpoint: string): boolean {
+function isValidEndpoint(endpoint: string): boolean {
   return !PATH_TRAVERSAL.test(endpoint) && !ENCODED_TRAVERSAL.test(endpoint)
 }
 
 /** Sanitizes an endpoint path. */
-export function sanitizeEndpoint(endpoint: string): string {
+function sanitizeEndpoint(endpoint: string): string {
   return endpoint.replace(/^\/+|\.{2,}/g, '')
 }
 
@@ -122,7 +122,7 @@ export function sanitizeEndpoint(endpoint: string): string {
 // URL Building
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface UrlBuildOptions {
+interface UrlBuildOptions {
   serverAddress: string
   accessToken?: string
   endpoint: string

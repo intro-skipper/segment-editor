@@ -10,7 +10,7 @@ import { BaseItemKind } from '@/types/jellyfin'
  * Route configuration by item type.
  * Maps Jellyfin item types to their corresponding route paths.
  */
-export const ROUTE_MAP: Record<string, string> = {
+const ROUTE_MAP: Record<string, string> = {
   [BaseItemKind.Series]: '/series/$itemId',
   [BaseItemKind.MusicArtist]: '/artist/$itemId',
   [BaseItemKind.MusicAlbum]: '/album/$itemId',
@@ -19,10 +19,18 @@ export const ROUTE_MAP: Record<string, string> = {
 /**
  * Navigation route result type.
  */
-export interface NavigationRoute {
+interface NavigationRoute {
   to: string
   params: { itemId: string }
   search?: { fetchSegments: string }
+}
+
+type RouteConsumer = (...args: Array<never>) => unknown
+
+function asRouteArg<TConsumer extends RouteConsumer>(
+  route: NavigationRoute,
+): Parameters<TConsumer>[0] {
+  return route as Parameters<TConsumer>[0]
 }
 
 /**
@@ -33,7 +41,7 @@ export interface NavigationRoute {
  * @param item - The media item to get navigation route for
  * @returns Navigation route configuration
  */
-export function getNavigationRoute(item: BaseItemDto): NavigationRoute {
+function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   const itemId = item.Id ?? ''
   const to = ROUTE_MAP[item.Type ?? ''] ?? '/player/$itemId'
   const isPlayable = !ROUTE_MAP[item.Type ?? '']
@@ -43,4 +51,28 @@ export function getNavigationRoute(item: BaseItemDto): NavigationRoute {
     params: { itemId },
     ...(isPlayable && { search: { fetchSegments: 'true' } }),
   }
+}
+
+export function navigateToMediaItem<TNavigate extends RouteConsumer>(
+  navigate: TNavigate,
+  item: BaseItemDto,
+): void {
+  if (!item.Id) {
+    return
+  }
+
+  const route = getNavigationRoute(item)
+  navigate(asRouteArg<TNavigate>(route))
+}
+
+export function preloadMediaRoute<TPreload extends RouteConsumer>(
+  preloadRoute: TPreload,
+  item: BaseItemDto,
+): void {
+  if (!item.Id) {
+    return
+  }
+
+  const route = getNavigationRoute(item)
+  void preloadRoute(asRouteArg<TPreload>(route))
 }

@@ -8,7 +8,6 @@ import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import type { ValidationResult } from '@/types/segment'
 
 export { SEGMENT_TYPES }
-
 export const sortSegmentsByStart = (
   a: MediaSegmentDto,
   b: MediaSegmentDto,
@@ -46,7 +45,7 @@ export const isValidUUID = (uuid: string | null | undefined): boolean =>
 const VALID_SEGMENT_TYPES = new Set<string>(SEGMENT_TYPES)
 
 /** Validates that a segment type is a known valid type */
-export const isValidSegmentType = (type: unknown): type is MediaSegmentType =>
+const isValidSegmentType = (type: unknown): type is MediaSegmentType =>
   typeof type === 'string' && VALID_SEGMENT_TYPES.has(type)
 
 /** Creates an invalid validation result with the given error message */

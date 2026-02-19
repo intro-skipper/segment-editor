@@ -10,7 +10,7 @@
  * @module hooks/use-video-player
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackState } from '@/services/video/playback-state'
@@ -55,25 +55,9 @@ export interface VideoPlayerError {
 }
 
 /**
- * Re-export PlaybackState as PreservedPlaybackState for backward compatibility.
- * @deprecated Use PlaybackState from '@/services/video/playback-state' instead
- */
-export type { PlaybackState as PreservedPlaybackState }
-
-/**
- * @deprecated Use capturePlaybackState from '@/services/video/playback-state' instead
- */
-export const preserveState = capturePlaybackState
-
-/**
- * @deprecated Use restorePlaybackStateSync from '@/services/video/playback-state' instead
- */
-export const restoreState = restorePlaybackStateSync
-
-/**
  * Options for the useVideoPlayer hook.
  */
-export interface UseVideoPlayerOptions {
+interface UseVideoPlayerOptions {
   /** The Jellyfin item to play */
   item: BaseItemDto | null
   /** Preferred audio stream index for initial playback (Jellyfin MediaStream index) */
@@ -89,7 +73,7 @@ export interface UseVideoPlayerOptions {
 /**
  * Return value from the useVideoPlayer hook.
  */
-export interface UseVideoPlayerReturn {
+interface UseVideoPlayerReturn {
   /** Ref to attach to the video element */
   videoRef: React.RefObject<HTMLVideoElement | null>
   /** Ref to the HLS.js instance (only available in HLS mode) */
@@ -165,8 +149,6 @@ function createErrorFromMediaError(
  *
  * @param options - Hook options including item and callbacks
  * @returns Video player state and controls
- *
- * Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3
  */
 export function useVideoPlayer({
   item,
@@ -177,15 +159,21 @@ export function useVideoPlayer({
 }: UseVideoPlayerOptions): UseVideoPlayerReturn {
   const [strategy, setStrategy] = useState<PlaybackStrategy>('hls')
   const [videoUrl, setVideoUrl] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<VideoPlayerError | null>(null)
+  // Track which (item, audioStreamIndex) combination has finished loading
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined)
 
   const networkRetryCountRef = useRef(0)
   const preservedStateRef = useRef<PlaybackState | null>(null)
+  const pendingHlsStateRestoreRef = useRef(false)
   const isActiveRef = useRef(true)
+  const playbackRequestIdRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const emptyHlsRef = useRef<Hls | null>(null)
   const currentStrategyRef = useRef<PlaybackStrategy>('hls')
+  const hlsRestoreVideoRef = useRef<HTMLVideoElement | null>(null)
+  const hlsCanPlayListenerRef = useRef<(() => void) | null>(null)
+  const hlsRestoreFrameIdRef = useRef<number | null>(null)
 
   // Helper to update strategy in both state and ref
   const updateStrategy = useCallback((newStrategy: PlaybackStrategy) => {
@@ -193,9 +181,22 @@ export function useVideoPlayer({
     setStrategy(newStrategy)
   }, [])
 
-  // Store latest callbacks in ref to avoid stale closures
-  const callbacksRef = useRef({ onError, onStrategyChange, t })
-  callbacksRef.current = { onError, onStrategyChange, t }
+  const clearHlsStateRestoreSubscription = useCallback(() => {
+    if (hlsRestoreFrameIdRef.current !== null) {
+      window.cancelAnimationFrame(hlsRestoreFrameIdRef.current)
+      hlsRestoreFrameIdRef.current = null
+    }
+
+    if (hlsRestoreVideoRef.current && hlsCanPlayListenerRef.current) {
+      hlsRestoreVideoRef.current.removeEventListener(
+        'canplay',
+        hlsCanPlayListenerRef.current,
+      )
+    }
+
+    hlsRestoreVideoRef.current = null
+    hlsCanPlayListenerRef.current = null
+  }, [])
 
   // HLS player hook for fallback
   const hlsPlayer = useHlsPlayer({
@@ -208,7 +209,7 @@ export function useVideoPlayer({
           recoverable: hlsError.recoverable,
         }
         setError(videoError)
-        callbacksRef.current.onError?.(videoError)
+        onError?.(videoError)
       } else {
         setError(null)
       }
@@ -223,100 +224,178 @@ export function useVideoPlayer({
   })
 
   /**
+   * Marks playback state for restoration when the HLS video element is ready.
+   */
+  const scheduleHlsStateRestore = useCallback(() => {
+    if (!preservedStateRef.current) {
+      return
+    }
+
+    pendingHlsStateRestoreRef.current = true
+    clearHlsStateRestoreSubscription()
+
+    const attachRestore = () => {
+      if (!isActiveRef.current || !pendingHlsStateRestoreRef.current) {
+        return
+      }
+
+      const video = hlsPlayer.videoRef.current
+      if (!video) {
+        hlsRestoreFrameIdRef.current =
+          window.requestAnimationFrame(attachRestore)
+        return
+      }
+
+      hlsRestoreFrameIdRef.current = null
+
+      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        restorePendingHlsState(video)
+        return
+      }
+
+      const onCanPlay = () => {
+        restorePendingHlsState(video)
+        clearHlsStateRestoreSubscription()
+      }
+
+      hlsRestoreVideoRef.current = video
+      hlsCanPlayListenerRef.current = onCanPlay
+      video.addEventListener('canplay', onCanPlay)
+    }
+
+    hlsRestoreFrameIdRef.current = window.requestAnimationFrame(attachRestore)
+  }, [clearHlsStateRestoreSubscription, hlsPlayer.videoRef])
+
+  /**
    * Switches to HLS fallback strategy.
    * Preserves current playback state before switching.
    */
-  const switchToHls = useCallback(async () => {
-    if (!item?.Id || !isActiveRef.current) return
+  const switchToHls = useCallback(
+    async (requestId = playbackRequestIdRef.current) => {
+      const isCurrentRequest =
+        isActiveRef.current && playbackRequestIdRef.current === requestId
 
-    // Preserve current state before switching
-    if (videoRef.current) {
-      preservedStateRef.current = capturePlaybackState(videoRef.current)
-    }
+      if (!item?.Id || !isCurrentRequest) return
 
-    // Start playback session for HLS to enable server-side cleanup
-    await startPlaybackSession(item.Id)
+      // Preserve current state before switching
+      if (videoRef.current) {
+        preservedStateRef.current = capturePlaybackState(videoRef.current)
+      }
 
-    // Get HLS config
-    const config = await getPlaybackConfig(item)
-    const hlsUrl = config.strategy === 'hls' ? config.url : ''
+      // Start playback session for HLS to enable server-side cleanup
+      await startPlaybackSession(item.Id)
+      if (!isActiveRef.current || playbackRequestIdRef.current !== requestId) {
+        return
+      }
 
-    // Check if still active after async operation
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (isActiveRef.current) {
+      // Get HLS config
+      const config = await getPlaybackConfig(item)
+      if (playbackRequestIdRef.current !== requestId) {
+        return
+      }
+      const hlsUrl = config.strategy === 'hls' ? config.url : ''
+
+      // Update strategy after async operation
       updateStrategy('hls')
       setVideoUrl(hlsUrl || config.url)
-      callbacksRef.current.onStrategyChange?.('hls')
-    }
-  }, [item])
+      scheduleHlsStateRestore()
+      onStrategyChange?.('hls')
+    },
+    [item, onStrategyChange, scheduleHlsStateRestore, updateStrategy],
+  )
 
   /**
    * Handles video element errors during direct play.
    * Implements fallback logic based on error type.
-   *
-   * Requirements: 4.1, 4.2, 4.3
    */
-  const handleDirectPlayError = useCallback(
-    async (event: Event) => {
-      if (!isActiveRef.current || strategy !== 'direct') return
+  const handleDirectPlayError = useEffectEvent(async (event: Event) => {
+    if (!isActiveRef.current || strategy !== 'direct') return
 
-      const video = event.target as HTMLVideoElement
-      const mediaError = video.error
+    const requestId = playbackRequestIdRef.current
 
-      if (!mediaError) return
+    const video = event.target as HTMLVideoElement
+    const mediaError = video.error
 
-      const videoError = createErrorFromMediaError(
-        mediaError,
-        callbacksRef.current.t,
-      )
+    if (!mediaError) return
 
-      // Media errors: immediate fallback to HLS
-      if (videoError.type === 'media_error') {
-        setError(videoError)
-        callbacksRef.current.onError?.(videoError)
-        await switchToHls()
-        return
-      }
+    const videoError = createErrorFromMediaError(mediaError, t)
 
-      // Network errors: retry once, then fallback
-      if (videoError.type === 'network_error') {
-        if (networkRetryCountRef.current < 1) {
-          networkRetryCountRef.current++
-          // Retry by reloading the source
-          video.load()
-          return
-        }
-
-        // Max retries reached, fallback to HLS
-        setError(videoError)
-        callbacksRef.current.onError?.(videoError)
-        await switchToHls()
-        return
-      }
-
-      // Other errors: report and fallback
+    // Media errors: immediate fallback to HLS
+    if (videoError.type === 'media_error') {
       setError(videoError)
-      callbacksRef.current.onError?.(videoError)
-      await switchToHls()
+      onError?.(videoError)
+      await switchToHls(requestId)
+      return
+    }
+
+    // Network errors: retry once, then fallback
+    if (videoError.type === 'network_error') {
+      if (networkRetryCountRef.current < 1) {
+        networkRetryCountRef.current++
+        // Retry by reloading the source
+        video.load()
+        return
+      }
+
+      // Max retries reached, fallback to HLS
+      setError(videoError)
+      onError?.(videoError)
+      await switchToHls(requestId)
+      return
+    }
+
+    // Other errors: report and fallback
+    setError(videoError)
+    onError?.(videoError)
+    await switchToHls(requestId)
+  })
+
+  const handleInitPlaybackSuccess = useEffectEvent(
+    (config: { strategy: PlaybackStrategy; url: string }, itemId: string) => {
+      setError(null)
+      updateStrategy(config.strategy)
+      setVideoUrl(config.url)
+      setLoadedKey(`${itemId}:${preferredAudioStreamIndex ?? ''}`)
+      onStrategyChange?.(config.strategy)
     },
-    [strategy, switchToHls],
   )
+
+  const handleInitPlaybackFailure = useEffectEvent(
+    (err: unknown, itemId: string) => {
+      const videoError: VideoPlayerError = {
+        type: 'unknown_error',
+        message: t('player.error.unknown'),
+        recoverable: false,
+        originalError: err instanceof Error ? err : undefined,
+      }
+      setError(videoError)
+      setLoadedKey(`${itemId}:${preferredAudioStreamIndex ?? ''}`)
+      onError?.(videoError)
+    },
+  )
+
+  const restorePendingHlsState = useEffectEvent((video: HTMLVideoElement) => {
+    if (!pendingHlsStateRestoreRef.current || !preservedStateRef.current) {
+      return
+    }
+
+    restorePlaybackStateSync(video, preservedStateRef.current)
+    preservedStateRef.current = null
+    pendingHlsStateRestoreRef.current = false
+  })
 
   /**
    * Initializes playback with the appropriate strategy.
    */
-  /* eslint-disable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
   useEffect(() => {
-    if (!item?.Id) {
-      setIsLoading(false)
-      setVideoUrl('')
-      return
-    }
+    if (!item?.Id) return
 
+    const itemId = item.Id
+    const requestId = ++playbackRequestIdRef.current
     isActiveRef.current = true
-    setIsLoading(true)
-    setError(null)
     networkRetryCountRef.current = 0
+    pendingHlsStateRestoreRef.current = false
+    clearHlsStateRestoreSubscription()
 
     const initPlayback = async () => {
       try {
@@ -327,29 +406,24 @@ export function useVideoPlayer({
           preferredAudioStreamIndex,
         )
 
-        if (!isActiveRef.current) return
+        if (playbackRequestIdRef.current !== requestId) {
+          return
+        }
 
         // Start playback session for HLS to enable server-side cleanup
         if (config.strategy === 'hls') {
-          await startPlaybackSession(item.Id!)
+          await startPlaybackSession(itemId)
+          if (playbackRequestIdRef.current !== requestId) {
+            return
+          }
         }
 
-        updateStrategy(config.strategy)
-        setVideoUrl(config.url)
-        setIsLoading(false)
-        callbacksRef.current.onStrategyChange?.(config.strategy)
+        handleInitPlaybackSuccess(config, itemId)
       } catch (err) {
-        if (!isActiveRef.current) return
-
-        const videoError: VideoPlayerError = {
-          type: 'unknown_error',
-          message: callbacksRef.current.t('player.error.unknown'),
-          recoverable: false,
-          originalError: err instanceof Error ? err : undefined,
+        if (playbackRequestIdRef.current !== requestId) {
+          return
         }
-        setError(videoError)
-        setIsLoading(false)
-        callbacksRef.current.onError?.(videoError)
+        handleInitPlaybackFailure(err, itemId)
       }
     }
 
@@ -357,6 +431,9 @@ export function useVideoPlayer({
 
     return () => {
       isActiveRef.current = false
+      playbackRequestIdRef.current++
+      pendingHlsStateRestoreRef.current = false
+      clearHlsStateRestoreSubscription()
       // Stop playback session on cleanup to trigger server-side transcoding cleanup
       // Use refs to get current values, avoiding stale closure issues
       const video =
@@ -365,8 +442,12 @@ export function useVideoPlayer({
           : videoRef.current
       stopPlaybackSession(getPositionTicks(video))
     }
-  }, [item, preferredAudioStreamIndex, hlsPlayer.videoRef])
-  /* eslint-enable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
+  }, [
+    item,
+    preferredAudioStreamIndex,
+    hlsPlayer.videoRef,
+    clearHlsStateRestoreSubscription,
+  ])
 
   /**
    * Sets up direct play video element with error handling.
@@ -399,34 +480,7 @@ export function useVideoPlayer({
     return () => {
       video.removeEventListener('error', handleDirectPlayError)
     }
-  }, [strategy, videoUrl, handleDirectPlayError])
-
-  /**
-   * Restores state when HLS player is ready after URL change.
-   * This handles both initial load and audio track switching reloads.
-   * Video element event binding requires effect.
-   */
-  /* eslint-disable react-you-might-not-need-an-effect/no-pass-ref-to-parent, react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-derived-state */
-  useEffect(() => {
-    if (strategy !== 'hls' || !hlsPlayer.videoRef.current || !videoUrl) return
-
-    const video = hlsPlayer.videoRef.current
-    if (preservedStateRef.current) {
-      const handleCanPlay = () => {
-        if (preservedStateRef.current) {
-          restorePlaybackStateSync(video, preservedStateRef.current)
-          preservedStateRef.current = null
-        }
-        video.removeEventListener('canplay', handleCanPlay)
-      }
-      video.addEventListener('canplay', handleCanPlay)
-
-      return () => {
-        video.removeEventListener('canplay', handleCanPlay)
-      }
-    }
-  }, [strategy, hlsPlayer.videoRef, videoUrl])
-  /* eslint-enable react-you-might-not-need-an-effect/no-pass-ref-to-parent, react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-derived-state */
+  }, [strategy, videoUrl])
 
   /**
    * Retry playback after an error.
@@ -473,27 +527,42 @@ export function useVideoPlayer({
 
         // Switch strategy to HLS
         updateStrategy('hls')
-        callbacksRef.current.onStrategyChange?.('hls')
+        onStrategyChange?.('hls')
       }
 
       // Update the URL state - this will trigger HLS.js to load the new URL
       setVideoUrl(newUrl)
+      scheduleHlsStateRestore()
     },
-    [item?.Id, hlsPlayer.videoRef, updateStrategy],
+    [
+      item?.Id,
+      hlsPlayer.videoRef,
+      onStrategyChange,
+      updateStrategy,
+      scheduleHlsStateRestore,
+    ],
   )
 
   // Use HLS player's video ref when in HLS mode
   const activeVideoRef = strategy === 'hls' ? hlsPlayer.videoRef : videoRef
   const activeHlsRef = strategy === 'hls' ? hlsPlayer.hlsRef : emptyHlsRef
 
+  // Derive loading/error/url from item and load tracking
+  const itemKey = item?.Id
+    ? `${item.Id}:${preferredAudioStreamIndex ?? ''}`
+    : undefined
+  const isLoading = !!itemKey && loadedKey !== itemKey
+  const effectiveError = !item?.Id || isLoading ? null : error
+  const effectiveVideoUrl = !item?.Id ? '' : videoUrl
+
   return {
     videoRef: activeVideoRef,
     hlsRef: activeHlsRef,
     strategy,
     isLoading,
-    error,
+    error: effectiveError,
     retry,
-    videoUrl,
+    videoUrl: effectiveVideoUrl,
     reloadHlsWithUrl,
   }
 }

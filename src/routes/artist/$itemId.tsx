@@ -3,21 +3,27 @@
  * Renders the ArtistView component for a specific artist.
  */
 
+import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { ArtistView } from '@/components/views/ArtistView'
+import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
 import {
-  QUERY_STALE_TIMES,
   artistKeys,
   itemsKeys,
   useAlbums,
   useItem,
-} from '@/hooks/queries'
+} from '@/hooks/queries/use-items'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getAlbums, getItemById } from '@/services/items/api'
+
+const ArtistView = lazy(() =>
+  import('@/components/views/ArtistView').then((module) => ({
+    default: module.ArtistView,
+  })),
+)
 
 /**
  * Route params schema - validates itemId is a valid UUID.
@@ -85,19 +91,19 @@ export const Route = createFileRoute('/artist/$itemId')({
     const { itemId } = params
     const { queryClient } = context
 
-    // Prefetch artist data
-    await queryClient.ensureQueryData({
-      queryKey: itemsKeys.detail(itemId),
-      queryFn: () => getItemById(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
-
-    // Prefetch albums data
-    await queryClient.ensureQueryData({
-      queryKey: artistKeys.albums(itemId),
-      queryFn: () => getAlbums(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
+    // Prefetch artist and albums data in parallel
+    await Promise.all([
+      queryClient.ensureQueryData({
+        queryKey: itemsKeys.detail(itemId),
+        queryFn: () => getItemById(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+      queryClient.ensureQueryData({
+        queryKey: artistKeys.albums(itemId),
+        queryFn: () => getAlbums(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+    ])
   },
   onError: () => {
     // Throw notFound for invalid params (e.g., malformed UUID)
@@ -146,7 +152,9 @@ function ArtistPage() {
         featureName="Artist"
         minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       >
-        <ArtistView artist={artist} albums={albums || []} />
+        <Suspense fallback={<ArtistSkeleton />}>
+          <ArtistView artist={artist} albums={albums || []} />
+        </Suspense>
       </FeatureErrorBoundary>
     </main>
   )

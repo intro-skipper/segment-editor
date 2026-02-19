@@ -6,21 +6,24 @@
  * @module components/connection/steps/EntryStep
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import { Loader2, Search, Server } from 'lucide-react'
 
 import { WizardError } from '../WizardError'
+import type { RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export interface EntryStepProps {
+interface EntryStepProps {
   address: string
   error: string | null
   isLoading: boolean
   onAddressChange: (address: string) => void
   onDiscover: () => void
   onRetry?: () => void
+  /** Ref forwarded to the server address input for dialog initialFocus */
+  inputRef?: RefObject<HTMLInputElement | null>
 }
 
 export function EntryStep({
@@ -30,14 +33,8 @@ export function EntryStep({
   onAddressChange,
   onDiscover,
   onRetry,
+  inputRef,
 }: EntryStepProps) {
-  const addressInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const timer = setTimeout(() => addressInputRef.current?.focus(), 100)
-    return () => clearTimeout(timer)
-  }, [])
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !isLoading) {
@@ -64,7 +61,7 @@ export function EntryStep({
       <div className="space-y-2">
         <Label htmlFor="server-address">Server Address</Label>
         <Input
-          ref={addressInputRef}
+          ref={inputRef}
           id="server-address"
           type="text"
           inputMode="url"
@@ -96,7 +93,9 @@ export function EntryStep({
       >
         {isLoading ? (
           <>
-            <Loader2 className="size-4 animate-spin" aria-hidden />
+            <div className="animate-spin" aria-hidden>
+              <Loader2 className="size-4" />
+            </div>
             Discovering...
           </>
         ) : (

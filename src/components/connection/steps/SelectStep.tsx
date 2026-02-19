@@ -20,7 +20,11 @@ import {
 import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { useTranslation } from 'react-i18next'
 
-import { WizardActions } from '../WizardActions'
+import {
+  WizardActions,
+  WizardBackAction,
+  WizardContinueAction,
+} from '../WizardActions'
 import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +34,7 @@ import { getScoreDisplay } from '@/services/jellyfin'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface SelectStepProps {
+interface SelectStepProps {
   servers: Array<RecommendedServerInfo>
   selectedServer: RecommendedServerInfo | null
   isLoading: boolean
@@ -44,15 +48,15 @@ export interface SelectStepProps {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getScoreIcon(score: RecommendedServerInfoScore) {
+function renderScoreIcon(score: RecommendedServerInfoScore) {
   switch (score) {
     case RecommendedServerInfoScore.GREAT:
     case RecommendedServerInfoScore.GOOD:
-      return Shield
+      return <Shield className="size-3" aria-hidden />
     case RecommendedServerInfoScore.OK:
-      return ShieldAlert
+      return <ShieldAlert className="size-3" aria-hidden />
     default:
-      return ShieldOff
+      return <ShieldOff className="size-3" aria-hidden />
   }
 }
 
@@ -82,7 +86,7 @@ function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
     () => getScoreDisplay(server.score),
     [server.score],
   )
-  const ScoreIcon = useMemo(() => getScoreIcon(server.score), [server.score])
+  const scoreIcon = useMemo(() => renderScoreIcon(server.score), [server.score])
 
   const serverName = server.systemInfo?.ServerName ?? 'Jellyfin Server'
   const serverVersion = server.systemInfo?.Version ?? 'Unknown version'
@@ -101,7 +105,7 @@ function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
       aria-selected={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
-        'w-full text-left p-4 rounded-xl transition-all duration-200',
+        'w-full text-left p-4 rounded-xl transition-[transform,box-shadow,background-color,border-color] duration-200',
         'border-2 border-transparent',
         'hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isSelected && 'border-primary bg-primary/5',
@@ -139,7 +143,7 @@ function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
 
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={getBadgeVariant(scoreDisplay.variant)}>
-              <ScoreIcon className="size-3" aria-hidden />
+              {scoreIcon}
               {scoreDisplay.label}
             </Badge>
             <Badge variant="outline">v{serverVersion}</Badge>
@@ -225,8 +229,10 @@ function ServerList({
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <Loader2 className="size-8 animate-spin mb-3" aria-hidden />
-        <p>Discovering servers...</p>
+        <div className="animate-spin mb-3" aria-hidden>
+          <Loader2 className="size-8" />
+        </div>
+        <p>Discovering servers…</p>
       </div>
     )
   }
@@ -336,12 +342,13 @@ export function SelectStep({
         </div>
       )}
 
-      <WizardActions
-        onBack={onBack}
-        onContinue={onContinue}
-        isLoading={isLoading}
-        continueDisabled={!selectedServer}
-      />
+      <WizardActions>
+        <WizardBackAction onBack={onBack} disabled={isLoading} />
+        <WizardContinueAction
+          onContinue={onContinue}
+          disabled={!selectedServer || isLoading}
+        />
+      </WizardActions>
     </div>
   )
 }

@@ -5,6 +5,8 @@
  * @module services/video/tracks
  */
 
+import { getLanguageName } from '@/lib/language-utils'
+
 // ============================================================================
 // Types and Interfaces
 // ============================================================================
@@ -98,7 +100,7 @@ export interface TrackState {
  * Mapping of subtitle codec names to human-readable format names.
  * Used for displaying subtitle format in the track selector UI.
  */
-export const SUBTITLE_FORMATS: Record<string, string> = {
+const SUBTITLE_FORMATS: Record<string, string> = {
   srt: 'SRT',
   subrip: 'SRT',
   ass: 'ASS',
@@ -119,7 +121,7 @@ export const SUBTITLE_FORMATS: Record<string, string> = {
  * Mapping of channel counts to human-readable labels.
  * Used for displaying audio channel configuration in the track selector UI.
  */
-export const CHANNEL_LABELS: Record<number, string> = {
+const CHANNEL_LABELS: Record<number, string> = {
   1: 'Mono',
   2: 'Stereo',
   6: '5.1',
@@ -129,8 +131,8 @@ export const CHANNEL_LABELS: Record<number, string> = {
 /**
  * MediaStream type identifiers from Jellyfin API.
  */
-export const AUDIO_STREAM_TYPE = 'Audio' as const
-export const SUBTITLE_STREAM_TYPE = 'Subtitle' as const
+const AUDIO_STREAM_TYPE = 'Audio' as const
+const SUBTITLE_STREAM_TYPE = 'Subtitle' as const
 
 // ============================================================================
 // Track Extraction Types
@@ -139,7 +141,7 @@ export const SUBTITLE_STREAM_TYPE = 'Subtitle' as const
 /**
  * Result of extracting tracks from a media item.
  */
-export interface TrackExtractionResult {
+interface TrackExtractionResult {
   /** All audio tracks found in the media source */
   audioTracks: Array<AudioTrackInfo>
   /** All subtitle tracks found in the media source */
@@ -309,7 +311,7 @@ function extractSubtitleTrack(
  * // Returns: "Unknown - AC3 Stereo"
  * ```
  */
-export function formatAudioTrackLabel(track: {
+function formatAudioTrackLabel(track: {
   language: string | null
   codec: string
   channels: number
@@ -336,7 +338,7 @@ export function formatAudioTrackLabel(track: {
  * // Returns: "Unknown - ASS"
  * ```
  */
-export function formatSubtitleTrackLabel(track: {
+function formatSubtitleTrackLabel(track: {
   language: string | null
   format: string
 }): string {
@@ -348,107 +350,4 @@ export function formatSubtitleTrackLabel(track: {
 // ============================================================================
 // Language Utilities
 // ============================================================================
-
-/**
- * Common ISO 639 language codes to display names mapping.
- * Used when Intl.DisplayNames is not available or for consistency.
- */
-const LANGUAGE_NAMES: Record<string, string> = {
-  eng: 'English',
-  en: 'English',
-  deu: 'German',
-  de: 'German',
-  ger: 'German',
-  fra: 'French',
-  fr: 'French',
-  fre: 'French',
-  spa: 'Spanish',
-  es: 'Spanish',
-  ita: 'Italian',
-  it: 'Italian',
-  jpn: 'Japanese',
-  ja: 'Japanese',
-  kor: 'Korean',
-  ko: 'Korean',
-  zho: 'Chinese',
-  zh: 'Chinese',
-  chi: 'Chinese',
-  por: 'Portuguese',
-  pt: 'Portuguese',
-  rus: 'Russian',
-  ru: 'Russian',
-  ara: 'Arabic',
-  ar: 'Arabic',
-  hin: 'Hindi',
-  hi: 'Hindi',
-  nld: 'Dutch',
-  nl: 'Dutch',
-  dut: 'Dutch',
-  pol: 'Polish',
-  pl: 'Polish',
-  swe: 'Swedish',
-  sv: 'Swedish',
-  nor: 'Norwegian',
-  no: 'Norwegian',
-  dan: 'Danish',
-  da: 'Danish',
-  fin: 'Finnish',
-  fi: 'Finnish',
-  tur: 'Turkish',
-  tr: 'Turkish',
-  tha: 'Thai',
-  th: 'Thai',
-  vie: 'Vietnamese',
-  vi: 'Vietnamese',
-  ind: 'Indonesian',
-  id: 'Indonesian',
-  ces: 'Czech',
-  cs: 'Czech',
-  cze: 'Czech',
-  hun: 'Hungarian',
-  hu: 'Hungarian',
-  ron: 'Romanian',
-  ro: 'Romanian',
-  rum: 'Romanian',
-  ell: 'Greek',
-  el: 'Greek',
-  gre: 'Greek',
-  heb: 'Hebrew',
-  he: 'Hebrew',
-  ukr: 'Ukrainian',
-  uk: 'Ukrainian',
-  und: 'Undetermined',
-}
-
-/**
- * Gets the human-readable language name from an ISO 639 language code.
- * Falls back to "Unknown" if the language code is null or not recognized.
- *
- * @param languageCode - ISO 639-1 (2-letter) or ISO 639-2 (3-letter) code
- * @returns Human-readable language name or "Unknown"
- */
-function getLanguageName(languageCode: string | null): string {
-  if (!languageCode) {
-    return 'Unknown'
-  }
-
-  const code = languageCode.toLowerCase()
-
-  // Try our mapping first for consistency
-  if (LANGUAGE_NAMES[code]) {
-    return LANGUAGE_NAMES[code]
-  }
-
-  // Try Intl.DisplayNames for less common languages
-  try {
-    const displayNames = new Intl.DisplayNames(['en'], { type: 'language' })
-    const name = displayNames.of(code)
-    if (name && name !== code) {
-      return name
-    }
-  } catch {
-    // Intl.DisplayNames not supported or invalid code
-  }
-
-  return 'Unknown'
-}
+// getLanguageName is imported from @/lib/language-utils — single source of truth.

@@ -10,7 +10,7 @@ import { CACHE_CONFIG } from './constants'
 /**
  * Options for LRU cache configuration.
  */
-export interface LRUCacheOptions<TValue> {
+interface LRUCacheOptions<TValue> {
   /** Callback invoked when an entry is evicted from the cache */
   onEvict?: (value: TValue) => void
 }
@@ -185,8 +185,33 @@ export const blobCache = new LRUCache<string, string>(
   },
 )
 
+interface FetchBlobUrlOptions {
+  signal?: AbortSignal
+}
+
 // Track pending fetches to deduplicate concurrent requests
 const pendingBlobFetches = new Map<string, Promise<string | null>>()
+
+async function requestBlobUrl(
+  url: string,
+  options?: FetchBlobUrlOptions,
+): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: options?.signal })
+    if (!res.ok) return null
+
+    const blobUrl = URL.createObjectURL(await res.blob())
+    if (options?.signal?.aborted) {
+      URL.revokeObjectURL(blobUrl)
+      return null
+    }
+
+    blobCache.set(url, blobUrl)
+    return blobUrl
+  } catch {
+    return null
+  }
+}
 
 /**
  * Fetches a URL and returns a blob URL, with caching and request deduplication.
@@ -195,27 +220,25 @@ const pendingBlobFetches = new Map<string, Promise<string | null>>()
  * @param url - The URL to fetch
  * @returns Promise resolving to blob URL or null on failure
  */
-export function fetchBlobUrl(url: string): Promise<string | null> {
+export function fetchBlobUrl(
+  url: string,
+  options?: FetchBlobUrlOptions,
+): Promise<string | null> {
   // Return cached immediately
   const cached = blobCache.get(url)
   if (cached) return Promise.resolve(cached)
+
+  // Abortable calls skip dedupe so each caller can cancel independently.
+  if (options?.signal) {
+    return requestBlobUrl(url, options)
+  }
 
   // Return pending request if one exists
   let promise = pendingBlobFetches.get(url)
   if (promise) return promise
 
   // Start new fetch
-  promise = (async () => {
-    try {
-      const res = await fetch(url)
-      if (!res.ok) return null
-      const blobUrl = URL.createObjectURL(await res.blob())
-      blobCache.set(url, blobUrl)
-      return blobUrl
-    } catch {
-      return null
-    }
-  })()
+  promise = requestBlobUrl(url)
 
   pendingBlobFetches.set(url, promise)
   void promise.finally(() => pendingBlobFetches.delete(url))

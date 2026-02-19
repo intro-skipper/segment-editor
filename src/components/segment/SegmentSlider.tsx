@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { Copy, Crosshair, GripVertical, Play, Trash2 } from 'lucide-react'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { SessionStore } from '@/stores/session-store'
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { SegmentUpdate } from '@/types/segment'
 import { formatTime } from '@/lib/time-utils'
 import {
@@ -17,7 +17,6 @@ import {
   validateSegment,
 } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
-import { useSessionStore } from '@/stores/session-store'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -40,13 +39,13 @@ const { MIN_SEGMENT_GAP } = SEGMENT_CONFIG
 /** Handle width in pixels for positioning calculations */
 const HANDLE_WIDTH = 14
 
-export interface SegmentSliderProps {
+interface SegmentSliderProps {
   /** The segment to display and edit */
   segment: MediaSegmentDto
   /** Index of this segment in the list */
   index: number
-  /** Currently active segment index */
-  activeIndex: number
+  /** Whether this segment is currently active */
+  isActive: boolean
   /** Total runtime of the media in seconds */
   runtimeSeconds: number
   /** Callback when segment boundaries are updated */
@@ -63,19 +62,18 @@ export interface SegmentSliderProps {
   onSetEndFromPlayer?: (index: number) => void
   /** Callback to copy all segments to system clipboard as JSON */
   onCopyAllAsJson?: () => void
+  /** Vibrant theme colors derived from the current item artwork */
+  vibrantColors: VibrantColors | null
 }
 
 /**
  * SegmentSlider component.
  * Displays a segment with dual-handle range slider and numeric inputs.
  */
-// Stable selectors to prevent re-renders - defined outside component
-const selectVibrantColors = (state: SessionStore) => state.vibrantColors
-
-export const SegmentSlider = React.memo(function SegmentSlider({
+export const SegmentSlider = React.memo(function SegmentSliderComponent({
   segment,
   index,
-  activeIndex,
+  isActive,
   runtimeSeconds,
   onUpdate,
   onDelete,
@@ -84,14 +82,17 @@ export const SegmentSlider = React.memo(function SegmentSlider({
   onSetStartFromPlayer,
   onSetEndFromPlayer,
   onCopyAllAsJson,
+  vibrantColors,
 }: SegmentSliderProps) {
   const { t } = useTranslation()
-  // Use individual selectors instead of useShallow to avoid object creation
-  const vibrantColors = useSessionStore(selectVibrantColors)
   const sliderRef = React.useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
     null,
   )
+  // Derive local state from props when not dragging.
+  // Using segment.Id as the reset key — when segment identity changes we
+  // re-initialise. While dragging the pointer, props may lag behind; we keep
+  // the local value until the drag ends and an onUpdate fires.
   const [localStart, setLocalStart] = React.useState(segment.StartTicks ?? 0)
   const [localEnd, setLocalEnd] = React.useState(segment.EndTicks ?? 0)
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
@@ -115,14 +116,8 @@ export const SegmentSlider = React.memo(function SegmentSlider({
     [],
   )
 
-  const isActive = index === activeIndex
   const segmentColor = getSegmentColor(segment.Type)
   const segmentCssVar = getSegmentCssVar(segment.Type)
-
-  React.useEffect(() => {
-    setLocalStart(segment.StartTicks ?? 0)
-    setLocalEnd(segment.EndTicks ?? 0)
-  }, [segment.StartTicks, segment.EndTicks])
 
   const validation = React.useMemo(
     () =>
@@ -407,16 +402,33 @@ export const SegmentSlider = React.memo(function SegmentSlider({
     [onSetActive, index],
   )
 
+  const handleContainerKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.target !== e.currentTarget) {
+        return
+      }
+
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onSetActive(index)
+      }
+    },
+    [onSetActive, index],
+  )
+
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={cn(
-        'group relative rounded-xl border bg-card/50 backdrop-blur-sm p-4 transition-all duration-200',
+        'group relative rounded-xl border bg-card/50 backdrop-blur-sm p-4 transition-[transform,box-shadow,background-color,border-color] duration-200',
         isActive
           ? 'border-primary/60 bg-primary/5 shadow-lg shadow-primary/10'
           : 'border-border/50 hover:border-primary/30 hover:bg-card/80',
       )}
       style={containerStyle}
       onClick={handleSetActiveClick}
+      onKeyDown={handleContainerKeyDown}
     >
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
@@ -501,7 +513,7 @@ export const SegmentSlider = React.memo(function SegmentSlider({
         <div className="relative h-full w-full">
           {/* Segment range visualization */}
           <div
-            className="absolute top-1 bottom-1 rounded-md transition-all duration-75"
+            className="absolute top-1 bottom-1 rounded-md transition-[left,width,background-color,opacity] duration-75"
             style={segmentRangeStyle}
           />
 

@@ -7,7 +7,7 @@
  * - Safari native HLS fallback
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef } from 'react'
 import Hls from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
@@ -19,7 +19,7 @@ export interface HlsPlayerError {
   recoverable: boolean
 }
 
-export interface UseHlsPlayerOptions {
+interface UseHlsPlayerOptions {
   videoUrl: string
   onError: (error: HlsPlayerError | null) => void
   onRecoveryStart: () => void
@@ -27,7 +27,7 @@ export interface UseHlsPlayerOptions {
   t: (key: string) => string
 }
 
-export interface UseHlsPlayerReturn {
+interface UseHlsPlayerReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>
   hlsRef: React.RefObject<Hls | null>
   retry: () => void
@@ -69,9 +69,25 @@ export function useHlsPlayer({
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isActiveRef = useRef(true)
 
-  // Store latest callbacks in ref to avoid stale closures
-  const callbacksRef = useRef({ onError, onRecoveryStart, onRecoveryEnd, t })
-  callbacksRef.current = { onError, onRecoveryStart, onRecoveryEnd, t }
+  const reportError = useEffectEvent((error: HlsPlayerError | null) => {
+    onError(error)
+  })
+
+  const reportRecoveryStart = useEffectEvent(() => {
+    onRecoveryStart()
+  })
+
+  const reportRecoveryEnd = useEffectEvent(() => {
+    onRecoveryEnd()
+  })
+
+  const createLocalizedError = useEffectEvent(
+    (
+      type: HlsPlayerError['type'],
+      msgKey: string,
+      recoverable: boolean,
+    ): HlsPlayerError => createError(type, msgKey, t, recoverable),
+  )
 
   // Cleanup recovery timer - extracted for reuse
   const clearRecoveryTimer = useCallback(() => {
@@ -97,7 +113,7 @@ export function useHlsPlayer({
     isActiveRef.current = true
 
     // Clear previous state
-    callbacksRef.current.onError(null)
+    reportError(null)
     destroyHls()
 
     if (Hls.isSupported()) {
@@ -111,27 +127,18 @@ export function useHlsPlayer({
       ) => {
         if (!isActiveRef.current) return
 
-        const {
-          onError: setError,
-          onRecoveryStart: startRecovery,
-          onRecoveryEnd: endRecovery,
-          t: translate,
-        } = callbacksRef.current
-
-        setError(createError(type, msgKey, translate, true))
-        startRecovery()
+        reportError(createLocalizedError(type, msgKey, true))
+        reportRecoveryStart()
         recoveryFn()
 
         clearRecoveryTimer()
         recoveryTimerRef.current = setTimeout(() => {
-          if (isActiveRef.current) endRecovery()
+          if (isActiveRef.current) reportRecoveryEnd()
         }, RECOVERY_TIMEOUT_MS)
       }
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!isActiveRef.current || !data.fatal) return
-
-        const { t: translate } = callbacksRef.current
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
@@ -145,17 +152,17 @@ export function useHlsPlayer({
             )
             break
           default:
-            callbacksRef.current.onError(
-              createError('unknown', 'player.error.unknown', translate, false),
+            reportError(
+              createLocalizedError('unknown', 'player.error.unknown', false),
             )
         }
       })
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (!isActiveRef.current) return
-        callbacksRef.current.onError(null)
+        reportError(null)
         clearRecoveryTimer()
-        callbacksRef.current.onRecoveryEnd()
+        reportRecoveryEnd()
       })
 
       hls.loadSource(videoUrl)
@@ -172,9 +179,9 @@ export function useHlsPlayer({
   }, [videoUrl, destroyHls, clearRecoveryTimer])
 
   const retry = useCallback(() => {
-    callbacksRef.current.onError(null)
+    onError(null)
     hlsRef.current?.loadSource(videoUrl)
-  }, [videoUrl])
+  }, [onError, videoUrl])
 
   return { videoRef, hlsRef, retry }
 }

@@ -3,21 +3,27 @@
  * Renders the AlbumView component for a specific album.
  */
 
+import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { AlbumView } from '@/components/views/AlbumView'
+import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
 import {
-  QUERY_STALE_TIMES,
   albumKeys,
   itemsKeys,
   useItem,
   useTracks,
-} from '@/hooks/queries'
+} from '@/hooks/queries/use-items'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getItemById, getTracks } from '@/services/items/api'
+
+const AlbumView = lazy(() =>
+  import('@/components/views/AlbumView').then((module) => ({
+    default: module.AlbumView,
+  })),
+)
 
 /**
  * Route params schema - validates itemId is a valid UUID.
@@ -90,19 +96,19 @@ export const Route = createFileRoute('/album/$itemId')({
     const { itemId } = params
     const { queryClient } = context
 
-    // Prefetch album data
-    await queryClient.ensureQueryData({
-      queryKey: itemsKeys.detail(itemId),
-      queryFn: () => getItemById(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
-
-    // Prefetch tracks data
-    await queryClient.ensureQueryData({
-      queryKey: albumKeys.tracks(itemId),
-      queryFn: () => getTracks(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
+    // Prefetch album and tracks data in parallel
+    await Promise.all([
+      queryClient.ensureQueryData({
+        queryKey: itemsKeys.detail(itemId),
+        queryFn: () => getItemById(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+      queryClient.ensureQueryData({
+        queryKey: albumKeys.tracks(itemId),
+        queryFn: () => getTracks(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+    ])
   },
   onError: () => {
     // Throw notFound for invalid params (e.g., malformed UUID)
@@ -151,7 +157,9 @@ function AlbumPage() {
         featureName="Album"
         minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       >
-        <AlbumView album={album} tracks={tracks || []} />
+        <Suspense fallback={<AlbumSkeleton />}>
+          <AlbumView album={album} tracks={tracks || []} />
+        </Suspense>
       </FeatureErrorBoundary>
     </main>
   )

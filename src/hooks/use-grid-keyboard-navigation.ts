@@ -3,16 +3,16 @@
  * Enables arrow key navigation, Home/End support, and proper focus management.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
-export interface UseGridKeyboardNavigationOptions {
+interface UseGridKeyboardNavigationOptions {
   itemCount: number
   columns: number
   enabled?: boolean
   onActivate?: (index: number) => void
 }
 
-export interface GridProps {
+interface GridProps {
   role: 'grid'
   'aria-label': string
   tabIndex: number
@@ -20,15 +20,15 @@ export interface GridProps {
   onFocus: () => void
 }
 
-export interface GridItemProps {
+interface GridItemProps {
   role: 'gridcell'
   tabIndex: number
   'data-grid-index': number
   'aria-selected': boolean
-  onFocus: () => void
+  onFocus: (e: React.FocusEvent<HTMLElement>) => void
 }
 
-export interface UseGridKeyboardNavigationReturn {
+interface UseGridKeyboardNavigationReturn {
   focusedIndex: number
   setFocusedIndex: (index: number) => void
   gridProps: GridProps
@@ -65,7 +65,8 @@ export function useGridKeyboardNavigation({
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
-  // Reset focus when items change
+  // Clamp stored index to valid range — used for all rendering and comparisons.
+  // No effect needed: this is a pure derivation from existing state.
   const validFocusedIndex =
     itemCount === 0
       ? -1
@@ -73,69 +74,78 @@ export function useGridKeyboardNavigation({
         ? itemCount - 1
         : focusedIndex
 
-  // Sync state if computed value differs
-  if (validFocusedIndex !== focusedIndex) {
-    setFocusedIndex(validFocusedIndex)
-  }
-
-  // Focus management requires DOM manipulation via effect
-  /* eslint-disable react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-ref-to-parent */
-  useEffect(() => {
-    if (!enabled || validFocusedIndex < 0 || !gridRef.current) return
-    const item = gridRef.current.querySelector<HTMLElement>(
-      `[data-grid-index="${validFocusedIndex}"]`,
-    )
-    if (item && document.activeElement !== item)
-      item.focus({ preventScroll: true })
-  }, [validFocusedIndex, enabled])
-  /* eslint-enable react-you-might-not-need-an-effect/no-event-handler, react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-ref-to-parent */
+  /** Focuses the DOM element at the given grid index. */
+  const focusIndex = useCallback(
+    (index: number) => {
+      if (!enabled || index < 0 || !gridRef.current) return
+      const el = gridRef.current.querySelector<HTMLElement>(
+        `[data-grid-index="${index}"]`,
+      )
+      if (el && document.activeElement !== el) el.focus({ preventScroll: true })
+    },
+    [enabled],
+  )
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!enabled || itemCount === 0) return
 
-      if ((e.key === 'Enter' || e.key === ' ') && focusedIndex >= 0) {
+      if ((e.key === 'Enter' || e.key === ' ') && validFocusedIndex >= 0) {
         e.preventDefault()
-        onActivate?.(focusedIndex)
+        onActivate?.(validFocusedIndex)
         return
       }
 
       const handler = NAV_KEYS[e.key]
       if (!handler) return
 
-      const current = focusedIndex < 0 ? 0 : focusedIndex
+      const current = validFocusedIndex < 0 ? 0 : validFocusedIndex
       const newIndex = handler(current, columns, itemCount, e.ctrlKey)
 
       if (newIndex !== current) {
         e.preventDefault()
         setFocusedIndex(newIndex)
+        focusIndex(newIndex)
       }
     },
-    [enabled, itemCount, focusedIndex, columns, onActivate],
+    [enabled, itemCount, validFocusedIndex, columns, onActivate, focusIndex],
   )
 
   const handleGridFocus = useCallback(() => {
-    if (focusedIndex < 0 && itemCount > 0) setFocusedIndex(0)
-  }, [focusedIndex, itemCount])
+    if (validFocusedIndex < 0 && itemCount > 0) {
+      setFocusedIndex(0)
+      focusIndex(0)
+    }
+  }, [validFocusedIndex, itemCount, focusIndex])
+
+  const handleItemFocus = useCallback((e: React.FocusEvent<HTMLElement>) => {
+    const indexAttribute = e.currentTarget.dataset.gridIndex
+    if (!indexAttribute) return
+
+    const nextIndex = Number.parseInt(indexAttribute, 10)
+    if (Number.isNaN(nextIndex)) return
+
+    setFocusedIndex(nextIndex)
+  }, [])
 
   const getItemProps = useCallback(
     (index: number): GridItemProps => ({
       role: 'gridcell',
-      tabIndex: focusedIndex === index ? 0 : -1,
+      tabIndex: validFocusedIndex === index ? 0 : -1,
       'data-grid-index': index,
-      'aria-selected': focusedIndex === index,
-      onFocus: () => setFocusedIndex(index),
+      'aria-selected': validFocusedIndex === index,
+      onFocus: handleItemFocus,
     }),
-    [focusedIndex],
+    [validFocusedIndex, handleItemFocus],
   )
 
   return {
-    focusedIndex,
+    focusedIndex: validFocusedIndex,
     setFocusedIndex,
     gridProps: {
       role: 'grid',
       'aria-label': 'Media items grid',
-      tabIndex: focusedIndex < 0 && itemCount > 0 ? 0 : -1,
+      tabIndex: validFocusedIndex < 0 && itemCount > 0 ? 0 : -1,
       onKeyDown: handleKeyDown,
       onFocus: handleGridFocus,
     },

@@ -5,8 +5,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createQueryKey } from './query-error-handling'
 import { createStandardQueryOptions } from './create-query-hook'
 import type { CacheDuration } from './create-query-hook'
-import type { BaseItemDto } from '@/types/jellyfin'
-import { filterItemsByName } from '@/lib/utils'
+import type { PagedItemsResult } from '@/services/items/api'
+import type { BaseItemKind } from '@/types/jellyfin'
 import {
   getAlbums,
   getEpisodes,
@@ -20,7 +20,16 @@ import { selectValidAuth, useApiStore } from '@/stores'
 // Query Keys
 export const itemsKeys = {
   all: createQueryKey('items'),
-  list: (parentId: string) => createQueryKey('items', 'list', parentId),
+  list: (
+    parentId: string,
+    options?: {
+      includeMediaStreams?: boolean
+      excludeItemTypes?: Array<BaseItemKind>
+      limit?: number
+      startIndex?: number
+      searchTerm?: string
+    },
+  ) => createQueryKey('items', 'list', parentId, options),
   detail: (itemId: string) => createQueryKey('items', 'detail', itemId),
   episodes: (seriesId: string) => createQueryKey('items', 'episodes', seriesId),
 } as const
@@ -49,7 +58,7 @@ interface UseEntityOptions {
 /** Generic hook factory for simple entity queries */
 const useEntityQuery = <T>(
   queryKey: ReturnType<typeof createQueryKey>,
-  queryFn: () => Promise<T>,
+  queryFn: (context: { signal?: AbortSignal }) => Promise<T>,
   ids: string | Array<string>,
   operation: string,
   options?: UseEntityOptions,
@@ -70,10 +79,11 @@ const useEntityQuery = <T>(
 }
 
 // Hooks
-export interface UseItemsOptions {
+interface UseItemsOptions {
   parentId: string
   nameFilter?: string
   includeMediaStreams?: boolean
+  excludeItemTypes?: Array<BaseItemKind>
   limit?: number
   startIndex?: number
   enabled?: boolean
@@ -82,30 +92,52 @@ export interface UseItemsOptions {
 export function useItems({
   parentId,
   nameFilter,
-  includeMediaStreams,
+  includeMediaStreams = false,
+  excludeItemTypes,
   limit,
   startIndex,
   enabled = true,
 }: UseItemsOptions) {
   const validAuth = useApiStore(selectValidAuth)
-  const select = useMemo(
-    () => (data: Array<BaseItemDto>) => filterItemsByName(data, nameFilter),
-    [nameFilter],
-  )
+  const trimmedFilter = useMemo(() => nameFilter?.trim(), [nameFilter])
+
   const queryFn = useCallback(
-    () => getItems({ parentId, includeMediaStreams, limit, startIndex }),
-    [parentId, includeMediaStreams, limit, startIndex],
+    ({ signal }: { signal?: AbortSignal }) =>
+      getItems(
+        {
+          parentId,
+          searchTerm: trimmedFilter,
+          includeMediaStreams,
+          excludeItemTypes,
+          limit,
+          startIndex,
+        },
+        { signal },
+      ),
+    [
+      parentId,
+      trimmedFilter,
+      includeMediaStreams,
+      excludeItemTypes,
+      limit,
+      startIndex,
+    ],
   )
 
   return useQuery({
-    ...createStandardQueryOptions<Array<BaseItemDto>>({
-      queryKey: itemsKeys.list(parentId),
+    ...createStandardQueryOptions<PagedItemsResult>({
+      queryKey: itemsKeys.list(parentId, {
+        includeMediaStreams,
+        excludeItemTypes,
+        limit,
+        startIndex,
+        searchTerm: trimmedFilter,
+      }),
       queryFn,
       enabled: validAuth && enabled && !!parentId,
       cacheDuration: 'MEDIUM',
       operation: 'Fetch items',
     }),
-    select,
     // Keep showing previous data during transitions to prevent flicker
     placeholderData: keepPreviousData,
   })
@@ -114,7 +146,7 @@ export function useItems({
 export const useItem = (itemId: string, opts?: UseEntityOptions) =>
   useEntityQuery(
     itemsKeys.detail(itemId),
-    () => getItemById(itemId),
+    (context) => getItemById(itemId, context),
     itemId,
     'Fetch item',
     opts,
@@ -123,7 +155,7 @@ export const useItem = (itemId: string, opts?: UseEntityOptions) =>
 export const useSeasons = (seriesId: string, opts?: UseEntityOptions) =>
   useEntityQuery(
     seriesKeys.seasons(seriesId),
-    () => getSeasons(seriesId),
+    (context) => getSeasons(seriesId, context),
     seriesId,
     'Fetch seasons',
     opts,
@@ -132,7 +164,7 @@ export const useSeasons = (seriesId: string, opts?: UseEntityOptions) =>
 export const useTracks = (albumId: string, opts?: UseEntityOptions) =>
   useEntityQuery(
     albumKeys.tracks(albumId),
-    () => getTracks(albumId),
+    (context) => getTracks(albumId, undefined, context),
     albumId,
     'Fetch tracks',
     opts,
@@ -141,7 +173,7 @@ export const useTracks = (albumId: string, opts?: UseEntityOptions) =>
 export const useAlbums = (artistId: string, opts?: UseEntityOptions) =>
   useEntityQuery(
     artistKeys.albums(artistId),
-    () => getAlbums(artistId),
+    (context) => getAlbums(artistId, context),
     artistId,
     'Fetch albums',
     opts,
@@ -154,7 +186,7 @@ export const useEpisodes = (
 ) =>
   useEntityQuery(
     seriesKeys.episodes(seriesId, seasonId),
-    () => getEpisodes(seriesId, seasonId),
+    (context) => getEpisodes(seriesId, seasonId, undefined, context),
     [seriesId, seasonId],
     'Fetch episodes',
     opts,

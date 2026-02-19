@@ -34,7 +34,7 @@ const router = createRouter({
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,
-  defaultPreloadStaleTime: 0,
+  defaultPreloadStaleTime: 30_000,
   // Enable view transitions with typed navigation
   defaultViewTransition: {
     types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {

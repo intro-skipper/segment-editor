@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { motion } from 'motion/react'
+import { m, useReducedMotion } from 'motion/react'
 import type { CSSProperties } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -49,6 +49,24 @@ const createRays = (count: number, cycle: number): Array<LightRay> => {
   })
 }
 
+const coarsePointerQuery =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)')
+    : null
+
+let prefersCoarsePointer = coarsePointerQuery?.matches ?? false
+
+coarsePointerQuery?.addEventListener('change', (event) => {
+  prefersCoarsePointer = event.matches
+})
+
+const prefersSaveData =
+  typeof navigator !== 'undefined' &&
+  'connection' in navigator &&
+  ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    ?.saveData ??
+    false)
+
 const Ray = ({
   left,
   rotate,
@@ -59,7 +77,7 @@ const Ray = ({
   intensity,
 }: LightRay) => {
   return (
-    <motion.div
+    <m.div
       className="pointer-events-none absolute -top-[12%] left-[var(--ray-left)] h-[var(--light-rays-length)] w-[var(--ray-width)] origin-top -translate-x-1/2 rounded-full bg-gradient-to-b from-[color-mix(in_srgb,var(--light-rays-color)_70%,transparent)] to-transparent opacity-0 mix-blend-screen blur-[var(--light-rays-blur)]"
       style={
         {
@@ -95,10 +113,13 @@ export function LightRays({
   ...props
 }: LightRaysProps) {
   const cycleDuration = Math.max(speed, 0.1)
+  const prefersReducedMotion = useReducedMotion()
+  const disableAnimatedRays =
+    prefersReducedMotion || prefersCoarsePointer || prefersSaveData
 
   const rays = useMemo(
-    () => createRays(count, cycleDuration),
-    [count, cycleDuration],
+    () => (disableAnimatedRays ? [] : createRays(count, cycleDuration)),
+    [count, cycleDuration, disableAnimatedRays],
   )
 
   return (

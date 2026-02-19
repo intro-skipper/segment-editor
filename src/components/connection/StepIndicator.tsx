@@ -16,7 +16,7 @@ const STEPS: Array<{ key: WizardStep; label: string }> = [
   { key: 'success', label: 'Done' },
 ]
 
-export interface StepIndicatorProps {
+interface StepIndicatorProps {
   currentStep: WizardStep
 }
 
@@ -33,7 +33,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
           <div key={step.key} className="flex items-center">
             <div
               className={cn(
-                'size-2 rounded-full transition-all',
+                'size-2 rounded-full transition-[transform,background-color]',
                 isActive && 'bg-primary scale-125',
                 isCompleted && 'bg-primary/60',
                 !isActive && !isCompleted && 'bg-muted-foreground/30',

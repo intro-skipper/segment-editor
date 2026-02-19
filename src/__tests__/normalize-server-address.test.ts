@@ -9,15 +9,15 @@ import { normalizeServerAddress } from '@/services/jellyfin/security'
 
 describe('normalizeServerAddress', () => {
   it('should extract origin from full URL with path', () => {
-    expect(normalizeServerAddress('https://jellyfin.example.com/web/#/home')).toBe(
-      'https://jellyfin.example.com',
-    )
+    expect(
+      normalizeServerAddress('https://jellyfin.example.com/web/#/home'),
+    ).toBe('https://jellyfin.example.com')
   })
 
   it('should extract origin from URL with port', () => {
-    expect(normalizeServerAddress('https://jellyfin.example.com:8096/web/#/home')).toBe(
-      'https://jellyfin.example.com:8096',
-    )
+    expect(
+      normalizeServerAddress('https://jellyfin.example.com:8096/web/#/home'),
+    ).toBe('https://jellyfin.example.com:8096')
   })
 
   it('should handle URL with query parameters', () => {
@@ -33,7 +33,9 @@ describe('normalizeServerAddress', () => {
   })
 
   it('should return trimmed address for URLs without scheme', () => {
-    expect(normalizeServerAddress('jellyfin.example.com')).toBe('jellyfin.example.com')
+    expect(normalizeServerAddress('jellyfin.example.com')).toBe(
+      'jellyfin.example.com',
+    )
   })
 
   it('should return trimmed address for hostname with port', () => {

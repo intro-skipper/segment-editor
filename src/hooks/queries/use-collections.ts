@@ -13,7 +13,7 @@ import { selectValidAuth, useApiStore } from '@/stores'
 /**
  * Type-safe query key factory for collections.
  */
-export const collectionsKeys = {
+const collectionsKeys = {
   all: createQueryKey('collections'),
   list: () => createQueryKey('collections', 'list'),
 } as const
@@ -30,7 +30,7 @@ export function useCollections() {
   return useQuery(
     createStandardQueryOptions<Array<VirtualFolderInfo>>({
       queryKey: collectionsKeys.list(),
-      queryFn: getCollections,
+      queryFn: ({ signal }) => getCollections({ signal }),
       enabled: validAuth,
       cacheDuration: 'LONG',
       operation: 'Fetch collections',

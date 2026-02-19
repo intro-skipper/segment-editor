@@ -7,14 +7,14 @@ import { useCallback, useMemo } from 'react'
 import type { VibrantColors } from './use-vibrant-color'
 
 /** Style object for button elements */
-export interface VibrantButtonStyle {
+interface VibrantButtonStyle {
   backgroundColor?: string
   color?: string
   borderColor?: string
 }
 
 /** Return type for useVibrantButtonStyle hook */
-export interface VibrantButtonStyleResult {
+interface VibrantButtonStyleResult {
   getButtonStyle: (isActive?: boolean) => VibrantButtonStyle | undefined
   primaryStyle: VibrantButtonStyle | undefined
   secondaryStyle: VibrantButtonStyle | undefined
@@ -24,7 +24,7 @@ export interface VibrantButtonStyleResult {
 }
 
 /** Return type for useVibrantTabStyle hook */
-export interface VibrantTabStyleResult {
+interface VibrantTabStyleResult {
   getTabStyle: (isSelected: boolean) => VibrantButtonStyle | undefined
   hasColors: boolean
 }

@@ -2,10 +2,10 @@
  * usePlayerKeyboard - Custom hook for player keyboard shortcuts.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { isEditableElement } from '@/lib/keyboard-utils'
 
-export interface KeyboardHandlers {
+interface KeyboardHandlers {
   togglePlay: () => void
   cycleSkipTimeUp: () => void
   cycleSkipTimeDown: () => void
@@ -29,36 +29,22 @@ const KEY_MAP: Record<string, keyof KeyboardHandlers> = {
 }
 
 export function usePlayerKeyboard(handlers: KeyboardHandlers): void {
-  const handlerValues = useMemo(
-    () => Object.values(handlers),
-    [
-      handlers.togglePlay,
-      handlers.cycleSkipTimeUp,
-      handlers.cycleSkipTimeDown,
-      handlers.skipBackward,
-      handlers.skipForward,
-      handlers.pushStartTimestamp,
-      handlers.pushEndTimestamp,
-      handlers.toggleMute,
-    ],
-  )
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (isEditableElement(e.target)) return
+
+    const key = e.key.toLowerCase()
+    if (key in KEY_MAP) {
+      e.preventDefault()
+      handlers[KEY_MAP[key]]()
+    }
+  })
 
   useEffect(() => {
     const controller = new AbortController()
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isEditableElement(e.target)) return
-
-      const key = e.key.toLowerCase()
-      if (key in KEY_MAP) {
-        e.preventDefault()
-        handlers[KEY_MAP[key]]()
-      }
-    }
 
     window.addEventListener('keydown', handleKeyDown, {
       signal: controller.signal,
     })
     return () => controller.abort()
-  }, [handlerValues, handlers])
+  }, [])
 }

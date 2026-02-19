@@ -7,7 +7,7 @@ import { SEGMENT_CONFIG } from './constants'
 
 const { KEYBOARD_STEP_FINE, KEYBOARD_STEP_COARSE } = SEGMENT_CONFIG
 
-export interface RangeKeyboardConfig {
+interface RangeKeyboardConfig {
   min: number
   max: number
   value: number
@@ -19,7 +19,7 @@ export interface RangeKeyboardConfig {
   stepCoarse?: number
 }
 
-export interface RangeKeyboardResult {
+interface RangeKeyboardResult {
   handled: boolean
   newValue: number
 }

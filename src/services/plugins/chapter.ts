@@ -5,21 +5,10 @@
  * Security: All item IDs are validated before use in API calls.
  */
 
-import {
-  buildPluginEndpoint,
-  pluginGet,
-  pluginPost,
-  validatePluginItemId,
-  validatePluginItemIds,
-} from './plugin-api'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { PluginApiOptions, PluginCreateResult } from './plugin-api'
 import { MediaSegmentType } from '@/types/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
-
-export type ChapterApiOptions = PluginApiOptions
-export type ChapterCreateResult = PluginCreateResult
 
 export interface ChapterMarker {
   name: string
@@ -98,30 +87,3 @@ export const chaptersToSegments = (
   mediaDurationSeconds?: number,
 ): Array<MediaSegmentDto> =>
   chapters.map((c) => chapterToSegment(c, itemId, mediaDurationSeconds))
-
-export const segmentsToChapters = (
-  segments: Array<MediaSegmentDto>,
-): Array<ChapterMarker> => segments.map(segmentToChapter)
-
-export const getChapterById = (
-  itemId: string,
-  options?: ChapterApiOptions,
-): Promise<Record<string, unknown> | null> => {
-  const validation = validatePluginItemId(itemId, 'chapter lookup')
-  if (!validation.valid) return Promise.resolve(null)
-  return pluginGet<Record<string, unknown>>(
-    buildPluginEndpoint('/PluginChapter/Chapter', itemId),
-    options,
-  )
-}
-
-export const createChapterById = (
-  itemIds: Array<string>,
-  options?: ChapterApiOptions,
-): Promise<PluginCreateResult> => {
-  const validation = validatePluginItemIds(itemIds, 'chapter creation')
-  if (!validation.valid) {
-    return Promise.resolve({ success: false, error: validation.error })
-  }
-  return pluginPost('/PluginChapter/Chapter', itemIds, options)
-}

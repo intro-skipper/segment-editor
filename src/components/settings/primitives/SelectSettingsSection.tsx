@@ -14,7 +14,7 @@ import { SettingsSelect } from './SettingsSelect'
 import type { LucideIcon } from 'lucide-react'
 import type { SelectOption } from './SettingsSelect'
 
-export interface SelectSettingsSectionProps<T extends string = string> {
+interface SelectSettingsSectionProps<T extends string = string> {
   /** Icon to display in the section header */
   icon: LucideIcon
   /** i18n key for the section title */

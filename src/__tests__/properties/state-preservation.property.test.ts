@@ -4,8 +4,6 @@
  * For any playback state (currentTime, volume, muted, paused) before a strategy switch,
  * the state after the switch SHALL be equivalent to the state before
  * (within acceptable tolerance for currentTime).
- *
- * **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'

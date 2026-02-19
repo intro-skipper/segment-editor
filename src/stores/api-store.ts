@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type AuthMethod = 'apiKey' | 'userPass'
 
-export interface ApiState {
+interface ApiState {
   serverAddress: string
   apiKey: string | undefined
   serverVersion: string
@@ -14,7 +14,7 @@ export interface ApiState {
   username: string | undefined
 }
 
-export interface ApiActions {
+interface ApiActions {
   setServerAddress: (address: string) => void
   setApiKey: (key: string | undefined) => void
   setServerVersion: (version: string) => void
@@ -25,7 +25,7 @@ export interface ApiActions {
   clearAuth: () => void
 }
 
-export type ApiStore = ApiState & ApiActions
+type ApiStore = ApiState & ApiActions
 
 const initialState: ApiState = {
   serverAddress: '',

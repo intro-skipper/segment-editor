@@ -15,12 +15,12 @@ import { AppError, isAbortError } from '@/lib/unified-error'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface DiscoveryResult {
+interface DiscoveryResult {
   servers: Array<RecommendedServerInfo>
   error?: string
 }
 
-export interface ScoreDisplay {
+interface ScoreDisplay {
   label: string
   variant: 'success' | 'warning' | 'error'
 }
@@ -97,6 +97,3 @@ const SCORE_DISPLAY: Record<RecommendedServerInfoScore, ScoreDisplay> = {
 export const getScoreDisplay = (
   score: RecommendedServerInfoScore,
 ): ScoreDisplay => SCORE_DISPLAY[score]
-
-export { RecommendedServerInfoScore }
-export type { RecommendedServerInfo }

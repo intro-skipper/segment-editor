@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { Suspense, lazy, useCallback, useState } from 'react'
 import {
   Link,
   Outlet,
@@ -10,12 +10,11 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Home } from 'lucide-react'
+import { LazyMotion, domAnimation } from 'motion/react'
 
 import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Toaster } from '../components/ui/sonner'
-import { SettingsDialog } from '../components/settings'
-import { ConnectionWizard } from '../components/connection'
 import { Button } from '../components/ui/button'
 import {
   Card,
@@ -28,6 +27,7 @@ import {
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
+import { useSessionStore } from '../stores/session-store'
 
 // Initialize i18next
 import '../i18n/config'
@@ -38,27 +38,48 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
+const loadSettingsDialog = () => import('../components/settings')
+const loadConnectionWizard = () => import('../components/connection')
+
+const SettingsDialog = lazy(() =>
+  loadSettingsDialog().then((module) => ({
+    default: module.SettingsDialog,
+  })),
+)
+
+const ConnectionWizard = lazy(() =>
+  loadConnectionWizard().then((module) => ({
+    default: module.ConnectionWizard,
+  })),
+)
+
+const selectSettingsOpen = (
+  state: ReturnType<typeof useSessionStore.getState>,
+) => state.settingsOpen
+
 /**
  * Minimal header fallback when the main header crashes.
  * Provides basic navigation to recover from errors.
  */
 function HeaderFallback() {
   const { t } = useTranslation()
+  const router = useRouter()
+
+  const handleRefresh = useCallback(() => {
+    void router.invalidate()
+  }, [router])
+
   return (
     <header
       className="sticky top-0 z-40 backdrop-blur-xl bg-background/80"
       role="banner"
     >
-      <nav className="px-4 py-4 sm:px-6" role="navigation">
+      <nav className="px-4 py-4 sm:px-6">
         <div className="flex items-center justify-between gap-4">
           <Link to="/" className="text-xl font-bold">
             {t('app.name', 'Segment Editor')}
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="ghost" size="sm" onClick={handleRefresh}>
             {t('common.reload', 'Reload')}
           </Button>
         </div>
@@ -136,6 +157,7 @@ function RootComponent() {
 
   // Unified connection initialization for both plugin and standalone modes
   const { showWizard } = useConnectionInit()
+  const settingsOpen = useSessionStore(selectSettingsOpen)
 
   // Local override to allow manually closing the wizard
   const [wizardDismissed, setWizardDismissed] = useState(false)
@@ -153,49 +175,59 @@ function RootComponent() {
   }, [])
 
   return (
-    <div className="min-h-screen">
-      {/* Skip link for keyboard navigation - visible only when focused */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-      >
-        {t('accessibility.skipToMain', 'Skip to main content')}
-      </a>
-      {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
-      <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
-        <Header />
-      </ErrorBoundary>
-      <main
-        id="main-content"
-        role="main"
-        aria-label={t('accessibility.mainContent', 'Main content')}
-        tabIndex={-1}
-        className="pb-safe outline-none"
-      >
-        <ErrorBoundary componentName="MainContent">
-          <Outlet />
+    <LazyMotion features={domAnimation}>
+      <div className="min-h-screen">
+        {/* Skip link for keyboard navigation - visible only when focused */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          {t('accessibility.skipToMain', 'Skip to main content')}
+        </a>
+        {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
+        <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
+          <Header />
         </ErrorBoundary>
-      </main>
-      <SettingsDialog />
-      <ConnectionWizard
-        open={wizardOpen}
-        onOpenChange={handleWizardOpenChange}
-        onComplete={handleWizardComplete}
-      />
-      <Toaster />
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-          TanStackQueryDevtools,
-        ]}
-      />
-    </div>
+        <main
+          id="main-content"
+          role="main"
+          aria-label={t('accessibility.mainContent', 'Main content')}
+          tabIndex={-1}
+          className="pb-safe outline-none"
+        >
+          <ErrorBoundary componentName="MainContent">
+            <Outlet />
+          </ErrorBoundary>
+        </main>
+        {settingsOpen ? (
+          <Suspense fallback={null}>
+            <SettingsDialog />
+          </Suspense>
+        ) : null}
+        {wizardOpen ? (
+          <Suspense fallback={null}>
+            <ConnectionWizard
+              open={wizardOpen}
+              onOpenChange={handleWizardOpenChange}
+              onComplete={handleWizardComplete}
+            />
+          </Suspense>
+        ) : null}
+        <Toaster />
+        <TanStackDevtools
+          config={{
+            position: 'bottom-right',
+          }}
+          plugins={[
+            {
+              name: 'Tanstack Router',
+              render: <TanStackRouterDevtoolsPanel />,
+            },
+            TanStackQueryDevtools,
+          ]}
+        />
+      </div>
+    </LazyMotion>
   )
 }
 

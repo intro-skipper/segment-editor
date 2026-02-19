@@ -3,8 +3,8 @@
  * Navigates to appropriate view based on item type.
  */
 
-import { memo, useCallback, useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -13,9 +13,9 @@ import { ItemImage } from '@/components/media/ItemImage'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
-import { getNavigationRoute } from '@/lib/navigation-utils'
+import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 
-export interface MediaCardProps {
+interface MediaCardProps {
   item: BaseItemDto
   className?: string
   index?: number
@@ -23,7 +23,64 @@ export interface MediaCardProps {
   role?: 'gridcell'
   'data-grid-index'?: number
   'aria-selected'?: boolean
-  onFocus?: (index: number) => void
+  onFocus?: (event: React.FocusEvent<HTMLElement>) => void
+}
+
+const INTERSECTION_ROOT_MARGIN = '240px'
+const inViewCallbacks = new Map<Element, () => void>()
+let sharedInViewObserver: IntersectionObserver | null = null
+
+function cleanupInViewObserver() {
+  if (inViewCallbacks.size > 0) return
+  sharedInViewObserver?.disconnect()
+  sharedInViewObserver = null
+}
+
+function getInViewObserver(): IntersectionObserver | null {
+  if (typeof IntersectionObserver === 'undefined') {
+    return null
+  }
+
+  if (sharedInViewObserver) {
+    return sharedInViewObserver
+  }
+
+  sharedInViewObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+
+        const callback = inViewCallbacks.get(entry.target)
+        if (!callback) continue
+
+        inViewCallbacks.delete(entry.target)
+        sharedInViewObserver?.unobserve(entry.target)
+        callback()
+      }
+
+      cleanupInViewObserver()
+    },
+    { rootMargin: INTERSECTION_ROOT_MARGIN },
+  )
+
+  return sharedInViewObserver
+}
+
+function observeCardInView(element: Element, onVisible: () => void) {
+  const observer = getInViewObserver()
+  if (!observer) {
+    onVisible()
+    return () => undefined
+  }
+
+  inViewCallbacks.set(element, onVisible)
+  observer.observe(element)
+
+  return () => {
+    inViewCallbacks.delete(element)
+    observer.unobserve(element)
+    cleanupInViewObserver()
+  }
 }
 
 /** Label key mapping by item type */
@@ -39,7 +96,7 @@ const LABEL_KEY_MAP: Record<string, string> = {
 const MAX_ANIMATION_DELAY = 300
 const ANIMATION_STAGGER = 30
 
-export const MediaCard = memo(function MediaCard({
+export const MediaCard = memo(function MediaCardComponent({
   item,
   className,
   index = 0,
@@ -51,21 +108,53 @@ export const MediaCard = memo(function MediaCard({
 }: MediaCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const router = useRouter()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const hasPrefetchedRef = useRef(false)
+  const [isInView, setIsInView] = useState(false)
+
+  useEffect(() => {
+    const element = cardRef.current
+    if (!element) return
+
+    return observeCardInView(element, () => {
+      setIsInView(true)
+    })
+  }, [])
+
   const imageUrl = useMemo(() => getBestImageUrl(item, 200), [item])
-  const vibrantColors = useVibrantColor(imageUrl ?? null)
+  const vibrantColors = useVibrantColor(imageUrl ?? null, {
+    enabled: isInView,
+  })
+
+  const prefetchRoute = useCallback(() => {
+    if (hasPrefetchedRef.current || !item.Id) return
+
+    hasPrefetchedRef.current = true
+    preloadMediaRoute(router.preloadRoute, item)
+  }, [item, router])
+
+  const handleFocus = useCallback(
+    (event: React.FocusEvent<HTMLElement>) => {
+      prefetchRoute()
+      onFocus?.(event)
+    },
+    [onFocus, prefetchRoute],
+  )
 
   const handleClick = useCallback(() => {
-    const route = getNavigationRoute(item)
-    // Type assertion needed due to dynamic route resolution
-    navigate(route as unknown as Parameters<typeof navigate>[0])
+    navigateToMediaItem(navigate, item)
   }, [item, navigate])
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        handleClick()
+    (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return
       }
+
+      event.preventDefault()
+      event.stopPropagation()
+      handleClick()
     },
     [handleClick],
   )
@@ -110,68 +199,69 @@ export const MediaCard = memo(function MediaCard({
     [vibrantColors],
   )
 
-  const handleFocus = useCallback(() => {
-    onFocus?.(index)
-  }, [onFocus, index])
-
   return (
     <div
+      ref={cardRef}
       role={role}
-      tabIndex={tabIndex}
-      data-grid-index={dataGridIndex}
       aria-selected={ariaSelected}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
-      aria-label={accessibleLabel}
-      className={cn(
-        'group cursor-pointer rounded-2xl overflow-hidden min-h-[44px]',
-        'transition-all duration-300 ease-out',
-        'hover:scale-[1.03] hover:shadow-xl hover:shadow-black/20',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
-        className,
-      )}
-      style={cardStyle}
+      className={cn('rounded-2xl min-h-[44px]', className)}
     >
-      {/* Item Thumbnail */}
-      <ItemImage
-        item={item}
-        maxWidth={200}
-        aspectRatio="aspect-[2/3]"
-        className="w-full"
-      />
-
-      {/* Item Name - with extracted poster color */}
-      <div
-        className="px-3 py-2.5 md:px-4 md:py-3 transition-colors duration-500"
-        style={textBoxStyle}
+      <button
+        type="button"
+        tabIndex={tabIndex}
+        data-grid-index={dataGridIndex}
+        aria-label={accessibleLabel}
+        onClick={handleClick}
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        onPointerEnter={prefetchRoute}
+        onTouchStart={prefetchRoute}
+        className={cn(
+          'group cursor-pointer rounded-2xl overflow-hidden min-h-[44px] w-full text-left',
+          'transition-[transform,box-shadow,border-color,background-color,color] duration-200 ease-out',
+          'hover:scale-[1.02] active:scale-[0.98]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
+        )}
+        style={cardStyle}
       >
-        {/* Title - fixed height for 2 lines */}
-        <p
-          className={cn(
-            'text-sm md:text-base font-semibold line-clamp-2 leading-snug h-[2.5em]',
-            !vibrantColors && 'text-foreground group-hover:text-primary',
-          )}
-          style={textStyle}
-          title={item.Name || undefined}
-        >
-          {item.Name || 'Unknown'}
-        </p>
+        {/* Item Thumbnail */}
+        <ItemImage
+          item={item}
+          maxWidth={200}
+          aspectRatio="aspect-[2/3]"
+          className="w-full"
+        />
 
-        {/* Year - always in third row */}
-        <p
-          className={cn(
-            'text-xs md:text-sm opacity-70 font-medium h-[1.25em]',
-            !vibrantColors && 'text-muted-foreground',
-          )}
-          style={textStyle}
+        {/* Item Name - with extracted poster color */}
+        <div
+          className="px-3 py-2.5 md:px-4 md:py-3 transition-colors duration-500"
+          style={textBoxStyle}
         >
-          {item.ProductionYear ?? '\u00A0'}
-        </p>
-      </div>
+          {/* Title - fixed height for 2 lines */}
+          <p
+            className={cn(
+              'text-sm md:text-base font-semibold line-clamp-2 leading-snug h-[2.5em]',
+              !vibrantColors && 'text-foreground',
+            )}
+            style={textStyle}
+            title={item.Name || undefined}
+          >
+            {item.Name || 'Unknown'}
+          </p>
+
+          {/* Year - always in third row */}
+          <p
+            className={cn(
+              'text-xs md:text-sm opacity-70 font-medium h-[1.25em]',
+              !vibrantColors && 'text-muted-foreground',
+            )}
+            style={textStyle}
+          >
+            {item.ProductionYear ?? '\u00A0'}
+          </p>
+        </div>
+      </button>
     </div>
   )
 })
-
-export default MediaCard

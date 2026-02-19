@@ -11,7 +11,15 @@
  * @module hooks/use-track-manager
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
@@ -36,10 +44,8 @@ import { useAppStore } from '@/stores/app-store'
 
 /**
  * Options for the useTrackManager hook.
- *
- * Requirements: 1.1, 2.1
  */
-export interface UseTrackManagerOptions {
+interface UseTrackManagerOptions {
   /** The Jellyfin item containing media source information */
   item: BaseItemDto | null
   /** Current playback strategy (direct or hls) */
@@ -56,10 +62,8 @@ export interface UseTrackManagerOptions {
 
 /**
  * Return value from the useTrackManager hook.
- *
- * Requirements: 1.1, 2.1
  */
-export interface UseTrackManagerReturn {
+interface UseTrackManagerReturn {
   /** Current state of available and active tracks */
   trackState: TrackState
   /** Select an audio track by index */
@@ -70,6 +74,14 @@ export interface UseTrackManagerReturn {
   isLoading: boolean
   /** Current error message, if any */
   error: string | null
+}
+
+interface UserTrackSelectionState {
+  key: string
+  hasAudioSelection: boolean
+  audioIndex: number
+  hasSubtitleSelection: boolean
+  subtitleIndex: number | null
 }
 
 // ============================================================================
@@ -136,8 +148,6 @@ function findPreferredSubtitleIndex(
  *
  * @param options - Hook options including item, strategy, and refs
  * @returns Track state and selection functions
- *
- * Requirements: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.2, 7.4, 7.5
  */
 export function useTrackManager({
   item,
@@ -147,16 +157,40 @@ export function useTrackManager({
   t,
   onReloadHls,
 }: UseTrackManagerOptions): UseTrackManagerReturn {
-  // Only store user-selected active indices in state
-  const [activeAudioIndex, setActiveAudioIndex] = useState(0)
-  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number | null>(
-    null,
-  )
+  // Only store explicit user track picks; defaults are derived during render.
+  const [userSelection, setUserSelection] = useState<UserTrackSelectionState>({
+    key: '',
+    hasAudioSelection: false,
+    audioIndex: 0,
+    hasSubtitleSelection: false,
+    subtitleIndex: null,
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // AbortController for cancelling in-flight subtitle load operations on unmount
+  const abortControllerRef = useRef<AbortController>(new AbortController())
+  useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    return () => {
+      controller.abort()
+    }
+  }, [])
+
   // Get track preferences from app store
-  const trackPreferences = useAppStore((state) => state.trackPreferences)
+  const {
+    preferredAudioLanguage,
+    preferredSubtitleLanguage,
+    subtitlesEnabled,
+  } = useAppStore(
+    useShallow((state: ReturnType<typeof useAppStore.getState>) => ({
+      preferredAudioLanguage: state.trackPreferences.preferredAudioLanguage,
+      preferredSubtitleLanguage:
+        state.trackPreferences.preferredSubtitleLanguage,
+      subtitlesEnabled: state.trackPreferences.subtitlesEnabled,
+    })),
+  )
 
   // ============================================================================
   // Track Lists
@@ -172,34 +206,49 @@ export function useTrackManager({
     return extractTracks(item as Parameters<typeof extractTracks>[0])
   }, [item])
 
-  /**
-   * Track the previous item to detect changes and reset indices.
-   * Using "adjusting state during render" pattern instead of useEffect.
-   */
-  const [prevItem, setPrevItem] = useState<BaseItemDto | null>(null)
+  const itemId = item?.Id ?? undefined
 
-  if (item !== prevItem) {
-    setPrevItem(item)
-    setError(null)
+  const trackResetKey = useMemo(
+    () =>
+      [
+        itemId ?? '',
+        preferredAudioLanguage ?? '',
+        preferredSubtitleLanguage ?? '',
+        subtitlesEnabled ? '1' : '0',
+        audioTracks.length,
+        subtitleTracks.length,
+      ].join('|'),
+    [
+      itemId,
+      preferredAudioLanguage,
+      preferredSubtitleLanguage,
+      subtitlesEnabled,
+      audioTracks.length,
+      subtitleTracks.length,
+    ],
+  )
 
-    if (item) {
-      // Recompute preferred indices for the new item
-      const newAudioIndex = findPreferredAudioIndex(
-        audioTracks,
-        trackPreferences.preferredAudioLanguage,
-      )
-      const newSubtitleIndex = findPreferredSubtitleIndex(
+  const preferredAudioIndex = itemId
+    ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
+    : 0
+
+  const preferredSubtitleIndex = itemId
+    ? findPreferredSubtitleIndex(
         subtitleTracks,
-        trackPreferences.preferredSubtitleLanguage,
-        trackPreferences.subtitlesEnabled,
+        preferredSubtitleLanguage,
+        subtitlesEnabled,
       )
-      setActiveAudioIndex(newAudioIndex)
-      setActiveSubtitleIndex(newSubtitleIndex)
-    } else {
-      setActiveAudioIndex(0)
-      setActiveSubtitleIndex(null)
-    }
-  }
+    : null
+
+  const activeAudioIndex =
+    userSelection.key === trackResetKey && userSelection.hasAudioSelection
+      ? userSelection.audioIndex
+      : preferredAudioIndex
+
+  const activeSubtitleIndex =
+    userSelection.key === trackResetKey && userSelection.hasSubtitleSelection
+      ? userSelection.subtitleIndex
+      : preferredSubtitleIndex
 
   /**
    * Combine track lists and active indices into trackState.
@@ -219,29 +268,37 @@ export function useTrackManager({
   // Track Switching Options
   // ============================================================================
 
-  /**
-   * Memoized track switch options to avoid recreating on every render.
-   * Includes audioTracks and subtitleTracks for proper index mapping.
-   */
-  const switchOptions = useMemo(
-    () => ({
+  const mediaSourceId = item?.MediaSources?.[0]?.Id ?? undefined
+
+  const audioTrackMap = useMemo(
+    () => new Map(audioTracks.map((track) => [track.index, track])),
+    [audioTracks],
+  )
+
+  const subtitleTrackMap = useMemo(
+    () => new Map(subtitleTracks.map((track) => [track.index, track])),
+    [subtitleTracks],
+  )
+
+  const createSwitchOptions = useCallback(
+    (videoElement: HTMLVideoElement) => ({
       strategy,
-      videoElement: videoRef.current!,
+      videoElement,
       hlsInstance: hlsRef?.current,
-      itemId: item?.Id,
-      mediaSourceId: item?.MediaSources?.[0]?.Id ?? undefined,
-      audioTracks: trackState.audioTracks,
-      subtitleTracks: trackState.subtitleTracks,
+      itemId,
+      mediaSourceId,
+      audioTracks,
+      subtitleTracks,
       onReloadHls,
+      signal: abortControllerRef.current.signal,
     }),
     [
       strategy,
-      videoRef,
       hlsRef,
-      item?.Id,
-      item?.MediaSources,
-      trackState.audioTracks,
-      trackState.subtitleTracks,
+      itemId,
+      mediaSourceId,
+      audioTracks,
+      subtitleTracks,
       onReloadHls,
     ],
   )
@@ -255,10 +312,8 @@ export function useTrackManager({
    * Calls the appropriate switching service based on playback strategy.
    *
    * @param index - The audio track index to select
-   *
-   * Requirements: 3.1, 4.1
    */
-  const selectAudioTrack = useCallback(
+  const selectAudioTrack = useEffectEvent(
     async (index: number): Promise<void> => {
       const video = videoRef.current
       if (!video) {
@@ -267,7 +322,7 @@ export function useTrackManager({
       }
 
       // Validate track index
-      const track = trackState.audioTracks.find((trk) => trk.index === index)
+      const track = audioTrackMap.get(index)
       if (!track) {
         const errorMsg = t('player.tracks.error.trackNotFound')
         setError(errorMsg)
@@ -285,13 +340,21 @@ export function useTrackManager({
 
       try {
         const result: TrackSwitchResult = await switchAudioTrack(index, {
-          ...switchOptions,
-          videoElement: video,
-          hlsInstance: hlsRef?.current,
+          ...createSwitchOptions(video),
         })
 
         if (result.success) {
-          setActiveAudioIndex(index)
+          setUserSelection((prev) =>
+            prev.key === trackResetKey
+              ? { ...prev, hasAudioSelection: true, audioIndex: index }
+              : {
+                  key: trackResetKey,
+                  hasAudioSelection: true,
+                  audioIndex: index,
+                  hasSubtitleSelection: false,
+                  subtitleIndex: null,
+                },
+          )
         } else if (result.error) {
           const errorMsg =
             result.error.message || t('player.tracks.error.switchFailed')
@@ -309,14 +372,6 @@ export function useTrackManager({
         setIsLoading(false)
       }
     },
-    [
-      videoRef,
-      hlsRef,
-      trackState.audioTracks,
-      trackState.activeAudioIndex,
-      switchOptions,
-      t,
-    ],
   )
 
   // ============================================================================
@@ -328,10 +383,8 @@ export function useTrackManager({
    * Calls the appropriate switching service based on playback strategy.
    *
    * @param index - The subtitle track index to select, or null for off
-   *
-   * Requirements: 5.1, 6.1
    */
-  const selectSubtitleTrack = useCallback(
+  const selectSubtitleTrack = useEffectEvent(
     async (index: number | null): Promise<void> => {
       const video = videoRef.current
       if (!video) {
@@ -341,9 +394,7 @@ export function useTrackManager({
 
       // Validate track index if not turning off
       if (index !== null) {
-        const track = trackState.subtitleTracks.find(
-          (trk) => trk.index === index,
-        )
+        const track = subtitleTrackMap.get(index)
         if (!track) {
           const errorMsg = t('player.tracks.error.trackNotFound')
           setError(errorMsg)
@@ -362,13 +413,25 @@ export function useTrackManager({
 
       try {
         const result: TrackSwitchResult = await switchSubtitleTrack(index, {
-          ...switchOptions,
-          videoElement: video,
-          hlsInstance: hlsRef?.current,
+          ...createSwitchOptions(video),
         })
 
         if (result.success) {
-          setActiveSubtitleIndex(index)
+          setUserSelection((prev) =>
+            prev.key === trackResetKey
+              ? {
+                  ...prev,
+                  hasSubtitleSelection: true,
+                  subtitleIndex: index,
+                }
+              : {
+                  key: trackResetKey,
+                  hasAudioSelection: false,
+                  audioIndex: 0,
+                  hasSubtitleSelection: true,
+                  subtitleIndex: index,
+                },
+          )
         } else if (result.error) {
           const errorMsg =
             result.error.message || t('player.tracks.error.switchFailed')
@@ -386,14 +449,6 @@ export function useTrackManager({
         setIsLoading(false)
       }
     },
-    [
-      videoRef,
-      hlsRef,
-      trackState.subtitleTracks,
-      trackState.activeSubtitleIndex,
-      switchOptions,
-      t,
-    ],
   )
 
   // ============================================================================

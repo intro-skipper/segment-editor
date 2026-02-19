@@ -4,13 +4,12 @@
  */
 
 import type { QueryKey } from '@tanstack/react-query'
-import { AppError, getErrorMessage } from '@/lib/unified-error'
+import { AppError } from '@/lib/unified-error'
 import { calculateBackoffDelay } from '@/lib/retry-utils'
 import { API_CONFIG } from '@/lib/constants'
 
 // Re-export for query-specific usage
-export { AppError as QueryError, getErrorMessage }
-export type { ErrorCode as QueryErrorCode } from '@/lib/unified-error'
+export { AppError as QueryError }
 
 export const createQueryKey = <T extends ReadonlyArray<unknown>>(
   ...parts: T

@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
 
@@ -20,7 +20,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 
-export interface FeatureErrorBoundaryProps {
+interface FeatureErrorBoundaryProps {
   /** Child components to wrap */
   children: ReactNode
   /** Feature name for error logging and display */
@@ -48,10 +48,11 @@ function FeatureErrorFallback({
   minHeightClass?: string
   showNavigation?: boolean
   errorMessage?: string
-  onRetry: () => void
+  onRetry?: () => void
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const router = useRouter()
 
   const handleGoBack = useCallback(() => {
     navigate({ to: '/' })
@@ -60,6 +61,15 @@ function FeatureErrorFallback({
   const handleGoHome = useCallback(() => {
     navigate({ to: '/' })
   }, [navigate])
+
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry()
+      return
+    }
+
+    void router.invalidate()
+  }, [onRetry, router])
 
   return (
     <div
@@ -90,7 +100,7 @@ function FeatureErrorFallback({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button variant="outline" onClick={onRetry}>
+          <Button variant="outline" onClick={handleRetry}>
             <RefreshCw className="size-4" aria-hidden="true" />
             {t('common.retry', 'Try Again')}
           </Button>
@@ -132,7 +142,6 @@ export function FeatureErrorBoundary({
           minHeightClass={minHeightClass}
           showNavigation={showNavigation}
           errorMessage={errorMessage}
-          onRetry={() => window.location.reload()}
         />
       }
     >
@@ -140,5 +149,3 @@ export function FeatureErrorBoundary({
     </ErrorBoundary>
   )
 }
-
-export default FeatureErrorBoundary

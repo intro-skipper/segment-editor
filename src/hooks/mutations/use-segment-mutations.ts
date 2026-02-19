@@ -5,15 +5,9 @@
 
 import { useCallback, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { QueryClient, UseMutationOptions } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { CreateSegmentInput } from '@/services/segments/api'
-import {
-  batchSaveSegments,
-  createSegment,
-  createSegmentFromInput,
-  deleteSegment,
-} from '@/services/segments/api'
+import { batchSaveSegments, deleteSegment } from '@/services/segments/api'
 import { segmentsKeys } from '@/hooks/queries/use-segments'
 import {
   QueryError,
@@ -22,11 +16,10 @@ import {
 import { showError, showSuccess } from '@/lib/notifications'
 import { isAbortError } from '@/lib/unified-error'
 
-export interface BatchSaveInput {
+interface BatchSaveInput {
   itemId: string
   existingSegments: Array<MediaSegmentDto>
   newSegments: Array<MediaSegmentDto>
-  providerId?: string
 }
 
 interface OptimisticContext {
@@ -90,62 +83,6 @@ const rollbackSegments = (
   ctx.rolledBack = true
 }
 
-/** Creates standard segment mutation with cache invalidation */
-const useSegmentMutation = <TData, TInput>(
-  mutationFn: UseMutationOptions<
-    TData,
-    QueryError,
-    TInput,
-    OptimisticContext
-  >['mutationFn'],
-  getItemId: (input: TInput, data?: TData) => string | undefined,
-  operation: string,
-  successMsg: string,
-) => {
-  const qc = useQueryClient()
-  return useMutation<TData, QueryError, TInput, OptimisticContext>({
-    mutationFn,
-    onSuccess: (data, input) => {
-      const itemId = getItemId(input, data)
-      if (itemId) {
-        qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
-        showSuccess(successMsg)
-      }
-    },
-    onError: handleMutationError(operation),
-  })
-}
-
-export const useCreateSegment = () => {
-  const getController = useAbortController()
-  return useSegmentMutation<MediaSegmentDto | false, CreateSegmentInput>(
-    wrapMutationFn(
-      (input, signal) => createSegmentFromInput(input, undefined, { signal }),
-      getController,
-    ),
-    (input) => input.itemId,
-    'Create segment',
-    'Segment created',
-  )
-}
-
-export const useCreateSegmentFromDto = () => {
-  const getController = useAbortController()
-  return useSegmentMutation<
-    MediaSegmentDto | false,
-    { segment: MediaSegmentDto; providerId?: string }
-  >(
-    wrapMutationFn(
-      ({ segment, providerId }, signal) =>
-        createSegment(segment, providerId, { signal }),
-      getController,
-    ),
-    ({ segment }) => segment.ItemId,
-    'Create segment',
-    'Segment created',
-  )
-}
-
 export const useDeleteSegment = () => {
   const qc = useQueryClient()
   const getController = useAbortController()
@@ -177,9 +114,9 @@ export const useDeleteSegment = () => {
     onSuccess: (_data, segment) => {
       if (segment.ItemId) showSuccess('Segment deleted')
     },
-    onSettled: (_data, _error, segment, ctx) => {
-      if (segment.ItemId && !ctx?.rolledBack)
-        qc.invalidateQueries({ queryKey: segmentsKeys.list(segment.ItemId) })
+    onSettled: () => {
+      // Keep optimistic cache result to avoid redundant refetch.
+      // Rollback path already restores previous data when needed.
     },
   })
 }
@@ -195,8 +132,8 @@ export const useBatchSaveSegments = () => {
     OptimisticContext
   >({
     mutationFn: wrapMutationFn(
-      ({ itemId, existingSegments, newSegments, providerId }, signal) =>
-        batchSaveSegments(itemId, existingSegments, newSegments, providerId, {
+      ({ itemId, existingSegments, newSegments }, signal) =>
+        batchSaveSegments(itemId, existingSegments, newSegments, {
           signal,
         }),
       getController,
@@ -217,16 +154,18 @@ export const useBatchSaveSegments = () => {
         rollbackSegments(qc, itemId, ctx.previousSegments, ctx)
       handleMutationError('Save segments')(error)
     },
-    onSuccess: (data, { newSegments }) => {
+    onSuccess: (data, { itemId, newSegments }) => {
+      qc.setQueryData<Array<MediaSegmentDto>>(segmentsKeys.list(itemId), data)
+
       const saved = data.length
       const expected = newSegments.length
       if (saved === expected) showSuccess('All segments saved')
       else if (saved > 0)
         showError('Partial save', `${saved} of ${expected} segments saved`)
     },
-    onSettled: (_data, _error, { itemId }, ctx) => {
-      if (!ctx?.rolledBack)
-        qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+    onSettled: () => {
+      // Keep server response in cache instead of forcing an immediate refetch.
+      // Rollback path invalidates if reconciliation fails.
     },
   })
 }

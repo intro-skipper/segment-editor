@@ -425,19 +425,18 @@ body {
     0 0 12px oklch(from var(--ring) l c h / 10%);
 }
 
-/* Button and interactive element transitions */
-button,
-[role='button'],
-a {
+/* Opt-in transitions for interactive elements */
+[data-interactive-transition='true'] {
   transition:
     transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 150ms ease,
     box-shadow 150ms ease,
     opacity 150ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-button:active:not(:disabled),
-[role='button']:active:not(:disabled) {
+[data-interactive-transition='true']:active:not(:disabled) {
   transform: scale(0.97);
 }
 

@@ -3,17 +3,20 @@
  */
 
 import {
+  memo,
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { AlertTriangle, Expand, RefreshCw, Shrink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useShallow } from 'zustand/shallow'
+import { useShallow } from 'zustand/react/shallow'
 
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerControls } from './PlayerControls'
@@ -23,13 +26,13 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type {
   VideoPlayerError,
   VideoPlayerErrorType,
 } from '@/hooks/use-video-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
-import type { SessionStore } from '@/stores/session-store'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getBestImageUrl } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
@@ -54,8 +57,101 @@ const {
   DOUBLE_TAP_THRESHOLD_MS,
 } = PLAYER_CONFIG
 
-const selectPlayerState = (state: SessionStore) => ({
-  vibrantColors: state.vibrantColors,
+const PLAYBACK_UPDATE_INTERVAL_MS = 120
+
+interface PlaybackTimelineState {
+  currentTime: number
+  duration: number
+  buffered: number
+}
+
+interface PlaybackTimelineStore {
+  getSnapshot: () => PlaybackTimelineState
+  subscribe: (listener: () => void) => () => void
+  setState: (partial: Partial<PlaybackTimelineState>) => void
+}
+
+function createPlaybackTimelineStore(): PlaybackTimelineStore {
+  let state: PlaybackTimelineState = {
+    currentTime: 0,
+    duration: 0,
+    buffered: 0,
+  }
+  const listeners = new Set<() => void>()
+
+  return {
+    getSnapshot: () => state,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    setState: (partial) => {
+      const nextState: PlaybackTimelineState = {
+        currentTime: partial.currentTime ?? state.currentTime,
+        duration: partial.duration ?? state.duration,
+        buffered: partial.buffered ?? state.buffered,
+      }
+
+      if (
+        nextState.currentTime === state.currentTime &&
+        nextState.duration === state.duration &&
+        nextState.buffered === state.buffered
+      ) {
+        return
+      }
+
+      state = nextState
+      listeners.forEach((listener) => {
+        listener()
+      })
+    },
+  }
+}
+
+interface TimelineScrubberProps {
+  timelineStore: PlaybackTimelineStore
+  item: BaseItemDto
+  segments: Array<MediaSegmentDto> | undefined
+  vibrantColors: VibrantColors | null
+  onSeek: (time: number) => void
+  className?: string
+}
+
+const TimelineScrubber = memo(function TimelineScrubberComponent({
+  timelineStore,
+  item,
+  segments,
+  vibrantColors,
+  onSeek,
+  className,
+}: TimelineScrubberProps) {
+  const { currentTime, duration, buffered } = useSyncExternalStore(
+    timelineStore.subscribe,
+    timelineStore.getSnapshot,
+    timelineStore.getSnapshot,
+  )
+
+  return (
+    <PlayerScrubber
+      currentTime={currentTime}
+      duration={duration}
+      buffered={buffered}
+      chapters={item.Chapters}
+      segments={segments}
+      vibrantColors={vibrantColors}
+      onSeek={onSeek}
+      itemId={item.Id}
+      trickplay={item.Trickplay}
+      className={className}
+    />
+  )
+})
+
+const selectPlayerState = (
+  state: ReturnType<typeof useSessionStore.getState>,
+) => ({
   persistedVolume: state.playerVolume,
   persistedMuted: state.playerMuted,
   setPlayerVolume: state.setPlayerVolume,
@@ -96,8 +192,66 @@ function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
   }
 }
 
-export interface PlayerProps {
+interface FullscreenUiState {
+  isFullscreen: boolean
+  showFullscreenControls: boolean
+  videoFitMode: 'contain' | 'cover'
+}
+
+type FullscreenUiAction =
+  | { type: 'ENTER_FULLSCREEN' }
+  | { type: 'EXIT_FULLSCREEN' }
+  | { type: 'SHOW_CONTROLS' }
+  | { type: 'HIDE_CONTROLS' }
+  | { type: 'TOGGLE_FIT_MODE' }
+
+const initialFullscreenUiState: FullscreenUiState = {
+  isFullscreen: false,
+  showFullscreenControls: true,
+  videoFitMode: 'contain',
+}
+
+function fullscreenUiReducer(
+  state: FullscreenUiState,
+  action: FullscreenUiAction,
+): FullscreenUiState {
+  switch (action.type) {
+    case 'ENTER_FULLSCREEN':
+      return {
+        ...state,
+        isFullscreen: true,
+        showFullscreenControls: true,
+      }
+    case 'EXIT_FULLSCREEN':
+      return {
+        ...state,
+        isFullscreen: false,
+        showFullscreenControls: true,
+        videoFitMode: 'contain',
+      }
+    case 'SHOW_CONTROLS':
+      return {
+        ...state,
+        showFullscreenControls: true,
+      }
+    case 'HIDE_CONTROLS':
+      return {
+        ...state,
+        showFullscreenControls: false,
+      }
+    case 'TOGGLE_FIT_MODE':
+      return {
+        ...state,
+        videoFitMode: state.videoFitMode === 'contain' ? 'cover' : 'contain',
+      }
+    default:
+      return state
+  }
+}
+
+interface PlayerProps {
   item: BaseItemDto
+  vibrantColors: VibrantColors | null
   timestamp?: number
   segments?: Array<MediaSegmentDto>
   onCreateSegment: (data: CreateSegmentData) => void
@@ -113,6 +267,29 @@ export interface PlayerProps {
  */
 export function Player({
   item,
+  vibrantColors,
+  timestamp,
+  segments,
+  onCreateSegment,
+  onUpdateSegmentTimestamp,
+  className,
+  getCurrentTimeRef,
+}: PlayerProps) {
+  return useRenderPlayer({
+    item,
+    vibrantColors,
+    timestamp,
+    segments,
+    onCreateSegment,
+    onUpdateSegmentTimestamp,
+    className,
+    getCurrentTimeRef,
+  })
+}
+
+function useRenderPlayer({
+  item,
+  vibrantColors,
   timestamp,
   segments,
   onCreateSegment,
@@ -123,13 +300,8 @@ export function Player({
   const { t } = useTranslation()
 
   // Use extracted selector with useShallow to prevent unnecessary re-renders
-  const {
-    vibrantColors,
-    persistedVolume,
-    persistedMuted,
-    setPlayerVolume,
-    setPlayerMuted,
-  } = useSessionStore(useShallow(selectPlayerState))
+  const { persistedVolume, persistedMuted, setPlayerVolume, setPlayerMuted } =
+    useSessionStore(useShallow(selectPlayerState))
 
   const { getButtonStyle, iconColor, hasColors } =
     useVibrantButtonStyle(vibrantColors)
@@ -141,9 +313,6 @@ export function Player({
   })
   const {
     isPlaying,
-    currentTime,
-    duration,
-    buffered,
     volume,
     isMuted,
     skipTimeIndex,
@@ -153,22 +322,23 @@ export function Player({
   } = state
 
   // Refs for stable callback references in skip operations
-  const currentTimeRef = useRef(currentTime)
-  const durationRef = useRef(duration)
+  const currentTimeRef = useRef(0)
+  const durationRef = useRef(0)
   const previousStrategyRef = useRef<PlaybackStrategy | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [timelineStore] = useState(createPlaybackTimelineStore)
 
-  // Fullscreen state
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  // Track controls visibility in fullscreen (auto-hide)
-  const [showFullscreenControls, setShowFullscreenControls] = useState(true)
+  const [fullscreenUiState, dispatchFullscreenUi] = useReducer(
+    fullscreenUiReducer,
+    initialFullscreenUiState,
+  )
+  const { isFullscreen, showFullscreenControls, videoFitMode } =
+    fullscreenUiState
+
   const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   )
-  // Video fit mode: 'contain' shows entire video, 'cover' fills screen (may crop)
-  const [videoFitMode, setVideoFitMode] = useState<'contain' | 'cover'>(
-    'contain',
-  )
+
   // Unified single/double click/tap detection (used for both mouse and touch)
   const lastInteractionTimeRef = useRef(0)
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -176,11 +346,20 @@ export function Player({
   const lastMouseMoveRef = useRef(0)
   // Track rAF IDs for subtitle resize cleanup
   const resizeRafRef = useRef<number | null>(null)
+  const playbackUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  const lastPlaybackUpdateAtRef = useRef(0)
 
-  useLayoutEffect(() => {
-    currentTimeRef.current = currentTime
-    durationRef.current = duration
-  }, [currentTime, duration])
+  useEffect(() => {
+    currentTimeRef.current = 0
+    durationRef.current = 0
+    timelineStore.setState({
+      currentTime: 0,
+      duration: 0,
+      buffered: 0,
+    })
+  }, [item.Id, timelineStore])
 
   // Expose getCurrentTime function to parent component
   useLayoutEffect(() => {
@@ -248,7 +427,6 @@ export function Player({
     hlsRef,
     strategy,
     isLoading: isVideoLoading,
-    error: videoError,
     retry: handleRetry,
     reloadHlsWithUrl,
   } = useVideoPlayer({
@@ -259,14 +437,18 @@ export function Player({
     t,
   })
 
-  // Track preference setters from app store
-  const setPreferredAudioLanguage = useAppStore(
-    (s) => s.setPreferredAudioLanguage,
+  // Track preference setters from app store (combined to avoid 3 separate subscriptions)
+  const {
+    setPreferredAudioLanguage,
+    setPreferredSubtitleLanguage,
+    setSubtitlesEnabled,
+  } = useAppStore(
+    useShallow((s: ReturnType<typeof useAppStore.getState>) => ({
+      setPreferredAudioLanguage: s.setPreferredAudioLanguage,
+      setPreferredSubtitleLanguage: s.setPreferredSubtitleLanguage,
+      setSubtitlesEnabled: s.setSubtitlesEnabled,
+    })),
   )
-  const setPreferredSubtitleLanguage = useAppStore(
-    (s) => s.setPreferredSubtitleLanguage,
-  )
-  const setSubtitlesEnabled = useAppStore((s) => s.setSubtitlesEnabled)
 
   // Initialize track manager for audio/subtitle selection
   const {
@@ -315,21 +497,6 @@ export function Player({
     [setJassubUserOffset],
   )
 
-  // Sync video player error with reducer state
-  useEffect(() => {
-    if (videoError) {
-      dispatch({
-        type: 'ERROR_STATE',
-        error: {
-          type: mapVideoErrorType(videoError.type),
-          message: videoError.message,
-          recoverable: videoError.recoverable,
-        },
-        isRecovering: false,
-      })
-    }
-  }, [videoError])
-
   // Handle external timestamp changes
   useEffect(() => {
     if (timestamp !== undefined && videoRef.current) {
@@ -347,30 +514,71 @@ export function Player({
   }, [videoRef, persistedVolume, persistedMuted])
 
   // Video event handlers - stable references
-  const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      dispatch({
-        type: 'PLAYBACK_UPDATE',
-        currentTime: videoRef.current.currentTime,
-      })
+  const clearPlaybackUpdateTimer = useCallback(() => {
+    if (playbackUpdateTimeoutRef.current !== null) {
+      clearTimeout(playbackUpdateTimeoutRef.current)
+      playbackUpdateTimeoutRef.current = null
     }
-  }, [videoRef])
+  }, [])
+
+  const publishTimelineTime = useCallback(
+    (nextTime: number) => {
+      timelineStore.setState({ currentTime: nextTime })
+    },
+    [timelineStore],
+  )
+
+  const handleTimeUpdate = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const nextTime = video.currentTime
+    currentTimeRef.current = nextTime
+
+    const now = performance.now()
+    const elapsed = now - lastPlaybackUpdateAtRef.current
+    if (
+      elapsed >= PLAYBACK_UPDATE_INTERVAL_MS &&
+      playbackUpdateTimeoutRef.current === null
+    ) {
+      lastPlaybackUpdateAtRef.current = now
+      publishTimelineTime(nextTime)
+      return
+    }
+
+    if (playbackUpdateTimeoutRef.current !== null) {
+      return
+    }
+
+    const remainingDelay = Math.max(0, PLAYBACK_UPDATE_INTERVAL_MS - elapsed)
+    playbackUpdateTimeoutRef.current = setTimeout(() => {
+      playbackUpdateTimeoutRef.current = null
+
+      const latestTime = videoRef.current?.currentTime
+      if (latestTime === undefined) return
+
+      currentTimeRef.current = latestTime
+      lastPlaybackUpdateAtRef.current = performance.now()
+      publishTimelineTime(latestTime)
+    }, remainingDelay)
+  }, [videoRef, publishTimelineTime])
 
   const handleDurationChange = useCallback(() => {
-    if (videoRef.current) {
-      dispatch({ type: 'MEDIA_LOADED', duration: videoRef.current.duration })
+    const duration = videoRef.current?.duration
+    if (duration !== undefined) {
+      durationRef.current = duration
+      timelineStore.setState({ duration })
     }
-  }, [videoRef])
+  }, [videoRef, timelineStore])
 
   const handleProgress = useCallback(() => {
     const video = videoRef.current
     if (video?.buffered.length) {
-      dispatch({
-        type: 'BUFFER_UPDATE',
+      timelineStore.setState({
         buffered: video.buffered.end(video.buffered.length - 1),
       })
     }
-  }, [videoRef])
+  }, [videoRef, timelineStore])
 
   const handlePlay = useCallback(() => {
     dispatch({ type: 'PLAY_STATE', isPlaying: true })
@@ -392,12 +600,12 @@ export function Player({
       video.muted = !video.muted
       dispatch({
         type: 'VOLUME_CHANGE',
-        volume: state.volume,
+        volume: video.volume,
         isMuted: video.muted,
       })
       setPlayerMuted(video.muted)
     }
-  }, [videoRef, state.volume, setPlayerMuted])
+  }, [videoRef, setPlayerMuted])
 
   const handleVolumeChange = useCallback(
     (newVolume: number) => {
@@ -429,35 +637,44 @@ export function Player({
   const handleSeek = useCallback(
     (time: number) => {
       if (videoRef.current) {
+        clearPlaybackUpdateTimer()
         videoRef.current.currentTime = time
-        dispatch({ type: 'PLAYBACK_UPDATE', currentTime: time })
+        currentTimeRef.current = time
+        lastPlaybackUpdateAtRef.current = performance.now()
+        publishTimelineTime(time)
       }
     },
-    [videoRef],
+    [videoRef, clearPlaybackUpdateTimer, publishTimelineTime],
   )
 
   // Skip controls using refs for stable timing
   const skipForward = useCallback(() => {
     const video = videoRef.current
     if (!video) return
+    clearPlaybackUpdateTimer()
     const newTime = Math.min(
       currentTimeRef.current + SKIP_TIMES[skipTimeIndex],
       durationRef.current,
     )
     video.currentTime = newTime
-    dispatch({ type: 'PLAYBACK_UPDATE', currentTime: newTime })
-  }, [skipTimeIndex, videoRef])
+    currentTimeRef.current = newTime
+    lastPlaybackUpdateAtRef.current = performance.now()
+    publishTimelineTime(newTime)
+  }, [skipTimeIndex, videoRef, clearPlaybackUpdateTimer, publishTimelineTime])
 
   const skipBackward = useCallback(() => {
     const video = videoRef.current
     if (!video) return
+    clearPlaybackUpdateTimer()
     const newTime = Math.max(
       currentTimeRef.current - SKIP_TIMES[skipTimeIndex],
       0,
     )
     video.currentTime = newTime
-    dispatch({ type: 'PLAYBACK_UPDATE', currentTime: newTime })
-  }, [skipTimeIndex, videoRef])
+    currentTimeRef.current = newTime
+    lastPlaybackUpdateAtRef.current = performance.now()
+    publishTimelineTime(newTime)
+  }, [skipTimeIndex, videoRef, clearPlaybackUpdateTimer, publishTimelineTime])
 
   const cycleSkipTimeUp = useCallback(() => {
     dispatch({ type: 'CYCLE_SKIP', direction: 1 })
@@ -522,76 +739,66 @@ export function Player({
     }
   }, [])
 
+  const handleFullscreenChange = useEffectEvent(() => {
+    const isFs = !!document.fullscreenElement
+
+    // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
+    if (isFs) {
+      dispatchFullscreenUi({ type: 'ENTER_FULLSCREEN' })
+      // Clear any existing timer before setting a new one
+      clearHideControlsTimer()
+      // Start auto-hide timer when entering fullscreen
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
+      }, CONTROLS_HIDE_DELAY_MS)
+    } else {
+      dispatchFullscreenUi({ type: 'EXIT_FULLSCREEN' })
+      // Clear the hide timer to avoid it firing when not in fullscreen
+      clearHideControlsTimer()
+    }
+  })
+
   // Listen for fullscreen changes
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFs = !!document.fullscreenElement
-      setIsFullscreen(isFs)
-      // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
-      if (isFs) {
-        setShowFullscreenControls(true)
-        // Clear any existing timer before setting a new one
-        clearHideControlsTimer()
-        // Start auto-hide timer when entering fullscreen
-        hideControlsTimeoutRef.current = setTimeout(() => {
-          setShowFullscreenControls(false)
-        }, CONTROLS_HIDE_DELAY_MS)
-      } else {
-        setVideoFitMode('contain')
-        // Clear the hide timer to avoid it firing when not in fullscreen
-        clearHideControlsTimer()
-      }
-    }
-
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [clearHideControlsTimer])
+  }, [])
 
   // Toggle video fit mode (contain <-> cover) and resize subtitles
   const toggleVideoFitMode = useCallback(() => {
-    setVideoFitMode((prev) => {
-      const next = prev === 'contain' ? 'cover' : 'contain'
+    dispatchFullscreenUi({ type: 'TOGGLE_FIT_MODE' })
 
-      // Cancel any pending resize to avoid stale callbacks
-      if (resizeRafRef.current !== null) {
-        cancelAnimationFrame(resizeRafRef.current)
+    // Cancel any pending resize to avoid stale callbacks
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current)
+      resizeRafRef.current = null
+    }
+
+    // Schedule resize after browser paints new styles.
+    // Double rAF pattern: outer frame waits for style recalc,
+    // inner frame ensures layout is complete before measuring.
+    // We only track the outer frame ID - cancelling it prevents
+    // the inner frame from ever being scheduled.
+    resizeRafRef.current = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
         resizeRafRef.current = null
-      }
-
-      // Schedule resize after browser paints new styles.
-      // Double rAF pattern: outer frame waits for style recalc,
-      // inner frame ensures layout is complete before measuring.
-      // We only track the outer frame ID - cancelling it prevents
-      // the inner frame from ever being scheduled.
-      resizeRafRef.current = requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          resizeRafRef.current = null
-          resizeJassub()
-        })
+        resizeJassub()
       })
-
-      return next
     })
   }, [resizeJassub])
 
   // Auto-hide controls in fullscreen after inactivity
   const resetHideControlsTimer = useCallback(() => {
     clearHideControlsTimer()
-    setShowFullscreenControls(true)
+    dispatchFullscreenUi({ type: 'SHOW_CONTROLS' })
     if (isFullscreen) {
       hideControlsTimeoutRef.current = setTimeout(() => {
-        setShowFullscreenControls(false)
+        dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
       }, CONTROLS_HIDE_DELAY_MS)
     }
   }, [isFullscreen, clearHideControlsTimer])
-
-  // Stable handler to stop event propagation (used in fullscreen OSD overlay)
-  const stopPropagation = useCallback(
-    (e: React.SyntheticEvent) => e.stopPropagation(),
-    [],
-  )
 
   /**
    * Handler for both mouse clicks and touch taps.
@@ -603,6 +810,11 @@ export function Player({
    */
   const handleVideoInteraction = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest('[data-player-controls-overlay="true"]')) {
+        return
+      }
+
       // For touch events, prevent the subsequent click event from firing
       if ('changedTouches' in e) {
         e.preventDefault()
@@ -650,6 +862,16 @@ export function Player({
     [isFullscreen, toggleVideoFitMode, togglePlay, resetHideControlsTimer],
   )
 
+  const handleVideoContainerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        togglePlay()
+      }
+    },
+    [togglePlay],
+  )
+
   // Handle mouse movement in fullscreen to show/hide controls
   // Throttled to avoid excessive timer resets during rapid mouse movement
   const handleFullscreenMouseMove = useCallback(() => {
@@ -662,13 +884,6 @@ export function Player({
       now - lastMouseMoveRef.current > MOUSE_MOVE_THROTTLE_MS
     ) {
       lastMouseMoveRef.current = now
-      resetHideControlsTimer()
-    }
-  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
-
-  // Handle keyboard input in fullscreen to show controls (accessibility)
-  const handleFullscreenKeyDown = useCallback(() => {
-    if (isFullscreen && !showFullscreenControls) {
       resetHideControlsTimer()
     }
   }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
@@ -690,8 +905,9 @@ export function Player({
       if (resizeRafRef.current !== null) {
         cancelAnimationFrame(resizeRafRef.current)
       }
+      clearPlaybackUpdateTimer()
     }
-  }, [clearHideControlsTimer])
+  }, [clearHideControlsTimer, clearPlaybackUpdateTimer])
 
   // Handler for skip time changes from controls
   const handleSkipTimeChange = useCallback((index: number) => {
@@ -699,7 +915,6 @@ export function Player({
   }, [])
 
   // Track selection handlers that also update preferences
-  // Requirements: 7.1, 7.3
   const handleAudioTrackSelect = useCallback(
     async (index: number) => {
       await selectAudioTrack(index)
@@ -805,17 +1020,20 @@ export function Player({
       {/* Fullscreen container - wraps everything */}
       <div
         ref={containerRef}
+        role="region"
+        aria-label={t('player.videoPlayer')}
         className={cn(
           'relative',
           isFullscreen && 'fixed inset-0 z-50 bg-black outline-none',
         )}
         onMouseMove={handleFullscreenMouseMove}
         onMouseLeave={handleContainerMouseLeave}
-        onKeyDown={handleFullscreenKeyDown}
         tabIndex={isFullscreen ? 0 : -1}
       >
         {/* Video container */}
         <div
+          role="button"
+          tabIndex={0}
           className={cn(
             'relative',
             isFullscreen
@@ -827,6 +1045,7 @@ export function Player({
           )}
           onClick={handleVideoInteraction}
           onTouchEnd={handleVideoInteraction}
+          onKeyDown={handleVideoContainerKeyDown}
         >
           <video
             ref={videoRef}
@@ -851,20 +1070,20 @@ export function Player({
           />
 
           {/* Error overlay - strategy-aware */}
-          {playerError && !isRecovering && (
+          {playerError && !isRecovering ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
               <AlertTriangle className="size-12 text-destructive mb-4" />
               <p className="text-lg font-medium mb-2">{playerError.message}</p>
-              {strategy === 'direct' && playerError.type === 'media' && (
+              {strategy === 'direct' && playerError.type === 'media' ? (
                 <p className="text-sm text-muted-foreground mb-2">
                   {t('player.error.directPlayFailed')}
                 </p>
-              )}
-              {playerError.recoverable && (
+              ) : null}
+              {playerError.recoverable ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                     e.stopPropagation()
                     handleRetry()
                   }}
@@ -873,33 +1092,32 @@ export function Player({
                   <RefreshCw className="size-4 mr-2" />
                   {t('player.retry')}
                 </Button>
-              )}
+              ) : null}
             </div>
-          )}
+          ) : null}
 
           {/* Loading/Recovery indicator */}
-          {(isVideoLoading || isRecovering) && (
+          {isVideoLoading || isRecovering ? (
             <div
               className="absolute inset-0 flex items-center justify-center bg-black/60"
               role="status"
               aria-live="polite"
               aria-busy="true"
             >
-              <RefreshCw
-                className="size-8 text-white animate-spin"
-                aria-hidden="true"
-              />
+              <div className="animate-spin" aria-hidden="true">
+                <RefreshCw className="size-8 text-white" />
+              </div>
               <span className="sr-only">
                 {isRecovering
                   ? t('player.recovering', 'Recovering playback')
                   : t('accessibility.loading')}
               </span>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Fullscreen OSD/Controls overlay */}
-        {isFullscreen && (
+        {isFullscreen ? (
           <div
             className={cn(
               'absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
@@ -910,10 +1128,11 @@ export function Player({
             aria-hidden={!showFullscreenControls}
             // Prevent keyboard focus on hidden controls - inert removes from tab order and accessibility tree
             inert={!showFullscreenControls || undefined}
-            onClick={stopPropagation}
-            onTouchEnd={stopPropagation}
           >
-            <div className="max-w-[90%] mx-auto">
+            <div
+              className="max-w-[90%] mx-auto"
+              data-player-controls-overlay="true"
+            >
               {/* Fit mode toggle hint */}
               <div className="flex justify-end mb-2">
                 <Button
@@ -941,41 +1160,35 @@ export function Player({
                 </Button>
               </div>
 
-              <PlayerScrubber
-                currentTime={currentTime}
-                duration={duration}
-                buffered={buffered}
-                chapters={item.Chapters}
+              <TimelineScrubber
+                timelineStore={timelineStore}
+                item={item}
                 segments={segments}
+                vibrantColors={vibrantColors}
                 onSeek={handleSeek}
-                itemId={item.Id}
-                trickplay={item.Trickplay}
                 className="mb-4"
               />
 
               <PlayerControls {...playerControlsProps} />
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Normal mode controls (outside fullscreen container) */}
-      {!isFullscreen && (
+      {!isFullscreen ? (
         <>
-          <PlayerScrubber
-            currentTime={currentTime}
-            duration={duration}
-            buffered={buffered}
-            chapters={item.Chapters}
+          <TimelineScrubber
+            timelineStore={timelineStore}
+            item={item}
             segments={segments}
+            vibrantColors={vibrantColors}
             onSeek={handleSeek}
-            itemId={item.Id}
-            trickplay={item.Trickplay}
           />
 
           <PlayerControls {...playerControlsProps} />
         </>
-      )}
+      ) : null}
     </div>
   )
 }

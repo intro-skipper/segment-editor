@@ -15,7 +15,7 @@ import { generateUUID } from '@/lib/segment-utils'
 // Types
 // ============================================================================
 
-export interface VideoStreamOptions {
+interface VideoStreamOptions {
   itemId: string
   container?: string
   audioCodec?: string
@@ -26,7 +26,7 @@ export interface VideoStreamOptions {
 /**
  * Options for generating a direct play URL.
  */
-export interface DirectPlayOptions {
+interface DirectPlayOptions {
   itemId: string
   mediaSourceId?: string
   startTimeTicks?: number
@@ -41,13 +41,13 @@ export type PlaybackStrategy = 'direct' | 'hls'
 /**
  * Configuration for video playback.
  */
-export interface PlaybackConfig {
+interface PlaybackConfig {
   strategy: PlaybackStrategy
   url: string
   startTime?: number
 }
 
-export interface ImageUrlOptions {
+interface ImageUrlOptions {
   itemId: string
   imageType?: ImageType
   maxWidth?: number
@@ -82,8 +82,6 @@ function buildUrl(endpoint: string, query: URLSearchParams): string {
  *
  * @param options - Direct play options including itemId and optional parameters
  * @returns The direct play URL with authentication parameters
- *
- * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 export function getDirectPlayUrl(options: DirectPlayOptions): string {
   const { itemId, mediaSourceId, startTimeTicks, container } = options
@@ -196,12 +194,52 @@ function getImageUrl(options: ImageUrlOptions): string {
 
 type ImageCandidate = { itemId: string; imageType: ImageType; tag?: string }
 
+const IMAGE_URL_CACHE_MAX_SIZE = 2000
+const imageUrlCache = new Map<string, string | null>()
+
+function setImageUrlCache(cacheKey: string, value: string | null): void {
+  if (imageUrlCache.has(cacheKey)) {
+    imageUrlCache.delete(cacheKey)
+  } else if (imageUrlCache.size >= IMAGE_URL_CACHE_MAX_SIZE) {
+    const firstKey = imageUrlCache.keys().next().value
+    if (firstKey) {
+      imageUrlCache.delete(firstKey)
+    }
+  }
+
+  imageUrlCache.set(cacheKey, value)
+}
+
+function getImageCacheKey(
+  item: BaseItemDto,
+  maxWidth?: number,
+  maxHeight?: number,
+): string {
+  return [
+    item.Id ?? '',
+    maxWidth ?? '',
+    maxHeight ?? '',
+    item.ImageTags?.Primary ?? '',
+    item.ImageTags?.Thumb ?? '',
+    item.BackdropImageTags?.[0] ?? '',
+    item.ParentThumbItemId ?? '',
+    item.SeriesId ?? '',
+    item.SeriesPrimaryImageTag ?? '',
+  ].join('|')
+}
+
 export function getBestImageUrl(
   item: BaseItemDto,
   maxWidth?: number,
   maxHeight?: number,
 ): string | undefined {
   if (!item.Id) return undefined
+
+  const cacheKey = getImageCacheKey(item, maxWidth, maxHeight)
+  const cached = imageUrlCache.get(cacheKey)
+  if (cached !== undefined) {
+    return cached ?? undefined
+  }
 
   const candidates: Array<ImageCandidate | null> = [
     item.ImageTags?.Primary
@@ -238,9 +276,14 @@ export function getBestImageUrl(
         maxHeight,
         tag: c.tag,
       })
-      if (url) return url
+      if (url) {
+        setImageUrlCache(cacheKey, url)
+        return url
+      }
     }
   }
+
+  setImageUrlCache(cacheKey, null)
   return undefined
 }
 
@@ -301,8 +344,6 @@ export function extractMediaSourceInfo(
  * @param startTimeTicks - Optional start time in ticks
  * @param audioStreamIndex - Optional audio stream index for track selection
  * @returns PlaybackConfig with strategy and appropriate URL
- *
- * Requirements: 3.1, 3.2, 3.4
  */
 export async function getPlaybackConfig(
   item: BaseItemDto,

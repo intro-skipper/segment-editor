@@ -38,14 +38,11 @@ useApiStore.subscribe((state, prev) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
-  TypedApis,
   ApiOptions,
-  Credentials,
   AuthCredentials,
   ApiKeyCredentials,
   UserPassCredentials,
   AuthResult,
-  ConnectionResult,
 } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,17 +51,11 @@ export type {
 
 export {
   withApi,
-  getTypedApis,
-  createApi,
   getRequestConfig,
   getAuthenticatedRequestConfig,
-  clearApiCache,
-  isAborted,
   isPluginMode,
   getPluginCredentials,
   getDeviceId,
-  getJellyfinClient,
-  resetClient,
 } from './core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,26 +63,17 @@ export {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export {
-  testConnection,
   testConnectionWithCredentials,
   storeAuthResult,
   getCredentials,
   getServerBaseUrl,
-  getAccessToken,
 } from './connection'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API - Security
 // ─────────────────────────────────────────────────────────────────────────────
 
-export {
-  sanitizeUrl,
-  sanitizeQueryParam,
-  sanitizeEndpoint,
-  isValidEndpoint,
-  buildApiUrl,
-  normalizeServerAddress,
-} from './security'
+export { buildApiUrl } from './security'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API - Discovery
@@ -102,13 +84,6 @@ export {
   findBestServer,
   sortServersByScore,
   getScoreDisplay,
-  RecommendedServerInfoScore,
-} from './discovery'
-
-export type {
-  DiscoveryResult,
-  ScoreDisplay,
-  RecommendedServerInfo,
 } from './discovery'
 
 // ─────────────────────────────────────────────────────────────────────────────

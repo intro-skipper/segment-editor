@@ -7,13 +7,18 @@
  * @module components/connection/ConnectionWizard
  */
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { useWizardState } from './use-wizard-state'
 import { AuthStep, EntryStep, SelectStep, SuccessStep } from './steps'
 import { StepIndicator } from './StepIndicator'
+import type { RefObject } from 'react'
 import type { AuthCredentials as Credentials } from '@/services/jellyfin'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogCloseButton,
+  DialogContent,
+} from '@/components/ui/dialog'
 import {
   authenticate,
   discoverServers,
@@ -26,13 +31,90 @@ import { withErrorBoundary } from '@/components/with-error-boundary'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface ConnectionWizardProps {
+interface ConnectionWizardProps {
   /** Whether the wizard dialog is open */
   open: boolean
   /** Callback when open state changes */
   onOpenChange: (open: boolean) => void
   /** Callback when connection is successfully established */
   onComplete?: () => void
+}
+
+interface WizardStepContentProps {
+  state: ReturnType<typeof useWizardState>['state']
+  setAddress: ReturnType<typeof useWizardState>['setAddress']
+  setAuthMethod: ReturnType<typeof useWizardState>['setAuthMethod']
+  handleDiscover: () => void
+  handleServerSelect: (
+    server: ReturnType<typeof useWizardState>['state']['selectedServer'],
+  ) => void
+  goBack: ReturnType<typeof useWizardState>['goBack']
+  handleProceedToAuth: () => void
+  handleAuthenticate: (credentials: Credentials) => void
+  handleComplete: () => void
+  serverAddressInputRef: RefObject<HTMLInputElement | null>
+}
+
+function WizardStepContent({
+  state,
+  setAddress,
+  setAuthMethod,
+  handleDiscover,
+  handleServerSelect,
+  goBack,
+  handleProceedToAuth,
+  handleAuthenticate,
+  handleComplete,
+  serverAddressInputRef,
+}: WizardStepContentProps) {
+  switch (state.step) {
+    case 'entry':
+      return (
+        <EntryStep
+          address={state.address}
+          error={state.error}
+          isLoading={state.isLoading}
+          onAddressChange={setAddress}
+          onDiscover={handleDiscover}
+          onRetry={handleDiscover}
+          inputRef={serverAddressInputRef}
+        />
+      )
+
+    case 'select':
+      return (
+        <SelectStep
+          servers={state.servers}
+          selectedServer={state.selectedServer}
+          isLoading={state.isLoading}
+          error={state.error}
+          onSelect={handleServerSelect}
+          onBack={goBack}
+          onContinue={handleProceedToAuth}
+        />
+      )
+
+    case 'auth':
+      return (
+        <AuthStep
+          serverAddress={state.selectedServer?.address ?? ''}
+          onSubmit={handleAuthenticate}
+          onBack={goBack}
+          isLoading={state.isLoading}
+          error={state.error}
+          authMethod={state.authMethod}
+          onAuthMethodChange={setAuthMethod}
+        />
+      )
+
+    case 'success':
+      return (
+        <SuccessStep
+          selectedServer={state.selectedServer}
+          onComplete={handleComplete}
+        />
+      )
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +130,10 @@ function ConnectionWizardBase({
   onComplete,
 }: ConnectionWizardProps) {
   const { createController, abort } = useAbortController()
+
+  // Ref for the server address input — passed as initialFocus to the dialog
+  // so Base UI focuses it reliably when the wizard opens, without a setTimeout.
+  const serverAddressInputRef = useRef<HTMLInputElement>(null)
 
   const {
     state,
@@ -177,70 +263,32 @@ function ConnectionWizardBase({
     onComplete?.()
   }, [handleOpenChange, onComplete])
 
-  // Render step content
-  const renderStepContent = () => {
-    switch (state.step) {
-      case 'entry':
-        return (
-          <EntryStep
-            address={state.address}
-            error={state.error}
-            isLoading={state.isLoading}
-            onAddressChange={setAddress}
-            onDiscover={handleDiscover}
-            onRetry={handleDiscover}
-          />
-        )
-
-      case 'select':
-        return (
-          <SelectStep
-            servers={state.servers}
-            selectedServer={state.selectedServer}
-            isLoading={state.isLoading}
-            error={state.error}
-            onSelect={handleServerSelect}
-            onBack={goBack}
-            onContinue={handleProceedToAuth}
-          />
-        )
-
-      case 'auth':
-        return (
-          <AuthStep
-            serverAddress={state.selectedServer?.address ?? ''}
-            onSubmit={handleAuthenticate}
-            onBack={goBack}
-            isLoading={state.isLoading}
-            error={state.error}
-            initialAuthMethod={state.authMethod}
-          />
-        )
-
-      case 'success':
-        return (
-          <SuccessStep
-            selectedServer={state.selectedServer}
-            onComplete={handleComplete}
-          />
-        )
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="sm:max-w-md p-6 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl"
         aria-describedby="wizard-description"
-        showCloseButton={state.step !== 'success'}
+        initialFocus={serverAddressInputRef}
       >
+        {state.step !== 'success' && <DialogCloseButton />}
         <span id="wizard-description" className="sr-only">
           Connection wizard to set up your Jellyfin server
         </span>
 
         <StepIndicator currentStep={state.step} />
 
-        {renderStepContent()}
+        <WizardStepContent
+          state={state}
+          setAddress={setAddress}
+          setAuthMethod={setAuthMethod}
+          handleDiscover={handleDiscover}
+          handleServerSelect={handleServerSelect}
+          goBack={goBack}
+          handleProceedToAuth={handleProceedToAuth}
+          handleAuthenticate={handleAuthenticate}
+          handleComplete={handleComplete}
+          serverAddressInputRef={serverAddressInputRef}
+        />
       </DialogContent>
     </Dialog>
   )

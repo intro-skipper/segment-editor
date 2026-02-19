@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 
-export interface RouteErrorFallbackProps {
+interface RouteErrorFallbackProps {
   /** Error message to display */
   message?: string
   /** Whether to show retry button */
@@ -58,9 +58,9 @@ export function RouteErrorFallback({
     if (onRetry) {
       onRetry()
     } else {
-      window.location.reload()
+      void router.invalidate()
     }
-  }, [onRetry])
+  }, [onRetry, router])
 
   return (
     <div
@@ -107,5 +107,3 @@ export function RouteErrorFallback({
     </div>
   )
 }
-
-export default RouteErrorFallback

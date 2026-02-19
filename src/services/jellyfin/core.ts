@@ -143,7 +143,7 @@ export function createApi(
 }
 
 /** Gets or creates a cached TypedApis instance for the given credentials. */
-export function getTypedApis(credentials: Credentials): TypedApis | null {
+function getTypedApis(credentials: Credentials): TypedApis | null {
   const key = `${credentials.serverAddress}:${credentials.accessToken}`
 
   if (apiCache?.key === key) return apiCache.apis
@@ -164,11 +164,6 @@ export function getTypedApis(credentials: Credentials): TypedApis | null {
 }
 
 export function clearApiCache(): void {
-  apiCache = null
-}
-
-export function resetClient(): void {
-  jellyfinInstance = null
   apiCache = null
 }
 

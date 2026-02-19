@@ -1,6 +1,6 @@
 /**
  * Feature: Settings Persistence Round-Trip
- * For any settings change (theme, locale, provider, server address),
+ * For any settings change (theme, locale, server address),
  * the value SHALL be persisted to local storage immediately.
  * When the application loads, for any previously persisted settings,
  * the state SHALL be restored to match the persisted values exactly.
@@ -22,7 +22,6 @@ type Locale = 'en-US' | 'de' | 'fr' | 'auto'
 interface AppSettings {
   theme: Theme
   locale: Locale
-  providerId: string
   showVideoPlayer: boolean
   enableEdl: boolean
   enableChapter: boolean
@@ -36,9 +35,6 @@ interface ApiSettings {
 // Arbitraries for generating random settings
 const themeArb = fc.constantFrom<Theme>('auto', 'dark', 'light')
 const localeArb = fc.constantFrom<Locale>('en-US', 'de', 'fr', 'auto')
-const providerIdArb = fc
-  .string({ minLength: 1, maxLength: 50 })
-  .filter((s) => s.trim().length > 0)
 const booleanArb = fc.boolean()
 const serverAddressArb = fc.webUrl()
 const apiKeyArb = fc.option(
@@ -54,7 +50,6 @@ const apiKeyArb = fc.option(
 const appSettingsArb = fc.record<AppSettings>({
   theme: themeArb,
   locale: localeArb,
-  providerId: providerIdArb,
   showVideoPlayer: booleanArb,
   enableEdl: booleanArb,
   enableChapter: booleanArb,
@@ -115,7 +110,6 @@ describe('Settings Persistence Round-Trip', () => {
         // Verify all settings match exactly
         expect(restored.theme).toBe(settings.theme)
         expect(restored.locale).toBe(settings.locale)
-        expect(restored.providerId).toBe(settings.providerId)
         expect(restored.showVideoPlayer).toBe(settings.showVideoPlayer)
         expect(restored.enableEdl).toBe(settings.enableEdl)
         expect(restored.enableChapter).toBe(settings.enableChapter)
@@ -173,7 +167,6 @@ describe('Settings Persistence Round-Trip', () => {
           state: {
             theme: 'auto' as Theme,
             locale: 'en-US' as Locale,
-            providerId: 'SegmentEditor',
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
@@ -212,7 +205,6 @@ describe('Settings Persistence Round-Trip', () => {
           state: {
             theme: 'auto' as Theme,
             locale: 'en-US' as Locale,
-            providerId: 'SegmentEditor',
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
@@ -269,7 +261,6 @@ describe('Settings Persistence Round-Trip', () => {
 
           expect(restored.theme).toBe(finalSettings.theme)
           expect(restored.locale).toBe(finalSettings.locale)
-          expect(restored.providerId).toBe(finalSettings.providerId)
           expect(restored.showVideoPlayer).toBe(finalSettings.showVideoPlayer)
           expect(restored.enableEdl).toBe(finalSettings.enableEdl)
           expect(restored.enableChapter).toBe(finalSettings.enableChapter)

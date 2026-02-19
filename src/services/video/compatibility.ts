@@ -23,7 +23,7 @@ export interface MediaSourceInfo {
 /**
  * Result of compatibility check.
  */
-export interface CompatibilityResult {
+interface CompatibilityResult {
   canDirectPlay: boolean
   reason?: string
 }
@@ -68,10 +68,6 @@ export const DIRECT_PLAY_AUDIO_CODECS = [
   'flac',
   'ac3',
 ] as const
-
-export type DirectPlayContainer = (typeof DIRECT_PLAY_CONTAINERS)[number]
-export type DirectPlayVideoCodec = (typeof DIRECT_PLAY_VIDEO_CODECS)[number]
-export type DirectPlayAudioCodec = (typeof DIRECT_PLAY_AUDIO_CODECS)[number]
 
 // ============================================================================
 // Capability Cache

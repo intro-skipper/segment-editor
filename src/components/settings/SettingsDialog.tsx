@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings2 } from 'lucide-react'
 
@@ -7,13 +7,15 @@ import {
   CodecCompatibilitySection,
   LanguageSection,
   PageSizeSection,
-  ProviderSection,
   ServerConnectionSection,
 } from './sections'
 import { useSessionStore } from '@/stores/session-store'
 import { isPluginMode } from '@/services/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { withErrorBoundary } from '@/components/with-error-boundary'
+
+// Stable: isPluginMode() reads a store/env value that never changes after init
+const PLUGIN_MODE = isPluginMode()
 
 function SettingsDialogBase() {
   const { t } = useTranslation()
@@ -22,20 +24,16 @@ function SettingsDialogBase() {
   const settingsOpen = useSessionStore((s) => s.settingsOpen)
   const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
-  const pluginMode = isPluginMode()
-
-  // Store trigger element for focus restoration
-  useEffect(() => {
-    if (settingsOpen) {
-      triggerRef.current = document.activeElement as HTMLElement
-    }
-  }, [settingsOpen])
+  const pluginMode = PLUGIN_MODE
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (open) {
+        triggerRef.current = document.activeElement as HTMLElement
+      }
       setSettingsOpen(open)
       if (!open) {
-        setTimeout(() => triggerRef.current?.focus(), 0)
+        requestAnimationFrame(() => triggerRef.current?.focus())
       }
     },
     [setSettingsOpen],
@@ -46,7 +44,6 @@ function SettingsDialogBase() {
       <DialogContent
         className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
         aria-describedby="settings-description"
-        showCloseButton={false}
       >
         <SettingsHeader title={`${t('app.title')} Settings`} />
 
@@ -54,7 +51,6 @@ function SettingsDialogBase() {
           {!pluginMode && <ServerConnectionSection />}
           <AppearanceSection />
           <LanguageSection />
-          <ProviderSection />
           <PageSizeSection />
           <CodecCompatibilitySection />
         </div>
@@ -81,4 +77,3 @@ function SettingsHeader({ title }: { title: string }) {
 
 // Wrap with error boundary for reliability
 export const SettingsDialog = withErrorBoundary(SettingsDialogBase)
-export default SettingsDialog

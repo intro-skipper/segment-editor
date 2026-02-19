@@ -5,8 +5,6 @@
  * - If compatible, the selected strategy SHALL be 'direct' with a direct play URL
  * - If incompatible, the selected strategy SHALL be 'hls' with an HLS URL
  * - The URL type SHALL match the selected strategy
- *
- * **Validates: Requirements 3.1, 3.2, 3.4**
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
