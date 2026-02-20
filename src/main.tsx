@@ -14,7 +14,7 @@ import { routeTree } from './routeTree.gen'
 import {
   PLUGIN_ROUTER_BASE_PATH,
   PLUGIN_ROUTER_ENTRY,
-  isPluginContext,
+  isPluginMode,
 } from './services/jellyfin/core'
 
 import './styles.css'
@@ -22,13 +22,18 @@ import './styles.css'
 // Create a new router instance
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
-const pluginMode = isPluginContext()
+const pluginMode = isPluginMode()
+const pluginBuild = import.meta.env.BASE_URL.startsWith('/SegmentEditor/')
 
 // Use memory history in plugin mode, browser history otherwise
 const history = pluginMode
   ? createMemoryHistory({ initialEntries: [PLUGIN_ROUTER_ENTRY] })
   : createBrowserHistory()
-const basePath = pluginMode ? PLUGIN_ROUTER_BASE_PATH : '/'
+const basePath = pluginMode
+  ? PLUGIN_ROUTER_BASE_PATH
+  : pluginBuild
+    ? '/SegmentEditor'
+    : '/'
 const router = createRouter({
   routeTree,
   basepath: basePath,

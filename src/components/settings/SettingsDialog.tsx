@@ -10,12 +10,9 @@ import {
   ServerConnectionSection,
 } from './sections'
 import { useSessionStore } from '@/stores/session-store'
-import { isPluginContext } from '@/services/jellyfin'
+import { isPluginMode } from '@/services/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { withErrorBoundary } from '@/components/with-error-boundary'
-
-// Stable: plugin context is determined by build/runtime and never changes after init
-const PLUGIN_MODE = isPluginContext()
 
 function SettingsDialogBase() {
   const { t } = useTranslation()
@@ -24,7 +21,7 @@ function SettingsDialogBase() {
   const settingsOpen = useSessionStore((s) => s.settingsOpen)
   const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
 
-  const pluginMode = PLUGIN_MODE
+  const pluginMode = isPluginMode()
 
   const handleOpenChange = useCallback(
     (open: boolean) => {

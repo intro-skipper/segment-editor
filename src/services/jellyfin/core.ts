@@ -96,11 +96,6 @@ export function getPluginCredentials(): Credentials | null {
 
 export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
 
-export const isPluginBuild = (): boolean =>
-  import.meta.env.BASE_URL.startsWith('/SegmentEditor/')
-
-export const isPluginContext = (): boolean => isPluginBuild() || isPluginMode()
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Client Factory
 // ─────────────────────────────────────────────────────────────────────────────

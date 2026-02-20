@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   getPluginCredentials,
-  isPluginContext,
+  isPluginMode,
   testConnectionWithCredentials,
 } from '@/services/jellyfin'
 import { useApiStore } from '@/stores/api-store'
@@ -37,7 +37,7 @@ interface ConnectionState {
 export function useConnectionInit(): ConnectionState {
   const [isValidating, setIsValidating] = useState(false)
   const [hasValidated, setHasValidated] = useState(false)
-  const hasAttemptedRef = useRef(false)
+  const lastAttemptKeyRef = useRef<string | null>(null)
 
   const { validAuth, serverAddress, apiKey } = useApiStore(
     useShallow((s: ReturnType<typeof useApiStore.getState>) => ({
@@ -47,12 +47,20 @@ export function useConnectionInit(): ConnectionState {
     })),
   )
 
-  const isPlugin = isPluginContext()
+  const isPlugin = isPluginMode()
 
   useEffect(() => {
-    if (validAuth || hasAttemptedRef.current) return
+    if (validAuth) {
+      setHasValidated(true)
+      return
+    }
 
-    hasAttemptedRef.current = true
+    const attemptKey = isPlugin
+      ? 'plugin'
+      : `standalone:${serverAddress}:${apiKey ?? ''}`
+    if (lastAttemptKeyRef.current === attemptKey) return
+    lastAttemptKeyRef.current = attemptKey
+
     const controller = new AbortController()
 
     const init = async () => {
@@ -134,7 +142,7 @@ export function usePluginMode() {
     })),
   )
 
-  const isPlugin = isPluginContext()
+  const isPlugin = isPluginMode()
 
   return {
     isPlugin,
