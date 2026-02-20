@@ -5,40 +5,90 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Vibrant, WorkerPipeline } from 'node-vibrant/worker'
-import PipelineWorker from 'node-vibrant/worker.worker?worker'
 import { formatHex, oklch, parse } from 'culori'
+import type * as VibrantWorkerRuntime from 'node-vibrant/worker'
 
 import type { Theme } from '@/stores/app-store'
 import type { VibrantColors } from '@/lib/cache-manager'
-import { LRUCache, blobCache, fetchBlobUrl } from '@/lib/cache-manager'
+import { LRUCache, fetchBlobUrl } from '@/lib/cache-manager'
+import { CACHE_CONFIG } from '@/lib/constants'
 import { selectTheme, useAppStore } from '@/stores/app-store'
 
 export type { VibrantColors } from '@/lib/cache-manager'
 
-type Palette = Awaited<ReturnType<Vibrant['getPalette']>>
+interface PaletteSwatch {
+  hex: string
+}
+
+interface Palette {
+  Vibrant?: PaletteSwatch | null
+  DarkVibrant?: PaletteSwatch | null
+  LightVibrant?: PaletteSwatch | null
+  Muted?: PaletteSwatch | null
+  DarkMuted?: PaletteSwatch | null
+  LightMuted?: PaletteSwatch | null
+}
+
 type ResolvedTheme = 'light' | 'dark'
 
 // Lazy worker initialization
+type VibrantWorkerModule = typeof VibrantWorkerRuntime
+
 let workerInitialized = false
-const initWorker = () => {
-  if (!workerInitialized) {
-    Vibrant.use(new WorkerPipeline(PipelineWorker as never))
-    workerInitialized = true
+let vibrantWorkerModulePromise: Promise<VibrantWorkerModule> | null = null
+let workerInitPromise: Promise<void> | null = null
+
+const loadVibrantWorkerModule = async (): Promise<VibrantWorkerModule> => {
+  if (!vibrantWorkerModulePromise) {
+    vibrantWorkerModulePromise = import('node-vibrant/worker')
   }
+  return vibrantWorkerModulePromise
 }
 
+const initWorker = async () => {
+  if (workerInitialized) {
+    return
+  }
+
+  if (!workerInitPromise) {
+    workerInitPromise = Promise.all([
+      loadVibrantWorkerModule(),
+      import('node-vibrant/worker.worker?worker'),
+    ]).then(([{ Vibrant, WorkerPipeline }, workerModule]) => {
+      Vibrant.use(new WorkerPipeline(workerModule.default as never))
+      workerInitialized = true
+    })
+  }
+
+  await workerInitPromise
+}
+
+// Cache the MediaQueryList and its result at module level so resolveTheme
+// never calls window.matchMedia() on every invocation.
+const darkModeQuery =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null
+
+let prefersDark = darkModeQuery?.matches ?? false
+
+darkModeQuery?.addEventListener('change', (e) => {
+  prefersDark = e.matches
+})
+
 const resolveTheme = (theme: Theme): ResolvedTheme =>
-  theme === 'auto'
-    ? window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-    : theme
+  theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
 
 // Caches
-const colorCacheLight = new LRUCache<string, VibrantColors>(100)
-const colorCacheDark = new LRUCache<string, VibrantColors>(100)
-const paletteCache = new LRUCache<string, Palette>(100)
+const colorCacheLight = new LRUCache<string, VibrantColors>(
+  CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
+)
+const colorCacheDark = new LRUCache<string, VibrantColors>(
+  CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
+)
+const paletteCache = new LRUCache<string, Palette>(
+  CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
+)
 const pending = new Map<string, Promise<Palette | null>>()
 
 const getCache = (theme: ResolvedTheme) =>
@@ -118,6 +168,7 @@ const EXTRACTION_TIMEOUT_MS = 5000
 async function extractPalette(
   url: string,
   blobUrl: string,
+  vibrantWorkerModule: VibrantWorkerModule,
 ): Promise<Palette | null> {
   const shared = getCanvas()
   if (!shared) return null
@@ -130,10 +181,26 @@ async function extractPalette(
       canvas.width = Math.floor(img.width * scale)
       canvas.height = Math.floor(img.height * scale)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
       try {
-        const palette = await Vibrant.from(canvas.toDataURL('image/jpeg', 0.6))
-          .quality(1)
-          .getPalette()
+        const compressedBlob = await new Promise<Blob | null>((onBlob) => {
+          canvas.toBlob(onBlob, 'image/jpeg', 0.6)
+        })
+        if (!compressedBlob) {
+          resolve(null)
+          return
+        }
+
+        const compressedUrl = URL.createObjectURL(compressedBlob)
+        let palette: Palette
+        try {
+          palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
+            .quality(1)
+            .getPalette()
+        } finally {
+          URL.revokeObjectURL(compressedUrl)
+        }
+
         paletteCache.set(url, palette)
         resolve(palette)
       } catch {
@@ -141,6 +208,7 @@ async function extractPalette(
       }
     }
     img.onerror = () => resolve(null)
+    img.decoding = 'async'
     img.crossOrigin = 'anonymous'
     img.src = blobUrl
   })
@@ -149,15 +217,17 @@ async function extractPalette(
 async function extractPaletteWithTimeout(
   url: string,
   blobUrl: string,
+  vibrantWorkerModule: VibrantWorkerModule,
 ): Promise<Palette | null> {
   return Promise.race([
-    extractPalette(url, blobUrl),
+    extractPalette(url, blobUrl, vibrantWorkerModule),
     new Promise<null>((r) => setTimeout(() => r(null), EXTRACTION_TIMEOUT_MS)),
   ])
 }
 
-function getPalette(url: string): Promise<Palette | null> {
-  initWorker()
+async function getPalette(url: string): Promise<Palette | null> {
+  await initWorker()
+  const vibrantWorkerModule = await loadVibrantWorkerModule()
 
   const cached = paletteCache.get(url)
   if (cached) return Promise.resolve(cached)
@@ -165,7 +235,7 @@ function getPalette(url: string): Promise<Palette | null> {
   let promise = pending.get(url)
   if (!promise) {
     promise = fetchBlobUrl(url).then((blob) =>
-      blob ? extractPaletteWithTimeout(url, blob) : null,
+      blob ? extractPaletteWithTimeout(url, blob, vibrantWorkerModule) : null,
     )
     pending.set(url, promise)
     void promise.finally(() => pending.delete(url))
@@ -189,18 +259,38 @@ async function getColors(
   return colors
 }
 
+/** Eagerly preloads vibrant colors for a list of image URLs into the cache. */
+export const preloadVibrantColors = (
+  urls: ReadonlyArray<string>,
+  theme: Theme = 'auto',
+): void => {
+  const resolved = resolveTheme(theme)
+  const cache = getCache(resolved)
+  for (const url of urls) {
+    if (url && !cache.has(url)) void getColors(url, resolved)
+  }
+}
+
 // Main hook
-export function useVibrantColor(imageUrl: string | null): VibrantColors | null {
+interface UseVibrantColorOptions {
+  enabled?: boolean
+}
+
+export function useVibrantColor(
+  imageUrl: string | null,
+  options?: UseVibrantColorOptions,
+): VibrantColors | null {
+  const enabled = options?.enabled ?? true
   const theme = useAppStore(selectTheme)
   const resolvedTheme = useMemo(() => resolveTheme(theme), [theme])
   const cache = useMemo(() => getCache(resolvedTheme), [resolvedTheme])
 
   const [colors, setColors] = useState<VibrantColors | null>(() =>
-    imageUrl ? (cache.get(imageUrl) ?? null) : null,
+    imageUrl && enabled ? (cache.get(imageUrl) ?? null) : null,
   )
 
   useEffect(() => {
-    if (!imageUrl) {
+    if (!imageUrl || !enabled) {
       setColors(null)
       return
     }
@@ -219,30 +309,7 @@ export function useVibrantColor(imageUrl: string | null): VibrantColors | null {
     return () => {
       cancelled = true
     }
-  }, [imageUrl, resolvedTheme, cache])
+  }, [imageUrl, resolvedTheme, cache, enabled])
 
   return colors
-}
-
-export const getCachedVibrantColor = (
-  url: string,
-  theme: Theme = 'auto',
-): VibrantColors | null => getCache(resolveTheme(theme)).get(url) ?? null
-
-export const preloadVibrantColors = (
-  urls: ReadonlyArray<string>,
-  theme: Theme = 'auto',
-): void => {
-  const resolved = resolveTheme(theme)
-  const cache = getCache(resolved)
-  for (const url of urls) {
-    if (url && !cache.has(url)) void getColors(url, resolved)
-  }
-}
-
-export const clearVibrantCaches = (): void => {
-  colorCacheLight.clear()
-  colorCacheDark.clear()
-  paletteCache.clear()
-  blobCache.clear()
 }

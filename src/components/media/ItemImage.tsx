@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { decode } from 'blurhash'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -6,7 +6,7 @@ import { getBestImageUrl, getImageBlurhash } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { cn } from '@/lib/utils'
 
-export interface ItemImageProps {
+interface ItemImageProps {
   /** The Jellyfin item to display an image for */
   item: BaseItemDto
   /** Maximum width for the image */
@@ -81,46 +81,97 @@ export function ItemImage({
   aspectRatio = 'aspect-[2/3]',
   showFallback = true,
 }: ItemImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [hasError, setHasError] = useState(false)
+  const [loadedSource, setLoadedSource] = useState<string | null>(null)
+  const [failedSource, setFailedSource] = useState<string | null>(null)
+  const [blobFallbackSource, setBlobFallbackSource] = useState<string | null>(
+    null,
+  )
   const imgRef = useRef<HTMLImageElement>(null)
+  const [decodedBlurhashState, setDecodedBlurhashState] = useState<{
+    blurhash: string
+    dataUrl: string | null
+  } | null>(null)
 
-  // Get the image URL and convert to blob URL to bypass COEP restrictions
+  // Start with the raw image URL to avoid unnecessary blob fetches.
+  // Fall back to blob URL only if the raw URL fails due to COEP/CORP restrictions.
   const rawImageUrl = useMemo(
     () => getBestImageUrl(item, maxWidth, maxHeight) ?? null,
     [item, maxWidth, maxHeight],
   )
-  const imageUrl = useBlobUrl(rawImageUrl)
+  const useBlobFallback =
+    rawImageUrl !== null && blobFallbackSource === rawImageUrl
+  const blobImageUrl = useBlobUrl(useBlobFallback ? rawImageUrl : null)
+  const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
 
-  // Get and decode the blurhash
-  const blurhashDataUrl = useMemo(() => {
-    const blurhash = getImageBlurhash(item)
+  // Resolve blurhash lazily to keep render path cheap.
+  const blurhash = useMemo(() => getImageBlurhash(item) ?? null, [item])
+  const cachedBlurhashDataUrl = useMemo(() => {
     if (!blurhash) return null
-    return decodeBlurhashToDataUrl(blurhash)
-  }, [item])
+    return blurhashCache.get(`${blurhash}-32-32`) ?? null
+  }, [blurhash])
 
-  // Reset state when imageUrl changes using key pattern
-  const imageKey = imageUrl || item.Id
-
-  const handleLoad = () => {
-    setIsLoaded(true)
-  }
-
-  const handleError = () => {
-    setHasError(true)
-  }
-
-  // Check if image is already cached on initial render
-  const checkCached = useCallback(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      setIsLoaded(true)
+  const blurhashDataUrl = useMemo(() => {
+    if (!blurhash) return null
+    if (cachedBlurhashDataUrl) return cachedBlurhashDataUrl
+    if (decodedBlurhashState?.blurhash === blurhash) {
+      return decodedBlurhashState.dataUrl
     }
-  }, [])
+    return null
+  }, [blurhash, cachedBlurhashDataUrl, decodedBlurhashState])
+
+  useEffect(() => {
+    if (!blurhash || cachedBlurhashDataUrl) {
+      return
+    }
+
+    let cancelled = false
+    const idleCallbackId = window.requestIdleCallback(
+      () => {
+        const decoded = decodeBlurhashToDataUrl(blurhash)
+        if (!cancelled) {
+          setDecodedBlurhashState({ blurhash, dataUrl: decoded })
+        }
+      },
+      {
+        timeout: 180,
+      },
+    )
+
+    return () => {
+      cancelled = true
+      window.cancelIdleCallback(idleCallbackId)
+    }
+  }, [blurhash, cachedBlurhashDataUrl])
+
+  // Reset state when image source changes using key pattern
+  const imageKey = imageUrl || rawImageUrl || item.Id
+  const isLoaded = imageUrl !== null && loadedSource === imageUrl
+  const hasError = imageUrl !== null && failedSource === imageUrl
+
+  const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const src = event.currentTarget.currentSrc || imageUrl
+    if (!src) return
+    setLoadedSource(src)
+    setFailedSource((previous) => (previous === src ? null : previous))
+  }
+
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const failedUrl = event.currentTarget.currentSrc || imageUrl
+
+    if (!useBlobFallback && rawImageUrl) {
+      setBlobFallbackSource(rawImageUrl)
+      return
+    }
+
+    if (failedUrl) {
+      setFailedSource(failedUrl)
+    }
+  }
 
   const displayAlt = alt || item.Name || 'Media item'
 
-  // No image available
-  if (!imageUrl || hasError) {
+  // No image available and no placeholder to show
+  if ((!imageUrl && !blurhashDataUrl) || hasError) {
     if (!showFallback) return null
 
     return (
@@ -158,27 +209,27 @@ export function ItemImage({
       )}
 
       {/* Actual image with native lazy loading */}
-      <img
-        ref={(el) => {
-          imgRef.current = el
-          // Check if already cached when ref is set
-          if (el?.complete && el.naturalWidth > 0) {
-            checkCached()
-          }
-        }}
-        src={imageUrl}
-        alt={displayAlt}
-        loading="lazy"
-        decoding="async"
-        onLoad={handleLoad}
-        onError={handleError}
-        className={cn(
-          'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
-          isLoaded ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+      {imageUrl && (
+        <img
+          ref={(el) => {
+            imgRef.current = el
+            // Check if already cached when ref is set
+            if (el?.complete && el.naturalWidth > 0) {
+              setLoadedSource(el.currentSrc || imageUrl)
+            }
+          }}
+          src={imageUrl}
+          alt={displayAlt}
+          loading="lazy"
+          decoding="async"
+          onLoad={handleLoad}
+          onError={handleError}
+          className={cn(
+            'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
+            isLoaded ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      )}
     </div>
   )
 }
-
-export default ItemImage

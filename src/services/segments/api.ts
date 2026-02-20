@@ -10,7 +10,7 @@
  * Security: All inputs validated before use, URL parameters properly encoded.
  */
 
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { RetryOptions } from '@/lib/retry-utils'
 import type { ApiOptions } from '@/services/jellyfin'
 import {
@@ -27,19 +27,11 @@ import {
   MediaSegmentArraySchema,
   encodeUrlParam,
   isValidItemId,
-  isValidProviderId,
 } from '@/lib/schemas'
 import { logValidationWarning } from '@/lib/unified-error'
-import { useAppStore } from '@/stores/app-store'
 
-export interface CreateSegmentInput {
-  itemId: string
-  type: MediaSegmentType
-  startSeconds: number
-  endSeconds: number
-}
-
-export type SegmentApiOptions = ApiOptions
+type SegmentApiOptions = ApiOptions
+const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry Configuration
@@ -77,42 +69,16 @@ const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
 
 interface SegmentValidation {
   valid: boolean
-  provider?: string
 }
 
 /** Validates segment creation prerequisites */
-const validateForCreate = (
-  segment: MediaSegmentDto,
-  providerId?: string,
-): SegmentValidation => {
-  const provider = providerId ?? useAppStore.getState().providerId
-
-  if (!provider || !isValidProviderId(provider)) {
-    console.error('[Segments] Invalid or missing provider ID')
-    return { valid: false }
-  }
-
+const validateForCreate = (segment: MediaSegmentDto): SegmentValidation => {
   if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
     console.error('[Segments] Invalid or missing Item ID')
     return { valid: false }
   }
 
-  return { valid: true, provider }
-}
-
-/** Validates segment input data */
-const validateInput = (input: CreateSegmentInput): boolean => {
-  const { itemId, startSeconds, endSeconds } = input
-  if (
-    !itemId ||
-    startSeconds < 0 ||
-    endSeconds < 0 ||
-    startSeconds >= endSeconds
-  ) {
-    console.error('[Segments] Invalid segment input')
-    return false
-  }
-  return true
+  return { valid: true }
 }
 
 /** Validates segment deletion prerequisites */
@@ -165,18 +131,17 @@ export async function getSegmentsById(
   return result ?? []
 }
 
-export async function createSegment(
+async function createSegment(
   segment: MediaSegmentDto,
-  providerId?: string,
   options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  const validation = validateForCreate(segment, providerId)
+  const validation = validateForCreate(segment)
   if (!validation.valid) return false
 
   const result = await withApi(async (apis) => {
     const url = buildSegmentUrl(
       encodeUrlParam(segment.ItemId!),
-      new URLSearchParams({ providerId: validation.provider! }),
+      new URLSearchParams({ providerId: DEFAULT_SEGMENT_PROVIDER_ID }),
     )
 
     return withSegmentRetry(async () => {
@@ -198,26 +163,6 @@ export async function createSegment(
     return false
   }
   return result
-}
-
-export async function createSegmentFromInput(
-  input: CreateSegmentInput,
-  providerId?: string,
-  options?: SegmentApiOptions,
-): Promise<MediaSegmentDto | false> {
-  if (!validateInput(input)) return false
-
-  return createSegment(
-    {
-      Id: generateUUID(),
-      ItemId: input.itemId,
-      Type: input.type,
-      StartTicks: input.startSeconds,
-      EndTicks: input.endSeconds,
-    },
-    providerId,
-    options,
-  )
 }
 
 export async function deleteSegment(
@@ -257,25 +202,10 @@ export async function deleteSegment(
   return true
 }
 
-export async function updateSegment(
-  oldSegment: MediaSegmentDto,
-  newSegment: MediaSegmentDto,
-  providerId?: string,
-  options?: SegmentApiOptions,
-): Promise<MediaSegmentDto | false> {
-  if (options?.signal?.aborted) return false
-
-  const deleted = await deleteSegment(oldSegment, options)
-  if (!deleted || options?.signal?.aborted) return false
-
-  return createSegment(newSegment, providerId, options)
-}
-
 export async function batchSaveSegments(
   itemId: string,
   existingSegments: Array<MediaSegmentDto>,
   newSegments: Array<MediaSegmentDto>,
-  providerId?: string,
   options?: SegmentApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
   if (options?.signal?.aborted) return []
@@ -296,7 +226,6 @@ export async function batchSaveSegments(
     newSegments.map((s) =>
       createSegment(
         { ...s, ItemId: itemId, Id: s.Id || generateUUID() },
-        providerId,
         options,
       ),
     ),

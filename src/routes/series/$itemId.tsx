@@ -3,18 +3,17 @@
  * Renders the SeriesView component for a specific series.
  */
 
-import { useEffect } from 'react'
+import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { SeriesView } from '@/components/views/SeriesView'
+import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
 import {
-  QUERY_STALE_TIMES,
   itemsKeys,
   seriesKeys,
   useItem,
   useSeasons,
-} from '@/hooks/queries'
+} from '@/hooks/queries/use-items'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LightRays } from '@/components/ui/light-rays'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
@@ -22,7 +21,12 @@ import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getItemById, getSeasons } from '@/services/items/api'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
-import { useSessionStore } from '@/stores/session-store'
+
+const SeriesView = lazy(() =>
+  import('@/components/views/SeriesView').then((module) => ({
+    default: module.SeriesView,
+  })),
+)
 
 /**
  * Route params schema - validates itemId is a valid Jellyfin ID.
@@ -83,19 +87,19 @@ export const Route = createFileRoute('/series/$itemId')({
     const { itemId } = params
     const { queryClient } = context
 
-    // Prefetch series data
-    await queryClient.ensureQueryData({
-      queryKey: itemsKeys.detail(itemId),
-      queryFn: () => getItemById(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
-
-    // Prefetch seasons data
-    await queryClient.ensureQueryData({
-      queryKey: seriesKeys.seasons(itemId),
-      queryFn: () => getSeasons(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
+    // Prefetch series and seasons data in parallel
+    await Promise.all([
+      queryClient.ensureQueryData({
+        queryKey: itemsKeys.detail(itemId),
+        queryFn: () => getItemById(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+      queryClient.ensureQueryData({
+        queryKey: seriesKeys.seasons(itemId),
+        queryFn: () => getSeasons(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+    ])
   },
   onError: () => {
     // Throw notFound for invalid params (e.g., malformed UUID)
@@ -107,7 +111,6 @@ export const Route = createFileRoute('/series/$itemId')({
 
 function SeriesPage() {
   const { itemId } = Route.useParams()
-  const setVibrantColors = useSessionStore((s) => s.setVibrantColors)
 
   // Fetch series data using the hook (will use cached data from loader)
   const {
@@ -125,13 +128,9 @@ function SeriesPage() {
 
   // Extract vibrant color from series poster
   const imageUrl = series ? getBestImageUrl(series, 300) : null
-  const vibrantColors = useVibrantColor(imageUrl || null)
-
-  // Sync vibrant colors to session store for header - must be called unconditionally
-  useEffect(() => {
-    setVibrantColors(vibrantColors)
-    return () => setVibrantColors(null)
-  }, [vibrantColors, setVibrantColors])
+  const vibrantColors = useVibrantColor(imageUrl || null, {
+    enabled: !!imageUrl,
+  })
 
   const isLoading = isLoadingSeries || isLoadingSeasons
   const error = seriesError || seasonsError
@@ -183,11 +182,13 @@ function SeriesPage() {
           featureName="Series"
           minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
         >
-          <SeriesView
-            series={series}
-            seasons={seasons}
-            vibrantColors={vibrantColors}
-          />
+          <Suspense fallback={<SeriesSkeleton />}>
+            <SeriesView
+              series={series}
+              seasons={seasons}
+              vibrantColors={vibrantColors}
+            />
+          </Suspense>
         </FeatureErrorBoundary>
       </main>
     </>

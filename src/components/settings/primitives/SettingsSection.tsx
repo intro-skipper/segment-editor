@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 
-export interface SettingsSectionProps {
+interface SettingsSectionProps {
   icon: LucideIcon
   title: string
   badge?: React.ReactNode

@@ -3,7 +3,7 @@
  * @module hooks/use-jassub-renderer
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
@@ -19,7 +19,7 @@ import { showError } from '@/lib/notifications'
 // Types
 // ============================================================================
 
-export interface UseJassubRendererOptions {
+interface UseJassubRendererOptions {
   videoRef: React.RefObject<HTMLVideoElement | null>
   activeTrack: SubtitleTrackInfo | null
   item: BaseItemDto | null
@@ -28,7 +28,7 @@ export interface UseJassubRendererOptions {
   t: (key: string) => string
 }
 
-export interface UseJassubRendererReturn {
+interface UseJassubRendererReturn {
   isActive: boolean
   isLoading: boolean
   error: string | null
@@ -149,16 +149,22 @@ export function useJassubRenderer({
     rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
   }, [])
 
+  const reportInitError = useEffectEvent((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    setError(msg)
+    showError(getErrorMessage(err, t), msg)
+    console.error('[JASSUB] Init error:', err)
+  })
+
   // Main effect: create/destroy renderer based on track
-  /* eslint-disable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
   useEffect(() => {
     const video = videoRef.current
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
 
     // Cleanup if no longer needed
     if (!needsJassub || !video || !item?.Id) {
-      destroyRenderer()
-      setError(null)
+      rendererRef.current?.destroy()
+      rendererRef.current = null
       return
     }
 
@@ -199,10 +205,7 @@ export function useJassubRenderer({
         setIsActive(true)
       } catch (err) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-        showError(getErrorMessage(err, t), msg)
-        console.error('[JASSUB] Init error:', err)
+        reportInitError(err)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -213,13 +216,15 @@ export function useJassubRenderer({
     return () => {
       cancelled = true
     }
-  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer, t])
-  /* eslint-enable react-you-might-not-need-an-effect/no-adjust-state-on-prop-change */
+  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer])
+
+  const needsJassubNow =
+    !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id
 
   // Resize observer
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !isActive) return
+    if (!video || !isActive || !needsJassubNow) return
 
     const observer = new ResizeObserver(resize)
     observer.observe(video)
@@ -232,7 +237,7 @@ export function useJassubRenderer({
       document.removeEventListener('fullscreenchange', onFullscreen)
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
     }
-  }, [videoRef, isActive, resize])
+  }, [videoRef, isActive, resize, needsJassubNow])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -242,5 +247,11 @@ export function useJassubRenderer({
     }
   }, [destroyRenderer])
 
-  return { isActive, isLoading, error, setUserOffset, resize }
+  return {
+    isActive: needsJassubNow && isActive,
+    isLoading: needsJassubNow ? isLoading : false,
+    error: needsJassubNow ? error : null,
+    setUserOffset,
+    resize,
+  }
 }

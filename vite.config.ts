@@ -54,7 +54,6 @@ export default defineConfig({
           'tanstack-vendor': [
             '@tanstack/react-query',
             '@tanstack/react-router',
-            '@tanstack/react-virtual',
           ],
           // UI libraries
           'ui-vendor': [

@@ -71,10 +71,9 @@ export const isAbortError = (e: unknown): boolean =>
   (e instanceof DOMException && e.name === 'AbortError') ||
   getCode(e) === 'ERR_CANCELED'
 
-export const isTimeoutError = (e: unknown): boolean =>
-  getCode(e) === 'ECONNABORTED'
+const isTimeoutError = (e: unknown): boolean => getCode(e) === 'ECONNABORTED'
 
-export const isNetworkError = (e: unknown): boolean => {
+const isNetworkError = (e: unknown): boolean => {
   const code = getCode(e)
   return typeof code === 'string' && NETWORK_CODES.has(code)
 }
@@ -158,13 +157,7 @@ export class AppError extends Error {
     if (status !== undefined) return AppError.fromStatus(status, error)
 
     // Security: Sanitize error message to prevent credential leakage
-    const rawMsg =
-      error instanceof Error
-        ? error.message
-        : typeof error === 'string'
-          ? error
-          : 'An unexpected error occurred'
-    const msg = sanitizeErrorMessage(rawMsg)
+    const msg = getErrorMessage(error)
     return new AppError(
       context ? `${context}: ${msg}` : msg,
       ErrorCodes.UNKNOWN,
@@ -217,7 +210,7 @@ export class AppError extends Error {
     new AppError('API not available', ErrorCodes.API_UNAVAILABLE, true)
 }
 
-export const getErrorMessage = (error: unknown): string => {
+const getErrorMessage = (error: unknown): string => {
   const rawMessage =
     error instanceof Error
       ? error.message
@@ -232,14 +225,14 @@ export const getErrorMessage = (error: unknown): string => {
 // Logging utilities
 // ============================================================================
 
-export interface ErrorLogContext {
+interface ErrorLogContext {
   component?: string
   context?: Record<string, unknown>
   action?: string
   severity?: 'low' | 'medium' | 'high' | 'critical'
 }
 
-export interface LoggedError {
+interface LoggedError {
   message: string
   stack?: string
   componentStack?: string
@@ -279,21 +272,6 @@ export function logError(
   }
 
   return loggedError
-}
-
-/**
- * Logs an API error with consistent formatting.
- * Security: Error messages are sanitized to prevent credential leakage.
- */
-export function logApiError(
-  error: { message: string; code: string; recoverable: boolean },
-  context?: string,
-): void {
-  const sanitizedMessage = sanitizeErrorMessage(error.message)
-  console.error(`[API]${context ? ` ${context}:` : ''} ${sanitizedMessage}`, {
-    code: error.code,
-    recoverable: error.recoverable,
-  })
 }
 
 /** Logs validation warnings for API responses with context. */

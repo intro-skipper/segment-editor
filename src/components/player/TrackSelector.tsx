@@ -36,10 +36,8 @@ import {
 
 /**
  * Props for the TrackSelector component.
- *
- * Requirements: 8.1
  */
-export interface TrackSelectorProps {
+interface TrackSelectorProps {
   /** Current state of available and active tracks */
   trackState: TrackState
   /** Callback when an audio track is selected */
@@ -70,10 +68,8 @@ export interface TrackSelectorProps {
  * Displays a dropdown menu with two sections:
  * - Audio tracks with language, codec, and channel information
  * - Subtitle tracks with "Off" option and format information
- *
- * Requirements: 8.1, 8.2, 8.4
  */
-export const TrackSelector = memo(function TrackSelector({
+export const TrackSelector = memo(function TrackSelectorComponent({
   trackState,
   onSelectAudio,
   onSelectSubtitle,

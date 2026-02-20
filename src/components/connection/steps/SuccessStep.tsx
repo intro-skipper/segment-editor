@@ -11,7 +11,7 @@ import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended
 
 import { Button } from '@/components/ui/button'
 
-export interface SuccessStepProps {
+interface SuccessStepProps {
   selectedServer: RecommendedServerInfo | null
   onComplete: () => void
 }

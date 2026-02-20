@@ -6,6 +6,117 @@
  */
 
 /**
+ * Common ISO 639 language codes to display names mapping.
+ * Used when Intl.DisplayNames is not available or for consistency.
+ * This is the single source of truth — consumers should import from here.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  eng: 'English',
+  en: 'English',
+  deu: 'German',
+  de: 'German',
+  ger: 'German',
+  fra: 'French',
+  fr: 'French',
+  fre: 'French',
+  spa: 'Spanish',
+  es: 'Spanish',
+  ita: 'Italian',
+  it: 'Italian',
+  jpn: 'Japanese',
+  ja: 'Japanese',
+  kor: 'Korean',
+  ko: 'Korean',
+  zho: 'Chinese',
+  zh: 'Chinese',
+  chi: 'Chinese',
+  por: 'Portuguese',
+  pt: 'Portuguese',
+  rus: 'Russian',
+  ru: 'Russian',
+  ara: 'Arabic',
+  ar: 'Arabic',
+  hin: 'Hindi',
+  hi: 'Hindi',
+  nld: 'Dutch',
+  nl: 'Dutch',
+  dut: 'Dutch',
+  pol: 'Polish',
+  pl: 'Polish',
+  swe: 'Swedish',
+  sv: 'Swedish',
+  nor: 'Norwegian',
+  no: 'Norwegian',
+  dan: 'Danish',
+  da: 'Danish',
+  fin: 'Finnish',
+  fi: 'Finnish',
+  tur: 'Turkish',
+  tr: 'Turkish',
+  tha: 'Thai',
+  th: 'Thai',
+  vie: 'Vietnamese',
+  vi: 'Vietnamese',
+  ind: 'Indonesian',
+  id: 'Indonesian',
+  ces: 'Czech',
+  cs: 'Czech',
+  cze: 'Czech',
+  hun: 'Hungarian',
+  hu: 'Hungarian',
+  ron: 'Romanian',
+  ro: 'Romanian',
+  rum: 'Romanian',
+  ell: 'Greek',
+  el: 'Greek',
+  gre: 'Greek',
+  heb: 'Hebrew',
+  he: 'Hebrew',
+  ukr: 'Ukrainian',
+  uk: 'Ukrainian',
+  und: 'Undetermined',
+}
+
+const languageDisplayNames =
+  typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+    ? new Intl.DisplayNames(['en'], { type: 'language' })
+    : null
+
+/**
+ * Gets the human-readable language name from an ISO 639 language code.
+ * Falls back to "Unknown" if the language code is null or not recognized.
+ *
+ * @param languageCode - ISO 639-1 (2-letter) or ISO 639-2 (3-letter) code
+ * @returns Human-readable language name or "Unknown"
+ */
+export function getLanguageName(languageCode: string | null): string {
+  if (!languageCode) {
+    return 'Unknown'
+  }
+
+  const code = languageCode.toLowerCase()
+
+  // Try our mapping first for consistency
+  if (LANGUAGE_NAMES[code]) {
+    return LANGUAGE_NAMES[code]
+  }
+
+  // Try Intl.DisplayNames for less common languages
+  if (languageDisplayNames) {
+    try {
+      const name = languageDisplayNames.of(code)
+      if (name && name !== code) {
+        return name
+      }
+    } catch {
+      // Invalid language code
+    }
+  }
+
+  return 'Unknown'
+}
+
+/**
  * Common language name to ISO 639-1 code mappings.
  * Handles full language names in various languages.
  */
@@ -117,9 +228,7 @@ const ISO_639_2_TO_1: Record<string, string> = {
  * @param language - Language string in any supported format
  * @returns Normalized 2-letter code, or null if invalid/empty
  */
-export function normalizeLanguage(
-  language: string | null | undefined,
-): string | null {
+function normalizeLanguage(language: string | null | undefined): string | null {
   if (!language) return null
 
   const normalized = language.toLowerCase().trim()

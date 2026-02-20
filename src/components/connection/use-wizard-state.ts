@@ -213,7 +213,7 @@ export function wizardReducer(
 // Hook
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface UseWizardStateReturn {
+interface UseWizardStateReturn {
   state: WizardState
   setAddress: (address: string) => void
   setServers: (servers: Array<RecommendedServerInfo>) => void

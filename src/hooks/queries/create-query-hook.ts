@@ -13,9 +13,9 @@ import type { QueryKey, UseQueryOptions } from '@tanstack/react-query'
 
 export type CacheDuration = 'SHORT' | 'MEDIUM' | 'LONG'
 
-export interface StandardQueryOptions<TData> {
+interface StandardQueryOptions<TData> {
   queryKey: QueryKey
-  queryFn: () => Promise<TData>
+  queryFn: (context: { signal?: AbortSignal }) => Promise<TData>
   enabled?: boolean
   cacheDuration?: CacheDuration
   operation: string
@@ -32,9 +32,9 @@ export function createStandardQueryOptions<TData>({
 }: StandardQueryOptions<TData>): UseQueryOptions<TData, QueryError, TData> {
   return {
     queryKey,
-    queryFn: async () => {
+    queryFn: async ({ signal }: { signal?: AbortSignal }) => {
       try {
-        return await queryFn()
+        return await queryFn({ signal })
       } catch (e) {
         throw QueryError.from(e)
       }
@@ -45,7 +45,7 @@ export function createStandardQueryOptions<TData>({
     retry: shouldRetryQuery,
     retryDelay: getRetryDelay,
     select,
-    throwOnError: (error) => {
+    throwOnError: (error: unknown) => {
       handleQueryError(error, { queryKey, operation })
       return false
     },

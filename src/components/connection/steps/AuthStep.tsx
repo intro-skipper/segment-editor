@@ -7,11 +7,15 @@
  * @module components/connection/steps/AuthStep
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { Eye, EyeOff, Key, User } from 'lucide-react'
 
 import { WizardError } from '../WizardError'
-import { WizardActions } from '../WizardActions'
+import {
+  WizardActions,
+  WizardBackAction,
+  WizardSubmitAction,
+} from '../WizardActions'
 import type { AuthMethod } from '@/stores/api-store'
 import type { AuthCredentials as Credentials } from '@/services/jellyfin'
 import { validateCredentials } from '@/services/jellyfin'
@@ -23,13 +27,14 @@ import { Label } from '@/components/ui/label'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface AuthStepProps {
+interface AuthStepProps {
   serverAddress: string
   onSubmit: (credentials: Credentials) => void
   onBack: () => void
   isLoading?: boolean
   error?: string | null
-  initialAuthMethod?: AuthMethod
+  authMethod: AuthMethod
+  onAuthMethodChange: (method: AuthMethod) => void
   onRetry?: () => void
 }
 
@@ -48,6 +53,72 @@ function buildCredentials(
     : { method: 'userPass', username, password }
 }
 
+interface AuthStepState {
+  apiKey: string
+  username: string
+  password: string
+  showPassword: boolean
+  validationError: string | null
+  lastSubmittedCredentials: Credentials | null
+}
+
+type AuthStepAction =
+  | { type: 'SET_API_KEY'; value: string }
+  | { type: 'SET_USERNAME'; value: string }
+  | { type: 'SET_PASSWORD'; value: string }
+  | { type: 'TOGGLE_SHOW_PASSWORD' }
+  | { type: 'SET_VALIDATION_ERROR'; value: string | null }
+  | { type: 'SET_LAST_SUBMITTED'; value: Credentials | null }
+
+const initialState: AuthStepState = {
+  apiKey: '',
+  username: '',
+  password: '',
+  showPassword: false,
+  validationError: null,
+  lastSubmittedCredentials: null,
+}
+
+function authStepReducer(state: AuthStepState, action: AuthStepAction) {
+  switch (action.type) {
+    case 'SET_API_KEY':
+      return {
+        ...state,
+        apiKey: action.value,
+        validationError: null,
+      }
+    case 'SET_USERNAME':
+      return {
+        ...state,
+        username: action.value,
+        validationError: null,
+      }
+    case 'SET_PASSWORD':
+      return {
+        ...state,
+        password: action.value,
+        validationError: null,
+      }
+    case 'TOGGLE_SHOW_PASSWORD':
+      return {
+        ...state,
+        showPassword: !state.showPassword,
+      }
+    case 'SET_VALIDATION_ERROR':
+      return {
+        ...state,
+        validationError: action.value,
+      }
+    case 'SET_LAST_SUBMITTED':
+      return {
+        ...state,
+        lastSubmittedCredentials: action.value,
+      }
+    default:
+      return state
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,17 +129,19 @@ export function AuthStep({
   onBack,
   isLoading = false,
   error = null,
-  initialAuthMethod = 'apiKey',
+  authMethod,
+  onAuthMethodChange,
   onRetry,
 }: AuthStepProps) {
-  const [authMethod, setAuthMethod] = useState<AuthMethod>(initialAuthMethod)
-  const [apiKey, setApiKey] = useState('')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const [lastSubmittedCredentials, setLastSubmittedCredentials] =
-    useState<Credentials | null>(null)
+  const [state, dispatch] = useReducer(authStepReducer, initialState)
+  const {
+    apiKey,
+    username,
+    password,
+    showPassword,
+    validationError,
+    lastSubmittedCredentials,
+  } = state
 
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
   const usernameInputRef = useRef<HTMLInputElement>(null)
@@ -81,19 +154,6 @@ export function AuthStep({
     }
   }, [authMethod])
 
-  const prevInputsRef = useRef({ apiKey, username, password, authMethod })
-  if (
-    prevInputsRef.current.apiKey !== apiKey ||
-    prevInputsRef.current.username !== username ||
-    prevInputsRef.current.password !== password ||
-    prevInputsRef.current.authMethod !== authMethod
-  ) {
-    prevInputsRef.current = { apiKey, username, password, authMethod }
-    if (validationError !== null) {
-      setValidationError(null)
-    }
-  }
-
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault()
@@ -105,10 +165,10 @@ export function AuthStep({
       )
       const validationResult = validateCredentials(credentials)
       if (validationResult) {
-        setValidationError(validationResult)
+        dispatch({ type: 'SET_VALIDATION_ERROR', value: validationResult })
         return
       }
-      setLastSubmittedCredentials(credentials)
+      dispatch({ type: 'SET_LAST_SUBMITTED', value: credentials })
       onSubmit(credentials)
     },
     [authMethod, apiKey, username, password, onSubmit],
@@ -155,11 +215,11 @@ export function AuthStep({
         <button
           type="button"
           onClick={() => {
-            setAuthMethod('apiKey')
-            setValidationError(null)
+            onAuthMethodChange('apiKey')
+            dispatch({ type: 'SET_VALIDATION_ERROR', value: null })
           }}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all',
+            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow]',
             authMethod === 'apiKey'
               ? 'bg-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground',
@@ -172,11 +232,11 @@ export function AuthStep({
         <button
           type="button"
           onClick={() => {
-            setAuthMethod('userPass')
-            setValidationError(null)
+            onAuthMethodChange('userPass')
+            dispatch({ type: 'SET_VALIDATION_ERROR', value: null })
           }}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all',
+            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow]',
             authMethod === 'userPass'
               ? 'bg-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground',
@@ -199,7 +259,9 @@ export function AuthStep({
               type="password"
               placeholder="Enter your API key"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) =>
+                dispatch({ type: 'SET_API_KEY', value: e.target.value })
+              }
               disabled={isLoading}
               aria-invalid={!!displayError}
               aria-describedby={displayError ? 'auth-error' : undefined}
@@ -219,7 +281,9 @@ export function AuthStep({
                 type="text"
                 placeholder="Enter your username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) =>
+                  dispatch({ type: 'SET_USERNAME', value: e.target.value })
+                }
                 disabled={isLoading}
                 aria-invalid={!!displayError}
                 autoComplete="username"
@@ -233,7 +297,9 @@ export function AuthStep({
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) =>
+                    dispatch({ type: 'SET_PASSWORD', value: e.target.value })
+                  }
                   disabled={isLoading}
                   aria-invalid={!!displayError}
                   aria-describedby={displayError ? 'auth-error' : undefined}
@@ -242,7 +308,7 @@ export function AuthStep({
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => dispatch({ type: 'TOGGLE_SHOW_PASSWORD' })}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -273,14 +339,14 @@ export function AuthStep({
       )}
 
       {/* Actions */}
-      <WizardActions
-        onBack={onBack}
-        isLoading={isLoading}
-        continueLabel="Connect"
-        loadingLabel="Connecting..."
-        showLoadingSpinner
-        continueType="submit"
-      />
+      <WizardActions>
+        <WizardBackAction onBack={onBack} disabled={isLoading} />
+        <WizardSubmitAction
+          isLoading={isLoading}
+          label="Connect"
+          loadingLabel="Connecting…"
+        />
+      </WizardActions>
     </form>
   )
 }

@@ -45,6 +45,17 @@ interface HTMLVideoElementWithAudioTracks extends HTMLVideoElement {
   audioTracks?: AudioTrackList
 }
 
+const SUBTITLE_TRACK_MARKER_ATTR = 'data-segment-editor-track'
+
+function removeManagedSubtitleTracks(videoElement: HTMLVideoElement): void {
+  const managedTracks = videoElement.querySelectorAll(
+    `track[${SUBTITLE_TRACK_MARKER_ATTR}="true"]`,
+  )
+  managedTracks.forEach((track) => {
+    track.remove()
+  })
+}
+
 // ============================================================================
 // Types and Interfaces
 // ============================================================================
@@ -52,7 +63,7 @@ interface HTMLVideoElementWithAudioTracks extends HTMLVideoElement {
 /**
  * Error types for track switching operations.
  */
-export type TrackSwitchErrorType =
+type TrackSwitchErrorType =
   | 'track_unavailable'
   | 'api_unsupported'
   | 'network_error'
@@ -69,10 +80,8 @@ export interface TrackSwitchError {
 
 /**
  * Options for track switching operations.
- *
- * Requirements: 3.1, 4.1, 5.4
  */
-export interface TrackSwitchOptions {
+interface TrackSwitchOptions {
   /** Current playback strategy (direct or hls) */
   strategy: PlaybackStrategy
   /** The video element for direct play operations */
@@ -89,6 +98,8 @@ export interface TrackSwitchOptions {
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
   onReloadHls?: (newUrl: string) => void
+  /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
+  signal?: AbortSignal
 }
 
 /**
@@ -98,8 +109,6 @@ export type JassubAction = 'initialize' | 'dispose'
 
 /**
  * Result of a track switching operation.
- *
- * Requirements: 3.1, 4.1, 10.1, 10.2
  */
 export interface TrackSwitchResult {
   /** Whether the switch was successful */
@@ -125,10 +134,8 @@ export interface TrackSwitchResult {
  * @param trackIndex - The subtitle track index
  * @param format - The desired subtitle format (default: 'vtt')
  * @returns The subtitle delivery URL
- *
- * Requirements: 6.4
  */
-export function getSubtitleDeliveryUrl(
+function getSubtitleDeliveryUrl(
   itemId: string,
   trackIndex: number,
   format: string = 'vtt',
@@ -159,7 +166,7 @@ export function getSubtitleDeliveryUrl(
  * @param audioStreamIndex - The audio stream index to use
  * @returns The HLS URL with audio stream parameter
  */
-export function getHlsUrlWithAudioTrack(
+function getHlsUrlWithAudioTrack(
   itemId: string,
   audioStreamIndex: number,
 ): string {
@@ -186,10 +193,8 @@ export function getHlsUrlWithAudioTrack(
  * mapToRelativeIndex(2, tracks) // Returns 1
  * mapToRelativeIndex(5, tracks) // Returns -1 (not found)
  * ```
- *
- * Requirements: 5.4, 5.5
  */
-export function mapToRelativeIndex(
+function mapToRelativeIndex(
   mediaStreamIndex: number,
   tracks: Array<{ index: number; relativeIndex: number }>,
 ): number {
@@ -218,10 +223,8 @@ export function mapToRelativeIndex(
  * @param hlsInstance - The HLS.js instance
  * @param audioTracks - Array of audio tracks for validation
  * @returns Result indicating success, or that a reload is required
- *
- * Requirements: 3.1, 3.2, 5.4
  */
-export function switchHlsAudioTrack(
+function switchHlsAudioTrack(
   trackIndex: number,
   hlsInstance: Hls | null | undefined,
   audioTracks?: Array<AudioTrackInfo>,
@@ -317,10 +320,8 @@ export function switchHlsAudioTrack(
  * @param trackIndex - The Jellyfin MediaStream index of the audio track to switch to
  * @param options - Track switch options
  * @returns Promise resolving to the result of the switch operation
- *
- * Requirements: 4.1, 4.2, 4.3, 4.4, 5.5, 5.6
  */
-export function switchDirectPlayAudioTrack(
+function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
@@ -443,10 +444,8 @@ export function switchDirectPlayAudioTrack(
  * @param hlsInstance - The HLS.js instance
  * @param subtitleTracks - Array of subtitle tracks for index mapping
  * @returns Result of the switch operation
- *
- * Requirements: 6.1, 5.4
  */
-export function switchHlsSubtitleTrack(
+function switchHlsSubtitleTrack(
   trackIndex: number | null,
   hlsInstance: Hls | null | undefined,
   subtitleTracks?: Array<SubtitleTrackInfo>,
@@ -532,14 +531,12 @@ export function switchHlsSubtitleTrack(
  * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to switch to, or null for off
  * @param options - Track switch options
  * @returns Promise resolving to the result of the switch operation
- *
- * Requirements: 7.1, 5.5
  */
-export async function switchDirectPlaySubtitleTrack(
+async function switchDirectPlaySubtitleTrack(
   trackIndex: number | null,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  const { videoElement, itemId, subtitleTracks } = options
+  const { videoElement, itemId, subtitleTracks, signal } = options
   const textTracks = videoElement.textTracks
 
   // Handle "Off" selection - hide all tracks
@@ -547,6 +544,7 @@ export async function switchDirectPlaySubtitleTrack(
     Array.from(textTracks).forEach((track) => {
       track.mode = 'hidden'
     })
+    removeManagedSubtitleTracks(videoElement)
     return { success: true }
   }
 
@@ -606,10 +604,13 @@ export async function switchDirectPlaySubtitleTrack(
     }
 
     // Create a new track element
+    removeManagedSubtitleTracks(videoElement)
+
     const trackElement = document.createElement('track')
     trackElement.kind = 'subtitles'
     trackElement.src = subtitleUrl
     trackElement.default = true
+    trackElement.setAttribute(SUBTITLE_TRACK_MARKER_ATTR, 'true')
 
     // Hide all existing tracks
     Array.from(textTracks).forEach((existingTrack) => {
@@ -621,12 +622,37 @@ export async function switchDirectPlaySubtitleTrack(
 
     // Wait for track to load
     await new Promise<void>((resolve, reject) => {
-      trackElement.addEventListener('load', () => resolve())
-      trackElement.addEventListener('error', () =>
-        reject(new Error('Failed to load subtitle')),
+      const timeoutId = setTimeout(
+        () => reject(new Error('Subtitle load timeout')),
+        10000,
       )
-      // Timeout after 10 seconds
-      setTimeout(() => reject(new Error('Subtitle load timeout')), 10000)
+
+      const handleAbort = () => {
+        cleanup()
+        reject(new Error('Subtitle load aborted'))
+      }
+
+      const cleanup = () => {
+        clearTimeout(timeoutId)
+        trackElement.removeEventListener('load', handleLoad)
+        trackElement.removeEventListener('error', handleError)
+        signal?.removeEventListener('abort', handleAbort)
+      }
+
+      const handleLoad = () => {
+        cleanup()
+        resolve()
+      }
+
+      const handleError = () => {
+        cleanup()
+        reject(new Error('Failed to load subtitle'))
+      }
+
+      trackElement.addEventListener('load', handleLoad)
+      trackElement.addEventListener('error', handleError)
+      // Cancel the timeout when the caller's AbortSignal fires (e.g. component unmount)
+      signal?.addEventListener('abort', handleAbort, { once: true })
     })
 
     // Find and show the newly added track
@@ -637,6 +663,7 @@ export async function switchDirectPlaySubtitleTrack(
 
     return { success: true }
   } catch (err) {
+    removeManagedSubtitleTracks(videoElement)
     return {
       success: false,
       error: {
@@ -666,8 +693,6 @@ export async function switchDirectPlaySubtitleTrack(
  * @param trackIndex - The Jellyfin MediaStream index of the audio track to switch to
  * @param options - Track switch options (includes audioTracks for index mapping)
  * @returns Promise resolving to the result of the switch operation
- *
- * Requirements: 3.1, 4.1, 5.4
  */
 export async function switchAudioTrack(
   trackIndex: number,
@@ -738,8 +763,6 @@ export async function switchAudioTrack(
  * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to switch to, or null for off
  * @param options - Track switch options (includes subtitleTracks for index mapping)
  * @returns Promise resolving to the result of the switch operation
- *
- * Requirements: 6.1, 7.1, 5.4, 10.1, 10.2
  */
 export async function switchSubtitleTrack(
   trackIndex: number | null,
@@ -775,7 +798,6 @@ export async function switchSubtitleTrack(
   }
 
   // Check if ASS/SSA - delegate to JASSUB renderer
-  // Requirements: 10.1, 10.2
   if (requiresJassubRenderer(track)) {
     // Hide any existing TextTracks before JASSUB takes over
     const textTracks = options.videoElement.textTracks

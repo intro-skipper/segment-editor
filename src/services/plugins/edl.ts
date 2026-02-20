@@ -5,21 +5,10 @@
  * Security: All item IDs are validated before use in API calls.
  */
 
-import {
-  buildPluginEndpoint,
-  pluginGet,
-  pluginPost,
-  validatePluginItemId,
-  validatePluginItemIds,
-} from './plugin-api'
-import type { PluginApiOptions, PluginCreateResult } from './plugin-api'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { MediaSegmentType } from '@/types/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
-
-export type EdlApiOptions = PluginApiOptions
-export type EdlCreateResult = PluginCreateResult
 
 export interface EdlEntry {
   start: number
@@ -80,30 +69,3 @@ export const edlToSegments = (
   entries: Array<EdlEntry>,
   itemId: string,
 ): Array<MediaSegmentDto> => entries.map((e) => edlEntryToSegment(e, itemId))
-
-export const segmentsToEdl = (
-  segments: Array<MediaSegmentDto>,
-): Array<EdlEntry> => segments.map(segmentToEdlEntry)
-
-export const getEdlById = (
-  itemId: string,
-  options?: EdlApiOptions,
-): Promise<Record<string, unknown> | null> => {
-  const validation = validatePluginItemId(itemId, 'EDL lookup')
-  if (!validation.valid) return Promise.resolve(null)
-  return pluginGet<Record<string, unknown>>(
-    buildPluginEndpoint('/PluginEdl/Edl', itemId),
-    options,
-  )
-}
-
-export const createEdlById = (
-  itemIds: Array<string>,
-  options?: EdlApiOptions,
-): Promise<PluginCreateResult> => {
-  const validation = validatePluginItemIds(itemIds, 'EDL creation')
-  if (!validation.valid) {
-    return Promise.resolve({ success: false, error: validation.error })
-  }
-  return pluginPost('/PluginEdl/Edl', itemIds, options)
-}

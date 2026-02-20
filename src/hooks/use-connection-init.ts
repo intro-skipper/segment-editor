@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import {
   getPluginCredentials,
   isPluginMode,
@@ -38,9 +39,13 @@ export function useConnectionInit(): ConnectionState {
   const [hasValidated, setHasValidated] = useState(false)
   const hasAttemptedRef = useRef(false)
 
-  const validAuth = useApiStore((s) => s.validAuth)
-  const serverAddress = useApiStore((s) => s.serverAddress)
-  const apiKey = useApiStore((s) => s.apiKey)
+  const { validAuth, serverAddress, apiKey } = useApiStore(
+    useShallow((s: ReturnType<typeof useApiStore.getState>) => ({
+      validAuth: s.validAuth,
+      serverAddress: s.serverAddress,
+      apiKey: s.apiKey,
+    })),
+  )
 
   const isPlugin = isPluginMode()
 
@@ -121,9 +126,13 @@ export function useConnectionInit(): ConnectionState {
  * Does NOT initialize connection - use after `useConnectionInit` in root.
  */
 export function usePluginMode() {
-  const validAuth = useApiStore((s) => s.validAuth)
-  const serverAddress = useApiStore((s) => s.serverAddress)
-  const apiKey = useApiStore((s) => s.apiKey)
+  const { validAuth, serverAddress, apiKey } = useApiStore(
+    useShallow((s: ReturnType<typeof useApiStore.getState>) => ({
+      validAuth: s.validAuth,
+      serverAddress: s.serverAddress,
+      apiKey: s.apiKey,
+    })),
+  )
 
   const isPlugin = isPluginMode()
 

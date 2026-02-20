@@ -4,8 +4,6 @@
  * For any MediaSourceInfo with a supported container (MP4, MKV, WebM),
  * the Compatibility_Checker SHALL evaluate both video and audio codec compatibility,
  * returning a CompatibilityResult that accurately reflects browser support.
- *
- * **Validates: Requirements 1.2, 1.3, 1.4**
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'

@@ -5,8 +5,6 @@
  * - Media errors SHALL trigger immediate HLS fallback
  * - Network errors SHALL trigger one retry before HLS fallback
  * - The playback position at time of error SHALL be preserved in the fallback session
- *
- * **Validates: Requirements 4.1, 4.2, 4.3**
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'

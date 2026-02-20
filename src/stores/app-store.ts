@@ -1,19 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { isValidProviderId } from '@/lib/schemas'
 
 export type Theme = 'auto' | 'dark' | 'light'
 export type Locale = 'en-US' | 'de' | 'fr' | 'auto'
-export type ResolvedLocale = Exclude<Locale, 'auto'>
+type ResolvedLocale = Exclude<Locale, 'auto'>
 
 /**
  * Track preferences for audio and subtitle selection.
  * These preferences are persisted and used to auto-select tracks
  * when loading new media items.
- *
- * Requirements: 7.1, 7.3
  */
-export interface TrackPreferences {
+interface TrackPreferences {
   /** Preferred audio track language (ISO 639-1 code, e.g., 'en', 'de') */
   preferredAudioLanguage: string | null
   /** Preferred subtitle track language (ISO 639-1 code, e.g., 'en', 'de') */
@@ -22,10 +19,9 @@ export interface TrackPreferences {
   subtitlesEnabled: boolean
 }
 
-export interface AppState {
+interface AppState {
   theme: Theme
   locale: Locale
-  providerId: string
   showVideoPlayer: boolean
   enableEdl: boolean
   enableChapter: boolean
@@ -33,10 +29,9 @@ export interface AppState {
   trackPreferences: TrackPreferences
 }
 
-export interface AppActions {
+interface AppActions {
   setTheme: (theme: Theme) => void
   setLocale: (locale: Locale) => void
-  setProviderId: (id: string) => void
   setShowVideoPlayer: (show: boolean) => void
   setEnableEdl: (enable: boolean) => void
   setEnableChapter: (enable: boolean) => void
@@ -48,7 +43,7 @@ export interface AppActions {
   setSubtitlesEnabled: (enabled: boolean) => void
 }
 
-export type AppStore = AppState & AppActions
+type AppStore = AppState & AppActions
 
 const applyTheme = (theme: Theme): void => {
   if (typeof document === 'undefined') return
@@ -76,7 +71,6 @@ const detectBrowserLocale = (): ResolvedLocale => {
 const initialState: AppState = {
   theme: 'auto',
   locale: 'auto',
-  providerId: 'SegmentEditor',
   showVideoPlayer: true,
   enableEdl: false,
   enableChapter: false,
@@ -96,9 +90,6 @@ export const useAppStore = create<AppStore>()(
         set({ theme })
       },
       setLocale: (locale) => set({ locale }),
-      setProviderId: (providerId) => {
-        if (isValidProviderId(providerId)) set({ providerId })
-      },
       setShowVideoPlayer: (showVideoPlayer) => set({ showVideoPlayer }),
       setEnableEdl: (enableEdl) => set({ enableEdl }),
       setEnableChapter: (enableChapter) => set({ enableChapter }),

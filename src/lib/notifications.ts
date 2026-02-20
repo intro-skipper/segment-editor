@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 /** Notification types for the application */
 export type NotificationType = 'positive' | 'negative' | 'info' | 'warning'
 
-export interface NotificationOptions {
+interface NotificationOptions {
   type: NotificationType
   message: string
   description?: string

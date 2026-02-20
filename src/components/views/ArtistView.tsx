@@ -12,7 +12,7 @@ import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { EmptyState } from '@/components/ui/async-state'
 
-export interface ArtistViewProps {
+interface ArtistViewProps {
   /** The artist item */
   artist: BaseItemDto
   /** Array of albums for the artist */
@@ -25,20 +25,26 @@ export interface ArtistViewProps {
 
 interface AlbumCardProps {
   album: BaseItemDto
-  onClick: () => void
+  albumId: string
+  onAlbumSelect: (albumId: string) => void
 }
 
-const AlbumCard = React.memo(function AlbumCard({
+const AlbumCard = React.memo(function AlbumCardComponent({
   album,
-  onClick,
+  albumId,
+  onAlbumSelect,
 }: AlbumCardProps) {
   const albumName = album.Name || 'Unknown Album'
   const year = album.ProductionYear ? ` (${album.ProductionYear})` : ''
   const ariaLabel = `View album: ${albumName}${year}`
 
+  const handleClick = React.useCallback(() => {
+    onAlbumSelect(albumId)
+  }, [onAlbumSelect, albumId])
+
   return (
     <InteractiveCard
-      onClick={onClick}
+      onClick={handleClick}
       className="group w-full rounded-lg overflow-hidden hover:scale-[1.02] hover:shadow-lg focus-visible:ring-offset-2"
       aria-label={ariaLabel}
     >
@@ -117,16 +123,22 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
           aria-label={`${albums.length} albums by ${artistName}`}
         >
           {albums.map((album) => (
-            <AlbumCard
+            <div
               key={album.Id}
-              album={album}
-              onClick={() => handleAlbumClick(album.Id || '')}
-            />
+              style={{
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 220px',
+              }}
+            >
+              <AlbumCard
+                album={album}
+                albumId={album.Id || ''}
+                onAlbumSelect={handleAlbumClick}
+              />
+            </div>
           ))}
         </div>
       )}
     </div>
   )
 }
-
-export default ArtistView

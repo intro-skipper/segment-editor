@@ -11,7 +11,7 @@ export interface SelectOption<T extends string = string> {
   label: string
 }
 
-export interface SettingsSelectProps<T extends string = string> {
+interface SettingsSelectProps<T extends string = string> {
   value: T
   onValueChange: (value: T) => void
   options: Array<SelectOption<T>>

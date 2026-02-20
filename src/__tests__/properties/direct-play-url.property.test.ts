@@ -6,8 +6,6 @@
  * - Include DeviceId and authentication token
  * - Include StartTimeTicks when provided
  * - Be a valid URL that can be parsed
- *
- * **Validates: Requirements 2.1, 2.2, 2.3, 2.4**
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'

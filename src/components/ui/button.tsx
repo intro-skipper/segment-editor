@@ -13,10 +13,14 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-interactive-transition="true"
+      className={cn(
+        'touch-manipulation',
+        buttonVariants({ variant, size, className }),
+      )}
       {...props}
     />
   )
 }
 
-export { Button, buttonVariants }
+export { Button }

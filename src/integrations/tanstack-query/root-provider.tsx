@@ -21,8 +21,8 @@ function createQueryClient(): QueryClient {
         staleTime: QUERY_STALE_TIMES.MEDIUM,
         gcTime: QUERY_GC_TIMES.MEDIUM,
         refetchOnWindowFocus: false,
-        // Prevent excessive refetching on reconnect
-        refetchOnReconnect: 'always',
+        // Avoid burst refetches while still refreshing stale queries
+        refetchOnReconnect: true,
       },
       mutations: {
         retry: 1,

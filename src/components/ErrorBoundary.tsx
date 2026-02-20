@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<
   }
 
   handleReload = (): void => {
-    window.location.reload()
+    this.handleRetry()
   }
 
   render(): ReactNode {
@@ -167,7 +167,4 @@ export class ErrorBoundary extends Component<
   }
 }
 
-// Re-export HOC for backward compatibility
-export { withErrorBoundary } from './with-error-boundary'
-
-export default ErrorBoundary
+// Re-export HOC for backward compatibilityexport default ErrorBoundary

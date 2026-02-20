@@ -3,7 +3,7 @@
  * Reduces Player.tsx complexity by isolating UI controls.
  */
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Maximize,
@@ -50,7 +50,7 @@ const SHORTCUT_KEYS = Object.freeze([
   { labelKey: 'shortcuts.toggleMute', keys: ['M'] },
 ] as const)
 
-export interface PlayerControlsProps {
+interface PlayerControlsProps {
   isPlaying: boolean
   isMuted: boolean
   volume: number
@@ -88,7 +88,7 @@ export interface PlayerControlsProps {
   hasActiveSubtitle?: boolean
 }
 
-export const PlayerControls = memo(function PlayerControls({
+export const PlayerControls = memo(function PlayerControlsComponent({
   isPlaying,
   isMuted,
   volume,
@@ -164,6 +164,27 @@ export const PlayerControls = memo(function PlayerControls({
   const handleSubtitleOffsetReset = useCallback(() => {
     onSubtitleOffsetChange?.(0)
   }, [onSubtitleOffsetChange])
+
+  // i18n labels change when `t` changes — memoize to avoid re-creating JSX on every render
+  const shortcutItems = useMemo(
+    () =>
+      SHORTCUT_KEYS.map(({ labelKey, keys }) => (
+        <div key={labelKey} className="flex justify-between items-center">
+          <span className="text-muted-foreground">{t(labelKey)}</span>
+          <span>
+            {keys.map((k) => (
+              <kbd
+                key={k}
+                className="px-2 py-0.5 bg-muted rounded text-xs font-mono ml-1"
+              >
+                {k}
+              </kbd>
+            ))}
+          </span>
+        </div>
+      )),
+    [t],
+  )
 
   return (
     <div
@@ -456,26 +477,7 @@ export const PlayerControls = memo(function PlayerControls({
             <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
               {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
             </p>
-            <div className="space-y-1.5 text-sm">
-              {SHORTCUT_KEYS.map(({ labelKey, keys }) => (
-                <div
-                  key={labelKey}
-                  className="flex justify-between items-center"
-                >
-                  <span className="text-muted-foreground">{t(labelKey)}</span>
-                  <span>
-                    {keys.map((k) => (
-                      <kbd
-                        key={k}
-                        className="px-2 py-0.5 bg-muted rounded text-xs font-mono ml-1"
-                      >
-                        {k}
-                      </kbd>
-                    ))}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <div className="space-y-1.5 text-sm">{shortcutItems}</div>
           </div>
         </DropdownMenuContent>
       </DropdownMenu>

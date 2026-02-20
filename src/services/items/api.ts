@@ -11,8 +11,10 @@
  */
 
 import { ItemFields, SortOrder } from '@jellyfin/sdk/lib/generated-client'
+import type { BaseItemKind } from '@jellyfin/sdk/lib/generated-client'
 import type { BaseItemDto, VirtualFolderInfo } from '@/types/jellyfin'
-import { withApi } from '@/services/jellyfin'
+import type { ApiOptions } from '@/services/jellyfin'
+import { getRequestConfig, withApi } from '@/services/jellyfin'
 import { AppError, logValidationWarning } from '@/lib/unified-error'
 import {
   BaseItemArraySchema,
@@ -20,14 +22,21 @@ import {
   isValidItemId,
 } from '@/lib/schemas'
 
-export interface GetItemsOptions {
+interface GetItemsOptions {
   parentId: string
+  searchTerm?: string
   includeMediaStreams?: boolean
+  excludeItemTypes?: Array<BaseItemKind>
   limit?: number
   startIndex?: number
 }
 
-export interface PaginationOptions {
+export interface PagedItemsResult {
+  items: Array<BaseItemDto>
+  totalCount: number
+}
+
+interface PaginationOptions {
   limit?: number
   startIndex?: number
 }
@@ -77,73 +86,101 @@ const SORT_ASCENDING = [SortOrder.Ascending] as const
 // API Operations
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getCollections(): Promise<Array<VirtualFolderInfo>> {
+export async function getCollections(
+  options?: ApiOptions,
+): Promise<Array<VirtualFolderInfo>> {
   const result = await withApi(async (apis) => {
-    const { data } = await apis.libraryStructureApi.getVirtualFolders()
+    const { data } = await apis.libraryStructureApi.getVirtualFolders(
+      getRequestConfig(options),
+    )
     const validation = VirtualFolderArraySchema.safeParse(data)
     if (!validation.success) {
       logValidationWarning('[Items] Collections', validation.error)
     }
     return data.filter((folder) => folder.CollectionType !== 'homevideos')
-  })
+  }, options)
   return result ?? []
 }
 
-export async function getItems({
-  parentId,
-  includeMediaStreams = true,
-  limit,
-  startIndex,
-}: GetItemsOptions): Promise<Array<BaseItemDto>> {
+export async function getItems(
+  {
+    parentId,
+    searchTerm,
+    includeMediaStreams = false,
+    excludeItemTypes,
+    limit,
+    startIndex,
+  }: GetItemsOptions,
+  options?: ApiOptions,
+): Promise<PagedItemsResult> {
   requireParam(parentId, 'Parent ID')
   requireValidId(parentId, 'Parent ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.itemsApi.getItems({
-      parentId,
-      sortBy: ['AiredEpisodeOrder', 'SortName'],
-      sortOrder: [...SORT_ASCENDING],
-      isMissing: false,
-      fields: includeMediaStreams
-        ? [ItemFields.MediaStreams, ItemFields.MediaSources]
-        : undefined,
-      limit,
-      startIndex,
-    })
-    return validateItems(data.Items ?? [], 'getItems')
-  })
-  return result ?? []
+    const { data } = await apis.itemsApi.getItems(
+      {
+        parentId,
+        searchTerm,
+        sortBy: ['AiredEpisodeOrder', 'SortName'],
+        sortOrder: [...SORT_ASCENDING],
+        isMissing: false,
+        excludeItemTypes,
+        fields: includeMediaStreams
+          ? [ItemFields.MediaStreams, ItemFields.MediaSources]
+          : undefined,
+        limit,
+        startIndex,
+      },
+      getRequestConfig(options),
+    )
+    const items = validateItems(data.Items ?? [], 'getItems')
+    return {
+      items,
+      totalCount: data.TotalRecordCount ?? items.length,
+    }
+  }, options)
+  return result ?? { items: [], totalCount: 0 }
 }
 
-export async function getItemById(itemId: string): Promise<BaseItemDto | null> {
+export async function getItemById(
+  itemId: string,
+  options?: ApiOptions,
+): Promise<BaseItemDto | null> {
   requireParam(itemId, 'Item ID')
   requireValidId(itemId, 'Item ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.itemsApi.getItems({
-      ids: [itemId],
-      fields: [...DETAIL_FIELDS],
-    })
+    const { data } = await apis.itemsApi.getItems(
+      {
+        ids: [itemId],
+        fields: [...DETAIL_FIELDS],
+      },
+      getRequestConfig(options),
+    )
     const items = data.Items ?? []
     validateItems(items, 'getItemById')
     return items[0] ?? null
-  })
+  }, options)
   return result ?? null
 }
 
 export async function getSeasons(
   seriesId: string,
+  options?: ApiOptions,
 ): Promise<Array<BaseItemDto>> {
   requireParam(seriesId, 'Series ID')
   requireValidId(seriesId, 'Series ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.tvShowsApi.getSeasons({
-      seriesId,
-      isMissing: false,
-    })
+    const { data } = await apis.tvShowsApi.getSeasons(
+      {
+        seriesId,
+        isMissing: false,
+      },
+      getRequestConfig(options),
+    )
     return validateItems(data.Items ?? [], 'getSeasons')
-  })
+  }, options)
   return result ?? []
 }
 
@@ -151,6 +188,7 @@ export async function getEpisodes(
   seriesId: string,
   seasonId: string,
   options?: PaginationOptions,
+  apiOptions?: ApiOptions,
 ): Promise<Array<BaseItemDto>> {
   requireParam(seriesId, 'Series ID')
   requireParam(seasonId, 'Season ID')
@@ -158,53 +196,66 @@ export async function getEpisodes(
   requireValidId(seasonId, 'Season ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.tvShowsApi.getEpisodes({
-      seriesId,
-      seasonId,
-      isMissing: false,
-      fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
-      limit: options?.limit,
-      startIndex: options?.startIndex,
-    })
+    const { data } = await apis.tvShowsApi.getEpisodes(
+      {
+        seriesId,
+        seasonId,
+        isMissing: false,
+        fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
+        limit: options?.limit,
+        startIndex: options?.startIndex,
+      },
+      getRequestConfig(apiOptions),
+    )
     return validateItems(data.Items ?? [], 'getEpisodes')
-  })
+  }, apiOptions)
   return result ?? []
 }
 
-export async function getAlbums(artistId: string): Promise<Array<BaseItemDto>> {
+export async function getAlbums(
+  artistId: string,
+  options?: ApiOptions,
+): Promise<Array<BaseItemDto>> {
   requireParam(artistId, 'Artist ID')
   requireValidId(artistId, 'Artist ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.itemsApi.getItems({
-      artistIds: [artistId],
-      sortBy: ['ProductionYear', 'SortName'],
-      sortOrder: [...SORT_ASCENDING],
-      includeItemTypes: ['MusicAlbum'],
-      recursive: true,
-    })
+    const { data } = await apis.itemsApi.getItems(
+      {
+        artistIds: [artistId],
+        sortBy: ['ProductionYear', 'SortName'],
+        sortOrder: [...SORT_ASCENDING],
+        includeItemTypes: ['MusicAlbum'],
+        recursive: true,
+      },
+      getRequestConfig(options),
+    )
     return validateItems(data.Items ?? [], 'getAlbums')
-  })
+  }, options)
   return result ?? []
 }
 
 export async function getTracks(
   albumId: string,
   options?: PaginationOptions,
+  apiOptions?: ApiOptions,
 ): Promise<Array<BaseItemDto>> {
   requireParam(albumId, 'Album ID')
   requireValidId(albumId, 'Album ID')
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.itemsApi.getItems({
-      parentId: albumId,
-      sortBy: ['ParentIndexNumber', 'IndexNumber'],
-      sortOrder: [...SORT_ASCENDING],
-      fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
-      limit: options?.limit,
-      startIndex: options?.startIndex,
-    })
+    const { data } = await apis.itemsApi.getItems(
+      {
+        parentId: albumId,
+        sortBy: ['ParentIndexNumber', 'IndexNumber'],
+        sortOrder: [...SORT_ASCENDING],
+        fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
+        limit: options?.limit,
+        startIndex: options?.startIndex,
+      },
+      getRequestConfig(apiOptions),
+    )
     return validateItems(data.Items ?? [], 'getTracks')
-  })
+  }, apiOptions)
   return result ?? []
 }

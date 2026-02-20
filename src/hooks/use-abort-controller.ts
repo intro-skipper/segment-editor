@@ -9,7 +9,7 @@
 
 import { useCallback, useRef } from 'react'
 
-export interface UseAbortControllerReturn {
+interface UseAbortControllerReturn {
   /** Creates a new AbortController, cancelling any previous one */
   createController: () => AbortController
   /** Aborts the current controller and clears the reference */

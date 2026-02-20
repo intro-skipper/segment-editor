@@ -6,7 +6,6 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -22,7 +21,7 @@ import {
 } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
 
-export interface SeriesViewProps {
+interface SeriesViewProps {
   /** The series item */
   series: BaseItemDto
   /** Array of seasons for the series */
@@ -46,7 +45,7 @@ interface SeasonTabsProps {
 const isSpecialSeason = (s: BaseItemDto) =>
   s.IndexNumber === 0 || (s.Name || '').toLowerCase().includes('special')
 
-const SeasonTabs = React.memo(function SeasonTabs({
+const SeasonTabs = React.memo(function SeasonTabsComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
@@ -54,10 +53,14 @@ const SeasonTabs = React.memo(function SeasonTabs({
 }: SeasonTabsProps) {
   const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
 
-  // Memoize sorted seasons - specials always last
+  // Memoize sorted seasons - specials always last, single pass
   const orderedSeasons = React.useMemo(() => {
-    const normal = seasons.filter((s) => !isSpecialSeason(s))
-    const specials = seasons.filter(isSpecialSeason)
+    const normal: typeof seasons = []
+    const specials: typeof seasons = []
+    for (const s of seasons) {
+      if (isSpecialSeason(s)) specials.push(s)
+      else normal.push(s)
+    }
     return [...normal, ...specials]
   }, [seasons])
 
@@ -80,7 +83,7 @@ const SeasonTabs = React.memo(function SeasonTabs({
             onClick={() => season.Id && onSeasonSelect(season.Id)}
             className={cn(
               'flex-shrink-0 px-4 py-3 md:px-6 md:py-4 rounded-full text-base md:text-lg font-semibold whitespace-nowrap',
-              'transition-all duration-200 ease-out border-2',
+              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               !hasColors &&
                 (isSelected
@@ -103,15 +106,17 @@ const SeasonTabs = React.memo(function SeasonTabs({
 
 interface EpisodeCardProps {
   episode: BaseItemDto
+  episodeId: string
   index: number
-  onClick: () => void
+  onEpisodeClick: (episodeId: string) => void
   vibrantColors?: VibrantColors | null
 }
 
-const EpisodeCard = React.memo(function EpisodeCard({
+const EpisodeCard = React.memo(function EpisodeCardComponent({
   episode,
+  episodeId,
   index,
-  onClick,
+  onEpisodeClick,
   vibrantColors,
 }: EpisodeCardProps) {
   const { t } = useTranslation()
@@ -137,10 +142,13 @@ const EpisodeCard = React.memo(function EpisodeCard({
   const ariaLabel = runtime
     ? `${episodeLabel}: ${episodeName}, ${runtime} minutes`
     : `${episodeLabel}: ${episodeName}`
+  const handleClick = React.useCallback(() => {
+    onEpisodeClick(episodeId)
+  }, [onEpisodeClick, episodeId])
 
   return (
     <InteractiveCard
-      onClick={onClick}
+      onClick={handleClick}
       animate
       animationDelay={animationDelay}
       className={cn(
@@ -250,18 +258,6 @@ function SeasonEpisodes({
     return <EmptyState message={t('series.noEpisodes')} />
   }
 
-  // Virtualize only for large lists
-  if (episodes.length > 30) {
-    return (
-      <VirtualizedEpisodeList
-        episodes={episodes}
-        seasonId={season.Id ?? ''}
-        onEpisodeClick={handleEpisodeClick}
-        vibrantColors={vibrantColors}
-      />
-    )
-  }
-
   return (
     <div
       className="space-y-2 md:space-y-3"
@@ -269,73 +265,22 @@ function SeasonEpisodes({
       id={`season-panel-${season.Id}`}
     >
       {episodes.map((episode, index) => (
-        <EpisodeCard
+        <div
           key={episode.Id}
-          episode={episode}
-          index={index}
-          onClick={() => handleEpisodeClick(episode.Id ?? '')}
-          vibrantColors={vibrantColors}
-        />
+          style={{
+            contentVisibility: 'auto',
+            containIntrinsicSize: '0 120px',
+          }}
+        >
+          <EpisodeCard
+            episode={episode}
+            episodeId={episode.Id ?? ''}
+            index={index}
+            onEpisodeClick={handleEpisodeClick}
+            vibrantColors={vibrantColors}
+          />
+        </div>
       ))}
-    </div>
-  )
-}
-
-/** Virtualized episode list for seasons with many episodes */
-interface VirtualizedEpisodeListProps {
-  episodes: Array<BaseItemDto>
-  seasonId: string
-  onEpisodeClick: (episodeId: string) => void
-  vibrantColors?: VibrantColors | null
-}
-
-function VirtualizedEpisodeList({
-  episodes,
-  seasonId,
-  onEpisodeClick,
-  vibrantColors,
-}: VirtualizedEpisodeListProps) {
-  const parentRef = React.useRef<HTMLDivElement>(null)
-
-  const virtualizer = useVirtualizer({
-    count: episodes.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 112, // ~96px card + 16px gap on desktop
-    overscan: 5,
-  })
-
-  return (
-    <div
-      ref={parentRef}
-      className="h-[600px] md:h-[700px] overflow-auto"
-      role="tabpanel"
-      id={`season-panel-${seasonId}`}
-    >
-      <div
-        className="relative w-full"
-        style={{ height: `${virtualizer.getTotalSize()}px` }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const episode = episodes[virtualItem.index]
-
-          return (
-            <div
-              key={episode.Id}
-              className="absolute top-0 left-0 w-full py-1 md:py-1.5"
-              style={{
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-            >
-              <EpisodeCard
-                episode={episode}
-                index={virtualItem.index}
-                onClick={() => onEpisodeClick(episode.Id ?? '')}
-                vibrantColors={vibrantColors}
-              />
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -360,31 +305,19 @@ export function SeriesView({
     () => findDefaultSeasonId(),
   )
 
-  const selectedSeason = seasons.find((s) => s.Id === selectedSeasonId)
-
-  // Keep selection in sync when `seasons` prop changes - compute during render
-  // If the previously selected season is not present in the new list, pick the first season
-  const prevSeasonsRef = React.useRef(seasons)
-  if (seasons !== prevSeasonsRef.current) {
-    prevSeasonsRef.current = seasons
-
+  const resolvedSelectedSeasonId = React.useMemo(() => {
     if (seasons.length === 0) {
-      if (selectedSeasonId !== null) {
-        setSelectedSeasonId(null)
-      }
-    } else {
-      const hasSelected = selectedSeasonId
-        ? seasons.some((s) => s.Id === selectedSeasonId)
-        : false
-
-      if (!hasSelected) {
-        const defaultId = findDefaultSeasonId()
-        if (defaultId !== selectedSeasonId) {
-          setSelectedSeasonId(defaultId)
-        }
-      }
+      return null
     }
-  }
+
+    const hasSelected = selectedSeasonId
+      ? seasons.some((s) => s.Id === selectedSeasonId)
+      : false
+
+    return hasSelected ? selectedSeasonId : findDefaultSeasonId()
+  }, [seasons, selectedSeasonId, findDefaultSeasonId])
+
+  const selectedSeason = seasons.find((s) => s.Id === resolvedSelectedSeasonId)
 
   if (seasons.length === 0) {
     return (
@@ -401,7 +334,7 @@ export function SeriesView({
     <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10">
       <SeasonTabs
         seasons={seasons}
-        selectedSeasonId={selectedSeasonId}
+        selectedSeasonId={resolvedSelectedSeasonId}
         onSeasonSelect={setSelectedSeasonId}
         vibrantColors={vibrantColors}
       />
@@ -419,5 +352,3 @@ export function SeriesView({
     </div>
   )
 }
-
-export default SeriesView

@@ -4,7 +4,6 @@
  *
  * Loading State Patterns:
  * - LoadingState: Centered spinner with optional message (for inline/small areas)
- * - FullPageLoadingState: Full-page centered spinner (for route-level loading)
  * - SegmentLoadingState: Skeleton cards for segment lists
  *
  * All loading components include proper ARIA attributes for accessibility.
@@ -16,10 +15,7 @@ import { Skeleton } from './skeleton'
 import { cn } from '@/lib/utils'
 
 // Re-export SimpleEmptyState as EmptyState for backward compatibility
-export {
-  SimpleEmptyState as EmptyState,
-  type SimpleEmptyStateProps as EmptyStateProps,
-} from './empty-state'
+export { SimpleEmptyState as EmptyState } from './empty-state'
 
 interface LoadingStateProps {
   /** Loading message to display */
@@ -55,46 +51,11 @@ export function LoadingState({
       aria-live="polite"
       aria-busy="true"
     >
-      <Loader2
-        className={cn(spinnerSizes[size], 'animate-spin')}
-        aria-hidden="true"
-      />
+      <div className="animate-spin" aria-hidden="true">
+        <Loader2 className={cn(spinnerSizes[size])} />
+      </div>
       <span className="sr-only">Loading</span>
       {message && <span>{message}</span>}
-    </div>
-  )
-}
-
-interface FullPageLoadingStateProps {
-  /** Loading message to display */
-  message?: string
-  /** Minimum height class for the container */
-  minHeightClass?: string
-}
-
-/**
- * Full-page centered loading spinner.
- * Use for route-level loading states or major feature areas.
- */
-export function FullPageLoadingState({
-  message,
-  minHeightClass = 'min-h-[var(--spacing-page-min-height-sm)]',
-}: FullPageLoadingStateProps) {
-  return (
-    <div
-      className={cn('flex items-center justify-center', minHeightClass)}
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="flex flex-col items-center gap-3">
-        <Loader2
-          className="size-8 animate-spin text-muted-foreground"
-          aria-hidden="true"
-        />
-        <span className="sr-only">Loading</span>
-        {message && <p className="text-sm text-muted-foreground">{message}</p>}
-      </div>
     </div>
   )
 }

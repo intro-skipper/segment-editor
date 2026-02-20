@@ -27,21 +27,21 @@ export function useBlobUrl(url: string | null | undefined): string {
 
     // Check cache synchronously first
     const cached = blobCache.get(url)
+    setBlobUrl(cached ?? '')
     if (cached) {
-      setBlobUrl(cached)
       return
     }
 
-    let cancelled = false
+    const controller = new AbortController()
 
-    fetchBlobUrl(url).then((result) => {
-      if (!cancelled && result) {
+    fetchBlobUrl(url, { signal: controller.signal }).then((result) => {
+      if (!controller.signal.aborted && result) {
         setBlobUrl(result)
       }
     })
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [url])
 

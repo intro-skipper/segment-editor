@@ -9,7 +9,7 @@ import { withApi } from '@/services/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 
-export interface PlaybackSession {
+interface PlaybackSession {
   playSessionId: string
   itemId: string
   mediaSourceId: string
@@ -82,13 +82,6 @@ export async function stopPlaybackSession(
  */
 export function getActivePlaySessionId(): string | null {
   return activeSession?.playSessionId ?? null
-}
-
-/**
- * Checks if there is an active playback session.
- */
-export function hasActiveSession(): boolean {
-  return activeSession !== null
 }
 
 /**

@@ -7,9 +7,7 @@ export type {
   MediaSegmentDto,
   TrickplayInfoDto,
   VirtualFolderInfo,
-  MediaSegmentsApiGetItemSegmentsRequest,
 } from '@jellyfin/sdk/lib/generated-client'
-
 export {
   BaseItemKind,
   ImageType,

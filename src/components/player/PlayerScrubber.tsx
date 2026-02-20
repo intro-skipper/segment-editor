@@ -11,11 +11,9 @@ import type { ChapterInfo } from '@jellyfin/sdk/lib/generated-client/models'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
-import type { SessionStore } from '@/stores/session-store'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import { cn } from '@/lib/utils'
 import { formatTime, ticksToSeconds } from '@/lib/time-utils'
-import { useSessionStore } from '@/stores/session-store'
 import { handleRangeKeyboard } from '@/lib/keyboard-utils'
 import { DEFAULT_SEGMENT_COLOR, SEGMENT_COLORS } from '@/lib/constants'
 import {
@@ -27,6 +25,8 @@ import { useApiStore } from '@/stores/api-store'
 /** Step sizes for scrubber keyboard navigation */
 const SCRUBBER_STEP_FINE = 5
 const SCRUBBER_STEP_COARSE = 10
+const HOVER_TIME_EPSILON_SECONDS = 0.05
+const HOVER_POSITION_EPSILON_PX = 1
 
 /** Trickplay thumbnail preview component */
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
@@ -51,12 +51,13 @@ function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   )
 }
 
-export interface PlayerScrubberProps {
+interface PlayerScrubberProps {
   currentTime: number
   duration: number
   buffered?: number
   chapters?: Array<ChapterInfo> | null
   segments?: Array<MediaSegmentDto>
+  vibrantColors: VibrantColors | null
   onSeek: (time: number) => void
   className?: string
   /** Item ID for trickplay URL construction */
@@ -65,26 +66,22 @@ export interface PlayerScrubberProps {
   trickplay?: TrickplayData | null
 }
 
-// Stable selector to prevent re-renders - returns primitive reference
-const selectVibrantColors = (s: SessionStore): VibrantColors | null =>
-  s.vibrantColors
-
 // Stable selectors for API store
 const selectServerAddress = (s: { serverAddress: string }) => s.serverAddress
 const selectApiKey = (s: { apiKey: string | undefined }) => s.apiKey
 
-export const PlayerScrubber = React.memo(function PlayerScrubber({
+export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   currentTime,
   duration,
   buffered = 0,
   chapters,
   segments,
+  vibrantColors,
   onSeek,
   className,
   itemId,
   trickplay,
 }: PlayerScrubberProps) {
-  const vibrantColors = useSessionStore(selectVibrantColors)
   const serverAddress = useApiStore(selectServerAddress)
   const apiKey = useApiStore(selectApiKey)
   const scrubberRef = React.useRef<HTMLDivElement>(null)
@@ -95,6 +92,16 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
     name: string
     position: number
   } | null>(null)
+  const seekFrameRef = React.useRef<number | null>(null)
+  const pendingSeekTimeRef = React.useRef<number | null>(null)
+  const hoverFrameRef = React.useRef<number | null>(null)
+  const scrubberRectRef = React.useRef<DOMRect | null>(null)
+  const pendingHoverRef = React.useRef<{
+    time: number
+    position: number
+  } | null>(null)
+  const lastHoverTimeRef = React.useRef<number | null>(null)
+  const lastHoverPositionRef = React.useRef<number | null>(null)
 
   // Get best trickplay info
   const trickplayInfo = React.useMemo(
@@ -102,65 +109,194 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
     [trickplay],
   )
 
+  const previewTime = React.useMemo(
+    () => (hoverTime === null ? null : Math.round(hoverTime * 4) / 4),
+    [hoverTime],
+  )
+
   // Calculate trickplay position for hover time
   const trickplayPosition = React.useMemo(() => {
-    if (!trickplayInfo || !itemId || hoverTime === null) return null
+    if (!trickplayInfo || !itemId || previewTime === null) return null
     return getTrickplayPosition(
-      hoverTime,
+      previewTime,
       trickplayInfo.info,
       itemId,
       trickplayInfo.mediaSourceId,
       serverAddress,
       apiKey,
     )
-  }, [trickplayInfo, itemId, hoverTime, serverAddress, apiKey])
+  }, [trickplayInfo, itemId, previewTime, serverAddress, apiKey])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
   const bufferedProgress = duration > 0 ? (buffered / duration) * 100 : 0
 
-  const getTimeFromPosition = React.useCallback(
-    (clientX: number): number => {
-      const scrubber = scrubberRef.current
-      if (!scrubber || duration <= 0) return 0
-      const rect = scrubber.getBoundingClientRect()
+  const refreshScrubberRect = React.useCallback(() => {
+    const scrubber = scrubberRef.current
+    if (!scrubber) {
+      scrubberRectRef.current = null
+      return null
+    }
+
+    const rect = scrubber.getBoundingClientRect()
+    scrubberRectRef.current = rect
+    return rect
+  }, [])
+
+  const invalidateScrubberRect = React.useCallback(() => {
+    scrubberRectRef.current = null
+  }, [])
+
+  const getPositionFromClientX = React.useCallback(
+    (clientX: number): { time: number; position: number } => {
+      if (duration <= 0) {
+        return { time: 0, position: 0 }
+      }
+
+      const rect = scrubberRectRef.current ?? refreshScrubberRect()
+      if (!rect || rect.width <= 0) {
+        return { time: 0, position: 0 }
+      }
+
       const x = Math.max(0, Math.min(clientX - rect.left, rect.width))
-      return (x / rect.width) * duration
+      const time = (x / rect.width) * duration
+      return { time, position: x }
     },
-    [duration],
+    [duration, refreshScrubberRect],
+  )
+
+  const scheduleSeek = React.useCallback(
+    (time: number) => {
+      pendingSeekTimeRef.current = time
+      if (seekFrameRef.current !== null) return
+
+      seekFrameRef.current = requestAnimationFrame(() => {
+        seekFrameRef.current = null
+        const nextTime = pendingSeekTimeRef.current
+        if (nextTime !== null) {
+          onSeek(nextTime)
+          pendingSeekTimeRef.current = null
+        }
+      })
+    },
+    [onSeek],
+  )
+
+  const scheduleHoverUpdate = React.useCallback(
+    (time: number, position: number) => {
+      pendingHoverRef.current = { time, position }
+      if (hoverFrameRef.current !== null) return
+
+      hoverFrameRef.current = requestAnimationFrame(() => {
+        hoverFrameRef.current = null
+        const next = pendingHoverRef.current
+        if (!next) return
+
+        const shouldUpdateTime =
+          lastHoverTimeRef.current === null ||
+          Math.abs(next.time - lastHoverTimeRef.current) >=
+            HOVER_TIME_EPSILON_SECONDS
+        const shouldUpdatePosition =
+          lastHoverPositionRef.current === null ||
+          Math.abs(next.position - lastHoverPositionRef.current) >=
+            HOVER_POSITION_EPSILON_PX
+
+        if (shouldUpdateTime) {
+          lastHoverTimeRef.current = next.time
+          setHoverTime(next.time)
+        }
+
+        if (shouldUpdatePosition) {
+          lastHoverPositionRef.current = next.position
+          setHoverPosition(next.position)
+        }
+      })
+    },
+    [],
   )
 
   const handlePointerDown = React.useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      refreshScrubberRect()
       setIsDragging(true)
-      onSeek(getTimeFromPosition(e.clientX))
+      const { time } = getPositionFromClientX(e.clientX)
+      scheduleSeek(time)
     },
-    [getTimeFromPosition, onSeek],
+    [getPositionFromClientX, refreshScrubberRect, scheduleSeek],
   )
 
   const handlePointerMove = React.useCallback(
     (e: React.PointerEvent) => {
-      const scrubber = scrubberRef.current
-      if (!scrubber) return
+      const { time, position } = getPositionFromClientX(e.clientX)
+      scheduleHoverUpdate(time, position)
 
-      const rect = scrubber.getBoundingClientRect()
-      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-      setHoverTime(getTimeFromPosition(e.clientX))
-      setHoverPosition(x)
-
-      if (isDragging) onSeek(getTimeFromPosition(e.clientX))
+      if (isDragging) {
+        scheduleSeek(time)
+      }
     },
-    [getTimeFromPosition, isDragging, onSeek],
+    [getPositionFromClientX, isDragging, scheduleSeek, scheduleHoverUpdate],
   )
 
-  const handlePointerUp = React.useCallback((e: React.PointerEvent) => {
-    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
-    setIsDragging(false)
-  }, [])
+  const handlePointerUp = React.useCallback(
+    (e: React.PointerEvent) => {
+      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+      setIsDragging(false)
+      scrubberRectRef.current = null
+
+      if (seekFrameRef.current !== null) {
+        cancelAnimationFrame(seekFrameRef.current)
+        seekFrameRef.current = null
+      }
+
+      const finalTime = pendingSeekTimeRef.current
+      if (finalTime !== null) {
+        onSeek(finalTime)
+        pendingSeekTimeRef.current = null
+      }
+    },
+    [onSeek],
+  )
 
   const handlePointerLeave = React.useCallback(() => {
+    scrubberRectRef.current = null
+    if (hoverFrameRef.current !== null) {
+      cancelAnimationFrame(hoverFrameRef.current)
+      hoverFrameRef.current = null
+    }
+    pendingHoverRef.current = null
+    lastHoverTimeRef.current = null
+    lastHoverPositionRef.current = null
     setHoverTime(null)
+  }, [])
+
+  React.useEffect(() => {
+    const scrubber = scrubberRef.current
+    if (!scrubber) return
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(invalidateScrubberRect)
+        : null
+
+    resizeObserver?.observe(scrubber)
+    window.addEventListener('scroll', invalidateScrubberRect, { passive: true })
+
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('scroll', invalidateScrubberRect)
+    }
+  }, [invalidateScrubberRect])
+
+  React.useEffect(() => {
+    return () => {
+      if (seekFrameRef.current !== null) {
+        cancelAnimationFrame(seekFrameRef.current)
+      }
+      if (hoverFrameRef.current !== null) {
+        cancelAnimationFrame(hoverFrameRef.current)
+      }
+    }
   }, [])
 
   const handleKeyDown = React.useCallback(
@@ -285,7 +421,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
       <div
         ref={scrubberRef}
         className="relative flex-1 h-2 cursor-pointer group touch-none"
-        style={{ contain: 'layout style' }}
+        style={{ contain: 'layout style', touchAction: 'none' }}
         role="slider"
         aria-label="Video progress"
         aria-valuemin={0}
@@ -298,6 +434,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
+        onPointerEnter={refreshScrubberRect}
         onKeyDown={handleKeyDown}
       >
         <div
@@ -337,15 +474,14 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
 
         {/* Chapter markers */}
         {chapterMarkers.map((marker, index) => (
-          <div
-            key={`chapter-${index}-${marker.position}`}
-            className="absolute top-1/2 w-1 h-3 rounded-sm bg-white/80 shadow-sm pointer-events-auto cursor-pointer transition-all hover:h-4 hover:bg-white z-10"
+          <button
+            key={`chapter-${marker.time}-${marker.position}-${marker.name}`}
+            type="button"
+            className="absolute top-1/2 w-1 h-3 rounded-sm bg-white/80 shadow-sm pointer-events-auto cursor-pointer transition-[height,background-color] hover:h-4 hover:bg-white z-10"
             style={{
               left: `${marker.position}%`,
               transform: 'translate(-50%, -50%)',
             }}
-            role="button"
-            tabIndex={0}
             aria-label={marker.name || `Chapter ${index + 1}`}
             onPointerEnter={() => {
               setHoveredChapter({
@@ -358,13 +494,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubber({
             onClick={(e) => {
               e.stopPropagation()
               onSeek(marker.time)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                e.stopPropagation()
-                onSeek(marker.time)
-              }
             }}
             title={marker.name || `Chapter ${index + 1}`}
           />

@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 import { Settings2 } from 'lucide-react'
 
 import { SelectSettingsSection } from '../primitives'
@@ -15,8 +14,11 @@ import type { SelectOption } from '../primitives'
 import type { PageSize } from '@/stores/session-store'
 import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
 
+function isPageSize(value: number): value is PageSize {
+  return PAGE_SIZE_OPTIONS.includes(value as PageSize)
+}
+
 export function PageSizeSection() {
-  const { t } = useTranslation()
   const pageSize = useSessionStore((s) => s.pageSize)
   const setPageSize = useSessionStore((s) => s.setPageSize)
 
@@ -24,15 +26,17 @@ export function PageSizeSection() {
     () =>
       PAGE_SIZE_OPTIONS.map((size) => ({
         value: String(size),
-        label: size == Number.MAX_SAFE_INTEGER ? t('app.pagesize.unlimited') : String(size),
+        label: String(size),
       })),
-    [t],
+    [],
   )
 
   const handleChange = useCallback(
     (value: string) => {
-      if (value === t('app.pagesize.unlimited')) setPageSize(Number.MAX_SAFE_INTEGER as PageSize)
-      else if (value) setPageSize(Number(value) as PageSize)
+      const parsedValue = Number(value)
+      if (Number.isFinite(parsedValue) && isPageSize(parsedValue)) {
+        setPageSize(parsedValue)
+      }
     },
     [setPageSize],
   )
@@ -42,7 +46,7 @@ export function PageSizeSection() {
       icon={Settings2}
       titleKey="items.perPage"
       defaultTitle="Items per page"
-      value={pageSize == Number.MAX_SAFE_INTEGER ? t('app.pagesize.unlimited') : String(pageSize)}
+      value={String(pageSize)}
       onValueChange={handleChange}
       options={options}
     />

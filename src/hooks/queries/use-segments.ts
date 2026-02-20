@@ -22,7 +22,7 @@ export const segmentsKeys = {
 /**
  * Options for the useSegments hook.
  */
-export interface UseSegmentsOptions {
+interface UseSegmentsOptions {
   /** Whether the query is enabled */
   enabled?: boolean
 }
@@ -42,7 +42,7 @@ export function useSegments(itemId: string, options?: UseSegmentsOptions) {
   return useQuery(
     createStandardQueryOptions<Array<MediaSegmentDto>>({
       queryKey: segmentsKeys.list(itemId),
-      queryFn: () => getSegmentsById(itemId),
+      queryFn: ({ signal }) => getSegmentsById(itemId, { signal }),
       enabled: validAuth && enabled && !!itemId,
       cacheDuration: 'SHORT',
       operation: 'Fetch segments',

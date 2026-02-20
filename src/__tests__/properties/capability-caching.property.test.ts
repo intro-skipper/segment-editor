@@ -4,8 +4,6 @@
  * For any codec string, calling isCodecSupported multiple times with the same codec
  * SHALL return the same result, and subsequent calls SHALL use cached values
  * (not re-query the browser APIs).
- *
- * **Validates: Requirements 5.3**
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'

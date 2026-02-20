@@ -26,7 +26,7 @@ export interface JassubRendererResult {
   setTrack: (url: string) => Promise<void>
 }
 
-export interface CreateRendererOptions {
+interface CreateRendererOptions {
   video: HTMLVideoElement
   track: SubtitleTrackInfo
   item: BaseItemDto

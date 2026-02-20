@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
 } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
@@ -25,12 +26,12 @@ import {
   Unplug,
 } from 'lucide-react'
 
-import { AnimatePresence, motion } from 'motion/react'
-import type { SessionStore } from '@/stores/session-store'
-import { BlurFade } from '@/components/ui/blur-fade'
+import { AnimatePresence, m, useIsPresent } from 'motion/react'
+import type { ReactNode } from 'react'
 import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
+import { Freeze } from '@/components/ui/freeze'
 import {
   Pagination,
   PaginationContent,
@@ -52,6 +53,7 @@ import { useCollections } from '@/hooks/queries/use-collections'
 import { useItems } from '@/hooks/queries/use-items'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
+import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { LibraryCard } from '@/components/filter/LibraryCard'
 import { useSessionStore } from '@/stores/session-store'
@@ -60,48 +62,68 @@ import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
-import { getNavigationRoute } from '@/lib/navigation-utils'
+import { navigateToMediaItem } from '@/lib/navigation-utils'
 
 // Stable selectors to prevent re-renders - defined outside component
-const selectPageSize = (state: SessionStore) => state.pageSize
-const selectSetSelectedCollectionId = (state: SessionStore) =>
-  state.setSelectedCollectionId
-const selectSetSearchFilter = (state: SessionStore) => state.setSearchFilter
+const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
+  state.pageSize
 
-/** Icon mapping for collection types */
-const COLLECTION_ICONS: Record<string, typeof Library> = {
-  movie: Film,
-  film: Film,
-  series: Tv,
-  tv: Tv,
-  show: Tv,
-  music: Mic2,
-  artist: Mic2,
-}
+const selectSetSettingsOpen = (
+  state: ReturnType<typeof useSessionStore.getState>,
+) => state.setSettingsOpen
+
+/** O(1) icon lookup by collection keyword */
+const COLLECTION_ICON_MAP = new Map<string, typeof Library>([
+  ['movie', Film],
+  ['film', Film],
+  ['series', Tv],
+  ['tv', Tv],
+  ['show', Tv],
+  ['music', Mic2],
+  ['artist', Mic2],
+])
 
 const getCollectionIcon = (name: string) => {
   const lower = name.toLowerCase()
-  return (
-    Object.entries(COLLECTION_ICONS).find(([key]) =>
-      lower.includes(key),
-    )?.[1] ?? Library
-  )
+  for (const [key, icon] of COLLECTION_ICON_MAP) {
+    if (lower.includes(key)) return icon
+  }
+  return Library
 }
 
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
+const COLOR_PRELOAD_ROWS = 1
+const VIRTUALIZED_GRID_THRESHOLD = 180
+const GRID_ROW_ESTIMATE_PX = 360
+const GRID_OVERSCAN_ROWS = 3
+
+interface FreezeOnExitProps {
+  children: ReactNode
+}
+
+function FreezeOnExit({ children }: FreezeOnExitProps) {
+  const isPresent = useIsPresent()
+
+  return <Freeze frozen={!isPresent}>{children}</Freeze>
+}
 
 /** Subscribe to window resize events */
 function subscribeToResize(callback: () => void) {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-  const debouncedCallback = () => {
-    if (timeoutId) clearTimeout(timeoutId)
-    timeoutId = setTimeout(callback, 150)
+  let frameId: number | null = null
+  const onResize = () => {
+    if (frameId !== null) return
+    frameId = requestAnimationFrame(() => {
+      frameId = null
+      callback()
+    })
   }
-  window.addEventListener('resize', debouncedCallback)
+  window.addEventListener('resize', onResize)
   return () => {
-    window.removeEventListener('resize', debouncedCallback)
-    if (timeoutId) clearTimeout(timeoutId)
+    window.removeEventListener('resize', onResize)
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId)
+    }
   }
 }
 
@@ -165,6 +187,10 @@ const routeApi = getRouteApi('/')
  * State is stored in URL search params for shareability.
  */
 export function FilterView() {
+  return useRenderFilterView()
+}
+
+function useRenderFilterView() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -177,21 +203,12 @@ export function FilterView() {
   const currentPage = page ?? 1
 
   // Page size is kept in session store as it's a user preference
-  // Use individual selectors instead of useShallow to avoid object creation
+  // Use individual selector to avoid object creation
   const pageSize = useSessionStore(selectPageSize)
-  const setSelectedCollectionId = useSessionStore(selectSetSelectedCollectionId)
-  const setStoreSearchFilter = useSessionStore(selectSetSearchFilter)
-
-  // Sync URL state to session store for Header and other components
-  useEffect(() => {
-    setSelectedCollectionId(selectedCollection ?? null)
-    setStoreSearchFilter(searchFilter ?? '')
-  }, [
-    selectedCollection,
-    searchFilter,
-    setSelectedCollectionId,
-    setStoreSearchFilter,
-  ])
+  const effectivePageSize =
+    Number.isFinite(pageSize) && pageSize > 0 && pageSize <= 240 ? pageSize : 24
+  const requestedPage = Math.max(1, currentPage)
+  const startIndex = (requestedPage - 1) * effectivePageSize
 
   const setCurrentPage = useCallback(
     (pageNum: number) => {
@@ -211,7 +228,7 @@ export function FilterView() {
 
   // Plugin mode and connection state
   const { isPlugin, hasCredentials, isConnected } = usePluginMode()
-  const setSettingsOpen = useSessionStore((s) => s.setSettingsOpen)
+  const setSettingsOpen = useSessionStore(selectSetSettingsOpen)
 
   // Fetch collections and items
   const {
@@ -221,46 +238,55 @@ export function FilterView() {
     refetch: refetchCollections,
   } = useCollections()
   const {
-    data: items,
+    data: itemsData,
     isLoading: itemsLoading,
     error: itemsError,
     refetch: refetchItems,
   } = useItems({
     parentId: selectedCollection ?? '',
     nameFilter: searchFilter,
+    limit: effectivePageSize,
+    startIndex,
+    includeMediaStreams: false,
     enabled: !!selectedCollection,
   })
 
-  // Memoize the collection options for the dropdown
-  //@ts-ignore noUnusedLocals (TS6133)
-  const collectionOptions = useMemo(() => {
-    if (!collections) return []
-    return collections.map((c) => ({
-      id: c.ItemId || '',
-      name: c.Name || 'Unknown',
-    }))
-  }, [collections])
-
   // Calculate pagination with bounds checking
-  const totalItems = items?.length ?? 0
-  const totalPages = pageSize == Number.MAX_SAFE_INTEGER ? 1 : Math.max(1, Math.ceil(totalItems / pageSize))
+  const totalItems = itemsData?.totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize))
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
-  // Get paginated items
-  const paginatedItems = useMemo(() => {
-    if (!items) return []
-    if (pageSize == Number.MAX_SAFE_INTEGER) return items
-    const startIndex = (validCurrentPage - 1) * pageSize
-    return items.slice(startIndex, startIndex + pageSize)
-  }, [items, validCurrentPage, pageSize])
+  const paginatedItems = useMemo(() => itemsData?.items ?? [], [itemsData])
+  const shouldVirtualizeGrid =
+    paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
+  const [virtualizedGridElement, setVirtualizedGridElement] =
+    useState<HTMLDivElement | null>(null)
+  const rowCount = Math.ceil(paginatedItems.length / columns)
+  const { totalSize: totalVirtualGridHeight, indexes: virtualRowIndexes } =
+    useVirtualWindow({
+      enabled: shouldVirtualizeGrid,
+      scrollElement: virtualizedGridElement,
+      itemCount: rowCount,
+      itemSize: GRID_ROW_ESTIMATE_PX,
+      overscan: GRID_OVERSCAN_ROWS,
+    })
+
+  const setVirtualizedGridRef = useCallback((node: HTMLDivElement | null) => {
+    setVirtualizedGridElement(node)
+  }, [])
+
+  useEffect(() => {
+    if (currentPage !== validCurrentPage) {
+      setCurrentPage(validCurrentPage)
+    }
+  }, [currentPage, validCurrentPage, setCurrentPage])
 
   // Grid keyboard navigation using the shared hook
   const handleItemActivate = useCallback(
     (index: number) => {
-      const item = paginatedItems[index]
-      navigate(
-        getNavigationRoute(item) as unknown as Parameters<typeof navigate>[0],
-      )
+      const item = paginatedItems.at(index)
+      if (item === undefined) return
+      navigateToMediaItem(navigate, item)
     },
     [paginatedItems, navigate],
   )
@@ -269,7 +295,7 @@ export function FilterView() {
     useGridKeyboardNavigation({
       itemCount: paginatedItems.length,
       columns,
-      enabled: paginatedItems.length > 0,
+      enabled: paginatedItems.length > 0 && !shouldVirtualizeGrid,
       onActivate: handleItemActivate,
     })
 
@@ -281,46 +307,57 @@ export function FilterView() {
     preloadedUrlsRef.current.clear()
   }, [selectedCollection])
 
-  // Preload vibrant colors for visible items
+  // Preload vibrant colors for above-the-fold items only
   useEffect(() => {
     if (paginatedItems.length === 0) return
 
-    // Use AbortController to prevent state updates after unmount
-    const controller = new AbortController()
+    const maxPreloadCount = Math.min(
+      paginatedItems.length,
+      Math.max(columns * COLOR_PRELOAD_ROWS, columns),
+    )
 
-    const timeoutId = setTimeout(() => {
-      // Check if aborted before processing
-      if (controller.signal.aborted) return
+    const preloadVisibleColors = () => {
+      const imageUrls: Array<string> = []
 
-      const imageUrls = paginatedItems
-        .map((item) => getBestImageUrl(item, 200))
-        .filter(
-          (url): url is string => !!url && !preloadedUrlsRef.current.has(url),
-        )
+      for (let index = 0; index < maxPreloadCount; index++) {
+        const item = paginatedItems[index]
+
+        const url = getBestImageUrl(item, 200)
+        if (!url || preloadedUrlsRef.current.has(url)) continue
+
+        imageUrls.push(url)
+      }
+
       if (imageUrls.length > 0) {
         imageUrls.forEach((url) => preloadedUrlsRef.current.add(url))
         preloadVibrantColors(imageUrls)
       }
-    }, 100)
+    }
+
+    let timeoutId: number | null = null
+    let idleId: number | null = null
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(preloadVisibleColors, {
+        timeout: 250,
+      })
+    } else {
+      timeoutId = window.setTimeout(preloadVisibleColors, 100)
+    }
 
     return () => {
-      controller.abort()
-      clearTimeout(timeoutId)
+      if (idleId !== null && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId)
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
     }
-  }, [paginatedItems])
-
-  // Sync URL page to valid bounds
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages)
-  }, [currentPage, totalPages, setCurrentPage])
-
-  // Reset focus when page changes
-  useEffect(() => {
-    setFocusedIndex(-1)
-  }, [validCurrentPage, setFocusedIndex])
+  }, [paginatedItems, columns])
 
   const handleCollectionChange = useCallback(
     (value: string | null) => {
+      setFocusedIndex(-1)
       navigate({
         to: '/',
         search: {
@@ -331,15 +368,16 @@ export function FilterView() {
         replace: true,
       })
     },
-    [navigate],
+    [navigate, setFocusedIndex],
   )
 
   const handlePageChange = useCallback(
     (newPage: number) => {
+      setFocusedIndex(-1)
       setCurrentPage(newPage)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     },
-    [setCurrentPage],
+    [setCurrentPage, setFocusedIndex],
   )
 
   const handleRetry = useCallback(() => {
@@ -355,10 +393,10 @@ export function FilterView() {
   // Derived state
   const showLoading =
     collectionsLoading ||
-    (selectedCollection && !itemsError && itemsLoading && !items)
+    (selectedCollection && !itemsError && itemsLoading && !itemsData)
   const showError = collectionsError || itemsError
   const showEmpty =
-    selectedCollection && !itemsLoading && !itemsError && items?.length === 0
+    selectedCollection && !itemsLoading && !itemsError && totalItems === 0
 
   // Not connected state (standalone mode only)
   const showNotConnected = !isPlugin && !hasCredentials && !isConnected
@@ -420,14 +458,13 @@ export function FilterView() {
             <Empty className="border-none bg-transparent">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
-                  <Loader2
-                    className="size-12 animate-spin"
-                    aria-hidden="true"
-                  />
+                  <div className="animate-spin" aria-hidden="true">
+                    <Loader2 className="size-12" />
+                  </div>
                 </EmptyMedia>
                 <EmptyTitle className="text-2xl">
                   {t('connection.connecting', {
-                    defaultValue: 'Connecting...',
+                    defaultValue: 'Connecting…',
                   })}
                 </EmptyTitle>
                 <EmptyDescription className="text-base">
@@ -450,7 +487,10 @@ export function FilterView() {
               <div className="w-full max-w-6xl">
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center justify-center size-16 rounded-full bg-primary/10 mb-4">
-                    <Library className="size-8 text-secondary" aria-hidden="true" />
+                    <Library
+                      className="size-8 text-secondary"
+                      aria-hidden="true"
+                    />
                   </div>
                   <h2 className="text-2xl font-semibold mb-2">
                     {t('items.selectLibrary', {
@@ -478,9 +518,7 @@ export function FilterView() {
                         key={collection.ItemId}
                         collection={collection}
                         Icon={Icon}
-                        onClick={() =>
-                          handleCollectionChange(collection.ItemId || null)
-                        }
+                        onSelect={handleCollectionChange}
                         index={index}
                       />
                     )
@@ -493,15 +531,20 @@ export function FilterView() {
         {/* Loading State */}
         <AnimatePresence mode="wait">
           {showLoading && (
-            <motion.div
+            <m.div
               key="loading"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <MediaGridSkeleton count={pageSize == Number.MAX_SAFE_INTEGER ? 100 : pageSize} gridClassName={GRID_CLASS} />
-            </motion.div>
+              <FreezeOnExit>
+                <MediaGridSkeleton
+                  count={Math.min(effectivePageSize, 24)}
+                  gridClassName={GRID_CLASS}
+                />
+              </FreezeOnExit>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -564,36 +607,97 @@ export function FilterView() {
                 aria-atomic="true"
               >
                 {t('items.showing', {
-                  start: (validCurrentPage - 1) * pageSize + 1,
-                  end: pageSize == Number.MAX_SAFE_INTEGER ? totalItems : Math.min(validCurrentPage * pageSize, totalItems),
+                  start: (validCurrentPage - 1) * effectivePageSize + 1,
+                  end: Math.min(
+                    validCurrentPage * effectivePageSize,
+                    totalItems,
+                  ),
                   total: totalItems,
-                  defaultValue: `Showing ${(validCurrentPage - 1) * pageSize + 1}-${Number.MAX_SAFE_INTEGER ? totalItems : Math.min(validCurrentPage * pageSize, totalItems)} of ${totalItems}`,
+                  defaultValue: `Showing ${(validCurrentPage - 1) * effectivePageSize + 1}-${Math.min(validCurrentPage * effectivePageSize, totalItems)} of ${totalItems}`,
                 })}
               </p>
             </div>
 
-            <div
-              ref={gridRef}
-              className={GRID_CLASS}
-              {...gridProps}
-              aria-label={t('items.mediaGrid', {
-                defaultValue: 'Media items',
-              })}
-            >
-              {paginatedItems.map((item, index) => (
-                <BlurFade
-                  key={item.Id}
-                  delay={0.04 + index * 0.03}
-                  direction="up"
+            {shouldVirtualizeGrid ? (
+              <div
+                ref={setVirtualizedGridRef}
+                role="grid"
+                aria-rowcount={rowCount}
+                aria-label={t('items.mediaGrid', {
+                  defaultValue: 'Media items',
+                })}
+                className="max-h-[72vh] overflow-auto overscroll-contain pr-1"
+              >
+                <div
+                  style={{
+                    height: totalVirtualGridHeight,
+                    width: '100%',
+                    position: 'relative',
+                  }}
                 >
-                  <MediaCard
-                    item={item}
-                    index={index}
-                    {...getItemProps(index)}
-                  />
-                </BlurFade>
-              ))}
-            </div>
+                  {virtualRowIndexes.map((rowIndex) => {
+                    const rowStartIndex = rowIndex * columns
+                    const rowItems = paginatedItems.slice(
+                      rowStartIndex,
+                      rowStartIndex + columns,
+                    )
+
+                    return (
+                      <div
+                        key={`grid-row-${rowIndex}`}
+                        role="row"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          width: '100%',
+                          transform: `translateY(${rowIndex * GRID_ROW_ESTIMATE_PX}px)`,
+                        }}
+                      >
+                        <div className={GRID_CLASS}>
+                          {rowItems.map((item, columnIndex) => {
+                            const index = rowStartIndex + columnIndex
+                            return (
+                              <MediaCard
+                                key={item.Id}
+                                item={item}
+                                index={index}
+                              />
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div
+                ref={gridRef}
+                className={GRID_CLASS}
+                {...gridProps}
+                aria-label={t('items.mediaGrid', {
+                  defaultValue: 'Media items',
+                })}
+              >
+                {paginatedItems.map((item, index) => (
+                  <div
+                    key={item.Id}
+                    style={{
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: '0 320px',
+                    }}
+                  >
+                    <MediaCard
+                      item={item}
+                      index={index}
+                      {...getItemProps(index)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -618,7 +722,9 @@ export function FilterView() {
 
                     {pageNumbers.map((pageNum, idx) =>
                       pageNum === 'ellipsis' ? (
-                        <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationItem
+                          key={`ellipsis-${String(pageNumbers[idx - 1] ?? 'start')}-${String(pageNumbers[idx + 1] ?? 'end')}`}
+                        >
                           <PaginationEllipsis />
                         </PaginationItem>
                       ) : (
@@ -671,5 +777,3 @@ export function FilterView() {
     </div>
   )
 }
-
-export default FilterView

@@ -93,7 +93,7 @@ export const CACHE_CONFIG = {
   /** Maximum color cache entries */
   MAX_COLOR_CACHE_SIZE: 200,
   /** Maximum blob URL cache entries */
-  MAX_BLOB_CACHE_SIZE: 100,
+  MAX_BLOB_CACHE_SIZE: 300,
 } as const
 
 /**

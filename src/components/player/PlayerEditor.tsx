@@ -18,11 +18,10 @@ import type {
   SegmentUpdate,
   TimestampUpdate,
 } from '@/types/segment'
-import type { SessionStore } from '@/stores/session-store'
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useSegments } from '@/hooks/queries/use-segments'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
-import { useSessionStore } from '@/stores/session-store'
 import { ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 import {
@@ -47,16 +46,88 @@ import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
 import { SegmentLoadingState } from '@/components/ui/async-state'
 
-// Stable selectors to prevent re-renders - defined outside component
-const selectVibrantColors = (state: SessionStore) => state.vibrantColors
-
-export interface PlayerEditorProps {
+interface PlayerEditorProps {
   /** Media item to edit segments for */
   item: BaseItemDto
   /** Whether to fetch segments on mount */
   fetchSegments?: boolean
+  /** Vibrant theme colors derived from the current item artwork */
+  vibrantColors: VibrantColors | null
   /** Additional class names */
   className?: string
+}
+
+type SegmentUpdater = (prev: Array<MediaSegmentDto>) => Array<MediaSegmentDto>
+
+function getSegmentStartTicks(segment: MediaSegmentDto): number {
+  return segment.StartTicks ?? 0
+}
+
+function getSegmentEndTicks(segment: MediaSegmentDto): number {
+  return segment.EndTicks ?? getSegmentStartTicks(segment)
+}
+
+function findInsertionIndex(
+  segments: ReadonlyArray<MediaSegmentDto>,
+  segment: MediaSegmentDto,
+): number {
+  const nextStart = getSegmentStartTicks(segment)
+  const nextEnd = getSegmentEndTicks(segment)
+
+  let low = 0
+  let high = segments.length
+
+  while (low < high) {
+    const mid = (low + high) >> 1
+    const candidate = segments[mid]
+    const candidateStart = getSegmentStartTicks(candidate)
+    const candidateEnd = getSegmentEndTicks(candidate)
+
+    if (
+      candidateStart < nextStart ||
+      (candidateStart === nextStart && candidateEnd <= nextEnd)
+    ) {
+      low = mid + 1
+    } else {
+      high = mid
+    }
+  }
+
+  return low
+}
+
+function insertSegmentSorted(
+  segments: ReadonlyArray<MediaSegmentDto>,
+  segment: MediaSegmentDto,
+): { nextSegments: Array<MediaSegmentDto>; insertedIndex: number } {
+  const insertedIndex = findInsertionIndex(segments, segment)
+  const nextSegments = [...segments]
+  nextSegments.splice(insertedIndex, 0, segment)
+  return { nextSegments, insertedIndex }
+}
+
+function replaceSegmentSorted(
+  segments: ReadonlyArray<MediaSegmentDto>,
+  updatedSegment: MediaSegmentDto,
+): { nextSegments: Array<MediaSegmentDto>; insertedIndex: number } {
+  if (!updatedSegment.Id) {
+    const nextSegments = [...segments].sort(sortSegmentsByStart)
+    return { nextSegments, insertedIndex: 0 }
+  }
+
+  const previousIndex = segments.findIndex(
+    (seg) => seg.Id === updatedSegment.Id,
+  )
+  if (previousIndex === -1) {
+    return insertSegmentSorted(segments, updatedSegment)
+  }
+
+  const nextSegments = [...segments]
+  nextSegments.splice(previousIndex, 1)
+  const insertedIndex = findInsertionIndex(nextSegments, updatedSegment)
+  nextSegments.splice(insertedIndex, 0, updatedSegment)
+
+  return { nextSegments, insertedIndex }
 }
 
 /**
@@ -66,13 +137,26 @@ export interface PlayerEditorProps {
 export function PlayerEditor({
   item,
   fetchSegments = true,
+  vibrantColors,
+  className,
+}: PlayerEditorProps) {
+  return useRenderPlayerEditor({
+    item,
+    fetchSegments,
+    vibrantColors,
+    className,
+  })
+}
+
+function useRenderPlayerEditor({
+  item,
+  fetchSegments = true,
+  vibrantColors,
   className,
 }: PlayerEditorProps) {
   const { t } = useTranslation()
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
 
-  // Use individual selectors instead of useShallow to avoid object creation
-  const vibrantColors = useSessionStore(selectVibrantColors)
   const { getButtonStyle, iconColor, hasColors } =
     useVibrantButtonStyle(vibrantColors)
   const batchSaveMutation = useBatchSaveSegments()
@@ -83,10 +167,15 @@ export function PlayerEditor({
       enabled: fetchSegments && !!item.Id,
     })
 
+  const sortedServerSegments = React.useMemo(
+    () => serverSegments.toSorted(sortSegmentsByStart),
+    [serverSegments],
+  )
+
   // Local editing state
-  const [editingSegments, setEditingSegments] = React.useState<
-    Array<MediaSegmentDto>
-  >([])
+  const [localEditingSegments, setLocalEditingSegments] =
+    React.useState<Array<MediaSegmentDto> | null>(null)
+  const editingSegments = localEditingSegments ?? sortedServerSegments
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [playerTimestamp, setPlayerTimestamp] = React.useState<number>()
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
@@ -105,17 +194,18 @@ export function PlayerEditor({
     unknownTypes: Array<string>
   } | null>(null)
 
-  // Track previous server segments to detect changes
-  // Use a ref to track the data identity, not the array reference
-  const prevServerSegmentsRef = React.useRef<Array<MediaSegmentDto> | null>(
-    null,
-  )
-
   // Track if save is in progress to prevent concurrent operations
   const isSaving = batchSaveMutation.isPending
 
   // AbortController ref for cancelling in-flight save operations
   const saveAbortRef = React.useRef<AbortController | null>(null)
+
+  const updateEditingSegments = React.useCallback(
+    (updater: SegmentUpdater) => {
+      setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
+    },
+    [sortedServerSegments],
+  )
 
   // Keep a ref to the latest editing segments for async operations
   const editingSegmentsRef = React.useRef(editingSegments)
@@ -138,16 +228,6 @@ export function PlayerEditor({
     [item.RunTimeTicks],
   )
 
-  // Sync editing segments from server when segment data changes
-  // Compare by reference - React Query maintains stable references when data hasn't changed
-  if (
-    serverSegments !== prevServerSegmentsRef.current &&
-    serverSegments.length > 0
-  ) {
-    prevServerSegmentsRef.current = serverSegments
-    setEditingSegments([...serverSegments].sort(sortSegmentsByStart))
-  }
-
   // Handle segment creation from player
   const handleCreateSegment = React.useCallback(
     (data: CreateSegmentData) => {
@@ -159,39 +239,45 @@ export function PlayerEditor({
         EndTicks: data.end ?? data.start + 1,
       }
 
-      setEditingSegments((prev) => {
-        const updated = [...prev, newSegment].sort(sortSegmentsByStart)
-        // Set active index to the new segment
-        const newIndex = updated.findIndex((s) => s.Id === newSegment.Id)
-        setActiveIndex(newIndex >= 0 ? newIndex : updated.length - 1)
-        return updated
+      updateEditingSegments((prev) => {
+        const { nextSegments, insertedIndex } = insertSegmentSorted(
+          prev,
+          newSegment,
+        )
+        setActiveIndex(insertedIndex)
+        return nextSegments
       })
     },
-    [item.Id],
+    [item.Id, updateEditingSegments],
   )
 
   // Handle timestamp update from player
   const handleUpdateSegmentTimestamp = React.useCallback(
     (data: TimestampUpdate) => {
-      setEditingSegments((prev) => {
+      updateEditingSegments((prev) => {
         if (prev.length === 0) return prev
 
         // Use provided index or fall back to activeIndex
         const targetIndex = data.index ?? activeIndex
-        const updated = [...prev]
-        const segment = updated[targetIndex] as MediaSegmentDto | undefined
+        const segment = prev[targetIndex] as MediaSegmentDto | undefined
         if (segment === undefined) return prev
 
-        if (data.start) {
-          segment.StartTicks = data.currentTime
-        } else {
-          segment.EndTicks = data.currentTime
+        const updatedSegment: MediaSegmentDto = {
+          ...segment,
+          StartTicks: data.start ? data.currentTime : segment.StartTicks,
+          EndTicks: data.start ? segment.EndTicks : data.currentTime,
         }
 
-        return updated.sort(sortSegmentsByStart)
+        const { nextSegments, insertedIndex } = replaceSegmentSorted(
+          prev,
+          updatedSegment,
+        )
+        setActiveIndex(insertedIndex)
+
+        return nextSegments
       })
     },
-    [activeIndex],
+    [activeIndex, updateEditingSegments],
   )
 
   // Handle setting a segment's start time from current player position
@@ -215,29 +301,43 @@ export function PlayerEditor({
   )
 
   // Handle segment update from slider
-  const handleUpdateSegment = React.useCallback((data: SegmentUpdate) => {
-    setEditingSegments((prev) => {
-      const updated = prev.map((seg) =>
-        seg.Id === data.id
-          ? { ...seg, StartTicks: data.start, EndTicks: data.end }
-          : seg,
-      )
-      return updated.sort(sortSegmentsByStart)
-    })
-  }, [])
+  const handleUpdateSegment = React.useCallback(
+    (data: SegmentUpdate) => {
+      updateEditingSegments((prev) => {
+        const segmentToUpdate = prev.find((seg) => seg.Id === data.id)
+        if (!segmentToUpdate) return prev
 
-  // Handle segment deletion
-  const handleDeleteSegment = React.useCallback((index: number) => {
-    setEditingSegments((prev) => {
-      const updated = [...prev]
-      updated.splice(index, 1)
-      // Update active index within the callback to use the new length
-      setActiveIndex((prevIndex) =>
-        Math.max(0, Math.min(prevIndex, updated.length - 1)),
-      )
-      return updated
-    })
-  }, [])
+        const { nextSegments } = replaceSegmentSorted(prev, {
+          ...segmentToUpdate,
+          StartTicks: data.start,
+          EndTicks: data.end,
+        })
+
+        return nextSegments
+      })
+    },
+    [updateEditingSegments],
+  )
+
+  const handleDeleteSegment = React.useCallback(
+    (index: number) => {
+      updateEditingSegments((prev) => {
+        if (index < 0 || index >= prev.length) return prev
+
+        const updated = [...prev]
+        updated.splice(index, 1)
+
+        setActiveIndex((prevIndex) => {
+          if (updated.length === 0) return 0
+          if (prevIndex > index) return prevIndex - 1
+          return Math.max(0, Math.min(prevIndex, updated.length - 1))
+        })
+
+        return updated
+      })
+    },
+    [updateEditingSegments],
+  )
 
   // Handle player timestamp request (seek video to segment time)
   const handlePlayerTimestamp = React.useCallback((timestamp: number) => {
@@ -264,79 +364,86 @@ export function PlayerEditor({
   // Save segment from edit dialog
   const handleSaveSegmentFromDialog = React.useCallback(
     (updatedSegment: MediaSegmentDto) => {
-      setEditingSegments((prev) => {
-        const updated = prev.map((seg) =>
-          seg.Id === updatedSegment.Id ? updatedSegment : seg,
+      updateEditingSegments((prev) => {
+        const { nextSegments, insertedIndex } = replaceSegmentSorted(
+          prev,
+          updatedSegment,
         )
-        return updated.sort(sortSegmentsByStart)
+        setActiveIndex(insertedIndex)
+        return nextSegments
       })
     },
-    [],
+    [updateEditingSegments],
   )
 
   // Delete segment from edit dialog
   const handleDeleteSegmentFromDialog = React.useCallback(
     (segment: MediaSegmentDto) => {
-      setEditingSegments((prev) => prev.filter((seg) => seg.Id !== segment.Id))
+      updateEditingSegments((prev) =>
+        prev.filter((seg) => seg.Id !== segment.Id),
+      )
       setActiveIndex((prev) => Math.max(0, prev - 1))
     },
-    [],
+    [updateEditingSegments],
   )
 
   // Paste from clipboard with validation
-  const handlePasteFromClipboard = React.useCallback(async () => {
+  const handlePasteFromClipboard = React.useCallback(() => {
     if (!item.Id) return
+    const itemId = item.Id
 
-    try {
-      const text = await navigator.clipboard.readText()
-      const result = introSkipperClipboardTextToSegments(text, {
-        itemId: item.Id,
-        maxDurationSeconds: runtimeSeconds,
+    void navigator.clipboard
+      .readText()
+      .then((text) => {
+        const result = introSkipperClipboardTextToSegments(text, {
+          itemId,
+          maxDurationSeconds: runtimeSeconds,
+        })
+
+        if (result.segments.length === 0) {
+          showNotification({
+            type: 'negative',
+            message: result.error ?? t('editor.noSegmentInClipboard'),
+          })
+          return
+        }
+
+        // If there are existing segments, show confirmation dialog
+        if (editingSegmentsRef.current.length > 0) {
+          pendingImportRef.current = result
+          setImportDialogOpen(true)
+          return
+        }
+
+        // No existing segments, replace directly
+        updateEditingSegments(() => {
+          const updated = [...result.segments].sort(sortSegmentsByStart)
+          setActiveIndex(0)
+          return updated
+        })
+
+        // Build informative notification message
+        const infoParts: Array<string> = []
+        if (result.skipped > 0) {
+          infoParts.push(`${result.skipped} skipped`)
+        }
+        if (result.unknownTypes.length > 0) {
+          infoParts.push(`unknown: ${result.unknownTypes.join(', ')}`)
+        }
+        const infoSuffix =
+          infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+        showNotification({
+          type: 'positive',
+          message: `Imported ${result.segments.length} segments${infoSuffix}`,
+        })
       })
-
-      if (result.segments.length === 0) {
+      .catch(() => {
         showNotification({
           type: 'negative',
-          message: result.error ?? t('editor.noSegmentInClipboard'),
+          message: t('editor.noSegmentInClipboard', 'No segment in clipboard'),
         })
-        return
-      }
-
-      // If there are existing segments, show confirmation dialog
-      if (editingSegmentsRef.current.length > 0) {
-        pendingImportRef.current = result
-        setImportDialogOpen(true)
-        return
-      }
-
-      // No existing segments, replace directly
-      setEditingSegments(() => {
-        const updated = [...result.segments].sort(sortSegmentsByStart)
-        setActiveIndex(0)
-        return updated
       })
-
-      // Build informative notification message
-      const infoParts: Array<string> = []
-      if (result.skipped > 0) {
-        infoParts.push(`${result.skipped} skipped`)
-      }
-      if (result.unknownTypes.length > 0) {
-        infoParts.push(`unknown: ${result.unknownTypes.join(', ')}`)
-      }
-      const infoSuffix =
-        infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
-      showNotification({
-        type: 'positive',
-        message: `Imported ${result.segments.length} segments${infoSuffix}`,
-      })
-    } catch {
-      showNotification({
-        type: 'negative',
-        message: t('editor.noSegmentInClipboard', 'No segment in clipboard'),
-      })
-    }
-  }, [item.Id, runtimeSeconds, t])
+  }, [item.Id, runtimeSeconds, t, updateEditingSegments])
 
   // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
@@ -414,7 +521,7 @@ export function PlayerEditor({
     const pending = pendingImportRef.current
     if (!pending) return
 
-    setEditingSegments(() => {
+    updateEditingSegments(() => {
       const updated = [...pending.segments].sort(sortSegmentsByStart)
       setActiveIndex(0)
       return updated
@@ -435,14 +542,14 @@ export function PlayerEditor({
 
     pendingImportRef.current = null
     setImportDialogOpen(false)
-  }, [])
+  }, [updateEditingSegments])
 
   // Handle import confirmation: merge with existing segments
   const handleImportMerge = React.useCallback(() => {
     const pending = pendingImportRef.current
     if (!pending) return
 
-    setEditingSegments((prev) => {
+    updateEditingSegments((prev) => {
       const merged = [...prev, ...pending.segments].sort(sortSegmentsByStart)
       return merged
     })
@@ -462,7 +569,7 @@ export function PlayerEditor({
 
     pendingImportRef.current = null
     setImportDialogOpen(false)
-  }, [])
+  }, [updateEditingSegments])
 
   // Handle import dialog cancel
   const handleImportCancel = React.useCallback(() => {
@@ -476,6 +583,7 @@ export function PlayerEditor({
       {showVideoPlayer && (
         <Player
           item={item}
+          vibrantColors={vibrantColors}
           timestamp={playerTimestamp}
           segments={editingSegments}
           onCreateSegment={handleCreateSegment}
@@ -513,13 +621,17 @@ export function PlayerEditor({
           <div className="space-y-3">
             {editingSegments.map((segment, index) => (
               <div
-                key={segment.Id}
+                key={segment.Id ?? `segment-${index}`}
+                style={{
+                  contentVisibility: 'auto',
+                  containIntrinsicSize: '0 280px',
+                }}
                 onDoubleClick={() => handleOpenEditDialog(index)}
               >
                 <SegmentSlider
                   segment={segment}
                   index={index}
-                  activeIndex={activeIndex}
+                  isActive={index === activeIndex}
                   runtimeSeconds={runtimeSeconds}
                   onUpdate={handleUpdateSegment}
                   onDelete={handleDeleteSegment}
@@ -532,6 +644,7 @@ export function PlayerEditor({
                     showVideoPlayer ? handleSetEndFromPlayer : undefined
                   }
                   onCopyAllAsJson={handleCopyAllAsJson}
+                  vibrantColors={vibrantColors}
                 />
               </div>
             ))}
@@ -542,6 +655,7 @@ export function PlayerEditor({
       {/* Segment Edit Dialog */}
       {editingSegmentIndex !== null && editingSegments[editingSegmentIndex] && (
         <SegmentEditDialog
+          key={editingSegments[editingSegmentIndex].Id ?? editingSegmentIndex}
           open={editDialogOpen}
           segment={editingSegments[editingSegmentIndex]}
           onClose={handleCloseEditDialog}
@@ -584,12 +698,13 @@ export function PlayerEditor({
         aria-label={t('editor.actions', 'Segment actions')}
       >
         <button
+          data-interactive-transition="true"
           onClick={handlePasteFromClipboard}
           aria-label={t('editor.paste', 'Paste segment from clipboard')}
           className={cn(
             'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
             'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-            'transition-all duration-200 ease-out border-2',
+            'transition-[transform,box-shadow,background-color,color,border-color] duration-200 ease-out border-2',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             !hasColors &&
               'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
@@ -604,6 +719,7 @@ export function PlayerEditor({
           {t('editor.paste', 'Paste')}
         </button>
         <button
+          data-interactive-transition="true"
           onClick={handleSaveAll}
           disabled={isSaving}
           aria-label={t('editor.saveSegment', 'Save all segments')}
@@ -612,7 +728,7 @@ export function PlayerEditor({
           className={cn(
             'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
             'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-            'transition-all duration-200 ease-out border-2',
+            'transition-[transform,box-shadow,background-color,color,border-color,opacity] duration-200 ease-out border-2',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             !hasColors &&
@@ -621,10 +737,9 @@ export function PlayerEditor({
           style={getButtonStyle(true)}
         >
           {isSaving ? (
-            <Loader2
-              className="size-4 sm:size-5 animate-spin"
-              aria-hidden="true"
-            />
+            <div className="animate-spin" aria-hidden="true">
+              <Loader2 className="size-4 sm:size-5" />
+            </div>
           ) : (
             <Save className="size-4 sm:size-5" aria-hidden="true" />
           )}

@@ -6,7 +6,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-export interface InteractiveCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface InteractiveCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Click handler for the card */
   onClick?: () => void
   /** Animation delay in ms for staggered entrance */
@@ -19,9 +19,9 @@ export interface InteractiveCardProps extends React.HTMLAttributes<HTMLDivElemen
 
 /**
  * Accessible interactive card with keyboard support.
- * Handles Enter/Space key activation and focus management.
+ * Renders as a native <button> for proper accessibility semantics.
  */
-export const InteractiveCard = React.memo(function InteractiveCard({
+export const InteractiveCard = React.memo(function InteractiveCardComponent({
   onClick,
   animationDelay = 0,
   animate = false,
@@ -31,25 +31,14 @@ export const InteractiveCard = React.memo(function InteractiveCard({
   'aria-label': ariaLabel,
   ...props
 }: InteractiveCardProps) {
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClick?.()
-      }
-    },
-    [onClick],
-  )
-
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
+      data-interactive-transition="true"
       onClick={onClick}
-      onKeyDown={handleKeyDown}
       aria-label={ariaLabel}
       className={cn(
-        'cursor-pointer transition-all duration-200',
+        'cursor-pointer transition-[transform,box-shadow,background-color,color] duration-200 text-left w-full',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         animate && 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
         className,
@@ -63,6 +52,6 @@ export const InteractiveCard = React.memo(function InteractiveCard({
       {...props}
     >
       {children}
-    </div>
+    </button>
   )
 })

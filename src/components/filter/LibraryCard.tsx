@@ -4,7 +4,6 @@
  */
 
 import { memo, useCallback, useMemo, useState } from 'react'
-import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { LucideIcon } from 'lucide-react'
 
@@ -13,13 +12,13 @@ import { getServerBaseUrl } from '@/services/jellyfin'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { cn } from '@/lib/utils'
 
-export interface LibraryCardProps {
+interface LibraryCardProps {
   /** The library/collection item */
   collection: VirtualFolderInfo
   /** Icon to display */
   Icon: LucideIcon
-  /** Click handler */
-  onClick: () => void
+  /** Selection handler */
+  onSelect: (collectionId: string | null) => void
   /** Optional CSS classes */
   className?: string
   /** Index for animation stagger */
@@ -30,10 +29,10 @@ export interface LibraryCardProps {
 const MAX_ANIMATION_DELAY = 300
 const ANIMATION_STAGGER = 30
 
-export const LibraryCard = memo(function LibraryCard({
+export const LibraryCard = memo(function LibraryCardComponent({
   collection,
   Icon,
-  onClick,
+  onSelect,
   className,
   index = 0,
 }: LibraryCardProps) {
@@ -51,15 +50,9 @@ export const LibraryCard = memo(function LibraryCard({
   // Convert to blob URL for COEP compliance
   const imageUrl = useBlobUrl(rawImageUrl)
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClick()
-      }
-    },
-    [onClick],
-  )
+  const handleClick = useCallback(() => {
+    onSelect(collection.ItemId ?? null)
+  }, [collection.ItemId, onSelect])
 
   const accessibleLabel = t('items.selectLibraryButton', {
     name: collection.Name || 'Unknown',
@@ -73,16 +66,15 @@ export const LibraryCard = memo(function LibraryCard({
   )
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
+    <button
+      type="button"
+      data-interactive-transition="true"
+      onClick={handleClick}
       aria-label={accessibleLabel}
       className={cn(
-        'group cursor-pointer rounded-2xl overflow-hidden',
+        'group cursor-pointer rounded-2xl overflow-hidden w-full text-left',
         'bg-card border border-border/50',
-        'transition-all duration-200',
+        'transition-[transform,box-shadow,border-color] duration-200',
         'hover:scale-[1.02] active:scale-[0.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
@@ -117,10 +109,7 @@ export const LibraryCard = memo(function LibraryCard({
 
       {/* Library Name and Icon */}
       <div className="px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 bg-secondary">
-        <Icon
-          className="size-5 flex-shrink-0"
-          aria-hidden="true"
-        />
+        <Icon className="size-5 flex-shrink-0" aria-hidden="true" />
         <p
           className="text-sm md:text-base font-semibold line-clamp-1 leading-snug group-hover:text-primary"
           title={collection.Name || undefined}
@@ -128,8 +117,6 @@ export const LibraryCard = memo(function LibraryCard({
           {collection.Name || 'Unknown'}
         </p>
       </div>
-    </div>
+    </button>
   )
 })
-
-export default LibraryCard

@@ -2,14 +2,15 @@
  * EpisodeSwitcher - Responsive episode selector for video player header.
  */
 
-import { memo, useCallback, useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { memo, useCallback, useRef, useState } from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes, useSeasons } from '@/hooks/queries/use-items'
+import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
@@ -21,32 +22,18 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 
-export interface EpisodeSwitcherProps {
+interface EpisodeSwitcherProps {
   currentEpisode: BaseItemDto
   vibrantColors?: VibrantColors | null
   className?: string
 }
 
-// Shared style utilities
-const useAccentStyle = (
-  isActive: boolean,
-  colors: VibrantColors | null | undefined,
-  bgOpacity: string,
-) =>
-  useMemo(
-    () =>
-      isActive && colors
-        ? {
-            backgroundColor: `${colors.accent}${bgOpacity}`,
-            color: colors.accent,
-          }
-        : undefined,
-    [isActive, colors, bgOpacity],
-  )
-
 const TICKS_TO_MINUTES = 600_000_000
+const EPISODE_ROW_ESTIMATE_PX = 58
+const VIRTUALIZE_THRESHOLD = 40
+const EPISODE_OVERSCAN = 6
 
-const EpisodeItemSkeleton = memo(function EpisodeItemSkeleton({
+const EpisodeItemSkeleton = memo(function EpisodeItemSkeletonComponent({
   index = 0,
 }: {
   index?: number
@@ -71,14 +58,16 @@ interface EpisodeItemProps {
   isActive: boolean
   index: number
   onSelect: (episodeId: string) => void
+  onIntent: (episodeId: string) => void
   vibrantColors?: VibrantColors | null
 }
 
-const EpisodeItem = memo(function EpisodeItem({
+const EpisodeItem = memo(function EpisodeItemComponent({
   episode,
   isActive,
   index,
   onSelect,
+  onIntent,
   vibrantColors,
 }: EpisodeItemProps) {
   const episodeNum = episode.IndexNumber ?? index + 1
@@ -91,8 +80,20 @@ const EpisodeItem = memo(function EpisodeItem({
     if (episode.Id) onSelect(episode.Id)
   }, [episode.Id, onSelect])
 
-  const accentStyle = useAccentStyle(isActive, vibrantColors, '20')
-  const badgeStyle = useAccentStyle(isActive, vibrantColors, '30')
+  const accentStyle =
+    isActive && vibrantColors
+      ? {
+          backgroundColor: `${vibrantColors.accent}20`,
+          color: vibrantColors.accent,
+        }
+      : undefined
+  const badgeStyle =
+    isActive && vibrantColors
+      ? {
+          backgroundColor: `${vibrantColors.accent}30`,
+          color: vibrantColors.accent,
+        }
+      : undefined
 
   return (
     <button
@@ -100,12 +101,18 @@ const EpisodeItem = memo(function EpisodeItem({
       onClick={handleClick}
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
-        'transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive
           ? 'bg-primary/15 text-primary'
           : 'hover:bg-muted/80 text-foreground',
       )}
       style={accentStyle}
+      onPointerEnter={() => {
+        if (episode.Id) onIntent(episode.Id)
+      }}
+      onFocus={() => {
+        if (episode.Id) onIntent(episode.Id)
+      }}
       role="option"
       aria-selected={isActive}
       aria-label={`Episode ${episodeNum}: ${episodeName}${runtime ? `, ${runtime} minutes` : ''}${isActive ? ', currently playing' : ''}`}
@@ -152,6 +159,59 @@ const EpisodeItem = memo(function EpisodeItem({
   )
 })
 
+interface SeasonButtonProps {
+  season: BaseItemDto
+  isSelected: boolean
+  onSeasonSelect: (seasonId: string) => void
+  vibrantColors?: VibrantColors | null
+}
+
+const SeasonButton = memo(function SeasonButtonComponent({
+  season,
+  isSelected,
+  onSeasonSelect,
+  vibrantColors,
+}: SeasonButtonProps) {
+  const handleClick = useCallback(() => {
+    if (season.Id) onSeasonSelect(season.Id)
+  }, [season.Id, onSeasonSelect])
+
+  const label =
+    season.IndexNumber === 0 ? 'SP' : `S${season.IndexNumber ?? '?'}`
+  const fullLabel =
+    season.IndexNumber === 0
+      ? 'Specials'
+      : `Season ${season.IndexNumber ?? '?'}`
+
+  return (
+    <button
+      key={season.Id}
+      type="button"
+      onClick={handleClick}
+      className={cn(
+        'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-[background-color,color,box-shadow] duration-150 ease-out',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        isSelected
+          ? 'bg-primary text-primary-foreground shadow-sm'
+          : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+      style={
+        isSelected && vibrantColors
+          ? {
+              backgroundColor: vibrantColors.accent,
+              color: vibrantColors.accentText,
+            }
+          : undefined
+      }
+      role="tab"
+      aria-selected={isSelected}
+      aria-label={fullLabel}
+    >
+      {label}
+    </button>
+  )
+})
+
 interface SeasonSelectorProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId: string | null
@@ -159,7 +219,7 @@ interface SeasonSelectorProps {
   vibrantColors?: VibrantColors | null
 }
 
-const SeasonSelector = memo(function SeasonSelector({
+const SeasonSelector = memo(function SeasonSelectorComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
@@ -175,39 +235,14 @@ const SeasonSelector = memo(function SeasonSelector({
     >
       {seasons.map((season) => {
         const isSelected = season.Id === selectedSeasonId
-        const label =
-          season.IndexNumber === 0 ? 'SP' : `S${season.IndexNumber ?? '?'}`
-        const fullLabel =
-          season.IndexNumber === 0
-            ? 'Specials'
-            : `Season ${season.IndexNumber ?? '?'}`
-
         return (
-          <button
+          <SeasonButton
             key={season.Id}
-            type="button"
-            onClick={() => season.Id && onSeasonSelect(season.Id)}
-            className={cn(
-              'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ease-out',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              isSelected
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-            style={
-              isSelected && vibrantColors
-                ? {
-                    backgroundColor: vibrantColors.accent,
-                    color: vibrantColors.accentText,
-                  }
-                : undefined
-            }
-            role="tab"
-            aria-selected={isSelected}
-            aria-label={fullLabel}
-          >
-            {label}
-          </button>
+            season={season}
+            isSelected={isSelected}
+            onSeasonSelect={onSeasonSelect}
+            vibrantColors={vibrantColors}
+          />
         )
       })}
     </div>
@@ -215,23 +250,39 @@ const SeasonSelector = memo(function SeasonSelector({
 })
 
 // Episode list content renderer - reduces cyclomatic complexity
-const EpisodeListContent = memo(function EpisodeListContent({
+const EpisodeListContent = memo(function EpisodeListContentComponent({
   episodes,
   currentEpisodeId,
   isLoading,
   isError,
   onSelect,
+  onIntent,
   vibrantColors,
-  t,
+  scrollElement,
 }: {
   episodes: Array<BaseItemDto>
   currentEpisodeId: string | undefined
   isLoading: boolean
   isError: boolean
   onSelect: (id: string) => void
+  onIntent: (id: string) => void
   vibrantColors?: VibrantColors | null
-  t: (key: string, fallback: string) => string
+  scrollElement: HTMLDivElement | null
 }) {
+  const { t } = useTranslation()
+  const shouldVirtualize = episodes.length > VIRTUALIZE_THRESHOLD
+  const {
+    totalSize: totalVirtualHeight,
+    startIndex: virtualStartIndex,
+    endIndex: virtualEndIndex,
+  } = useVirtualWindow({
+    enabled: shouldVirtualize,
+    scrollElement,
+    itemCount: episodes.length,
+    itemSize: EPISODE_ROW_ESTIMATE_PX,
+    overscan: EPISODE_OVERSCAN,
+  })
+
   if (isLoading) {
     return (
       <div
@@ -241,9 +292,11 @@ const EpisodeListContent = memo(function EpisodeListContent({
         aria-busy="true"
       >
         <span className="sr-only">Loading episodes</span>
-        {[0, 1, 2, 3].map((i) => (
-          <EpisodeItemSkeleton key={i} index={i} />
-        ))}
+        {['skeleton-1', 'skeleton-2', 'skeleton-3', 'skeleton-4'].map(
+          (skeletonId, index) => (
+            <EpisodeItemSkeleton key={skeletonId} index={index} />
+          ),
+        )}
       </div>
     )
   }
@@ -273,6 +326,47 @@ const EpisodeListContent = memo(function EpisodeListContent({
     )
   }
 
+  if (shouldVirtualize) {
+    return (
+      <div
+        role="listbox"
+        aria-label="Episodes"
+        style={{
+          height: totalVirtualHeight,
+          position: 'relative',
+        }}
+      >
+        {episodes
+          .slice(virtualStartIndex, virtualEndIndex)
+          .map((episode, offset) => {
+            const episodeIndex = virtualStartIndex + offset
+
+            return (
+              <div
+                key={episode.Id ?? `episode-${episodeIndex}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${episodeIndex * EPISODE_ROW_ESTIMATE_PX}px)`,
+                }}
+              >
+                <EpisodeItem
+                  episode={episode}
+                  isActive={episode.Id === currentEpisodeId}
+                  index={episodeIndex}
+                  onSelect={onSelect}
+                  onIntent={onIntent}
+                  vibrantColors={vibrantColors}
+                />
+              </div>
+            )
+          })}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-0.5" role="listbox" aria-label="Episodes">
       {episodes.map((episode, index) => (
@@ -282,6 +376,7 @@ const EpisodeListContent = memo(function EpisodeListContent({
           isActive={episode.Id === currentEpisodeId}
           index={index}
           onSelect={onSelect}
+          onIntent={onIntent}
           vibrantColors={vibrantColors}
         />
       ))}
@@ -289,35 +384,34 @@ const EpisodeListContent = memo(function EpisodeListContent({
   )
 })
 
-export function EpisodeSwitcher({
+export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
   currentEpisode,
   vibrantColors,
   className,
 }: EpisodeSwitcherProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const prefetchedEpisodeIdsRef = useRef(new Set<string>())
+  const [episodeListElement, setEpisodeListElement] =
+    useState<HTMLDivElement | null>(null)
 
   const { SeriesId: seriesId, SeasonId: currentSeasonId } = currentEpisode
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(
-    currentSeasonId ?? null,
-  )
+  // overrideSeasonId: set when user manually picks a season tab; null = follow current episode
+  const [overrideSeasonId, setOverrideSeasonId] = useState<string | null>(null)
+  const selectedSeasonId = overrideSeasonId ?? currentSeasonId ?? null
 
   const { data: seasons = [] } = useSeasons(seriesId ?? '', {
-    enabled: !!seriesId,
+    enabled: open && !!seriesId,
   })
   const {
     data: episodes = [],
     isLoading,
     isError,
   } = useEpisodes(seriesId ?? '', selectedSeasonId ?? '', {
-    enabled: !!seriesId && !!selectedSeasonId,
+    enabled: open && !!seriesId && !!selectedSeasonId,
   })
-
-  // Sync selectedSeasonId when currentSeasonId changes
-  if (currentSeasonId && currentSeasonId !== selectedSeasonId) {
-    setSelectedSeasonId(currentSeasonId)
-  }
 
   const handleEpisodeSelect = useCallback(
     (episodeId: string) => {
@@ -329,6 +423,29 @@ export function EpisodeSwitcher({
       })
     },
     [navigate],
+  )
+
+  const prefetchEpisodeRoute = useCallback(
+    (episodeId: string) => {
+      if (!episodeId || prefetchedEpisodeIdsRef.current.has(episodeId)) {
+        return
+      }
+
+      prefetchedEpisodeIdsRef.current.add(episodeId)
+      void router.preloadRoute({
+        to: '/player/$itemId',
+        params: { itemId: episodeId },
+        search: { fetchSegments: 'true' },
+      })
+    },
+    [router],
+  )
+
+  const setEpisodeListContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setEpisodeListElement(node)
+    },
+    [],
   )
 
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
@@ -371,7 +488,7 @@ export function EpisodeSwitcher({
               <SeasonSelector
                 seasons={seasons}
                 selectedSeasonId={selectedSeasonId}
-                onSeasonSelect={setSelectedSeasonId}
+                onSeasonSelect={setOverrideSeasonId}
                 vibrantColors={vibrantColors}
               />
             </div>
@@ -389,6 +506,7 @@ export function EpisodeSwitcher({
         </DropdownMenuGroup>
 
         <div
+          ref={setEpisodeListContainerRef}
           className="overflow-y-auto max-h-[min(320px,50vh)] px-1.5 pb-1.5"
           role="tabpanel"
         >
@@ -398,13 +516,12 @@ export function EpisodeSwitcher({
             isLoading={isLoading}
             isError={isError}
             onSelect={handleEpisodeSelect}
+            onIntent={prefetchEpisodeRoute}
             vibrantColors={vibrantColors}
-            t={t}
+            scrollElement={episodeListElement}
           />
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )
-}
-
-export default EpisodeSwitcher
+})

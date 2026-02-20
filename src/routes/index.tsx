@@ -8,12 +8,18 @@
  * - search: Search filter string (nullable)
  */
 
+import { Suspense, lazy } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { FilterView } from '@/components/filter/FilterView'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
+
+const FilterView = lazy(() =>
+  import('@/components/filter/FilterView').then((module) => ({
+    default: module.FilterView,
+  })),
+)
 
 /** URL search params schema for the index route */
 const indexSearchSchema = z.object({
@@ -21,8 +27,6 @@ const indexSearchSchema = z.object({
   page: z.coerce.number().positive().int().optional().catch(1),
   search: z.string().optional().catch(undefined),
 })
-
-export type IndexSearchParams = z.infer<typeof indexSearchSchema>
 
 /**
  * Loading skeleton for the index page.
@@ -58,7 +62,9 @@ function IndexPage() {
         minHeightClass="min-h-[var(--spacing-page-min-height-md)]"
         showNavigation={false}
       >
-        <FilterView />
+        <Suspense fallback={<IndexSkeleton />}>
+          <FilterView />
+        </Suspense>
       </FeatureErrorBoundary>
     </main>
   )

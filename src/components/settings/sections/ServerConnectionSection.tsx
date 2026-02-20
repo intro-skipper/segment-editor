@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, LogOut, Server, XCircle } from 'lucide-react'
-import { useShallow } from 'zustand/shallow'
+import { useShallow } from 'zustand/react/shallow'
 
 import { SettingsSection } from '../primitives'
 import { useApiStore } from '@/stores/api-store'
@@ -21,7 +21,7 @@ export function ServerConnectionSection() {
     username,
     clearAuth,
   } = useApiStore(
-    useShallow((s) => ({
+    useShallow((s: ReturnType<typeof useApiStore.getState>) => ({
       serverAddress: s.serverAddress,
       validConnection: s.validConnection,
       validAuth: s.validAuth,

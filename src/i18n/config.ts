@@ -8,12 +8,6 @@ import fr from './locales/fr.json'
 export const supportedLocales = ['en-US', 'de', 'fr'] as const
 export type SupportedLocale = (typeof supportedLocales)[number]
 
-export const localeNames: Record<SupportedLocale, string> = {
-  'en-US': 'English',
-  de: 'Deutsch',
-  fr: 'Français',
-}
-
 const resources = {
   'en-US': { translation: enUS },
   de: { translation: de },
@@ -46,7 +40,7 @@ function detectBrowserLocale(): SupportedLocale {
 /**
  * Gets the initial locale based on stored preference or browser detection
  */
-export function getInitialLocale(): SupportedLocale {
+function getInitialLocale(): SupportedLocale {
   const stored = localStorage.getItem('app-locale')
 
   if (stored === 'auto' || !stored) {

@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
 import { formatReadableTime, ticksToSeconds } from '@/lib/time-utils'
 
-export interface AlbumViewProps {
+interface AlbumViewProps {
   /** The album item */
   album: BaseItemDto
   /** Array of tracks for the album */
@@ -27,23 +27,29 @@ export interface AlbumViewProps {
 
 interface TrackRowProps {
   track: BaseItemDto
+  trackId: string
   index: number
-  onClick: () => void
+  onTrackSelect: (trackId: string) => void
 }
 
-const TrackRow = React.memo(function TrackRow({
+const TrackRow = React.memo(function TrackRowComponent({
   track,
+  trackId,
   index,
-  onClick,
+  onTrackSelect,
 }: TrackRowProps) {
   const trackNumber = track.IndexNumber ?? index
   const duration = track.RunTimeTicks
     ? formatReadableTime(ticksToSeconds(track.RunTimeTicks))
     : '--:--'
 
+  const handleClick = React.useCallback(() => {
+    onTrackSelect(trackId)
+  }, [onTrackSelect, trackId])
+
   return (
     <InteractiveCard
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'flex items-center gap-4 p-3 rounded-lg',
         'hover:bg-accent/50 group',
@@ -151,17 +157,23 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           aria-label={`${tracks.length} tracks in ${albumName}`}
         >
           {tracks.map((track, index) => (
-            <TrackRow
+            <div
               key={track.Id}
-              track={track}
-              index={index + 1}
-              onClick={() => handleTrackClick(track.Id || '')}
-            />
+              style={{
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 64px',
+              }}
+            >
+              <TrackRow
+                track={track}
+                trackId={track.Id || ''}
+                index={index + 1}
+                onTrackSelect={handleTrackClick}
+              />
+            </div>
           ))}
         </div>
       )}
     </div>
   )
 }
-
-export default AlbumView

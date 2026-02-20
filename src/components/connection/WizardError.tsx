@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface WizardErrorProps {
+interface WizardErrorProps {
   /** Error message to display */
   message: string
   /** Callback when retry is clicked */
@@ -64,7 +64,9 @@ export function WizardError({
         >
           {isRetrying ? (
             <>
-              <Loader2 className="size-4 animate-spin" aria-hidden />
+              <div className="animate-spin" aria-hidden>
+                <Loader2 className="size-4" />
+              </div>
               Retrying...
             </>
           ) : (

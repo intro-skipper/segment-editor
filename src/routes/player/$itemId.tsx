@@ -3,17 +3,13 @@
  * Renders the PlayerEditor component for a specific media item.
  */
 
-import { useEffect } from 'react'
+import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { PlayerEditor } from '@/components/player/PlayerEditor'
-import {
-  QUERY_STALE_TIMES,
-  itemsKeys,
-  segmentsKeys,
-  useItem,
-} from '@/hooks/queries'
+import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
+import { itemsKeys, useItem } from '@/hooks/queries/use-items'
+import { segmentsKeys } from '@/hooks/queries/use-segments'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -21,7 +17,12 @@ import { getItemById } from '@/services/items/api'
 import { getSegmentsById } from '@/services/segments/api'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
-import { useSessionStore } from '@/stores/session-store'
+
+const PlayerEditor = lazy(() =>
+  import('@/components/player/PlayerEditor').then((module) => ({
+    default: module.PlayerEditor,
+  })),
+)
 
 /**
  * Route params schema - validates itemId is a valid Jellyfin ID.
@@ -93,23 +94,30 @@ export const Route = createFileRoute('/player/$itemId')({
     stringify: (params) => params,
   },
   validateSearch: playerSearchSchema,
-  loader: async ({ params, context }) => {
+  loaderDeps: ({ search }) => ({ fetchSegments: search.fetchSegments }),
+  loader: async ({ params, context, deps }) => {
     const { itemId } = params
     const { queryClient } = context
 
-    // Prefetch item data
-    await queryClient.ensureQueryData({
-      queryKey: itemsKeys.detail(itemId),
-      queryFn: () => getItemById(itemId),
-      staleTime: QUERY_STALE_TIMES.LONG,
-    })
+    const prefetches: Array<Promise<unknown>> = [
+      queryClient.ensureQueryData({
+        queryKey: itemsKeys.detail(itemId),
+        queryFn: () => getItemById(itemId),
+        staleTime: QUERY_STALE_TIMES.LONG,
+      }),
+    ]
 
-    // Prefetch segments data
-    await queryClient.ensureQueryData({
-      queryKey: segmentsKeys.list(itemId),
-      queryFn: () => getSegmentsById(itemId),
-      staleTime: QUERY_STALE_TIMES.SHORT,
-    })
+    if (deps.fetchSegments) {
+      prefetches.push(
+        queryClient.ensureQueryData({
+          queryKey: segmentsKeys.list(itemId),
+          queryFn: () => getSegmentsById(itemId),
+          staleTime: QUERY_STALE_TIMES.SHORT,
+        }),
+      )
+    }
+
+    await Promise.all(prefetches)
   },
   onError: () => {
     // Throw notFound for invalid params (e.g., malformed UUID)
@@ -128,14 +136,9 @@ function PlayerPage() {
 
   // Extract vibrant color from item poster
   const imageUrl = item ? getBestImageUrl(item, 300) : null
-  const vibrantColors = useVibrantColor(imageUrl || null)
-
-  // Sync vibrant colors to session store for header
-  const setVibrantColors = useSessionStore((s) => s.setVibrantColors)
-  useEffect(() => {
-    setVibrantColors(vibrantColors)
-    return () => setVibrantColors(null)
-  }, [vibrantColors, setVibrantColors])
+  const vibrantColors = useVibrantColor(imageUrl || null, {
+    enabled: !!imageUrl,
+  })
 
   if (isLoading) {
     return <PlayerSkeleton />
@@ -164,7 +167,13 @@ function PlayerPage() {
           featureName="Player"
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
         >
-          <PlayerEditor item={item} fetchSegments={fetchSegments} />
+          <Suspense fallback={<PlayerSkeleton />}>
+            <PlayerEditor
+              item={item}
+              fetchSegments={fetchSegments}
+              vibrantColors={vibrantColors}
+            />
+          </Suspense>
         </FeatureErrorBoundary>
       </main>
     </>

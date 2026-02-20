@@ -37,10 +37,6 @@ export function getServerBaseUrl(): string {
   return sanitizeUrl(getCredentials().serverAddress) ?? ''
 }
 
-export function getAccessToken(): string {
-  return getCredentials().accessToken
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Result Storage
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,35 +112,4 @@ export async function testConnectionWithCredentials(
 
     return DEFAULT_RESULT
   }
-}
-
-/** Tests connection using stored credentials and updates store state. */
-export async function testConnection(
-  options?: ApiOptions,
-): Promise<ConnectionResult> {
-  const store = useApiStore.getState()
-  const { serverAddress, apiKey } = store
-
-  if (isAborted(options?.signal)) return DEFAULT_RESULT
-
-  if (!serverAddress.trim() || !apiKey?.trim()) {
-    store.setConnectionStatus(false, false)
-    return DEFAULT_RESULT
-  }
-
-  const result = await testConnectionWithCredentials(
-    { serverAddress, accessToken: apiKey },
-    options,
-  )
-
-  if (result.valid && result.authenticated) {
-    store.setServerVersion(result.serverVersion)
-    store.setConnectionStatus(true, true)
-  } else if (result.valid) {
-    store.setConnectionStatus(true, false)
-  } else {
-    store.setConnectionStatus(false, false)
-  }
-
-  return result
 }
