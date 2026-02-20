@@ -476,18 +476,18 @@ body {
   }
 
   /* Ensure small icon buttons have adequate touch area */
-  button[class*='size-6'],
-  button[class*='size-8'],
-  [role='button'][class*='size-6'],
-  [role='button'][class*='size-8'] {
+  button[class*='size-6']:not(.absolute, .fixed, .sticky),
+  button[class*='size-8']:not(.absolute, .fixed, .sticky),
+  [role='button'][class*='size-6']:not(.absolute, .fixed, .sticky),
+  [role='button'][class*='size-8']:not(.absolute, .fixed, .sticky) {
     position: relative;
   }
 
   /* Expand touch area for small buttons without changing visual size */
-  button[class*='size-6']::before,
-  button[class*='size-8']::before,
-  [role='button'][class*='size-6']::before,
-  [role='button'][class*='size-8']::before {
+  button[class*='size-6']:not(.absolute, .fixed, .sticky)::before,
+  button[class*='size-8']:not(.absolute, .fixed, .sticky)::before,
+  [role='button'][class*='size-6']:not(.absolute, .fixed, .sticky)::before,
+  [role='button'][class*='size-8']:not(.absolute, .fixed, .sticky)::before {
     content: '';
     position: absolute;
     top: 50%;

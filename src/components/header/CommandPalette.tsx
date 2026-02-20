@@ -348,12 +348,12 @@ export const CommandPalette = memo(function CommandPaletteComponent({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-lg p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
+        className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-full sm:max-w-lg p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >
         {/* Search Input Section */}
-        <div className="relative border-b border-border/50 p-4">
+        <div className="relative border-b border-border/50 p-4 overflow-hidden">
           {showLoading ? (
             <div
               className="absolute left-7 top-1/2 -translate-y-1/2 animate-spin"
@@ -376,8 +376,8 @@ export const CommandPalette = memo(function CommandPaletteComponent({
             autoComplete="off"
             spellCheck={false}
             className={cn(
-              'w-full bg-transparent pl-10 h-10 text-base outline-none placeholder:text-muted-foreground',
-              search ? 'pr-32' : 'pr-24',
+              'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none placeholder:text-muted-foreground',
+              search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
             )}
             role="combobox"
             aria-expanded={resultItems.length > 0}
@@ -392,8 +392,8 @@ export const CommandPalette = memo(function CommandPaletteComponent({
             variant={includeEpisodes ? 'secondary' : 'outline'}
             size="sm"
             className={cn(
-              'absolute top-1/2 -translate-y-1/2 h-7 rounded-full px-2 text-[11px]',
-              search ? 'right-14' : 'right-5',
+              'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7 rounded-full px-1.5 sm:px-2 text-[10px] sm:text-[11px]',
+              search ? 'right-13 sm:right-14' : 'right-4 sm:right-5',
             )}
             onClick={handleEpisodeInclusionToggle}
             aria-pressed={includeEpisodes}
@@ -408,7 +408,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="absolute right-5 top-1/2 -translate-y-1/2 hover:bg-muted/80"
+              className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2 hover:bg-muted/80"
               onClick={handleClearSearch}
               aria-label={t('search.clear', 'Clear search')}
             >
