@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "vite build && tsc",
+    "build:plugin": "vite build --config vite.config.plugin.ts && tsc",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint --config ./eslint.config.js .",
