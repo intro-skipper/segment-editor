@@ -11,19 +11,24 @@ import * as TanStackQueryProvider from './integrations/tanstack-query/root-provi
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
-import { isPluginMode } from './services/jellyfin/core'
+import {
+  PLUGIN_ROUTER_BASE_PATH,
+  PLUGIN_ROUTER_ENTRY,
+  isPluginContext,
+} from './services/jellyfin/core'
 
 import './styles.css'
 
 // Create a new router instance
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
+const pluginMode = isPluginContext()
 
 // Use memory history in plugin mode, browser history otherwise
-const history = isPluginMode()
-  ? createMemoryHistory({ initialEntries: ['/'] })
+const history = pluginMode
+  ? createMemoryHistory({ initialEntries: [PLUGIN_ROUTER_ENTRY] })
   : createBrowserHistory()
-const basePath = isPluginMode() ? '/configurationpage' : '/'
+const basePath = pluginMode ? PLUGIN_ROUTER_BASE_PATH : '/'
 const router = createRouter({
   routeTree,
   basepath: basePath,

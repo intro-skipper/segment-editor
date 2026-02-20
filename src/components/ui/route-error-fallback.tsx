@@ -43,12 +43,8 @@ export function RouteErrorFallback({
   const router = useRouter()
 
   const handleGoBack = useCallback(() => {
-    if (router.history.length > 1) {
-      router.history.back()
-    } else {
-      navigate({ to: '/' })
-    }
-  }, [router.history, navigate])
+    navigate({ to: '/' })
+  }, [navigate])
 
   const handleGoHome = useCallback(() => {
     navigate({ to: '/' })

@@ -36,6 +36,11 @@ import { API_CONFIG } from '@/lib/constants'
 
 const CLIENT_INFO = { name: 'Segment Editor', version: '1.0.0' } as const
 const DEVICE_ID_KEY = 'segment-editor-device-id'
+const PLUGIN_CONFIGURATION_PATH = '/configurationpage'
+
+export const PLUGIN_ROUTER_BASE_PATH = PLUGIN_CONFIGURATION_PATH
+export const PLUGIN_ROUTER_ENTRY =
+  '/configurationpage?name=Segment%20Editor' as const
 
 let jellyfinInstance: Jellyfin | null = null
 let apiCache: { key: string; apis: TypedApis } | null = null
@@ -89,7 +94,12 @@ export function getPluginCredentials(): Credentials | null {
   return serverAddress && accessToken ? { serverAddress, accessToken } : null
 }
 
-export const isPluginMode = (): boolean => getPluginCredentials() !== null
+export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
+
+export const isPluginBuild = (): boolean =>
+  import.meta.env.BASE_URL.startsWith('/SegmentEditor/')
+
+export const isPluginContext = (): boolean => isPluginBuild() || isPluginMode()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client Factory

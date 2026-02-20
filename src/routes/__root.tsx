@@ -95,19 +95,11 @@ function HeaderFallback() {
 function NotFoundComponent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const router = useRouter()
 
   // Safe back navigation that stays within the app
   const handleGoBack = useCallback(() => {
-    // Check if there's router history to go back to
-    // If router history length > 1, we have internal navigation history
-    if (router.history.length > 1) {
-      router.history.back()
-    } else {
-      // No internal history - navigate to home instead of leaving the app
-      navigate({ to: '/' })
-    }
-  }, [router.history, navigate])
+    navigate({ to: '/' })
+  }, [navigate])
 
   return (
     <div className="flex min-h-[var(--spacing-page-min-height-sm)] items-center justify-center p-4">

@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   getPluginCredentials,
-  isPluginMode,
+  isPluginContext,
   testConnectionWithCredentials,
 } from '@/services/jellyfin'
 import { useApiStore } from '@/stores/api-store'
@@ -47,7 +47,7 @@ export function useConnectionInit(): ConnectionState {
     })),
   )
 
-  const isPlugin = isPluginMode()
+  const isPlugin = isPluginContext()
 
   useEffect(() => {
     if (validAuth || hasAttemptedRef.current) return
@@ -134,7 +134,7 @@ export function usePluginMode() {
     })),
   )
 
-  const isPlugin = isPluginMode()
+  const isPlugin = isPluginContext()
 
   return {
     isPlugin,

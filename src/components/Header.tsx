@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react'
 import {
+  useCanGoBack,
   useLocation,
   useNavigate,
   useParams,
@@ -128,6 +129,7 @@ export default function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const router = useRouter()
+  const canGoBack = useCanGoBack()
   const params = useParams({ strict: false })
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -227,7 +229,7 @@ export default function Header() {
 
   // Back navigation - go to series page if viewing episode, otherwise home with collection preserved
   const handleBack = useCallback(() => {
-    if (router.history.length > 1) {
+    if (canGoBack) {
       router.history.back()
       return
     }
@@ -248,7 +250,7 @@ export default function Header() {
         ? { collection: selectedCollection }
         : undefined,
     })
-  }, [isEpisode, seriesId, navigate, router.history, selectedCollection])
+  }, [canGoBack, isEpisode, navigate, router, selectedCollection, seriesId])
 
   // Memoize style objects to prevent re-renders
   const headerStyle = useMemo(

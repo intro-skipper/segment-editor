@@ -7,6 +7,6 @@ export default [
   ...tanstackConfig,
   reactYouMightNotNeedAnEffect.configs.recommended,
   {
-    ignores: ['eslint.config.js', 'prettier.config.js'],
+    ignores: ['eslint.config.js', 'prettier.config.js', 'dist-plugin/**'],
   },
 ]

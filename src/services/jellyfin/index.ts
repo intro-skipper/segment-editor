@@ -53,6 +53,8 @@ export {
   withApi,
   getRequestConfig,
   getAuthenticatedRequestConfig,
+  isPluginContext,
+  isPluginBuild,
   isPluginMode,
   getPluginCredentials,
   getDeviceId,
