@@ -41,7 +41,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.0",
     "@tanstack/devtools-vite": "^0.5.1",
-    "@tanstack/eslint-config": "^0.3.4",
+    "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-devtools": "^0.9.6",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@tanstack/react-router-devtools": "^1.161.1",
