@@ -24,6 +24,7 @@ import {
   getPositionTicks,
   startPlaybackSession,
   stopPlaybackSession,
+  stopPlaybackSessionKeepalive,
 } from '@/services/video/playback-session'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
 
@@ -383,6 +384,22 @@ export function useVideoPlayer({
     preservedStateRef.current = null
     pendingHlsStateRestoreRef.current = false
   })
+
+  const handlePageHide = useEffectEvent(() => {
+    const video =
+      currentStrategyRef.current === 'hls'
+        ? hlsPlayer.videoRef.current
+        : videoRef.current
+    stopPlaybackSessionKeepalive(getPositionTicks(video))
+  })
+
+  useEffect(() => {
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [])
 
   /**
    * Initializes playback with the appropriate strategy.

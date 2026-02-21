@@ -27,6 +27,7 @@ import {
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
+import { isPluginMode } from '../services/jellyfin/core'
 import { useSessionStore } from '../stores/session-store'
 
 // Initialize i18next
@@ -56,6 +57,7 @@ const ConnectionWizard = lazy(() =>
 const selectSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
 ) => state.settingsOpen
+const pluginMode = isPluginMode()
 
 /**
  * Minimal header fallback when the main header crashes.
@@ -146,6 +148,7 @@ function NotFoundComponent() {
  */
 function RootComponent() {
   const { t } = useTranslation()
+  const showSkipToMain = !pluginMode
 
   // Unified connection initialization for both plugin and standalone modes
   const { showWizard } = useConnectionInit()
@@ -170,12 +173,14 @@ function RootComponent() {
     <LazyMotion features={domAnimation}>
       <div className="min-h-screen">
         {/* Skip link for keyboard navigation - visible only when focused */}
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-        >
-          {t('accessibility.skipToMain', 'Skip to main content')}
-        </a>
+        {showSkipToMain ? (
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            {t('accessibility.skipToMain', 'Skip to main content')}
+          </a>
+        ) : null}
         {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
         <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
           <Header />

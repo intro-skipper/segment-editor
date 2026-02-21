@@ -1,4 +1,4 @@
-name: "Dispatch Plugin Release"
+name: 'Dispatch Plugin Release'
 on:
   push:
     branches:

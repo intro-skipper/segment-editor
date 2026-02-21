@@ -5,7 +5,7 @@
  * @module services/video/playback-session
  */
 
-import { withApi } from '@/services/jellyfin'
+import { buildApiUrl, getCredentials, withApi } from '@/services/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 
@@ -74,6 +74,48 @@ export async function stopPlaybackSession(
       },
     })
   })
+}
+
+/**
+ * Reports playback stopped using a keepalive request.
+ * Intended for pagehide/unload flows where async cleanup can be dropped.
+ */
+export function stopPlaybackSessionKeepalive(positionTicks?: number): void {
+  if (!activeSession) return
+
+  const session = activeSession
+  activeSession = null
+
+  const { serverAddress, accessToken } = getCredentials()
+  const url = buildApiUrl({
+    serverAddress,
+    accessToken,
+    endpoint: 'Sessions/Playing/Stopped',
+  })
+
+  if (!url) return
+
+  const body = JSON.stringify({
+    playbackStopInfo: {
+      ItemId: session.itemId,
+      PlaySessionId: session.playSessionId,
+      MediaSourceId: session.mediaSourceId,
+      PositionTicks: positionTicks,
+    },
+  })
+
+  try {
+    void fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body,
+    })
+  } catch {
+    // Best effort during unload/pagehide
+  }
 }
 
 /**
