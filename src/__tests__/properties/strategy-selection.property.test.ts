@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
 import type { BaseItemDto } from '@/types/jellyfin'
+import type * as CompatibilityModule from '@/services/video/compatibility'
 import { extractMediaSourceInfo, getPlaybackConfig } from '@/services/video/api'
 import {
   DIRECT_PLAY_AUDIO_CODECS,
@@ -51,9 +52,7 @@ vi.mock('@/services/jellyfin', () => ({
 // In real browser, isCodecSupported would check actual browser capabilities
 // For testing, we mock checkCompatibility to return predictable results
 vi.mock('@/services/video/compatibility', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  type CompatModule = typeof import('@/services/video/compatibility')
-  const original = await importOriginal<CompatModule>()
+  const original = await importOriginal<typeof CompatibilityModule>()
   return {
     ...original,
     checkCompatibility: vi.fn(
