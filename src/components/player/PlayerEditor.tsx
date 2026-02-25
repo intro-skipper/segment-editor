@@ -23,6 +23,7 @@ import { useSegments } from '@/hooks/queries/use-segments'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
 import { ticksToSeconds } from '@/lib/time-utils'
+import { getFrameStepSeconds } from '@/lib/frame-rate-utils'
 import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 import {
   introSkipperClipboardTextToSegments,
@@ -58,6 +59,31 @@ interface PlayerEditorProps {
 }
 
 type SegmentUpdater = (prev: Array<MediaSegmentDto>) => Array<MediaSegmentDto>
+
+interface ParsedImportResult {
+  segments: Array<MediaSegmentDto>
+  skipped: number
+  unknownTypes: Array<string>
+}
+
+function buildImportInfoSuffix({
+  skipped,
+  unknownTypes,
+}: Pick<ParsedImportResult, 'skipped' | 'unknownTypes'>): string {
+  const infoParts: Array<string> = []
+  if (skipped > 0) {
+    infoParts.push(`${skipped} skipped`)
+  }
+  if (unknownTypes.length > 0) {
+    infoParts.push(`unknown: ${unknownTypes.join(', ')}`)
+  }
+
+  if (infoParts.length === 0) {
+    return ''
+  }
+
+  return ` (${infoParts.join('; ')})`
+}
 
 function getSegmentStartTicks(segment: MediaSegmentDto): number {
   return segment.StartTicks ?? 0
@@ -188,11 +214,7 @@ function useRenderPlayerEditor({
 
   // Import confirmation dialog state
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
-  const pendingImportRef = React.useRef<{
-    segments: Array<MediaSegmentDto>
-    skipped: number
-    unknownTypes: Array<string>
-  } | null>(null)
+  const pendingImportRef = React.useRef<ParsedImportResult | null>(null)
 
   // Track if save is in progress to prevent concurrent operations
   const isSaving = batchSaveMutation.isPending
@@ -226,6 +248,11 @@ function useRenderPlayerEditor({
   const runtimeSeconds = React.useMemo(
     () => ticksToSeconds(item.RunTimeTicks) || 0,
     [item.RunTimeTicks],
+  )
+
+  const frameStepSeconds = React.useMemo(
+    () => getFrameStepSeconds(item),
+    [item],
   )
 
   // Handle segment creation from player
@@ -423,15 +450,7 @@ function useRenderPlayerEditor({
         })
 
         // Build informative notification message
-        const infoParts: Array<string> = []
-        if (result.skipped > 0) {
-          infoParts.push(`${result.skipped} skipped`)
-        }
-        if (result.unknownTypes.length > 0) {
-          infoParts.push(`unknown: ${result.unknownTypes.join(', ')}`)
-        }
-        const infoSuffix =
-          infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+        const infoSuffix = buildImportInfoSuffix(result)
         showNotification({
           type: 'positive',
           message: `Imported ${result.segments.length} segments${infoSuffix}`,
@@ -527,14 +546,7 @@ function useRenderPlayerEditor({
       return updated
     })
 
-    const infoParts: Array<string> = []
-    if (pending.skipped > 0) {
-      infoParts.push(`${pending.skipped} skipped`)
-    }
-    if (pending.unknownTypes.length > 0) {
-      infoParts.push(`unknown: ${pending.unknownTypes.join(', ')}`)
-    }
-    const infoSuffix = infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+    const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
       type: 'positive',
       message: `Replaced with ${pending.segments.length} segments${infoSuffix}`,
@@ -554,14 +566,7 @@ function useRenderPlayerEditor({
       return merged
     })
 
-    const infoParts: Array<string> = []
-    if (pending.skipped > 0) {
-      infoParts.push(`${pending.skipped} skipped`)
-    }
-    if (pending.unknownTypes.length > 0) {
-      infoParts.push(`unknown: ${pending.unknownTypes.join(', ')}`)
-    }
-    const infoSuffix = infoParts.length > 0 ? ` (${infoParts.join('; ')})` : ''
+    const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
       type: 'positive',
       message: `Added ${pending.segments.length} segments${infoSuffix}`,
@@ -621,7 +626,7 @@ function useRenderPlayerEditor({
           <div className="space-y-3">
             {editingSegments.map((segment, index) => (
               <div
-                key={segment.Id ?? `segment-${index}`}
+                key={`${segment.Id ?? `segment-${index}`}-${segment.StartTicks ?? 0}-${segment.EndTicks ?? 0}`}
                 style={{
                   contentVisibility: 'auto',
                   containIntrinsicSize: '0 280px',
@@ -633,6 +638,7 @@ function useRenderPlayerEditor({
                   index={index}
                   isActive={index === activeIndex}
                   runtimeSeconds={runtimeSeconds}
+                  frameStepSeconds={frameStepSeconds}
                   onUpdate={handleUpdateSegment}
                   onDelete={handleDeleteSegment}
                   onPlayerTimestamp={handlePlayerTimestamp}

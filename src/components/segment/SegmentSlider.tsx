@@ -10,7 +10,7 @@ import { Copy, Crosshair, GripVertical, Play, Trash2 } from 'lucide-react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { SegmentUpdate } from '@/types/segment'
-import { formatTime } from '@/lib/time-utils'
+import { formatTime, snapToFrame } from '@/lib/time-utils'
 import {
   getSegmentColor,
   getSegmentCssVar,
@@ -39,6 +39,38 @@ const { MIN_SEGMENT_GAP } = SEGMENT_CONFIG
 /** Handle width in pixels for positioning calculations */
 const HANDLE_WIDTH = 14
 
+/** Keep numeric input readable while preserving millisecond precision */
+const TIME_INPUT_DECIMALS = 3
+
+function formatInputSeconds(value: number): string {
+  return value.toFixed(TIME_INPUT_DECIMALS).replace(/\.?0+$/, '')
+}
+
+function clampStartToBounds(start: number, end: number): number {
+  return Math.max(0, Math.min(start, end - MIN_SEGMENT_GAP))
+}
+
+function clampEndToBounds(end: number, start: number, runtime: number): number {
+  return Math.min(runtime, Math.max(end, start + MIN_SEGMENT_GAP))
+}
+
+function snapAndClampStart(
+  value: number,
+  end: number,
+  frameStep: number | undefined,
+): number {
+  return clampStartToBounds(snapToFrame(value, frameStep), end)
+}
+
+function snapAndClampEnd(
+  value: number,
+  start: number,
+  runtime: number,
+  frameStep: number | undefined,
+): number {
+  return clampEndToBounds(snapToFrame(value, frameStep), start, runtime)
+}
+
 interface SegmentSliderProps {
   /** The segment to display and edit */
   segment: MediaSegmentDto
@@ -48,6 +80,8 @@ interface SegmentSliderProps {
   isActive: boolean
   /** Total runtime of the media in seconds */
   runtimeSeconds: number
+  /** Optional frame-based input step in seconds (e.g. 1001/24000) */
+  frameStepSeconds?: number
   /** Callback when segment boundaries are updated */
   onUpdate: (data: SegmentUpdate) => void
   /** Callback when segment is deleted */
@@ -75,6 +109,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   index,
   isActive,
   runtimeSeconds,
+  frameStepSeconds,
   onUpdate,
   onDelete,
   onPlayerTimestamp,
@@ -96,6 +131,13 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   const [localStart, setLocalStart] = React.useState(segment.StartTicks ?? 0)
   const [localEnd, setLocalEnd] = React.useState(segment.EndTicks ?? 0)
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
+  const [activeInput, setActiveInput] = React.useState<'start' | 'end' | null>(
+    null,
+  )
+  const [timeInputDraft, setTimeInputDraft] = React.useState<{
+    start?: string
+    end?: string
+  }>({})
 
   const localStartRef = React.useRef(localStart)
   const localEndRef = React.useRef(localEnd)
@@ -148,6 +190,44 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [localEnd, localStart],
   )
 
+  const frameStep = React.useMemo(() => {
+    if (
+      typeof frameStepSeconds === 'number' &&
+      Number.isFinite(frameStepSeconds) &&
+      frameStepSeconds > 0
+    ) {
+      return frameStepSeconds
+    }
+    return undefined
+  }, [frameStepSeconds])
+
+  const inputStep = frameStep ?? MIN_SEGMENT_GAP
+
+  const startInputValue =
+    activeInput === 'start'
+      ? (timeInputDraft.start ?? formatInputSeconds(localStart))
+      : formatInputSeconds(localStart)
+  const endInputValue =
+    activeInput === 'end'
+      ? (timeInputDraft.end ?? formatInputSeconds(localEnd))
+      : formatInputSeconds(localEnd)
+
+  const commitSegmentUpdate = React.useCallback(
+    (start: number, end: number) => {
+      if (!segment.Id) return
+
+      const nextValidation = validateSegment({
+        ...segment,
+        StartTicks: start,
+        EndTicks: end,
+      })
+      if (!nextValidation.valid) return
+
+      onUpdate({ id: segment.Id, start, end })
+    },
+    [segment, onUpdate],
+  )
+
   const handlePointerDown = React.useCallback(
     (handle: 'start' | 'end') => (e: React.PointerEvent) => {
       e.preventDefault()
@@ -181,17 +261,13 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
           const currentDragging = isDraggingRef.current
           if (currentDragging === 'start') {
-            setLocalStart(
-              Math.max(
-                0,
-                Math.min(pendingTime, localEndRef.current - MIN_SEGMENT_GAP),
-              ),
-            )
+            setLocalStart(clampStartToBounds(pendingTime, localEndRef.current))
           } else if (currentDragging === 'end') {
             setLocalEnd(
-              Math.min(
+              clampEndToBounds(
+                pendingTime,
+                localStartRef.current,
                 runtimeSeconds,
-                Math.max(pendingTime, localStartRef.current + MIN_SEGMENT_GAP),
               ),
             )
           }
@@ -214,16 +290,19 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       if (pendingTime !== null) {
         const currentDragging = isDraggingRef.current
         if (currentDragging === 'start') {
-          const newStart = Math.max(
-            0,
-            Math.min(pendingTime, localEndRef.current - MIN_SEGMENT_GAP),
+          const newStart = snapAndClampStart(
+            pendingTime,
+            localEndRef.current,
+            frameStep,
           )
           localStartRef.current = newStart
           setLocalStart(newStart)
         } else {
-          const newEnd = Math.min(
+          const newEnd = snapAndClampEnd(
+            pendingTime,
+            localStartRef.current,
             runtimeSeconds,
-            Math.max(pendingTime, localStartRef.current + MIN_SEGMENT_GAP),
+            frameStep,
           )
           localEndRef.current = newEnd
           setLocalEnd(newEnd)
@@ -233,33 +312,55 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
       ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
       setIsDragging(null)
-      if (segment.Id) {
-        onUpdate({
-          id: segment.Id,
-          start: localStartRef.current,
-          end: localEndRef.current,
-        })
-      }
+      commitSegmentUpdate(localStartRef.current, localEndRef.current)
     },
-    [segment.Id, onUpdate, runtimeSeconds],
+    [runtimeSeconds, frameStep, commitSegmentUpdate],
   )
 
   const handleInputChange = React.useCallback(
     (type: 'start' | 'end') => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseFloat(e.target.value)
-      if (isNaN(value) || value < 0) return
-      if (type === 'start' && value < localEnd) setLocalStart(value)
-      if (type === 'end' && value > localStart && value <= runtimeSeconds)
-        setLocalEnd(value)
+      const rawValue = e.target.value
+      setTimeInputDraft((current) => ({ ...current, [type]: rawValue }))
+
+      if (!rawValue.trim()) return
+
+      const value = Number(rawValue)
+      if (!Number.isFinite(value) || value < 0) return
+
+      if (type === 'start') {
+        setLocalStart(clampStartToBounds(value, localEnd))
+      }
+      if (type === 'end') {
+        setLocalEnd(clampEndToBounds(value, localStart, runtimeSeconds))
+      }
     },
     [localStart, localEnd, runtimeSeconds],
   )
 
-  const handleInputBlur = React.useCallback(() => {
-    if (segment.Id && validation.valid) {
-      onUpdate({ id: segment.Id, start: localStart, end: localEnd })
-    }
-  }, [segment.Id, localStart, localEnd, validation.valid, onUpdate])
+  const handleInputBlur = React.useCallback(
+    (type: 'start' | 'end') => {
+      const snappedStart = snapAndClampStart(localStart, localEnd, frameStep)
+      const snappedEnd = snapAndClampEnd(
+        localEnd,
+        snappedStart,
+        runtimeSeconds,
+        frameStep,
+      )
+
+      setLocalStart(snappedStart)
+      setLocalEnd(snappedEnd)
+
+      setActiveInput(null)
+      setTimeInputDraft((current) => {
+        const next = { ...current }
+        delete next[type]
+        return next
+      })
+
+      commitSegmentUpdate(snappedStart, snappedEnd)
+    },
+    [localStart, localEnd, runtimeSeconds, frameStep, commitSegmentUpdate],
+  )
 
   // Copy segment to system clipboard as JSON
   const handleCopy = React.useCallback(async () => {
@@ -309,10 +410,18 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   )
 
   const handleHandleBlur = React.useCallback(() => {
-    if (segment.Id && validation.valid) {
-      onUpdate({ id: segment.Id, start: localStart, end: localEnd })
-    }
-  }, [segment.Id, localStart, localEnd, validation.valid, onUpdate])
+    const snappedStart = snapAndClampStart(localStart, localEnd, frameStep)
+    const snappedEnd = snapAndClampEnd(
+      localEnd,
+      snappedStart,
+      runtimeSeconds,
+      frameStep,
+    )
+
+    setLocalStart(snappedStart)
+    setLocalEnd(snappedEnd)
+    commitSegmentUpdate(snappedStart, snappedEnd)
+  }, [localStart, localEnd, runtimeSeconds, frameStep, commitSegmentUpdate])
 
   const handleStartKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -325,10 +434,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       )
       if (result.handled) {
         e.preventDefault()
-        setLocalStart(result.newValue)
+        setLocalStart(snapAndClampStart(result.newValue, localEnd, frameStep))
       }
     },
-    [localStart, localEnd],
+    [localStart, localEnd, frameStep],
   )
 
   const handleEndKeyDown = React.useCallback(
@@ -343,10 +452,17 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       )
       if (result.handled) {
         e.preventDefault()
-        setLocalEnd(result.newValue)
+        setLocalEnd(
+          snapAndClampEnd(
+            result.newValue,
+            localStart,
+            runtimeSeconds,
+            frameStep,
+          ),
+        )
       }
     },
-    [localStart, localEnd, runtimeSeconds],
+    [localStart, localEnd, runtimeSeconds, frameStep],
   )
 
   // Memoize style objects to prevent re-renders
@@ -604,12 +720,13 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           <Input
             id={`segment-${segment.Id}-start`}
             type="number"
-            step="0.001"
+            step={inputStep}
             min="0"
-            max={localEnd - 0.001}
-            value={localStart.toFixed(3)}
+            max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
+            value={startInputValue}
+            onFocus={() => setActiveInput('start')}
             onChange={handleInputChange('start')}
-            onBlur={handleInputBlur}
+            onBlur={() => handleInputBlur('start')}
             className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
             aria-describedby={`segment-${segment.Id}-start-formatted`}
           />
@@ -658,12 +775,13 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           <Input
             id={`segment-${segment.Id}-end`}
             type="number"
-            step="0.001"
-            min={localStart + 0.001}
+            step={inputStep}
+            min={localStart + MIN_SEGMENT_GAP}
             max={runtimeSeconds}
-            value={localEnd.toFixed(3)}
+            value={endInputValue}
+            onFocus={() => setActiveInput('end')}
             onChange={handleInputChange('end')}
-            onBlur={handleInputBlur}
+            onBlur={() => handleInputBlur('end')}
             className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
             aria-describedby={`segment-${segment.Id}-end-formatted`}
           />

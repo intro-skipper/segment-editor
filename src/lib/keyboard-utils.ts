@@ -54,9 +54,11 @@ export function handleRangeKeyboard(
 
   switch (key) {
     case 'ArrowLeft':
+    case 'ArrowDown':
       newValue = Math.max(min, value - step)
       break
     case 'ArrowRight':
+    case 'ArrowUp':
       newValue = Math.min(effectiveMax, value + step)
       break
     case 'Home':

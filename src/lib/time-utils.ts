@@ -162,3 +162,58 @@ export function parseTimeString(
 
   return clampToTimeRange(result)
 }
+
+/**
+ * Parses a frame rate value into frames per second.
+ * Supports numeric values and rational strings like "24000/1001".
+ * Returns null for invalid, zero, or negative values.
+ */
+export function parseFrameRate(
+  value: string | number | null | undefined,
+): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null
+  }
+
+  if (typeof value !== 'string') return null
+
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  if (trimmed.includes('/')) {
+    const [numeratorText, denominatorText] = trimmed.split('/', 2)
+    const numerator = Number(numeratorText)
+    const denominator = Number(denominatorText)
+    if (
+      Number.isFinite(numerator) &&
+      Number.isFinite(denominator) &&
+      numerator > 0 &&
+      denominator > 0
+    ) {
+      return numerator / denominator
+    }
+    return null
+  }
+
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+/**
+ * Snaps a timestamp to the nearest frame boundary.
+ * Returns the original value when frameStep is invalid.
+ */
+export function snapToFrame(
+  seconds: number,
+  frameStep: number | null | undefined,
+): number {
+  const safeSeconds = toSafeNumber(seconds)
+  const safeFrameStep = toSafeNumber(frameStep)
+
+  if (safeFrameStep <= 0) return safeSeconds
+
+  const frameIndex = Math.round(safeSeconds / safeFrameStep)
+  const snapped = frameIndex * safeFrameStep
+
+  return Number(snapped.toFixed(9))
+}
