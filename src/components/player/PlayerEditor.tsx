@@ -485,6 +485,7 @@ function useRenderPlayerEditor({
 
       // Only show notification if not aborted
       if (!controller.signal.aborted) {
+        setLocalEditingSegments(null)
         showNotification({
           type: 'positive',
           message: t('editor.saveSegment'),
