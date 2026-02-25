@@ -626,7 +626,7 @@ function useRenderPlayerEditor({
           <div className="space-y-3">
             {editingSegments.map((segment, index) => (
               <div
-                key={`${segment.Id ?? `segment-${index}`}-${segment.StartTicks ?? 0}-${segment.EndTicks ?? 0}`}
+                key={segment.Id ?? `segment-${index}`}
                 style={{
                   contentVisibility: 'auto',
                   containIntrinsicSize: '0 280px',
