@@ -37,7 +37,7 @@ export function getFrameStepSeconds(item: BaseItemDto): number | undefined {
 
   for (const field of FRAME_RATE_FIELDS) {
     const fps = parseFrameRate(readNumericLikeField(videoStream, field))
-    if (fps && fps > 0) {
+    if (fps !== null) {
       return 1 / fps
     }
   }
