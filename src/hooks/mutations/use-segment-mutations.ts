@@ -163,9 +163,10 @@ export const useBatchSaveSegments = () => {
       else if (saved > 0)
         showError('Partial save', `${saved} of ${expected} segments saved`)
     },
-    onSettled: () => {
-      // Keep server response in cache instead of forcing an immediate refetch.
-      // Rollback path invalidates if reconciliation fails.
+    onSettled: (_data, _error, { itemId }, ctx) => {
+      if (!ctx?.rolledBack) {
+        void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+      }
     },
   })
 }
