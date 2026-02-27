@@ -3,12 +3,10 @@
  * Reduces Player.tsx complexity by isolating UI controls.
  */
 
-import { memo, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Maximize,
   Minimize,
-  MoreVertical,
   Pause,
   Play,
   Plus,
@@ -17,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { TrackSelector } from './TrackSelector'
+import { PlayerSettingsMenu } from './PlayerSettingsMenu'
 import {
   ICON_CLASS,
   applyAlphaToColor,
@@ -36,19 +35,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { PLAYER_CONFIG } from '@/lib/constants'
-
-const { SKIP_TIMES } = PLAYER_CONFIG
-
-/** Keyboard shortcut keys - labels are localized in component */
-const SHORTCUT_KEYS = Object.freeze([
-  { labelKey: 'shortcuts.playPause', keys: ['Space'] },
-  { labelKey: 'shortcuts.skipBackForward', keys: ['A', 'D'] },
-  { labelKey: 'shortcuts.changeSkipTime', keys: ['W', 'S'] },
-  { labelKey: 'shortcuts.setStartTime', keys: ['E'] },
-  { labelKey: 'shortcuts.setEndTime', keys: ['F'] },
-  { labelKey: 'shortcuts.toggleMute', keys: ['M'] },
-] as const)
 
 interface PlayerControlsProps {
   isPlaying: boolean
@@ -86,9 +72,13 @@ interface PlayerControlsProps {
   onSubtitleOffsetChange?: (offset: number) => void
   /** Whether subtitles are currently active */
   hasActiveSubtitle?: boolean
+  /** Current playback speed index into PLAYBACK_SPEEDS */
+  playbackSpeedIndex?: number
+  /** Callback when playback speed changes */
+  onSpeedChange?: (speedIndex: number) => void
 }
 
-export const PlayerControls = memo(function PlayerControlsComponent({
+export function PlayerControls({
   isPlaying,
   isMuted,
   volume,
@@ -113,78 +103,43 @@ export const PlayerControls = memo(function PlayerControlsComponent({
   subtitleOffset = 0,
   onSubtitleOffsetChange,
   hasActiveSubtitle = false,
+  playbackSpeedIndex,
+  onSpeedChange,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
 
   // Wrap getButtonStyle to apply background opacity if provided
   // Active buttons (like pause) get higher opacity for better visibility
-  const applyButtonStyle = useCallback(
-    (active?: boolean): React.CSSProperties | undefined => {
-      const baseStyle = getButtonStyle(active)
-      if (!baseStyle || buttonOpacity === undefined) return baseStyle
-      // Only apply alpha when a backgroundColor is present
-      if (!baseStyle.backgroundColor) {
-        return baseStyle
-      }
-      // Active state gets higher opacity (closer to 1)
-      const effectiveOpacity = active
-        ? Math.min(buttonOpacity + 0.3, 1)
-        : buttonOpacity
-      const newBackgroundColor = applyAlphaToColor(
-        baseStyle.backgroundColor,
-        effectiveOpacity,
-      )
-      // applyAlphaToColor may return undefined for unsupported color formats
-      // Fall back to base style if alpha cannot be applied
-      return newBackgroundColor === undefined
-        ? baseStyle
-        : {
-            ...baseStyle,
-            backgroundColor: newBackgroundColor,
-          }
-    },
-    [getButtonStyle, buttonOpacity],
-  )
+  const applyButtonStyle = (
+    active?: boolean,
+  ): React.CSSProperties | undefined => {
+    const baseStyle = getButtonStyle(active)
+    if (!baseStyle || buttonOpacity === undefined) return baseStyle
+    // Only apply alpha when a backgroundColor is present
+    if (!baseStyle.backgroundColor) {
+      return baseStyle
+    }
+    // Active state gets higher opacity (closer to 1)
+    const effectiveOpacity = active
+      ? Math.min(buttonOpacity + 0.3, 1)
+      : buttonOpacity
+    const newBackgroundColor = applyAlphaToColor(
+      baseStyle.backgroundColor,
+      effectiveOpacity,
+    )
+    // applyAlphaToColor may return undefined for unsupported color formats
+    // Fall back to base style if alpha cannot be applied
+    return newBackgroundColor === undefined
+      ? baseStyle
+      : {
+          ...baseStyle,
+          backgroundColor: newBackgroundColor,
+        }
+  }
 
-  const handleVolumeSliderChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onVolumeChange(parseFloat(e.target.value))
-    },
-    [onVolumeChange],
-  )
-
-  // Subtitle offset adjustment handlers
-  const handleSubtitleOffsetChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onSubtitleOffsetChange?.(parseFloat(e.target.value))
-    },
-    [onSubtitleOffsetChange],
-  )
-
-  const handleSubtitleOffsetReset = useCallback(() => {
-    onSubtitleOffsetChange?.(0)
-  }, [onSubtitleOffsetChange])
-
-  // i18n labels change when `t` changes — memoize to avoid re-creating JSX on every render
-  const shortcutItems = useMemo(
-    () =>
-      SHORTCUT_KEYS.map(({ labelKey, keys }) => (
-        <div key={labelKey} className="flex justify-between items-center">
-          <span className="text-muted-foreground">{t(labelKey)}</span>
-          <span>
-            {keys.map((k) => (
-              <kbd
-                key={k}
-                className="px-2 py-0.5 bg-muted rounded text-xs font-mono ml-1"
-              >
-                {k}
-              </kbd>
-            ))}
-          </span>
-        </div>
-      )),
-    [t],
-  )
+  const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onVolumeChange(parseFloat(e.target.value))
+  }
 
   return (
     <div
@@ -270,8 +225,8 @@ export const PlayerControls = memo(function PlayerControlsComponent({
                 onChange={handleVolumeSliderChange}
                 aria-label={t('player.volumeSlider')}
                 aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round((isMuted ? 0 : volume) * 100)}
+                aria-valuemax={1}
+                aria-valuenow={isMuted ? 0 : volume}
                 aria-valuetext={`${Math.round((isMuted ? 0 : volume) * 100)}%`}
                 className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
               />
@@ -326,7 +281,7 @@ export const PlayerControls = memo(function PlayerControlsComponent({
                 key={type}
                 onClick={() => onCreateSegment(type)}
               >
-                {type}
+                {t(`segmentType.${type}`)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -367,120 +322,18 @@ export const PlayerControls = memo(function PlayerControlsComponent({
       )}
 
       {/* Settings menu */}
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="outline"
-              aria-label={t('accessibility.keyboardShortcuts')}
-              style={applyButtonStyle()}
-              className={getButtonClass(false, hasColors)}
-            />
-          }
-        >
-          <MoreVertical
-            className={ICON_CLASS}
-            strokeWidth={3}
-            aria-hidden="true"
-            style={getIconStyle(iconColor)}
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="p-4 min-w-[280px]">
-          {/* Skip Duration */}
-          <div className="mb-4 pb-4 border-b border-border">
-            <p
-              className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
-              id="skip-duration-label"
-            >
-              {t('player.skipDuration', 'Skip Duration')}
-            </p>
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="radiogroup"
-              aria-labelledby="skip-duration-label"
-            >
-              {SKIP_TIMES.map((time, idx) => (
-                <button
-                  key={time}
-                  onClick={() => onSkipTimeChange(idx)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    idx === skipTimeIndex
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-muted/80 text-foreground',
-                  )}
-                  role="radio"
-                  aria-checked={idx === skipTimeIndex}
-                  aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', {
-                    time,
-                  })}
-                >
-                  {time}s
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Subtitle Offset - only shown when subtitles are active */}
-          {hasActiveSubtitle && onSubtitleOffsetChange && (
-            <div className="mb-4 pb-4 border-b border-border">
-              <p
-                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
-                id="subtitle-offset-label"
-              >
-                {t('player.subtitleOffset', 'Subtitle Offset')}
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="-10"
-                    max="10"
-                    step="0.1"
-                    value={subtitleOffset}
-                    onChange={handleSubtitleOffsetChange}
-                    aria-labelledby="subtitle-offset-label"
-                    aria-valuemin={-10}
-                    aria-valuemax={10}
-                    aria-valuenow={subtitleOffset}
-                    aria-valuetext={t(
-                      'player.subtitleOffsetValue',
-                      '{{offset}}s',
-                      { offset: subtitleOffset.toFixed(1) },
-                    )}
-                    className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
-                  />
-                  <span className="text-sm font-mono min-w-[6ch] text-right">
-                    {subtitleOffset > 0 ? '+' : ''}
-                    {subtitleOffset.toFixed(1)}s
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{t('player.subtitleEarlier', 'Earlier')}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSubtitleOffsetReset}
-                    className="h-6 px-2 text-xs"
-                    disabled={subtitleOffset === 0}
-                  >
-                    {t('player.subtitleReset', 'Reset')}
-                  </Button>
-                  <span>{t('player.subtitleLater', 'Later')}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Keyboard Shortcuts */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-              {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
-            </p>
-            <div className="space-y-1.5 text-sm">{shortcutItems}</div>
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <PlayerSettingsMenu
+        skipTimeIndex={skipTimeIndex}
+        hasColors={hasColors}
+        iconColor={iconColor}
+        applyButtonStyle={applyButtonStyle}
+        onSkipTimeChange={onSkipTimeChange}
+        subtitleOffset={subtitleOffset}
+        onSubtitleOffsetChange={onSubtitleOffsetChange}
+        hasActiveSubtitle={hasActiveSubtitle}
+        playbackSpeedIndex={playbackSpeedIndex}
+        onSpeedChange={onSpeedChange}
+      />
     </div>
   )
-})
+}

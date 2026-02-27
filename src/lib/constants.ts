@@ -29,6 +29,10 @@ export const PLAYER_CONFIG = {
   SKIP_TIMES: [0.001, 0.01, 0.1, 1, 5] as const,
   /** Default skip time index (5 seconds) */
   DEFAULT_SKIP_TIME_INDEX: 4,
+  /** Available playback speed options */
+  PLAYBACK_SPEEDS: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const,
+  /** Default playback speed index (1x) */
+  DEFAULT_PLAYBACK_SPEED_INDEX: 3,
   /** Recovery timeout in milliseconds */
   RECOVERY_TIMEOUT_MS: 2000,
   /** Color extraction timeout in milliseconds */

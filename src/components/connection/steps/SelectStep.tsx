@@ -96,12 +96,6 @@ function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
     <button
       type="button"
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
       aria-selected={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(

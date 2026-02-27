@@ -5,6 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
@@ -583,6 +584,27 @@ function useRenderPlayerEditor({
     setImportDialogOpen(false)
   }, [])
 
+  // Keyboard shortcut: Mod+S to save all segments
+  useHotkey('Mod+S', () => {
+    void handleSaveAll()
+  })
+
+  // Keyboard shortcut: [ to navigate to previous segment
+  useHotkey('[', () => {
+    setActiveIndex((prev) =>
+      editingSegments.length === 0
+        ? 0
+        : (prev - 1 + editingSegments.length) % editingSegments.length,
+    )
+  })
+
+  // Keyboard shortcut: ] to navigate to next segment
+  useHotkey(']', () => {
+    setActiveIndex((prev) =>
+      editingSegments.length === 0 ? 0 : (prev + 1) % editingSegments.length,
+    )
+  })
+
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
       {/* Player */}
@@ -632,7 +654,6 @@ function useRenderPlayerEditor({
                   contentVisibility: 'auto',
                   containIntrinsicSize: '0 280px',
                 }}
-                onDoubleClick={() => handleOpenEditDialog(index)}
               >
                 <SegmentSlider
                   segment={segment}
@@ -642,6 +663,7 @@ function useRenderPlayerEditor({
                   frameStepSeconds={frameStepSeconds}
                   onUpdate={handleUpdateSegment}
                   onDelete={handleDeleteSegment}
+                  onEdit={handleOpenEditDialog}
                   onPlayerTimestamp={handlePlayerTimestamp}
                   onSetActive={setActiveIndex}
                   onSetStartFromPlayer={

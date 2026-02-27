@@ -119,16 +119,3 @@ export function handleEndHandleKeyboard(
 
   return result
 }
-
-/**
- * Checks if an element is an editable input field.
- * Used to skip keyboard shortcuts when user is typing.
- */
-export function isEditableElement(target: EventTarget | null): boolean {
-  if (!target) return false
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  )
-}

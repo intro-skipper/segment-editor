@@ -266,7 +266,9 @@
     "subtitleEarlier": "Früher",
     "subtitleLater": "Später",
     "subtitleReset": "Zurücksetzen",
-    "keyboardShortcuts": "Tastaturkürzel"
+    "keyboardShortcuts": "Tastaturkürzel",
+    "playbackSpeed": "Wiedergabegeschwindigkeit",
+    "speedValue": "{{speed}}x Geschwindigkeit"
   },
   "shortcuts": {
     "playPause": "Abspielen/Pause",
@@ -274,7 +276,14 @@
     "changeSkipTime": "Sprungzeit ändern",
     "setStartTime": "Startzeit setzen",
     "setEndTime": "Endzeit setzen",
-    "toggleMute": "Stumm umschalten"
+    "toggleMute": "Stumm umschalten",
+    "toggleFullscreen": "Vollbild umschalten",
+    "toggleSubtitles": "Untertitel umschalten",
+    "saveAll": "Alle speichern",
+    "prevSegment": "Vorheriges Segment",
+    "nextSegment": "Nächstes Segment",
+    "increaseSpeed": "Schneller",
+    "decreaseSpeed": "Langsamer"
   },
   "series": {
     "unknownSeries": "Unbekannte Serie",
@@ -301,5 +310,13 @@
   },
   "navigation": {
     "back": "Zurück"
+  },
+  "segmentType": {
+    "Intro": "Intro",
+    "Outro": "Outro",
+    "Preview": "Vorschau",
+    "Recap": "Zusammenfassung",
+    "Commercial": "Werbung",
+    "Unknown": "Unbekannt"
   }
 }

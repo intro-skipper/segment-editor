@@ -6,7 +6,12 @@
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const { SKIP_TIMES, DEFAULT_SKIP_TIME_INDEX } = PLAYER_CONFIG
+const {
+  SKIP_TIMES,
+  DEFAULT_SKIP_TIME_INDEX,
+  PLAYBACK_SPEEDS,
+  DEFAULT_PLAYBACK_SPEED_INDEX,
+} = PLAYER_CONFIG
 
 /**
  * Player state managed by reducer.
@@ -24,6 +29,8 @@ export interface PlayerState {
   isRecovering: boolean
   /** User-configured subtitle offset in seconds (positive = delay, negative = advance) */
   subtitleOffset: number
+  /** Current index into PLAYBACK_SPEEDS array */
+  playbackSpeedIndex: number
 }
 
 /** Consolidated action types for better efficiency */
@@ -38,6 +45,8 @@ export type PlayerAction =
   | { type: 'RECOVERY_START' }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
+  | { type: 'CYCLE_SPEED'; direction: 1 | -1 }
+  | { type: 'SET_SPEED'; speedIndex: number }
 
 export const initialPlayerState: PlayerState = {
   isPlaying: false,
@@ -50,6 +59,7 @@ export const initialPlayerState: PlayerState = {
   playerError: null,
   isRecovering: false,
   subtitleOffset: 0,
+  playbackSpeedIndex: DEFAULT_PLAYBACK_SPEED_INDEX,
 }
 
 /**
@@ -92,14 +102,17 @@ export function playerReducer(
         : { ...state, skipTimeIndex: action.skipTimeIndex }
 
     case 'ERROR_STATE':
-      return {
-        ...state,
-        playerError: action.error,
-        isRecovering: action.isRecovering,
-      }
+      return state.playerError === action.error &&
+        state.isRecovering === action.isRecovering
+        ? state
+        : {
+            ...state,
+            playerError: action.error,
+            isRecovering: action.isRecovering,
+          }
 
     case 'RECOVERY_START':
-      return { ...state, isRecovering: true }
+      return state.isRecovering ? state : { ...state, isRecovering: true }
 
     case 'CYCLE_SKIP': {
       const newIndex = Math.max(
@@ -115,5 +128,23 @@ export function playerReducer(
       return state.subtitleOffset === action.offset
         ? state
         : { ...state, subtitleOffset: action.offset }
+
+    case 'CYCLE_SPEED': {
+      const newSpeedIndex = Math.max(
+        0,
+        Math.min(
+          PLAYBACK_SPEEDS.length - 1,
+          state.playbackSpeedIndex + action.direction,
+        ),
+      )
+      return newSpeedIndex === state.playbackSpeedIndex
+        ? state
+        : { ...state, playbackSpeedIndex: newSpeedIndex }
+    }
+
+    case 'SET_SPEED':
+      return state.playbackSpeedIndex === action.speedIndex
+        ? state
+        : { ...state, playbackSpeedIndex: action.speedIndex }
   }
 }

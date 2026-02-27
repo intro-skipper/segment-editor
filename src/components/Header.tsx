@@ -3,15 +3,8 @@
  * Single-responsibility: Navigation + collection selection + settings access
  */
 
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useState,
-} from 'react'
+import { Suspense, lazy, useState } from 'react'
+import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   useCanGoBack,
   useLocation,
@@ -74,12 +67,9 @@ function CollectionSelector({
   const currentName = collections.find((c) => c.ItemId === selectedId)?.Name
 
   // Handle collection selection
-  const handleSelect = useCallback(
-    (id: string | null) => {
-      onSelect(id)
-    },
-    [onSelect],
-  )
+  const handleSelect = (id: string | null) => {
+    onSelect(id)
+  }
 
   return (
     <DropdownMenu>
@@ -120,6 +110,9 @@ const iconButtonClass = cn(
   'focus-visible:ring-2 focus-visible:ring-ring',
 )
 
+/** Pre-computed platform-aware shortcut display for search button title */
+const MOD_K_DISPLAY = formatForDisplay('Mod+K')
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -136,20 +129,17 @@ export default function Header() {
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
-  const handleCollectionSelect = useCallback(
-    (collectionId: string | null) => {
-      navigate({
-        to: '/',
-        search: {
-          collection: collectionId ?? undefined,
-          page: undefined,
-          search: undefined,
-        },
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  const handleCollectionSelect = (collectionId: string | null) => {
+    navigate({
+      to: '/',
+      search: {
+        collection: collectionId ?? undefined,
+        page: undefined,
+        search: undefined,
+      },
+      replace: true,
+    })
+  }
 
   // Collections query
   const { data: collections } = useCollections()
@@ -168,67 +158,33 @@ export default function Header() {
     enabled: isDetailPage && !!headerImageUrl,
   })
 
-  // Compute page title and check if on player page - memoized to avoid recalculation
-  const { pageTitle, isEpisode, seriesId, isPlayerPage } = useMemo(() => {
-    const onPlayerPage = location.pathname.startsWith('/player/')
+  // Compute page title and check if on player page
+  const isPlayerPage = location.pathname.startsWith('/player/')
+  let pageTitle = ''
+  let isEpisode = false
+  let seriesId: string | undefined
 
-    if (!currentItem)
-      return {
-        pageTitle: '',
-        isEpisode: false,
-        seriesId: undefined,
-        isPlayerPage: onPlayerPage,
-      }
-
-    const isEp = currentItem.Type === 'Episode' || !!currentItem.SeriesId
-    const title = isEp
+  if (currentItem) {
+    isEpisode = currentItem.Type === 'Episode' || !!currentItem.SeriesId
+    pageTitle = isEpisode
       ? (formatEpisodeLabel(currentItem) ?? currentItem.Name ?? '')
       : (currentItem.Name ?? currentItem.SeriesName ?? '')
+    seriesId = currentItem.SeriesId ?? undefined
+  }
 
-    return {
-      pageTitle: title,
-      isEpisode: isEp,
-      seriesId: currentItem.SeriesId,
-      isPlayerPage: onPlayerPage,
-    }
-  }, [currentItem, location.pathname])
-
-  const handleCommandPaletteShortcut = useEffectEvent((e: KeyboardEvent) => {
-    const isSearchShortcut =
-      (e.key === 'k' && (e.metaKey || e.ctrlKey)) ||
-      (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey)
-
-    if (!isSearchShortcut) return
-
-    // Skip if user is typing in an input field
-    const target = e.target as HTMLElement
-    const tagName = target.tagName.toUpperCase()
-    if (
-      tagName === 'INPUT' ||
-      tagName === 'TEXTAREA' ||
-      target.isContentEditable
-    ) {
-      return
-    }
-
-    e.preventDefault()
+  // Keyboard shortcuts for command palette
+  const openCommandPalette = () => {
     void loadCommandPalette()
     setCommandPaletteOpen(true)
-  })
+  }
 
-  // Keyboard shortcut for command palette (Cmd/Ctrl+K or /)
-  useEffect(() => {
-    const controller = new AbortController()
-
-    document.addEventListener('keydown', handleCommandPaletteShortcut, {
-      signal: controller.signal,
-    })
-
-    return () => controller.abort()
-  }, [])
+  // Mod+K fires in inputs by default (modifier shortcut smart default)
+  useHotkey('Mod+K', openCommandPalette)
+  // "/" key — ignored in inputs by default (single-key smart default)
+  useHotkey('/', openCommandPalette)
 
   // Back navigation - go to series page if viewing episode, otherwise home with collection preserved
-  const handleBack = useCallback(() => {
+  const handleBack = () => {
     if (canGoBack) {
       router.history.back()
       return
@@ -250,29 +206,18 @@ export default function Header() {
         ? { collection: selectedCollection }
         : undefined,
     })
-  }, [canGoBack, isEpisode, navigate, router, selectedCollection, seriesId])
+  }
 
-  // Memoize style objects to prevent re-renders
-  const headerStyle = useMemo(
-    () =>
-      vibrantColors
-        ? ({
-            backgroundColor: `${vibrantColors.background}00`,
-          } as React.CSSProperties)
-        : undefined,
-    [vibrantColors],
-  )
+  const headerStyle: React.CSSProperties | undefined = vibrantColors
+    ? { backgroundColor: `${vibrantColors.background}00` }
+    : undefined
 
-  const accentButtonStyle = useMemo(
-    () =>
-      vibrantColors
-        ? {
-            backgroundColor: vibrantColors.accent,
-            color: vibrantColors.accentText,
-          }
-        : undefined,
-    [vibrantColors],
-  )
+  const accentButtonStyle = vibrantColors
+    ? {
+        backgroundColor: vibrantColors.accent,
+        color: vibrantColors.accentText,
+      }
+    : undefined
 
   return (
     <>
@@ -355,6 +300,7 @@ export default function Header() {
                   )}
                   style={accentButtonStyle}
                   aria-label={t('search.open', 'Open search')}
+                  title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
                 >
                   <Search className="size-5" aria-hidden />
                 </Button>

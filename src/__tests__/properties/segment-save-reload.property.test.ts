@@ -138,9 +138,7 @@ function createWrapper() {
 }
 
 // Setup mock axios to handle batch save (POST for creates, DELETE for deletes)
-function setupMockAxiosForSave(
-  savedSegments: Array<MediaSegmentDto>,
-): void {
+function setupMockAxiosForSave(savedSegments: Array<MediaSegmentDto>): void {
   let callIndex = 0
   mockAxiosInstance.post.mockImplementation(() => {
     const segment = savedSegments[callIndex % savedSegments.length]
@@ -177,18 +175,21 @@ describe('Segment Save Reload', () => {
   it('invalidates segments query after successful batch save', async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.array(segmentArb, { minLength: 1, maxLength: 3 }).chain(
-          (segments) => {
+        fc
+          .array(segmentArb, { minLength: 1, maxLength: 3 })
+          .chain((segments) => {
             const itemId = segments[0].ItemId!
-            const withSameItemId = segments.map((s) => ({ ...s, ItemId: itemId }))
+            const withSameItemId = segments.map((s) => ({
+              ...s,
+              ItemId: itemId,
+            }))
             return fc.constant(withSameItemId)
-          },
-        ),
+          }),
         async (segments) => {
           mockAxiosInstance.post.mockClear()
           mockAxiosInstance.delete.mockClear()
 
-          const itemId = segments[0].ItemId!
+          const itemId = segments[0].ItemId
           setupMockAxiosForSave(segments)
 
           const { queryClient, wrapper } = createWrapper()
