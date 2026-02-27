@@ -1,4 +1,5 @@
 import { parseFrameRate } from './time-utils'
+import { DEFAULT_FRAME_STEP } from './constants'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 type FrameRateField = 'RealFrameRate' | 'AverageFrameRate' | 'FrameRate'
@@ -26,7 +27,7 @@ function isVideoStream(stream: unknown): boolean {
   return (stream as Record<string, unknown>).Type === 'Video'
 }
 
-export function getFrameStepSeconds(item: BaseItemDto): number | undefined {
+function getFrameStepSeconds(item: BaseItemDto): number | undefined {
   const mediaStreams = item.MediaSources?.[0]?.MediaStreams
   if (!Array.isArray(mediaStreams) || mediaStreams.length === 0) {
     return undefined
@@ -43,4 +44,8 @@ export function getFrameStepSeconds(item: BaseItemDto): number | undefined {
   }
 
   return undefined
+}
+
+export function resolveFrameStepSeconds(item: BaseItemDto): number {
+  return getFrameStepSeconds(item) ?? DEFAULT_FRAME_STEP
 }

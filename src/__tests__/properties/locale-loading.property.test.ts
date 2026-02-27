@@ -38,6 +38,7 @@ const sampleTranslationKeys = [
   'back',
   'common.home',
   'player.volume',
+  'player.skipOneFrame',
   'editor.saveSegment',
 ] as const
 

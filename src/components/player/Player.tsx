@@ -45,10 +45,11 @@ import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
+import { getSkipStepSeconds } from '@/lib/player-timing-utils'
+import { snapToFrame } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
-  SKIP_TIMES,
   CONTROLS_HIDE_DELAY_MS,
   MOUSE_MOVE_THROTTLE_MS,
   DOUBLE_TAP_THRESHOLD_MS,
@@ -251,6 +252,8 @@ interface PlayerProps {
   vibrantColors: VibrantColors | null
   timestamp?: number
   segments?: Array<MediaSegmentDto>
+  /** Pre-resolved frame duration in seconds (avoids duplicate computation when parent already has it). */
+  frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   className?: string
@@ -267,6 +270,7 @@ export function Player({
   vibrantColors,
   timestamp,
   segments,
+  frameStepSeconds,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
@@ -277,6 +281,7 @@ export function Player({
     vibrantColors,
     timestamp,
     segments,
+    frameStepSeconds,
     onCreateSegment,
     onUpdateSegmentTimestamp,
     className,
@@ -289,6 +294,7 @@ function useRenderPlayer({
   vibrantColors,
   timestamp,
   segments,
+  frameStepSeconds: frameStep,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
@@ -322,6 +328,11 @@ function useRenderPlayer({
   // Refs for stable callback references in skip operations
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
+
+  // Convenience: snap the current playback position to the nearest frame boundary.
+  const snappedCurrentTime = () =>
+    snapToFrame(currentTimeRef.current, frameStep)
+
   const previousStrategyRef = useRef<PlaybackStrategy | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [timelineStore] = useState(createPlaybackTimelineStore)
@@ -627,8 +638,9 @@ function useRenderPlayer({
     const video = videoRef.current
     if (!video) return
     clearPlaybackUpdateTimer()
+    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.min(
-      currentTimeRef.current + SKIP_TIMES[skipTimeIndex],
+      snapToFrame(currentTimeRef.current + step, frameStep),
       durationRef.current,
     )
     video.currentTime = newTime
@@ -641,8 +653,9 @@ function useRenderPlayer({
     const video = videoRef.current
     if (!video) return
     clearPlaybackUpdateTimer()
+    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.max(
-      currentTimeRef.current - SKIP_TIMES[skipTimeIndex],
+      snapToFrame(currentTimeRef.current - step, frameStep),
       0,
     )
     video.currentTime = newTime
@@ -679,24 +692,27 @@ function useRenderPlayer({
     video.playbackRate = PLAYER_CONFIG.PLAYBACK_SPEEDS[playbackSpeedIndex]
   }, [playbackSpeedIndex])
 
-  // Segment timestamp handlers
+  // Segment timestamp handlers — snap to nearest frame boundary
   const pushStartTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: currentTimeRef.current,
+      currentTime: snappedCurrentTime(),
       start: true,
     })
   }
 
   const pushEndTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: currentTimeRef.current,
+      currentTime: snappedCurrentTime(),
       start: false,
     })
   }
 
   // Segment creation
   const handleCreateSegment = (type: MediaSegmentType) => {
-    onCreateSegment({ type, start: currentTimeRef.current })
+    onCreateSegment({
+      type,
+      start: snappedCurrentTime(),
+    })
   }
 
   // Fullscreen toggle

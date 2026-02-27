@@ -261,6 +261,7 @@
     },
     "skipDuration": "Skip Duration",
     "skipSeconds": "Skip {{time}} seconds",
+    "skipOneFrame": "Skip 1 frame",
     "subtitleOffset": "Subtitle Offset",
     "subtitleOffsetValue": "{{offset}}s",
     "subtitleEarlier": "Earlier",

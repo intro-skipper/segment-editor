@@ -190,6 +190,7 @@
     },
     "skipDuration": "Durée du saut",
     "skipSeconds": "Sauter {{time}} secondes",
+    "skipOneFrame": "Sauter 1 image",
     "subtitleOffset": "Décalage des sous-titres",
     "subtitleOffsetValue": "{{offset}}s",
     "subtitleEarlier": "Plus tôt",

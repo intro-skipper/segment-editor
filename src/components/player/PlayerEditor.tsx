@@ -23,8 +23,8 @@ import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useSegments } from '@/hooks/queries/use-segments'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
-import { ticksToSeconds } from '@/lib/time-utils'
-import { getFrameStepSeconds } from '@/lib/frame-rate-utils'
+import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
+import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 import {
   introSkipperClipboardTextToSegments,
@@ -251,10 +251,7 @@ function useRenderPlayerEditor({
     [item.RunTimeTicks],
   )
 
-  const frameStepSeconds = React.useMemo(
-    () => getFrameStepSeconds(item),
-    [item],
-  )
+  const frameStepSeconds = resolveFrameStepSeconds(item)
 
   // Handle segment creation from player
   const handleCreateSegment = React.useCallback(
@@ -311,21 +308,23 @@ function useRenderPlayerEditor({
   // Handle setting a segment's start time from current player position
   const handleSetStartFromPlayer = React.useCallback(
     (index: number) => {
-      const currentTime = getCurrentTimeRef.current?.()
-      if (currentTime === undefined) return
+      const raw = getCurrentTimeRef.current?.()
+      if (raw === undefined) return
+      const currentTime = snapToFrame(raw, frameStepSeconds)
       handleUpdateSegmentTimestamp({ currentTime, start: true, index })
     },
-    [handleUpdateSegmentTimestamp],
+    [handleUpdateSegmentTimestamp, frameStepSeconds],
   )
 
   // Handle setting a segment's end time from current player position
   const handleSetEndFromPlayer = React.useCallback(
     (index: number) => {
-      const currentTime = getCurrentTimeRef.current?.()
-      if (currentTime === undefined) return
+      const raw = getCurrentTimeRef.current?.()
+      if (raw === undefined) return
+      const currentTime = snapToFrame(raw, frameStepSeconds)
       handleUpdateSegmentTimestamp({ currentTime, start: false, index })
     },
-    [handleUpdateSegmentTimestamp],
+    [handleUpdateSegmentTimestamp, frameStepSeconds],
   )
 
   // Handle segment update from slider
@@ -614,6 +613,7 @@ function useRenderPlayerEditor({
           vibrantColors={vibrantColors}
           timestamp={playerTimestamp}
           segments={editingSegments}
+          frameStepSeconds={frameStepSeconds}
           onCreateSegment={handleCreateSegment}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
           getCurrentTimeRef={getCurrentTimeRef}

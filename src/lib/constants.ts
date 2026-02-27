@@ -25,10 +25,10 @@ export const API_CONFIG = {
  * Player configuration constants.
  */
 export const PLAYER_CONFIG = {
-  /** Available skip time options in seconds */
-  SKIP_TIMES: [0.001, 0.01, 0.1, 1, 5] as const,
+  /** Available skip time options in seconds. 0 = "1 frame" (resolved at runtime). */
+  SKIP_TIMES: [0, 0.5, 1, 5, 10] as const,
   /** Default skip time index (5 seconds) */
-  DEFAULT_SKIP_TIME_INDEX: 4,
+  DEFAULT_SKIP_TIME_INDEX: 3,
   /** Available playback speed options */
   PLAYBACK_SPEEDS: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const,
   /** Default playback speed index (1x) */
@@ -50,13 +50,20 @@ export const PLAYER_CONFIG = {
 } as const
 
 /**
+ * Default frame rate used across the application (NTSC ~23.976 fps).
+ * Used for both subtitle rendering and video frame stepping.
+ */
+const DEFAULT_FRAME_RATE = 24000 / 1001
+
+/** Duration of a single frame at the default frame rate. */
+export const DEFAULT_FRAME_STEP = 1 / DEFAULT_FRAME_RATE
+
+/**
  * Subtitle/JASSUB configuration constants.
  */
 export const SUBTITLE_CONFIG = {
   /** JASSUB initialization timeout in milliseconds */
   JASSUB_READY_TIMEOUT_MS: 10_000,
-  /** Default frame rate fallback */
-  DEFAULT_TARGET_FPS: 24,
   /** ASS/SSA codec identifiers (case-insensitive) */
   ASS_CODECS: ['ass', 'ssa'] as const,
   /** Supported font MIME types for embedded fonts */

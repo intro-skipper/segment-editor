@@ -12,6 +12,10 @@ import { formatForDisplay } from '@tanstack/react-hotkeys'
 import { ICON_CLASS, getButtonClass, getIconStyle } from './player-ui-constants'
 import { cn } from '@/lib/utils'
 import { PLAYER_SHORTCUT_CHEATSHEET } from '@/lib/player-shortcuts'
+import {
+  formatSkipDurationLabel,
+  isFrameSkipSeconds,
+} from '@/lib/player-timing-utils'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -120,25 +124,29 @@ export function PlayerSettingsMenu({
             role="radiogroup"
             aria-labelledby={`${idPrefix}-skip-duration`}
           >
-            {SKIP_TIMES.map((time, idx) => (
-              <button
-                key={time}
-                onClick={() => onSkipTimeChange(idx)}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  idx === skipTimeIndex
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted hover:bg-muted/80 text-foreground',
-                )}
-                role="radio"
-                aria-checked={idx === skipTimeIndex}
-                aria-label={t('player.skipSeconds', 'Skip {{time}} seconds', {
-                  time,
-                })}
-              >
-                {time}s
-              </button>
-            ))}
+            {SKIP_TIMES.map((time, idx) => {
+              const label = formatSkipDurationLabel(time)
+              const ariaLabel = isFrameSkipSeconds(time)
+                ? t('player.skipOneFrame', 'Skip 1 frame')
+                : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
+              return (
+                <button
+                  key={idx}
+                  onClick={() => onSkipTimeChange(idx)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    idx === skipTimeIndex
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80 text-foreground',
+                  )}
+                  role="radio"
+                  aria-checked={idx === skipTimeIndex}
+                  aria-label={ariaLabel}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
 

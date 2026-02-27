@@ -261,6 +261,7 @@
     },
     "skipDuration": "Sprungdauer",
     "skipSeconds": "{{time}} Sekunden überspringen",
+    "skipOneFrame": "1 Frame überspringen",
     "subtitleOffset": "Untertitel-Versatz",
     "subtitleOffsetValue": "{{offset}}s",
     "subtitleEarlier": "Früher",
