@@ -24,7 +24,7 @@ interface KeyboardHandlers {
 /**
  * Key mappings:
  * Space=Play, W/S=Skip time, A/D=Skip, E/F=Timestamps,
- * M=Mute, F11=Fullscreen, C=Subtitles, Shift+>=Faster, Shift+<=Slower
+ * M=Mute, F11=Fullscreen, C=Subtitles, .=Faster, ,=Slower
  */
 export function usePlayerKeyboard(handlers: KeyboardHandlers): void {
   // Single-key shortcuts: ignoreInputs defaults to true (smart default),

@@ -281,7 +281,7 @@ function useRenderFilterView() {
     if (!container) return
     const rowIndex = Math.floor(index / columns)
     const targetScrollTop = rowIndex * GRID_ROW_ESTIMATE_PX
-    container.scrollTo({ top: targetScrollTop, behavior: 'instant' })
+    container.scrollTo({ top: targetScrollTop, behavior: 'auto' })
   }
 
   const { setFocusedIndex, gridProps, getItemProps, gridRef } =

@@ -10,6 +10,7 @@ import { MoreVertical } from 'lucide-react'
 
 import { formatForDisplay } from '@tanstack/react-hotkeys'
 import { ICON_CLASS, getButtonClass, getIconStyle } from './player-ui-constants'
+import type React from 'react'
 import { cn } from '@/lib/utils'
 import { PLAYER_SHORTCUT_CHEATSHEET } from '@/lib/player-shortcuts'
 import {
@@ -131,7 +132,7 @@ export function PlayerSettingsMenu({
                 : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
               return (
                 <button
-                  key={idx}
+                  key={time}
                   onClick={() => onSkipTimeChange(idx)}
                   className={cn(
                     'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',

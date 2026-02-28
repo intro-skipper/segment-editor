@@ -50,6 +50,17 @@ describe('player timing utilities', () => {
     expect(formatSkipDurationLabel(0.5)).toBe('0.5s')
   })
 
+  it('formats skip labels consistently from config', () => {
+    PLAYER_CONFIG.SKIP_TIMES.forEach((skipTime) => {
+      const isFrameSentinel = skipTime === 0
+
+      expect(isFrameSkipSeconds(skipTime)).toBe(isFrameSentinel)
+
+      const expectedLabel = isFrameSentinel ? '1f' : `${skipTime}s`
+      expect(formatSkipDurationLabel(skipTime)).toBe(expectedLabel)
+    })
+  })
+
   it('resolves frame step from media metadata with fallback', () => {
     const item = createItemWithVideoFrameRate(24000 / 1001)
     expect(resolveFrameStepSeconds(item)).toBeCloseTo(1001 / 24000, 9)

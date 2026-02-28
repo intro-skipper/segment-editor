@@ -690,7 +690,7 @@ function useRenderPlayer({
     const video = videoRef.current
     if (!video) return
     video.playbackRate = PLAYER_CONFIG.PLAYBACK_SPEEDS[playbackSpeedIndex]
-  }, [playbackSpeedIndex])
+  }, [playbackSpeedIndex, videoRef])
 
   // Segment timestamp handlers — snap to nearest frame boundary
   const pushStartTimestamp = () => {
