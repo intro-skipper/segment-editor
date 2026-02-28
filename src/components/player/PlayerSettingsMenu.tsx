@@ -49,6 +49,8 @@ interface PlayerSettingsMenuProps {
   playbackSpeedIndex?: number
   /** Callback when playback speed changes */
   onSpeedChange?: (speedIndex: number) => void
+  /** Container element for dropdown portals (needed for fullscreen) */
+  portalContainer?: React.RefObject<HTMLElement | null>
 }
 
 export function PlayerSettingsMenu({
@@ -62,6 +64,7 @@ export function PlayerSettingsMenu({
   hasActiveSubtitle,
   playbackSpeedIndex,
   onSpeedChange,
+  portalContainer,
 }: PlayerSettingsMenuProps) {
   const { t } = useTranslation()
   const idPrefix = useId()
@@ -111,7 +114,11 @@ export function PlayerSettingsMenu({
           style={getIconStyle(iconColor)}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="p-4 min-w-[280px]">
+      <DropdownMenuContent
+        align="end"
+        className="p-4 min-w-[280px]"
+        container={portalContainer}
+      >
         {/* Skip Duration */}
         <div className="mb-4 pb-4 border-b border-border">
           <p

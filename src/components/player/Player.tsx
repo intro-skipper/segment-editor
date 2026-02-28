@@ -1030,6 +1030,7 @@ function useRenderPlayer({
     hasActiveSubtitle: activeSubtitleTrack !== null,
     playbackSpeedIndex,
     onSpeedChange: handleSpeedChange,
+    portalContainer: containerRef,
   }
 
   return (

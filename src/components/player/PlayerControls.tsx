@@ -76,6 +76,8 @@ interface PlayerControlsProps {
   playbackSpeedIndex?: number
   /** Callback when playback speed changes */
   onSpeedChange?: (speedIndex: number) => void
+  /** Container element for dropdown portals (needed for fullscreen) */
+  portalContainer?: React.RefObject<HTMLElement | null>
 }
 
 export function PlayerControls({
@@ -105,6 +107,7 @@ export function PlayerControls({
   hasActiveSubtitle = false,
   playbackSpeedIndex,
   onSpeedChange,
+  portalContainer,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
 
@@ -214,7 +217,11 @@ export function PlayerControls({
               />
             )}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="p-4">
+          <DropdownMenuContent
+            align="start"
+            className="p-4"
+            container={portalContainer}
+          >
             <div className="flex flex-col gap-2 items-center">
               <input
                 type="range"
@@ -253,6 +260,7 @@ export function PlayerControls({
             getButtonStyle={applyButtonStyle}
             iconColor={iconColor}
             hasColors={hasColors}
+            portalContainer={portalContainer}
           />
         )}
 
@@ -275,7 +283,7 @@ export function PlayerControls({
               style={getIconStyle(iconColor)}
             />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" container={portalContainer}>
             {SEGMENT_TYPES.map((type) => (
               <DropdownMenuItem
                 key={type}
@@ -333,6 +341,7 @@ export function PlayerControls({
         hasActiveSubtitle={hasActiveSubtitle}
         playbackSpeedIndex={playbackSpeedIndex}
         onSpeedChange={onSpeedChange}
+        portalContainer={portalContainer}
       />
     </div>
   )

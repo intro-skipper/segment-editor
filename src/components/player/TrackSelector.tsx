@@ -56,6 +56,8 @@ interface TrackSelectorProps {
   hasColors?: boolean
   /** Custom class name for the trigger button */
   className?: string
+  /** Container element for dropdown portals (needed for fullscreen) */
+  portalContainer?: React.RefObject<HTMLElement | null>
 }
 
 // ============================================================================
@@ -79,6 +81,7 @@ export const TrackSelector = memo(function TrackSelectorComponent({
   iconColor,
   hasColors = false,
   className,
+  portalContainer,
 }: TrackSelectorProps) {
   const { t } = useTranslation()
 
@@ -125,6 +128,7 @@ export const TrackSelector = memo(function TrackSelectorComponent({
       <DropdownMenuContent
         align="start"
         className="min-w-[240px] max-h-[400px] overflow-y-auto"
+        container={portalContainer}
       >
         {/* Playback Strategy Indicator */}
         {strategy && (
