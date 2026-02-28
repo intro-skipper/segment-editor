@@ -9,7 +9,7 @@ import type { TrickplayInfoDto } from '@/types/jellyfin'
 export type TrickplayData = {
   [mediaSourceId: string]: {
     [width: string]: TrickplayInfoDto
-  }
+  } | null
 }
 
 /** Computed trickplay position for rendering */
@@ -35,25 +35,30 @@ export function getBestTrickplayInfo(
 ): { mediaSourceId: string; info: TrickplayInfoDto } | null {
   if (!trickplay) return null
 
-  const mediaSourceIds = Object.keys(trickplay)
-  if (mediaSourceIds.length === 0) return null
+  for (const mediaSourceId of Object.keys(trickplay)) {
+    const widthMap = trickplay[mediaSourceId]
+    if (!widthMap) {
+      continue
+    }
 
-  const mediaSourceId = mediaSourceIds[0]
-  const widthMap = trickplay[mediaSourceId]
+    const widths = Object.keys(widthMap)
+      .map(Number)
+      .filter((w) => !Number.isNaN(w))
+      .sort((a, b) => a - b)
 
-  const widths = Object.keys(widthMap)
-    .map(Number)
-    .filter((w) => !isNaN(w))
-    .sort((a, b) => a - b)
+    if (widths.length === 0) {
+      continue
+    }
 
-  if (widths.length === 0) return null
+    // Prefer width around 320px for good quality/size balance
+    const preferredWidth =
+      widths.find((w) => w >= 320) ?? widths[widths.length - 1]
+    const info = widthMap[String(preferredWidth)]
 
-  // Prefer width around 320px for good quality/size balance
-  const preferredWidth =
-    widths.find((w) => w >= 320) ?? widths[widths.length - 1]
-  const info = widthMap[String(preferredWidth)]
+    return { mediaSourceId, info }
+  }
 
-  return { mediaSourceId, info }
+  return null
 }
 
 /**

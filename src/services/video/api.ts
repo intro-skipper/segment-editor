@@ -289,7 +289,14 @@ export function getBestImageUrl(
 
 export function getImageBlurhash(item: BaseItemDto): string | undefined {
   const hashes = item.ImageBlurHashes?.Primary
-  return hashes ? Object.values(hashes)[0] : undefined
+  if (!hashes) {
+    return undefined
+  }
+
+  const values: Array<string | null> = Object.values(hashes)
+  const [firstHash] = values
+
+  return firstHash ?? undefined
 }
 
 // ============================================================================
