@@ -98,7 +98,7 @@ export function PlayerSettingsMenu({
         render={
           <Button
             variant="outline"
-            aria-label={t('accessibility.keyboardShortcuts')}
+            aria-label={t('accessibility.playerSettings', 'Player settings')}
             style={applyButtonStyle()}
             className={getButtonClass(false, hasColors)}
           />
