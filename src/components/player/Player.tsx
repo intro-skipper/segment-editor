@@ -402,6 +402,12 @@ function useRenderPlayer({
 
   // Strategy change handler - shows notification on fallback
   const handleStrategyChange = (strategy: PlaybackStrategy) => {
+    // Clear any stale error from the previous strategy — the switch succeeded,
+    // so the error overlay (e.g. "directPlayFailed") must not persist.
+    if (state.playerError) {
+      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+    }
+
     // Show notification when falling back from direct play to HLS
     if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
       showNotification({
