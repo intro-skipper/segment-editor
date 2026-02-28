@@ -584,7 +584,16 @@ function useRenderPlayer({
   // Playback controls
   const togglePlay = () => {
     const video = videoRef.current
-    if (video) video.paused ? video.play() : video.pause()
+    if (!video) return
+    if (video.paused) {
+      video.play().catch(() => {
+        // Play can be rejected by autoplay policy or if the element
+        // is removed before the promise settles. Failures are
+        // already surfaced through the video error event path.
+      })
+    } else {
+      video.pause()
+    }
   }
 
   const toggleMute = () => {
@@ -721,26 +730,37 @@ function useRenderPlayer({
     if (!container) return
 
     if (document.fullscreenElement) {
-      document.exitFullscreen()
+      document.exitFullscreen().catch(() => {
+        // Can fail if the document is not in fullscreen or element was removed.
+        // The fullscreenchange listener will reconcile UI state regardless.
+      })
     } else {
-      container.requestFullscreen()
+      container.requestFullscreen().catch(() => {
+        // Can fail due to permissions policy, missing user gesture, or
+        // element removal. UI state stays in sync via the fullscreenchange listener.
+      })
     }
   }
 
   // Subtitle toggle — cycles between off and the last/first available subtitle track
   const toggleSubtitles = async () => {
-    if (trackState.activeSubtitleIndex !== null) {
-      // Subtitles are on — turn them off
-      await selectSubtitleTrack(null)
-      setSubtitlesEnabled(false)
-    } else if (trackState.subtitleTracks.length > 0) {
-      // Subtitles are off — turn on the first available track
-      const firstTrack = trackState.subtitleTracks[0]
-      await selectSubtitleTrack(firstTrack.index)
-      setSubtitlesEnabled(true)
-      if (firstTrack.language) {
-        setPreferredSubtitleLanguage(firstTrack.language)
+    try {
+      if (trackState.activeSubtitleIndex !== null) {
+        // Subtitles are on — turn them off
+        await selectSubtitleTrack(null)
+        setSubtitlesEnabled(false)
+      } else if (trackState.subtitleTracks.length > 0) {
+        // Subtitles are off — turn on the first available track
+        const firstTrack = trackState.subtitleTracks[0]
+        await selectSubtitleTrack(firstTrack.index)
+        setSubtitlesEnabled(true)
+        if (firstTrack.language) {
+          setPreferredSubtitleLanguage(firstTrack.language)
+        }
       }
+    } catch {
+      // Track switch failures are already surfaced by useTrackManager;
+      // catch here to prevent an unhandled rejection from the hotkey path.
     }
   }
 
@@ -942,7 +962,11 @@ function useRenderPlayer({
 
   // Track selection handlers that also update preferences
   const handleAudioTrackSelect = async (index: number) => {
-    await selectAudioTrack(index)
+    try {
+      await selectAudioTrack(index)
+    } catch {
+      return
+    }
     // Update preference with the selected track's language
     const selectedTrack = trackState.audioTracks.find(
       (track) => track.index === index,
@@ -953,7 +977,11 @@ function useRenderPlayer({
   }
 
   const handleSubtitleTrackSelect = async (index: number | null) => {
-    await selectSubtitleTrack(index)
+    try {
+      await selectSubtitleTrack(index)
+    } catch {
+      return
+    }
     // Update preferences based on selection
     if (index === null) {
       // Subtitles turned off
