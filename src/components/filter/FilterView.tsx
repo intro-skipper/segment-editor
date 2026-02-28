@@ -3,14 +3,7 @@
  * Displays library picker, search, and paginated media grid.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
@@ -210,19 +203,16 @@ function useRenderFilterView() {
   const requestedPage = Math.max(1, currentPage)
   const startIndex = (requestedPage - 1) * effectivePageSize
 
-  const setCurrentPage = useCallback(
-    (pageNum: number) => {
-      navigate({
-        to: '/',
-        search: (prev) => ({
-          ...prev,
-          page: pageNum > 1 ? pageNum : undefined,
-        }),
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  const setCurrentPage = (pageNum: number) => {
+    navigate({
+      to: '/',
+      search: (prev) => ({
+        ...prev,
+        page: pageNum > 1 ? pageNum : undefined,
+      }),
+      replace: true,
+    })
+  }
 
   const columns = useGridColumns()
 
@@ -256,7 +246,7 @@ function useRenderFilterView() {
   const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize))
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
-  const paginatedItems = useMemo(() => itemsData?.items ?? [], [itemsData])
+  const paginatedItems = itemsData?.items ?? []
   const shouldVirtualizeGrid =
     paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
   const [virtualizedGridElement, setVirtualizedGridElement] =
@@ -271,10 +261,6 @@ function useRenderFilterView() {
       overscan: GRID_OVERSCAN_ROWS,
     })
 
-  const setVirtualizedGridRef = useCallback((node: HTMLDivElement | null) => {
-    setVirtualizedGridElement(node)
-  }, [])
-
   useEffect(() => {
     if (currentPage !== validCurrentPage) {
       setCurrentPage(validCurrentPage)
@@ -282,22 +268,37 @@ function useRenderFilterView() {
   }, [currentPage, validCurrentPage, setCurrentPage])
 
   // Grid keyboard navigation using the shared hook
-  const handleItemActivate = useCallback(
-    (index: number) => {
-      const item = paginatedItems.at(index)
-      if (item === undefined) return
-      navigateToMediaItem(navigate, item)
-    },
-    [paginatedItems, navigate],
-  )
+  const handleItemActivate = (index: number) => {
+    const item = paginatedItems.at(index)
+    if (item === undefined) return
+    navigateToMediaItem(navigate, item)
+  }
+
+  // Scroll a virtualized grid item into view by programmatically scrolling
+  // the container. The hook will retry focus after the element renders.
+  const handleScrollToIndex = (index: number) => {
+    const container = virtualizedGridElement
+    if (!container) return
+    const rowIndex = Math.floor(index / columns)
+    const targetScrollTop = rowIndex * GRID_ROW_ESTIMATE_PX
+    container.scrollTo({ top: targetScrollTop, behavior: 'auto' })
+  }
 
   const { setFocusedIndex, gridProps, getItemProps, gridRef } =
     useGridKeyboardNavigation({
       itemCount: paginatedItems.length,
       columns,
-      enabled: paginatedItems.length > 0 && !shouldVirtualizeGrid,
+      enabled: paginatedItems.length > 0,
       onActivate: handleItemActivate,
+      onScrollToIndex: shouldVirtualizeGrid ? handleScrollToIndex : undefined,
     })
+
+  // Merged ref callback: sets both the virtualizer scroll element and the
+  // grid keyboard navigation ref so both systems work on the same DOM node.
+  const setVirtualizedGridRef = (node: HTMLDivElement | null) => {
+    setVirtualizedGridElement(node)
+    gridRef.current = node
+  }
 
   // Track URLs already requested for preloading
   const preloadedUrlsRef = useRef(new Set<string>())
@@ -355,40 +356,31 @@ function useRenderFilterView() {
     }
   }, [paginatedItems, columns])
 
-  const handleCollectionChange = useCallback(
-    (value: string | null) => {
-      setFocusedIndex(-1)
-      navigate({
-        to: '/',
-        search: {
-          collection: value ?? undefined,
-          page: undefined,
-          search: undefined,
-        },
-        replace: true,
-      })
-    },
-    [navigate, setFocusedIndex],
-  )
+  const handleCollectionChange = (value: string | null) => {
+    setFocusedIndex(-1)
+    navigate({
+      to: '/',
+      search: {
+        collection: value ?? undefined,
+        page: undefined,
+        search: undefined,
+      },
+      replace: true,
+    })
+  }
 
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      setFocusedIndex(-1)
-      setCurrentPage(newPage)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    },
-    [setCurrentPage, setFocusedIndex],
-  )
+  const handlePageChange = (newPage: number) => {
+    setFocusedIndex(-1)
+    setCurrentPage(newPage)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     if (collectionsError) refetchCollections()
     else refetchItems()
-  }, [collectionsError, refetchCollections, refetchItems])
+  }
 
-  const pageNumbers = useMemo(
-    () => getPageNumbers(validCurrentPage, totalPages),
-    [validCurrentPage, totalPages],
-  )
+  const pageNumbers = getPageNumbers(validCurrentPage, totalPages)
 
   // Derived state
   const showLoading =
@@ -621,7 +613,7 @@ function useRenderFilterView() {
             {shouldVirtualizeGrid ? (
               <div
                 ref={setVirtualizedGridRef}
-                role="grid"
+                {...gridProps}
                 aria-rowcount={rowCount}
                 aria-label={t('items.mediaGrid', {
                   defaultValue: 'Media items',
@@ -663,6 +655,7 @@ function useRenderFilterView() {
                                 key={item.Id}
                                 item={item}
                                 index={index}
+                                {...getItemProps(index)}
                               />
                             )
                           })}
@@ -706,10 +699,16 @@ function useRenderFilterView() {
                   <PaginationContent className="gap-2">
                     <PaginationItem>
                       <PaginationPrevious
-                        onClick={() =>
-                          handlePageChange(Math.max(1, validCurrentPage - 1))
+                        onClick={
+                          validCurrentPage === 1
+                            ? undefined
+                            : () =>
+                                handlePageChange(
+                                  Math.max(1, validCurrentPage - 1),
+                                )
                         }
                         aria-disabled={validCurrentPage === 1}
+                        tabIndex={validCurrentPage === 1 ? -1 : undefined}
                         aria-label={t('accessibility.pagination.previous')}
                         className={cn(
                           'rounded-full',
@@ -752,12 +751,18 @@ function useRenderFilterView() {
 
                     <PaginationItem>
                       <PaginationNext
-                        onClick={() =>
-                          handlePageChange(
-                            Math.min(totalPages, validCurrentPage + 1),
-                          )
+                        onClick={
+                          validCurrentPage === totalPages
+                            ? undefined
+                            : () =>
+                                handlePageChange(
+                                  Math.min(totalPages, validCurrentPage + 1),
+                                )
                         }
                         aria-disabled={validCurrentPage === totalPages}
+                        tabIndex={
+                          validCurrentPage === totalPages ? -1 : undefined
+                        }
                         aria-label={t('accessibility.pagination.next')}
                         className={cn(
                           'rounded-full',

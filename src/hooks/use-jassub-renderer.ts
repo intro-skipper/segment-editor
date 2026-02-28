@@ -124,24 +124,61 @@ export function useJassubRenderer({
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevActiveTrackRef = useRef(activeTrack)
   const prevItemIdRef = useRef(item?.Id)
+  const prevVideoRef = useRef<HTMLVideoElement | null>(null)
 
   userOffsetRef.current = userOffset
   transcodingRef.current = transcodingOffsetTicks
 
-  // Cleanup helper
-  const destroyRenderer = useCallback(() => {
+  // Cleanup helper — also cancels any pending debounced resize to prevent
+  // the timer from firing after the renderer has been destroyed.
+  const teardownRenderer = useCallback(() => {
+    if (resizeTimerRef.current) {
+      clearTimeout(resizeTimerRef.current)
+      resizeTimerRef.current = null
+    }
     rendererRef.current?.destroy()
     rendererRef.current = null
-    setIsActive(false)
   }, [])
 
-  // Debounced resize
+  const destroyRenderer = useCallback(() => {
+    teardownRenderer()
+    setIsActive(false)
+  }, [teardownRenderer])
+
+  // Debounced resize — guards against calling JASSUB resize() when the video
+  // element has invalid layout dimensions (e.g. during strategy switches when
+  // the element is detached/hidden). JASSUB's worker would try to set
+  // OffscreenCanvas.width to NaN, throwing a TypeError.
   const resize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
     resizeTimerRef.current = setTimeout(() => {
-      rendererRef.current?.instance.resize()
+      const renderer = rendererRef.current
+      if (!renderer) return
+
+      // Validate that the video element JASSUB is bound to has real dimensions.
+      // During strategy transitions the element may be detached with 0×0 layout.
+      const video = videoRef.current
+      if (!video || video.clientWidth <= 0 || video.clientHeight <= 0) return
+
+      // Skip resize if the active video element no longer matches the one
+      // JASSUB was created against. During strategy switches (direct <-> HLS)
+      // videoRef resolves to a different HTMLVideoElement while the old
+      // renderer is still alive. Calling resize() would make the worker read
+      // dimensions from the stale/detached element, causing
+      // "Failed to set 'width' on OffscreenCanvas" in the worker.
+      if (video !== prevVideoRef.current) return
+
+      try {
+        // resize() posts to the JASSUB web worker and returns a Promise.
+        // The worker may still reject asynchronously if it reads stale
+        // dimensions, so swallow the rejection — the next resize after
+        // JASSUB is re-created for the new element will recover.
+        void Promise.resolve(renderer.instance.resize()).catch(() => {})
+      } catch {
+        // Synchronous errors (e.g. renderer already destroyed)
+      }
     }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
-  }, [])
+  }, [videoRef])
 
   // User offset update
   const setUserOffset = useCallback((offset: number) => {
@@ -163,15 +200,18 @@ export function useJassubRenderer({
 
     // Cleanup if no longer needed
     if (!needsJassub || !video || !item?.Id) {
-      rendererRef.current?.destroy()
-      rendererRef.current = null
+      teardownRenderer()
       return
     }
 
-    // Skip if track and item haven't changed
+    // Skip if track, item, and video element haven't changed.
+    // The video element identity check is critical: during strategy switches
+    // (direct <-> HLS) the videoRef may resolve to a different HTMLVideoElement,
+    // and JASSUB must be re-created against the new element.
     if (
       activeTrack === prevActiveTrackRef.current &&
       item.Id === prevItemIdRef.current &&
+      video === prevVideoRef.current &&
       rendererRef.current
     ) {
       return
@@ -179,6 +219,7 @@ export function useJassubRenderer({
 
     prevActiveTrackRef.current = activeTrack
     prevItemIdRef.current = item.Id
+    prevVideoRef.current = video
 
     let cancelled = false
 

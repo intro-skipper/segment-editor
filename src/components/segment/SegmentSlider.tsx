@@ -5,7 +5,14 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Crosshair, GripVertical, Play, Trash2 } from 'lucide-react'
+import {
+  Copy,
+  Crosshair,
+  GripVertical,
+  Pencil,
+  Play,
+  Trash2,
+} from 'lucide-react'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
@@ -32,7 +39,7 @@ import { SEGMENT_CONFIG } from '@/lib/constants'
 import {
   handleEndHandleKeyboard,
   handleStartHandleKeyboard,
-} from '@/lib/keyboard-utils'
+} from '@/lib/range-keyboard'
 
 const { MIN_SEGMENT_GAP } = SEGMENT_CONFIG
 
@@ -96,6 +103,8 @@ interface SegmentSliderProps {
   onSetEndFromPlayer?: (index: number) => void
   /** Callback to copy all segments to system clipboard as JSON */
   onCopyAllAsJson?: () => void
+  /** Callback to open the segment edit dialog */
+  onEdit?: (index: number) => void
   /** Vibrant theme colors derived from the current item artwork */
   vibrantColors: VibrantColors | null
 }
@@ -117,6 +126,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   onSetStartFromPlayer,
   onSetEndFromPlayer,
   onCopyAllAsJson,
+  onEdit,
   vibrantColors,
 }: SegmentSliderProps) {
   const { t } = useTranslation()
@@ -632,6 +642,17 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onEdit(index)}
+              aria-label={t('segment.edit')}
+              className="hover:bg-primary/10"
+            >
+              <Pencil className="size-4" aria-hidden="true" style={iconStyle} />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"

@@ -5,6 +5,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
@@ -22,8 +23,8 @@ import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useSegments } from '@/hooks/queries/use-segments'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { useAppStore } from '@/stores/app-store'
-import { ticksToSeconds } from '@/lib/time-utils'
-import { getFrameStepSeconds } from '@/lib/frame-rate-utils'
+import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
+import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 import {
   introSkipperClipboardTextToSegments,
@@ -250,10 +251,7 @@ function useRenderPlayerEditor({
     [item.RunTimeTicks],
   )
 
-  const frameStepSeconds = React.useMemo(
-    () => getFrameStepSeconds(item),
-    [item],
-  )
+  const frameStepSeconds = resolveFrameStepSeconds(item)
 
   // Handle segment creation from player
   const handleCreateSegment = React.useCallback(
@@ -310,21 +308,23 @@ function useRenderPlayerEditor({
   // Handle setting a segment's start time from current player position
   const handleSetStartFromPlayer = React.useCallback(
     (index: number) => {
-      const currentTime = getCurrentTimeRef.current?.()
-      if (currentTime === undefined) return
+      const raw = getCurrentTimeRef.current?.()
+      if (raw === undefined) return
+      const currentTime = snapToFrame(raw, frameStepSeconds)
       handleUpdateSegmentTimestamp({ currentTime, start: true, index })
     },
-    [handleUpdateSegmentTimestamp],
+    [handleUpdateSegmentTimestamp, frameStepSeconds],
   )
 
   // Handle setting a segment's end time from current player position
   const handleSetEndFromPlayer = React.useCallback(
     (index: number) => {
-      const currentTime = getCurrentTimeRef.current?.()
-      if (currentTime === undefined) return
+      const raw = getCurrentTimeRef.current?.()
+      if (raw === undefined) return
+      const currentTime = snapToFrame(raw, frameStepSeconds)
       handleUpdateSegmentTimestamp({ currentTime, start: false, index })
     },
-    [handleUpdateSegmentTimestamp],
+    [handleUpdateSegmentTimestamp, frameStepSeconds],
   )
 
   // Handle segment update from slider
@@ -583,6 +583,27 @@ function useRenderPlayerEditor({
     setImportDialogOpen(false)
   }, [])
 
+  // Keyboard shortcut: Mod+S to save all segments
+  useHotkey('Mod+S', () => {
+    void handleSaveAll()
+  })
+
+  // Keyboard shortcut: [ to navigate to previous segment
+  useHotkey('[', () => {
+    setActiveIndex((prev) =>
+      editingSegments.length === 0
+        ? 0
+        : (prev - 1 + editingSegments.length) % editingSegments.length,
+    )
+  })
+
+  // Keyboard shortcut: ] to navigate to next segment
+  useHotkey(']', () => {
+    setActiveIndex((prev) =>
+      editingSegments.length === 0 ? 0 : (prev + 1) % editingSegments.length,
+    )
+  })
+
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
       {/* Player */}
@@ -592,6 +613,7 @@ function useRenderPlayerEditor({
           vibrantColors={vibrantColors}
           timestamp={playerTimestamp}
           segments={editingSegments}
+          frameStepSeconds={frameStepSeconds}
           onCreateSegment={handleCreateSegment}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
           getCurrentTimeRef={getCurrentTimeRef}
@@ -632,7 +654,6 @@ function useRenderPlayerEditor({
                   contentVisibility: 'auto',
                   containIntrinsicSize: '0 280px',
                 }}
-                onDoubleClick={() => handleOpenEditDialog(index)}
               >
                 <SegmentSlider
                   segment={segment}
@@ -642,6 +663,7 @@ function useRenderPlayerEditor({
                   frameStepSeconds={frameStepSeconds}
                   onUpdate={handleUpdateSegment}
                   onDelete={handleDeleteSegment}
+                  onEdit={handleOpenEditDialog}
                   onPlayerTimestamp={handlePlayerTimestamp}
                   onSetActive={setActiveIndex}
                   onSetStartFromPlayer={

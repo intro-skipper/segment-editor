@@ -11,6 +11,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Home } from 'lucide-react'
 import { LazyMotion, domAnimation } from 'motion/react'
+import { HotkeysProvider } from '@tanstack/react-hotkeys'
 
 import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -170,61 +171,63 @@ function RootComponent() {
   }, [])
 
   return (
-    <LazyMotion features={domAnimation}>
-      <div className="min-h-screen">
-        {/* Skip link for keyboard navigation - visible only when focused */}
-        {showSkipToMain ? (
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            {t('accessibility.skipToMain', 'Skip to main content')}
-          </a>
-        ) : null}
-        {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
-        <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
-          <Header />
-        </ErrorBoundary>
-        <main
-          id="main-content"
-          role="main"
-          aria-label={t('accessibility.mainContent', 'Main content')}
-          tabIndex={-1}
-          className="pb-safe outline-none"
-        >
-          <ErrorBoundary componentName="MainContent">
-            <Outlet />
+    <HotkeysProvider>
+      <LazyMotion features={domAnimation}>
+        <div className="min-h-screen">
+          {/* Skip link for keyboard navigation - visible only when focused */}
+          {showSkipToMain ? (
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              {t('accessibility.skipToMain', 'Skip to main content')}
+            </a>
+          ) : null}
+          {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
+          <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
+            <Header />
           </ErrorBoundary>
-        </main>
-        {settingsOpen ? (
-          <Suspense fallback={null}>
-            <SettingsDialog />
-          </Suspense>
-        ) : null}
-        {wizardOpen ? (
-          <Suspense fallback={null}>
-            <ConnectionWizard
-              open={wizardOpen}
-              onOpenChange={handleWizardOpenChange}
-              onComplete={handleWizardComplete}
-            />
-          </Suspense>
-        ) : null}
-        <Toaster />
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
-      </div>
-    </LazyMotion>
+          <main
+            id="main-content"
+            role="main"
+            aria-label={t('accessibility.mainContent', 'Main content')}
+            tabIndex={-1}
+            className="pb-safe outline-none"
+          >
+            <ErrorBoundary componentName="MainContent">
+              <Outlet />
+            </ErrorBoundary>
+          </main>
+          {settingsOpen ? (
+            <Suspense fallback={null}>
+              <SettingsDialog />
+            </Suspense>
+          ) : null}
+          {wizardOpen ? (
+            <Suspense fallback={null}>
+              <ConnectionWizard
+                open={wizardOpen}
+                onOpenChange={handleWizardOpenChange}
+                onComplete={handleWizardComplete}
+              />
+            </Suspense>
+          ) : null}
+          <Toaster />
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+              TanStackQueryDevtools,
+            ]}
+          />
+        </div>
+      </LazyMotion>
+    </HotkeysProvider>
   )
 }
 

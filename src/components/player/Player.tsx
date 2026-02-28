@@ -3,12 +3,9 @@
  */
 
 import {
-  memo,
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -48,10 +45,11 @@ import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
+import { getSkipStepSeconds } from '@/lib/player-timing-utils'
+import { snapToFrame } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
-  SKIP_TIMES,
   CONTROLS_HIDE_DELAY_MS,
   MOUSE_MOVE_THROTTLE_MS,
   DOUBLE_TAP_THRESHOLD_MS,
@@ -119,7 +117,7 @@ interface TimelineScrubberProps {
   className?: string
 }
 
-const TimelineScrubber = memo(function TimelineScrubberComponent({
+function TimelineScrubber({
   timelineStore,
   item,
   segments,
@@ -147,7 +145,7 @@ const TimelineScrubber = memo(function TimelineScrubberComponent({
       className={className}
     />
   )
-})
+}
 
 const selectPlayerState = (
   state: ReturnType<typeof useSessionStore.getState>,
@@ -254,6 +252,8 @@ interface PlayerProps {
   vibrantColors: VibrantColors | null
   timestamp?: number
   segments?: Array<MediaSegmentDto>
+  /** Pre-resolved frame duration in seconds (avoids duplicate computation when parent already has it). */
+  frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   className?: string
@@ -270,6 +270,7 @@ export function Player({
   vibrantColors,
   timestamp,
   segments,
+  frameStepSeconds,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
@@ -280,6 +281,7 @@ export function Player({
     vibrantColors,
     timestamp,
     segments,
+    frameStepSeconds,
     onCreateSegment,
     onUpdateSegmentTimestamp,
     className,
@@ -292,6 +294,7 @@ function useRenderPlayer({
   vibrantColors,
   timestamp,
   segments,
+  frameStepSeconds: frameStep,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   className,
@@ -319,11 +322,17 @@ function useRenderPlayer({
     playerError,
     isRecovering,
     subtitleOffset,
+    playbackSpeedIndex,
   } = state
 
   // Refs for stable callback references in skip operations
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
+
+  // Convenience: snap the current playback position to the nearest frame boundary.
+  const snappedCurrentTime = () =>
+    snapToFrame(currentTimeRef.current, frameStep)
+
   const previousStrategyRef = useRef<PlaybackStrategy | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [timelineStore] = useState(createPlaybackTimelineStore)
@@ -373,15 +382,12 @@ function useRenderPlayer({
     }
   }, [getCurrentTimeRef])
 
-  // Memoized poster URL - use blob URL to bypass COEP restrictions
-  const rawPosterUrl = useMemo(
-    () => getBestImageUrl(item, 900, 506) ?? null,
-    [item],
-  )
+  // Poster URL - use blob URL to bypass COEP restrictions
+  const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  // Video player error handler - memoized for stability
-  const handleVideoError = useCallback((error: VideoPlayerError | null) => {
+  // Video player error handler
+  const handleVideoError = (error: VideoPlayerError | null) => {
     if (error) {
       const hlsError: HlsPlayerError = {
         type: mapVideoErrorType(error.type),
@@ -392,23 +398,26 @@ function useRenderPlayer({
     } else {
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
     }
-  }, [])
+  }
 
   // Strategy change handler - shows notification on fallback
-  const handleStrategyChange = useCallback(
-    (strategy: PlaybackStrategy) => {
-      // Show notification when falling back from direct play to HLS
-      if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
-        showNotification({
-          type: 'info',
-          message: t('player.notification.switchedToTranscode'),
-          duration: 3000,
-        })
-      }
-      previousStrategyRef.current = strategy
-    },
-    [t],
-  )
+  const handleStrategyChange = (strategy: PlaybackStrategy) => {
+    // Clear any stale error from the previous strategy — the switch succeeded,
+    // so the error overlay (e.g. "directPlayFailed") must not persist.
+    if (state.playerError) {
+      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+    }
+
+    // Show notification when falling back from direct play to HLS
+    if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
+      showNotification({
+        type: 'info',
+        message: t('player.notification.switchedToTranscode'),
+        duration: 3000,
+      })
+    }
+    previousStrategyRef.current = strategy
+  }
 
   // Get preferred audio language from app store for initial playback
   const preferredAudioLanguage = useAppStore(
@@ -416,9 +425,9 @@ function useRenderPlayer({
   )
 
   // Compute preferred audio stream index for initial URL generation
-  const preferredAudioStreamIndex = useMemo(
-    () => findPreferredAudioStreamIndex(item, preferredAudioLanguage),
-    [item, preferredAudioLanguage],
+  const preferredAudioStreamIndex = findPreferredAudioStreamIndex(
+    item,
+    preferredAudioLanguage,
   )
 
   // Initialize video player via custom hook with direct play support
@@ -466,16 +475,12 @@ function useRenderPlayer({
   })
 
   // Get the active subtitle track for JASSUB renderer
-  const activeSubtitleTrack = useMemo(() => {
-    if (trackState.activeSubtitleIndex === null) {
-      return null
-    }
-    return (
-      trackState.subtitleTracks.find(
-        (track) => track.index === trackState.activeSubtitleIndex,
-      ) ?? null
-    )
-  }, [trackState.activeSubtitleIndex, trackState.subtitleTracks])
+  const activeSubtitleTrack =
+    trackState.activeSubtitleIndex === null
+      ? null
+      : (trackState.subtitleTracks.find(
+          (track) => track.index === trackState.activeSubtitleIndex,
+        ) ?? null)
 
   // Initialize JASSUB renderer for ASS/SSA subtitles
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
@@ -489,13 +494,10 @@ function useRenderPlayer({
     })
 
   // Handler for subtitle offset changes from UI controls
-  const handleSubtitleOffsetChange = useCallback(
-    (offset: number) => {
-      dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
-      setJassubUserOffset(offset)
-    },
-    [setJassubUserOffset],
-  )
+  const handleSubtitleOffsetChange = (offset: number) => {
+    dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
+    setJassubUserOffset(offset)
+  }
 
   // Handle external timestamp changes
   useEffect(() => {
@@ -513,22 +515,19 @@ function useRenderPlayer({
     }
   }, [videoRef, persistedVolume, persistedMuted])
 
-  // Video event handlers - stable references
-  const clearPlaybackUpdateTimer = useCallback(() => {
+  // Video event handlers
+  const clearPlaybackUpdateTimer = () => {
     if (playbackUpdateTimeoutRef.current !== null) {
       clearTimeout(playbackUpdateTimeoutRef.current)
       playbackUpdateTimeoutRef.current = null
     }
-  }, [])
+  }
 
-  const publishTimelineTime = useCallback(
-    (nextTime: number) => {
-      timelineStore.setState({ currentTime: nextTime })
-    },
-    [timelineStore],
-  )
+  const publishTimelineTime = (nextTime: number) => {
+    timelineStore.setState({ currentTime: nextTime })
+  }
 
-  const handleTimeUpdate = useCallback(() => {
+  const handleTimeUpdate = () => {
     const video = videoRef.current
     if (!video) return
 
@@ -561,40 +560,49 @@ function useRenderPlayer({
       lastPlaybackUpdateAtRef.current = performance.now()
       publishTimelineTime(latestTime)
     }, remainingDelay)
-  }, [videoRef, publishTimelineTime])
+  }
 
-  const handleDurationChange = useCallback(() => {
+  const handleDurationChange = () => {
     const duration = videoRef.current?.duration
     if (duration !== undefined) {
       durationRef.current = duration
       timelineStore.setState({ duration })
     }
-  }, [videoRef, timelineStore])
+  }
 
-  const handleProgress = useCallback(() => {
+  const handleProgress = () => {
     const video = videoRef.current
     if (video?.buffered.length) {
       timelineStore.setState({
         buffered: video.buffered.end(video.buffered.length - 1),
       })
     }
-  }, [videoRef, timelineStore])
+  }
 
-  const handlePlay = useCallback(() => {
+  const handlePlay = () => {
     dispatch({ type: 'PLAY_STATE', isPlaying: true })
-  }, [])
+  }
 
-  const handlePause = useCallback(() => {
+  const handlePause = () => {
     dispatch({ type: 'PLAY_STATE', isPlaying: false })
-  }, [])
+  }
 
   // Playback controls
-  const togglePlay = useCallback(() => {
+  const togglePlay = () => {
     const video = videoRef.current
-    if (video) video.paused ? video.play() : video.pause()
-  }, [videoRef])
+    if (!video) return
+    if (video.paused) {
+      video.play().catch(() => {
+        // Play can be rejected by autoplay policy or if the element
+        // is removed before the promise settles. Failures are
+        // already surfaced through the video error event path.
+      })
+    } else {
+      video.pause()
+    }
+  }
 
-  const toggleMute = useCallback(() => {
+  const toggleMute = () => {
     const video = videoRef.current
     if (video) {
       video.muted = !video.muted
@@ -605,107 +613,162 @@ function useRenderPlayer({
       })
       setPlayerMuted(video.muted)
     }
-  }, [videoRef, setPlayerMuted])
+  }
 
-  const handleVolumeChange = useCallback(
-    (newVolume: number) => {
-      const video = videoRef.current
-      if (!video) return
+  const handleVolumeChange = (newVolume: number) => {
+    const video = videoRef.current
+    if (!video) return
 
-      video.volume = newVolume
+    video.volume = newVolume
 
-      // Determine mute state: mute if volume is 0, unmute if volume > 0 and was muted
-      const shouldUnmute = newVolume > 0 && video.muted
-      const newMuted =
-        newVolume === 0 ? true : shouldUnmute ? false : video.muted
+    // Determine mute state: mute if volume is 0, unmute if volume > 0 and was muted
+    const shouldUnmute = newVolume > 0 && video.muted
+    const newMuted = newVolume === 0 ? true : shouldUnmute ? false : video.muted
 
-      if (shouldUnmute) {
-        video.muted = false
-      }
+    if (shouldUnmute) {
+      video.muted = false
+    }
 
-      dispatch({
-        type: 'VOLUME_CHANGE',
-        volume: newVolume,
-        isMuted: newMuted,
-      })
-      setPlayerVolume(newVolume)
-      setPlayerMuted(newMuted)
-    },
-    [videoRef, setPlayerVolume, setPlayerMuted],
-  )
+    dispatch({
+      type: 'VOLUME_CHANGE',
+      volume: newVolume,
+      isMuted: newMuted,
+    })
+    setPlayerVolume(newVolume)
+    setPlayerMuted(newMuted)
+  }
 
-  const handleSeek = useCallback(
-    (time: number) => {
-      if (videoRef.current) {
-        clearPlaybackUpdateTimer()
-        videoRef.current.currentTime = time
-        currentTimeRef.current = time
-        lastPlaybackUpdateAtRef.current = performance.now()
-        publishTimelineTime(time)
-      }
-    },
-    [videoRef, clearPlaybackUpdateTimer, publishTimelineTime],
-  )
+  const handleSeek = (time: number) => {
+    if (videoRef.current) {
+      clearPlaybackUpdateTimer()
+      videoRef.current.currentTime = time
+      currentTimeRef.current = time
+      lastPlaybackUpdateAtRef.current = performance.now()
+      publishTimelineTime(time)
+    }
+  }
 
   // Skip controls using refs for stable timing
-  const skipForward = useCallback(() => {
+  const skipForward = () => {
     const video = videoRef.current
     if (!video) return
     clearPlaybackUpdateTimer()
+    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.min(
-      currentTimeRef.current + SKIP_TIMES[skipTimeIndex],
+      snapToFrame(currentTimeRef.current + step, frameStep),
       durationRef.current,
     )
     video.currentTime = newTime
     currentTimeRef.current = newTime
     lastPlaybackUpdateAtRef.current = performance.now()
     publishTimelineTime(newTime)
-  }, [skipTimeIndex, videoRef, clearPlaybackUpdateTimer, publishTimelineTime])
+  }
 
-  const skipBackward = useCallback(() => {
+  const skipBackward = () => {
     const video = videoRef.current
     if (!video) return
     clearPlaybackUpdateTimer()
+    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.max(
-      currentTimeRef.current - SKIP_TIMES[skipTimeIndex],
+      snapToFrame(currentTimeRef.current - step, frameStep),
       0,
     )
     video.currentTime = newTime
     currentTimeRef.current = newTime
     lastPlaybackUpdateAtRef.current = performance.now()
     publishTimelineTime(newTime)
-  }, [skipTimeIndex, videoRef, clearPlaybackUpdateTimer, publishTimelineTime])
+  }
 
-  const cycleSkipTimeUp = useCallback(() => {
+  const cycleSkipTimeUp = () => {
     dispatch({ type: 'CYCLE_SKIP', direction: 1 })
-  }, [])
+  }
 
-  const cycleSkipTimeDown = useCallback(() => {
+  const cycleSkipTimeDown = () => {
     dispatch({ type: 'CYCLE_SKIP', direction: -1 })
-  }, [])
+  }
 
-  // Segment timestamp handlers
-  const pushStartTimestamp = useCallback(() => {
+  // Playback speed controls
+  const increaseSpeed = () => {
+    dispatch({ type: 'CYCLE_SPEED', direction: 1 })
+  }
+
+  const decreaseSpeed = () => {
+    dispatch({ type: 'CYCLE_SPEED', direction: -1 })
+  }
+
+  const handleSpeedChange = (speedIndex: number) => {
+    dispatch({ type: 'SET_SPEED', speedIndex })
+  }
+
+  // Sync video element playback rate when speed index changes
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.playbackRate = PLAYER_CONFIG.PLAYBACK_SPEEDS[playbackSpeedIndex]
+  }, [playbackSpeedIndex, videoRef])
+
+  // Segment timestamp handlers — snap to nearest frame boundary
+  const pushStartTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: currentTimeRef.current,
+      currentTime: snappedCurrentTime(),
       start: true,
     })
-  }, [onUpdateSegmentTimestamp])
+  }
 
-  const pushEndTimestamp = useCallback(() => {
+  const pushEndTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: currentTimeRef.current,
+      currentTime: snappedCurrentTime(),
       start: false,
     })
-  }, [onUpdateSegmentTimestamp])
+  }
 
   // Segment creation
-  const handleCreateSegment = useCallback(
-    (type: MediaSegmentType) => {
-      onCreateSegment({ type, start: currentTimeRef.current })
-    },
-    [onCreateSegment],
-  )
+  const handleCreateSegment = (type: MediaSegmentType) => {
+    onCreateSegment({
+      type,
+      start: snappedCurrentTime(),
+    })
+  }
+
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    const container = containerRef.current
+    if (!container) return
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {
+        // Can fail if the document is not in fullscreen or element was removed.
+        // The fullscreenchange listener will reconcile UI state regardless.
+      })
+    } else {
+      container.requestFullscreen().catch(() => {
+        // Can fail due to permissions policy, missing user gesture, or
+        // element removal. UI state stays in sync via the fullscreenchange listener.
+      })
+    }
+  }
+
+  // Subtitle toggle — cycles between off and the last/first available subtitle track
+  const toggleSubtitles = async () => {
+    try {
+      if (trackState.activeSubtitleIndex !== null) {
+        // Subtitles are on — turn them off
+        await selectSubtitleTrack(null)
+        setSubtitlesEnabled(false)
+      } else if (trackState.subtitleTracks.length > 0) {
+        // Subtitles are off — turn on the first available track
+        const firstTrack = trackState.subtitleTracks[0]
+        await selectSubtitleTrack(firstTrack.index)
+        setSubtitlesEnabled(true)
+        if (firstTrack.language) {
+          setPreferredSubtitleLanguage(firstTrack.language)
+        }
+      }
+    } catch {
+      // Track switch failures are already surfaced by useTrackManager;
+      // catch here to prevent an unhandled rejection from the hotkey path.
+    }
+  }
 
   // Keyboard shortcuts via custom hook
   usePlayerKeyboard({
@@ -717,27 +780,19 @@ function useRenderPlayer({
     pushStartTimestamp,
     pushEndTimestamp,
     toggleMute,
+    toggleFullscreen,
+    toggleSubtitles,
+    increaseSpeed,
+    decreaseSpeed,
   })
 
-  // Fullscreen toggle
-  const toggleFullscreen = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    if (document.fullscreenElement) {
-      document.exitFullscreen()
-    } else {
-      container.requestFullscreen()
-    }
-  }, [])
-
   // Helper to clear the hide controls timer
-  const clearHideControlsTimer = useCallback(() => {
+  const clearHideControlsTimer = () => {
     if (hideControlsTimeoutRef.current) {
       clearTimeout(hideControlsTimeoutRef.current)
       hideControlsTimeoutRef.current = null
     }
-  }, [])
+  }
 
   const handleFullscreenChange = useEffectEvent(() => {
     const isFs = !!document.fullscreenElement
@@ -767,7 +822,7 @@ function useRenderPlayer({
   }, [])
 
   // Toggle video fit mode (contain <-> cover) and resize subtitles
-  const toggleVideoFitMode = useCallback(() => {
+  const toggleVideoFitMode = () => {
     dispatchFullscreenUi({ type: 'TOGGLE_FIT_MODE' })
 
     // Cancel any pending resize to avoid stale callbacks
@@ -787,10 +842,10 @@ function useRenderPlayer({
         resizeJassub()
       })
     })
-  }, [resizeJassub])
+  }
 
   // Auto-hide controls in fullscreen after inactivity
-  const resetHideControlsTimer = useCallback(() => {
+  const resetHideControlsTimer = () => {
     clearHideControlsTimer()
     dispatchFullscreenUi({ type: 'SHOW_CONTROLS' })
     if (isFullscreen) {
@@ -798,7 +853,7 @@ function useRenderPlayer({
         dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
       }, CONTROLS_HIDE_DELAY_MS)
     }
-  }, [isFullscreen, clearHideControlsTimer])
+  }
 
   /**
    * Handler for both mouse clicks and touch taps.
@@ -808,73 +863,70 @@ function useRenderPlayer({
    * - Outside fullscreen: single tap/click toggles play, double tap/click toggles play
    * - In fullscreen: single tap/click shows OSD, double tap/click toggles fit mode
    */
-  const handleVideoInteraction = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      const target = e.target as HTMLElement | null
-      if (target?.closest('[data-player-controls-overlay="true"]')) {
-        return
-      }
+  const handleVideoInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    const target = e.target as HTMLElement | null
+    if (target?.closest('[data-player-controls-overlay="true"]')) {
+      return
+    }
 
-      // For touch events, prevent the subsequent click event from firing
-      if ('changedTouches' in e) {
-        e.preventDefault()
+    // For touch events, prevent the subsequent click event from firing
+    if ('changedTouches' in e) {
+      e.preventDefault()
+    } else {
+      // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
+      if (e.detail === 0) return
+    }
+
+    const now = Date.now()
+    const timeSinceLastInteraction = now - lastInteractionTimeRef.current
+    lastInteractionTimeRef.current = now
+
+    // Clear any pending single-tap/click action
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current)
+      singleTapTimerRef.current = null
+    }
+
+    if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
+      // Double-tap/click detected
+      if (isFullscreen) {
+        toggleVideoFitMode()
+        // Show controls/OSD after changing fit mode so user gets feedback
+        resetHideControlsTimer()
       } else {
-        // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
-        if (e.detail === 0) return
-      }
-
-      const now = Date.now()
-      const timeSinceLastInteraction = now - lastInteractionTimeRef.current
-      lastInteractionTimeRef.current = now
-
-      // Clear any pending single-tap/click action
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current)
-        singleTapTimerRef.current = null
-      }
-
-      if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
-        // Double-tap/click detected
-        if (isFullscreen) {
-          toggleVideoFitMode()
-          // Show controls/OSD after changing fit mode so user gets feedback
-          resetHideControlsTimer()
-        } else {
-          togglePlay()
-        }
-        // Set timestamp just before threshold window so the next tap
-        // won't be detected as another double-tap (prevents triple-tap)
-        lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
-      } else {
-        // Wait to see if this is a single tap/click or first of a double
-        singleTapTimerRef.current = setTimeout(() => {
-          singleTapTimerRef.current = null
-          if (isFullscreen) {
-            // In fullscreen: single tap/click shows controls
-            resetHideControlsTimer()
-          } else {
-            // Outside fullscreen: toggle play
-            togglePlay()
-          }
-        }, DOUBLE_TAP_THRESHOLD_MS)
-      }
-    },
-    [isFullscreen, toggleVideoFitMode, togglePlay, resetHideControlsTimer],
-  )
-
-  const handleVideoContainerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
         togglePlay()
       }
-    },
-    [togglePlay],
-  )
+      // Set timestamp just before threshold window so the next tap
+      // won't be detected as another double-tap (prevents triple-tap)
+      lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
+    } else {
+      // Wait to see if this is a single tap/click or first of a double
+      singleTapTimerRef.current = setTimeout(() => {
+        singleTapTimerRef.current = null
+        if (isFullscreen) {
+          // In fullscreen: single tap/click shows controls
+          resetHideControlsTimer()
+        } else {
+          // Outside fullscreen: toggle play
+          togglePlay()
+        }
+      }, DOUBLE_TAP_THRESHOLD_MS)
+    }
+  }
+
+  const handleVideoContainerKeyDown = (
+    e: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    // Only handle Enter here — Space is handled globally by usePlayerKeyboard
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      togglePlay()
+    }
+  }
 
   // Handle mouse movement in fullscreen to show/hide controls
   // Throttled to avoid excessive timer resets during rapid mouse movement
-  const handleFullscreenMouseMove = useCallback(() => {
+  const handleFullscreenMouseMove = () => {
     if (!isFullscreen) return
 
     const now = Date.now()
@@ -886,14 +938,14 @@ function useRenderPlayer({
       lastMouseMoveRef.current = now
       resetHideControlsTimer()
     }
-  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+  }
 
   // Handle mouse leave - don't immediately hide, let the timer handle it gracefully
-  const handleContainerMouseLeave = useCallback(() => {
+  const handleContainerMouseLeave = () => {
     if (isFullscreen && showFullscreenControls) {
       resetHideControlsTimer()
     }
-  }, [isFullscreen, showFullscreenControls, resetHideControlsTimer])
+  }
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -907,113 +959,85 @@ function useRenderPlayer({
       }
       clearPlaybackUpdateTimer()
     }
-  }, [clearHideControlsTimer, clearPlaybackUpdateTimer])
-
-  // Handler for skip time changes from controls
-  const handleSkipTimeChange = useCallback((index: number) => {
-    dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
   }, [])
 
+  // Handler for skip time changes from controls
+  const handleSkipTimeChange = (index: number) => {
+    dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
+  }
+
   // Track selection handlers that also update preferences
-  const handleAudioTrackSelect = useCallback(
-    async (index: number) => {
+  const handleAudioTrackSelect = async (index: number) => {
+    try {
       await selectAudioTrack(index)
-      // Update preference with the selected track's language
-      const selectedTrack = trackState.audioTracks.find(
+    } catch {
+      return
+    }
+    // Update preference with the selected track's language
+    const selectedTrack = trackState.audioTracks.find(
+      (track) => track.index === index,
+    )
+    if (selectedTrack?.language) {
+      setPreferredAudioLanguage(selectedTrack.language)
+    }
+  }
+
+  const handleSubtitleTrackSelect = async (index: number | null) => {
+    try {
+      await selectSubtitleTrack(index)
+    } catch {
+      return
+    }
+    // Update preferences based on selection
+    if (index === null) {
+      // Subtitles turned off
+      setSubtitlesEnabled(false)
+    } else {
+      // Subtitles enabled - update language preference
+      setSubtitlesEnabled(true)
+      const selectedTrack = trackState.subtitleTracks.find(
         (track) => track.index === index,
       )
       if (selectedTrack?.language) {
-        setPreferredAudioLanguage(selectedTrack.language)
+        setPreferredSubtitleLanguage(selectedTrack.language)
       }
-    },
-    [selectAudioTrack, trackState.audioTracks, setPreferredAudioLanguage],
-  )
-
-  const handleSubtitleTrackSelect = useCallback(
-    async (index: number | null) => {
-      await selectSubtitleTrack(index)
-      // Update preferences based on selection
-      if (index === null) {
-        // Subtitles turned off
-        setSubtitlesEnabled(false)
-      } else {
-        // Subtitles enabled - update language preference
-        setSubtitlesEnabled(true)
-        const selectedTrack = trackState.subtitleTracks.find(
-          (track) => track.index === index,
-        )
-        if (selectedTrack?.language) {
-          setPreferredSubtitleLanguage(selectedTrack.language)
-        }
-      }
-    },
-    [
-      selectSubtitleTrack,
-      trackState.subtitleTracks,
-      setPreferredSubtitleLanguage,
-      setSubtitlesEnabled,
-    ],
-  )
+    }
+  }
 
   // Check if tracks are available
   const hasAnyTracks =
     trackState.audioTracks.length > 0 || trackState.subtitleTracks.length > 0
 
-  // Memoized props for PlayerControls to avoid duplication
-  const playerControlsProps = useMemo(
-    () => ({
-      isPlaying,
-      isMuted,
-      volume,
-      skipTimeIndex,
-      vibrantColors,
-      hasColors,
-      iconColor,
-      getButtonStyle,
-      onTogglePlay: togglePlay,
-      onToggleMute: toggleMute,
-      onVolumeChange: handleVolumeChange,
-      onCreateSegment: handleCreateSegment,
-      onSkipTimeChange: handleSkipTimeChange,
-      trackState,
-      onSelectAudioTrack: handleAudioTrackSelect,
-      onSelectSubtitleTrack: handleSubtitleTrackSelect,
-      isTrackSelectorDisabled: !hasAnyTracks || isTrackLoading,
-      strategy,
-      isFullscreen,
-      onToggleFullscreen: toggleFullscreen,
-      buttonOpacity: isFullscreen ? 0.3 : undefined,
-      subtitleOffset,
-      onSubtitleOffsetChange: handleSubtitleOffsetChange,
-      hasActiveSubtitle: activeSubtitleTrack !== null,
-    }),
-    [
-      isPlaying,
-      isMuted,
-      volume,
-      skipTimeIndex,
-      vibrantColors,
-      hasColors,
-      iconColor,
-      getButtonStyle,
-      togglePlay,
-      toggleMute,
-      handleVolumeChange,
-      handleCreateSegment,
-      handleSkipTimeChange,
-      trackState,
-      handleAudioTrackSelect,
-      handleSubtitleTrackSelect,
-      hasAnyTracks,
-      isTrackLoading,
-      strategy,
-      isFullscreen,
-      toggleFullscreen,
-      subtitleOffset,
-      handleSubtitleOffsetChange,
-      activeSubtitleTrack,
-    ],
-  )
+  // Props for PlayerControls — used in both normal and fullscreen layouts
+  const playerControlsProps = {
+    isPlaying,
+    isMuted,
+    volume,
+    skipTimeIndex,
+    vibrantColors,
+    hasColors,
+    iconColor,
+    getButtonStyle,
+    onTogglePlay: togglePlay,
+    onToggleMute: toggleMute,
+    onVolumeChange: handleVolumeChange,
+    onCreateSegment: handleCreateSegment,
+    onSkipTimeChange: handleSkipTimeChange,
+    trackState,
+    onSelectAudioTrack: handleAudioTrackSelect,
+    onSelectSubtitleTrack: handleSubtitleTrackSelect,
+    isTrackSelectorDisabled: !hasAnyTracks || isTrackLoading,
+    strategy,
+    isFullscreen,
+    onToggleFullscreen: toggleFullscreen,
+    buttonOpacity: isFullscreen ? 0.3 : undefined,
+    subtitleOffset,
+    onSubtitleOffsetChange: handleSubtitleOffsetChange,
+    hasActiveSubtitle: activeSubtitleTrack !== null,
+    playbackSpeedIndex,
+    onSpeedChange: handleSpeedChange,
+    portalContainer: containerRef,
+  }
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

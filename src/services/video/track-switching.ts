@@ -97,7 +97,7 @@ interface TrackSwitchOptions {
   /** Media source ID for URL generation */
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
-  onReloadHls?: (newUrl: string) => void
+  onReloadHls?: (newUrl: string) => Promise<void>
   /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
   signal?: AbortSignal
 }
@@ -321,7 +321,7 @@ function switchHlsAudioTrack(
  * @param options - Track switch options
  * @returns Promise resolving to the result of the switch operation
  */
-function switchDirectPlayAudioTrack(
+async function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
@@ -334,14 +334,14 @@ function switchDirectPlayAudioTrack(
   // Find the target track
   const targetTrack = audioTracks?.find((t) => t.index === trackIndex)
   if (!targetTrack) {
-    return Promise.resolve({
+    return {
       success: false,
       error: {
         type: 'track_unavailable',
         message: `Audio track with index ${trackIndex} not found`,
         trackIndex,
       },
-    })
+    }
   }
 
   // Strategy 1: Try native AudioTrack API (Safari, some Chromium)
@@ -354,7 +354,7 @@ function switchDirectPlayAudioTrack(
       for (let i = 0; i < nativeAudioTracks.length; i++) {
         nativeAudioTracks[i].enabled = i === targetTrack.relativeIndex
       }
-      return Promise.resolve({ success: true })
+      return { success: true }
     }
 
     // Try language matching
@@ -371,7 +371,7 @@ function switchDirectPlayAudioTrack(
           for (let j = 0; j < nativeAudioTracks.length; j++) {
             nativeAudioTracks[j].enabled = j === i
           }
-          return Promise.resolve({ success: true })
+          return { success: true }
         }
       }
     }
@@ -383,14 +383,14 @@ function switchDirectPlayAudioTrack(
       for (let i = 0; i < nativeAudioTracks.length; i++) {
         nativeAudioTracks[i].enabled = i === trackPosition
       }
-      return Promise.resolve({ success: true })
+      return { success: true }
     }
   }
 
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
   if (!itemId) {
-    return Promise.resolve({
+    return {
       success: false,
       error: {
         type: 'api_unsupported',
@@ -398,11 +398,11 @@ function switchDirectPlayAudioTrack(
           'Audio track switching requires transcoding in this browser. Item ID not available.',
         trackIndex,
       },
-    })
+    }
   }
 
   if (!onReloadHls) {
-    return Promise.resolve({
+    return {
       success: false,
       error: {
         type: 'api_unsupported',
@@ -410,26 +410,40 @@ function switchDirectPlayAudioTrack(
           'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
         trackIndex,
       },
-    })
+    }
   }
 
   // Generate HLS URL with the selected audio track and trigger reload
   const newUrl = getHlsUrlWithAudioTrack(itemId, trackIndex)
   if (!newUrl) {
-    return Promise.resolve({
+    return {
       success: false,
       error: {
         type: 'network_error',
         message: 'Failed to generate HLS URL for audio track switching',
         trackIndex,
       },
-    })
+    }
   }
 
   // Trigger HLS reload - this will switch from direct play to HLS mode
-  onReloadHls(newUrl)
+  try {
+    await onReloadHls(newUrl)
+  } catch (err) {
+    return {
+      success: false,
+      error: {
+        type: 'unknown_error',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to reload HLS stream for audio track switching',
+        trackIndex,
+      },
+    }
+  }
 
-  return Promise.resolve({ success: true, reloadRequired: true })
+  return { success: true, reloadRequired: true }
 }
 
 // ============================================================================
@@ -746,7 +760,21 @@ export async function switchAudioTrack(
       }
 
       // Trigger the reload
-      options.onReloadHls(newUrl)
+      try {
+        await options.onReloadHls(newUrl)
+      } catch (err) {
+        return {
+          success: false,
+          error: {
+            type: 'unknown_error',
+            message:
+              err instanceof Error
+                ? err.message
+                : 'Failed to reload HLS stream with new audio track',
+            trackIndex,
+          },
+        }
+      }
 
       return { success: true, reloadRequired: true }
     }

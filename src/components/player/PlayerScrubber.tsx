@@ -6,6 +6,7 @@
  */
 
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { ChapterInfo } from '@jellyfin/sdk/lib/generated-client/models'
 
@@ -14,7 +15,7 @@ import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import { cn } from '@/lib/utils'
 import { formatTime, ticksToSeconds } from '@/lib/time-utils'
-import { handleRangeKeyboard } from '@/lib/keyboard-utils'
+import { handleRangeKeyboard } from '@/lib/range-keyboard'
 import { DEFAULT_SEGMENT_COLOR, SEGMENT_COLORS } from '@/lib/constants'
 import {
   getBestTrickplayInfo,
@@ -82,6 +83,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   itemId,
   trickplay,
 }: PlayerScrubberProps) {
+  const { t } = useTranslation()
   const serverAddress = useApiStore(selectServerAddress)
   const apiKey = useApiStore(selectApiKey)
   const scrubberRef = React.useRef<HTMLDivElement>(null)
@@ -423,7 +425,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
         className="relative flex-1 h-2 cursor-pointer group touch-none"
         style={{ contain: 'layout style', touchAction: 'none' }}
         role="slider"
-        aria-label="Video progress"
+        aria-label={t('accessibility.player.videoProgress', 'Video progress')}
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(currentTime)}

@@ -190,12 +190,15 @@
     },
     "skipDuration": "Durée du saut",
     "skipSeconds": "Sauter {{time}} secondes",
+    "skipOneFrame": "Sauter 1 image",
     "subtitleOffset": "Décalage des sous-titres",
     "subtitleOffsetValue": "{{offset}}s",
     "subtitleEarlier": "Plus tôt",
     "subtitleLater": "Plus tard",
     "subtitleReset": "Réinitialiser",
-    "keyboardShortcuts": "Raccourcis clavier"
+    "keyboardShortcuts": "Raccourcis clavier",
+    "playbackSpeed": "Vitesse de lecture",
+    "speedValue": "Vitesse {{speed}}x"
   },
   "shortcuts": {
     "playPause": "Lecture/Pause",
@@ -203,7 +206,14 @@
     "changeSkipTime": "Modifier le temps de saut",
     "setStartTime": "Définir le temps de début",
     "setEndTime": "Définir le temps de fin",
-    "toggleMute": "Activer/Désactiver le son"
+    "toggleMute": "Activer/Désactiver le son",
+    "toggleFullscreen": "Plein écran",
+    "toggleSubtitles": "Sous-titres",
+    "saveAll": "Tout enregistrer",
+    "prevSegment": "Segment précédent",
+    "nextSegment": "Segment suivant",
+    "increaseSpeed": "Accélérer",
+    "decreaseSpeed": "Ralentir"
   },
   "series": {
     "unknownSeries": "Série inconnue",
@@ -213,5 +223,13 @@
     "episodeLoadError": "Échec du chargement des épisodes",
     "seasonNumber": "Saison {{number}}",
     "episodes": "Épisodes"
+  },
+  "segmentType": {
+    "Intro": "Introduction",
+    "Outro": "Conclusion",
+    "Preview": "Aperçu",
+    "Recap": "Résumé",
+    "Commercial": "Publicité",
+    "Unknown": "Inconnu"
   }
 }

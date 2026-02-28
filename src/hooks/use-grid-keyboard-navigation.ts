@@ -1,20 +1,23 @@
 /**
  * useGridKeyboardNavigation - Hook for keyboard navigation in grid layouts.
  * Enables arrow key navigation, Home/End support, and proper focus management.
+ * Supports virtualized grids via onScrollToIndex + retry-focus after scroll.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface UseGridKeyboardNavigationOptions {
   itemCount: number
   columns: number
   enabled?: boolean
   onActivate?: (index: number) => void
+  /** Called when keyboard navigation targets an off-screen virtualized item.
+   *  The consumer should scroll the item into view; focus will be retried after render. */
+  onScrollToIndex?: (index: number) => void
 }
 
 interface GridProps {
   role: 'grid'
-  'aria-label': string
   tabIndex: number
   onKeyDown: (e: React.KeyboardEvent) => void
   onFocus: () => void
@@ -33,7 +36,7 @@ interface UseGridKeyboardNavigationReturn {
   setFocusedIndex: (index: number) => void
   gridProps: GridProps
   getItemProps: (index: number) => GridItemProps
-  gridRef: React.RefObject<HTMLDivElement | null>
+  gridRef: React.MutableRefObject<HTMLDivElement | null>
 }
 
 /** Navigation key handlers mapped to index calculations */
@@ -56,17 +59,108 @@ const NAV_KEYS: Partial<
   PageUp: (cur, cols) => Math.max(cur - cols * 3, 0),
 }
 
+/** Max retry attempts to focus an element after scrolling it into view */
+const FOCUS_RETRY_MAX = 5
+/** Delay between retry attempts in ms (allows render after scroll) */
+const FOCUS_RETRY_DELAY_MS = 60
+
+// ---------------------------------------------------------------------------
+// useVirtualizedGridFocus – scroll-into-view + retry-focus state machine
+// ---------------------------------------------------------------------------
+
+interface UseVirtualizedGridFocusOptions {
+  enabled: boolean
+  gridRef: React.RefObject<HTMLDivElement | null>
+  onScrollToIndex?: (index: number) => void
+}
+
+/**
+ * Encapsulates the "try to focus a grid cell by data-attribute; if missing,
+ * scroll it into view and retry until it appears" state machine.
+ *
+ * Returns a single `focusIndex` function that the parent navigation hook
+ * can call whenever the focused index changes.
+ */
+function useVirtualizedGridFocus({
+  enabled,
+  gridRef,
+  onScrollToIndex,
+}: UseVirtualizedGridFocusOptions) {
+  const pendingFocusRef = useRef<number | null>(null)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const tryFocusElement = (index: number): boolean => {
+    if (!enabled || index < 0 || !gridRef.current) return false
+    const el = gridRef.current.querySelector<HTMLElement>(
+      `[data-grid-index="${index}"]`,
+    )
+    if (!el) return false
+
+    if (document.activeElement !== el) {
+      el.focus({ preventScroll: true })
+    }
+    return document.activeElement === el
+  }
+
+  const focusIndex = (index: number) => {
+    // Clear any pending retry
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+    pendingFocusRef.current = null
+
+    if (tryFocusElement(index)) return
+
+    // Element not in DOM — request scroll and schedule retries
+    if (!onScrollToIndex) return
+
+    onScrollToIndex(index)
+    pendingFocusRef.current = index
+
+    let attempt = 0
+    const retry = () => {
+      attempt += 1
+      if (pendingFocusRef.current !== index || attempt > FOCUS_RETRY_MAX) {
+        pendingFocusRef.current = null
+        return
+      }
+      if (tryFocusElement(index)) {
+        pendingFocusRef.current = null
+        return
+      }
+      retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
+    }
+
+    retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
+  }
+
+  // Clean up retry timer on unmount
+  useEffect(
+    () => () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    },
+    [],
+  )
+
+  return focusIndex
+}
+
+// ---------------------------------------------------------------------------
+// useGridKeyboardNavigation – index computation + event wiring
+// ---------------------------------------------------------------------------
+
 export function useGridKeyboardNavigation({
   itemCount,
   columns,
   enabled = true,
   onActivate,
+  onScrollToIndex,
 }: UseGridKeyboardNavigationOptions): UseGridKeyboardNavigationReturn {
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   // Clamp stored index to valid range — used for all rendering and comparisons.
-  // No effect needed: this is a pure derivation from existing state.
   const validFocusedIndex =
     itemCount === 0
       ? -1
@@ -74,51 +168,47 @@ export function useGridKeyboardNavigation({
         ? itemCount - 1
         : focusedIndex
 
-  /** Focuses the DOM element at the given grid index. */
-  const focusIndex = useCallback(
-    (index: number) => {
-      if (!enabled || index < 0 || !gridRef.current) return
-      const el = gridRef.current.querySelector<HTMLElement>(
-        `[data-grid-index="${index}"]`,
-      )
-      if (el && document.activeElement !== el) el.focus({ preventScroll: true })
-    },
-    [enabled],
-  )
+  const focusIndex = useVirtualizedGridFocus({
+    enabled,
+    gridRef,
+    onScrollToIndex,
+  })
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (!enabled || itemCount === 0) return
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!enabled || itemCount === 0) return
 
-      if ((e.key === 'Enter' || e.key === ' ') && validFocusedIndex >= 0) {
-        e.preventDefault()
-        onActivate?.(validFocusedIndex)
-        return
-      }
+    if ((e.key === 'Enter' || e.key === ' ') && validFocusedIndex >= 0) {
+      e.preventDefault()
+      onActivate?.(validFocusedIndex)
+      return
+    }
 
-      const handler = NAV_KEYS[e.key]
-      if (!handler) return
+    const handler = NAV_KEYS[e.key]
+    if (!handler) return
 
-      const current = validFocusedIndex < 0 ? 0 : validFocusedIndex
-      const newIndex = handler(current, columns, itemCount, e.ctrlKey)
+    const current = validFocusedIndex < 0 ? 0 : validFocusedIndex
+    const newIndex = handler(
+      current,
+      columns,
+      itemCount,
+      e.ctrlKey || e.metaKey,
+    )
 
-      if (newIndex !== current) {
-        e.preventDefault()
-        setFocusedIndex(newIndex)
-        focusIndex(newIndex)
-      }
-    },
-    [enabled, itemCount, validFocusedIndex, columns, onActivate, focusIndex],
-  )
+    if (newIndex !== current) {
+      e.preventDefault()
+      setFocusedIndex(newIndex)
+      focusIndex(newIndex)
+    }
+  }
 
-  const handleGridFocus = useCallback(() => {
+  const handleGridFocus = () => {
     if (validFocusedIndex < 0 && itemCount > 0) {
       setFocusedIndex(0)
       focusIndex(0)
     }
-  }, [validFocusedIndex, itemCount, focusIndex])
+  }
 
-  const handleItemFocus = useCallback((e: React.FocusEvent<HTMLElement>) => {
+  const handleItemFocus = (e: React.FocusEvent<HTMLElement>) => {
     const indexAttribute = e.currentTarget.dataset.gridIndex
     if (!indexAttribute) return
 
@@ -126,25 +216,21 @@ export function useGridKeyboardNavigation({
     if (Number.isNaN(nextIndex)) return
 
     setFocusedIndex(nextIndex)
-  }, [])
+  }
 
-  const getItemProps = useCallback(
-    (index: number): GridItemProps => ({
-      role: 'gridcell',
-      tabIndex: validFocusedIndex === index ? 0 : -1,
-      'data-grid-index': index,
-      'aria-selected': validFocusedIndex === index,
-      onFocus: handleItemFocus,
-    }),
-    [validFocusedIndex, handleItemFocus],
-  )
+  const getItemProps = (index: number): GridItemProps => ({
+    role: 'gridcell',
+    tabIndex: validFocusedIndex === index ? 0 : -1,
+    'data-grid-index': index,
+    'aria-selected': validFocusedIndex === index,
+    onFocus: handleItemFocus,
+  })
 
   return {
     focusedIndex: validFocusedIndex,
     setFocusedIndex,
     gridProps: {
       role: 'grid',
-      'aria-label': 'Media items grid',
       tabIndex: validFocusedIndex < 0 && itemCount > 0 ? 0 : -1,
       onKeyDown: handleKeyDown,
       onFocus: handleGridFocus,

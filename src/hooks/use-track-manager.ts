@@ -11,14 +11,7 @@
  * @module hooks/use-track-manager
  */
 
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -57,7 +50,7 @@ interface UseTrackManagerOptions {
   /** Translation function for error messages */
   t: (key: string) => string
   /** Callback to reload HLS stream with new URL (for audio track switching) */
-  onReloadHls?: (newUrl: string) => void
+  onReloadHls?: (newUrl: string) => Promise<void>
 }
 
 /**
@@ -313,7 +306,7 @@ export function useTrackManager({
    *
    * @param index - The audio track index to select
    */
-  const selectAudioTrack = useEffectEvent(
+  const selectAudioTrack = useCallback(
     async (index: number): Promise<void> => {
       const video = videoRef.current
       if (!video) {
@@ -372,6 +365,14 @@ export function useTrackManager({
         setIsLoading(false)
       }
     },
+    [
+      videoRef,
+      t,
+      audioTrackMap,
+      trackState.activeAudioIndex,
+      createSwitchOptions,
+      trackResetKey,
+    ],
   )
 
   // ============================================================================
@@ -384,7 +385,7 @@ export function useTrackManager({
    *
    * @param index - The subtitle track index to select, or null for off
    */
-  const selectSubtitleTrack = useEffectEvent(
+  const selectSubtitleTrack = useCallback(
     async (index: number | null): Promise<void> => {
       const video = videoRef.current
       if (!video) {
@@ -449,6 +450,14 @@ export function useTrackManager({
         setIsLoading(false)
       }
     },
+    [
+      videoRef,
+      t,
+      subtitleTrackMap,
+      trackState.activeSubtitleIndex,
+      createSwitchOptions,
+      trackResetKey,
+    ],
   )
 
   // ============================================================================
