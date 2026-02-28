@@ -4,7 +4,7 @@
  * Supports virtualized grids via onScrollToIndex + retry-focus after scroll.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface UseGridKeyboardNavigationOptions {
   itemCount: number
@@ -89,57 +89,51 @@ function useVirtualizedGridFocus({
   const pendingFocusRef = useRef<number | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const tryFocusElement = useCallback(
-    (index: number): boolean => {
-      if (!enabled || index < 0 || !gridRef.current) return false
-      const el = gridRef.current.querySelector<HTMLElement>(
-        `[data-grid-index="${index}"]`,
-      )
-      if (!el) return false
+  const tryFocusElement = (index: number): boolean => {
+    if (!enabled || index < 0 || !gridRef.current) return false
+    const el = gridRef.current.querySelector<HTMLElement>(
+      `[data-grid-index="${index}"]`,
+    )
+    if (!el) return false
 
-      if (document.activeElement !== el) {
-        el.focus({ preventScroll: true })
+    if (document.activeElement !== el) {
+      el.focus({ preventScroll: true })
+    }
+    return document.activeElement === el
+  }
+
+  const focusIndex = (index: number) => {
+    // Clear any pending retry
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+    pendingFocusRef.current = null
+
+    if (tryFocusElement(index)) return
+
+    // Element not in DOM — request scroll and schedule retries
+    if (!onScrollToIndex) return
+
+    onScrollToIndex(index)
+    pendingFocusRef.current = index
+
+    let attempt = 0
+    const retry = () => {
+      attempt += 1
+      if (pendingFocusRef.current !== index || attempt > FOCUS_RETRY_MAX) {
+        pendingFocusRef.current = null
+        return
       }
-      return document.activeElement === el
-    },
-    [enabled, gridRef],
-  )
-
-  const focusIndex = useCallback(
-    (index: number) => {
-      // Clear any pending retry
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current)
-        retryTimerRef.current = null
+      if (tryFocusElement(index)) {
+        pendingFocusRef.current = null
+        return
       }
-      pendingFocusRef.current = null
-
-      if (tryFocusElement(index)) return
-
-      // Element not in DOM — request scroll and schedule retries
-      if (!onScrollToIndex) return
-
-      onScrollToIndex(index)
-      pendingFocusRef.current = index
-
-      let attempt = 0
-      const retry = () => {
-        attempt += 1
-        if (pendingFocusRef.current !== index || attempt > FOCUS_RETRY_MAX) {
-          pendingFocusRef.current = null
-          return
-        }
-        if (tryFocusElement(index)) {
-          pendingFocusRef.current = null
-          return
-        }
-        retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
-      }
-
       retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
-    },
-    [onScrollToIndex, tryFocusElement],
-  )
+    }
+
+    retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
+  }
 
   // Clean up retry timer on unmount
   useEffect(

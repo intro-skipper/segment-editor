@@ -142,9 +142,14 @@ export function playerReducer(
         : { ...state, playbackSpeedIndex: newSpeedIndex }
     }
 
-    case 'SET_SPEED':
-      return state.playbackSpeedIndex === action.speedIndex
+    case 'SET_SPEED': {
+      const clampedSpeed = Math.max(
+        0,
+        Math.min(PLAYBACK_SPEEDS.length - 1, action.speedIndex),
+      )
+      return state.playbackSpeedIndex === clampedSpeed
         ? state
-        : { ...state, playbackSpeedIndex: action.speedIndex }
+        : { ...state, playbackSpeedIndex: clampedSpeed }
+    }
   }
 }
