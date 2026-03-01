@@ -27,8 +27,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
-          cache: "pnpm"
+          node-version: 'lts/*'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -47,4 +47,3 @@ jobs:
           password: ${{ secrets.FTPS_PASSWORD }}
           protocol: ftps
           local-dir: ./dist/
-

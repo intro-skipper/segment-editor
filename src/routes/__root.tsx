@@ -1,4 +1,11 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useState,
+} from 'react'
 import {
   Link,
   Outlet,
@@ -150,45 +157,44 @@ function NotFoundComponent() {
  * - Renders global UI elements (Header, Settings, Toaster)
  */
 function RootComponent() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const showSkipToMain = !pluginMode
-  const pwaRegisteredRef = useRef(false)
 
-  useEffect(() => {
-    if (pluginMode || pwaRegisteredRef.current) return
-    pwaRegisteredRef.current = true
+  const updateToastId = 'pwa-update-available'
 
-    const updateToastId = 'pwa-update-available'
-
-    registerPwaUpdates({
-      onNeedRefresh: (applyUpdate) => {
-        toast.info(i18n.t('pwa.updateAvailableTitle', 'New version available'), {
-          id: updateToastId,
-          description: i18n.t(
-            'pwa.updateAvailableDescription',
-            'A new app version is ready. Refresh to apply the update.',
-          ),
-          duration: Infinity,
-          action: {
-            label: i18n.t('pwa.updateNow', 'Update now'),
-            onClick: () => {
-              void applyUpdate()
-            },
-          },
-          cancel: {
-            label: i18n.t('pwa.later', 'Later'),
-            onClick: () => {
-              toast.dismiss(updateToastId)
-            },
-          },
-        })
+  // the SW registration setup.
+  const onNeedRefresh = useEffectEvent((applyUpdate: () => Promise<void>) => {
+    toast.info(t('pwa.updateAvailableTitle', 'New version available'), {
+      id: updateToastId,
+      description: t(
+        'pwa.updateAvailableDescription',
+        'A new app version is ready. Refresh to apply the update.',
+      ),
+      duration: Infinity,
+      action: {
+        label: t('pwa.updateNow', 'Update now'),
+        onClick: () => {
+          void applyUpdate()
+        },
+      },
+      cancel: {
+        label: t('pwa.later', 'Later'),
+        onClick: () => {
+          toast.dismiss(updateToastId)
+        },
       },
     })
+  })
+
+  useEffect(() => {
+    if (pluginMode) return
+
+    registerPwaUpdates({ onNeedRefresh })
 
     return () => {
       toast.dismiss(updateToastId)
     }
-  }, [i18n])
+  }, [])
 
   // Unified connection initialization for both plugin and standalone modes
   const { showWizard } = useConnectionInit()

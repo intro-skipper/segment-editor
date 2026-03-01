@@ -36,7 +36,7 @@ export default defineConfig({
         theme_color: '#000000',
         icons: [
           {
-            src: '/favicon.png',
+            src: '/logo192.png',
             sizes: '192x192',
             type: 'image/png',
           },
@@ -44,6 +44,12 @@ export default defineConfig({
             src: '/logo512.png',
             sizes: '512x512',
             type: 'image/png',
+          },
+          {
+            src: '/logo512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

@@ -85,9 +85,6 @@ importers:
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
-      workbox-window:
-        specifier: ^7.4.0
-        version: 7.4.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -173,6 +170,9 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.3.3)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@1.8.0))(lightningcss@1.31.1)(msw@2.12.10(@types/node@25.3.3)(typescript@5.9.3))(terser@5.46.0)(tsx@4.21.0)
+      workbox-window:
+        specifier: ^7.4.0
+        version: 7.4.0
 
 packages:
 
