@@ -37,14 +37,13 @@ jobs:
         run: pnpm build
 
       - name: Deploy dist/ via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTPS_SERVER }}
           username: ${{ secrets.FTPS_USERNAME }}
           password: ${{ secrets.FTPS_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: ./dist/
           dangerous-clean-slate: true
-          exclude: |
-            **/.htaccess
+          exclude: .htaccess
+          local-dir: ./dist/
