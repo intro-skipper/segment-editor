@@ -36,9 +36,6 @@ jobs:
       - name: Build app
         run: pnpm build
 
-      - name: Copy .htaccess to dist/
-        run: mv -f .htaccess dist/.htaccess
-
       - name: Deploy dist/ via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
