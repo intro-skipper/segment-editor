@@ -36,6 +36,9 @@ jobs:
       - name: Build app
         run: pnpm build
 
+      - name: Copy .htaccess to dist/
+        run: mv -f .htaccess dist/.htaccess
+
       - name: Deploy dist/ via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
@@ -43,7 +46,5 @@ jobs:
           username: ${{ secrets.FTPS_USERNAME }}
           password: ${{ secrets.FTPS_PASSWORD }}
           protocol: ftps
-          port: 21
-          dangerous-clean-slate: true
-          exclude: .htaccess
           local-dir: ./dist/
+
