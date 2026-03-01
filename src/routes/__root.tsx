@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Link,
   Outlet,
@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Home } from 'lucide-react'
 import { LazyMotion, domAnimation } from 'motion/react'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
+import { toast } from 'sonner'
 
 import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -28,6 +29,7 @@ import {
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
+import { registerPwaUpdates } from '../lib/pwa'
 import { isPluginMode } from '../services/jellyfin/core'
 import { useSessionStore } from '../stores/session-store'
 
@@ -148,8 +150,45 @@ function NotFoundComponent() {
  * - Renders global UI elements (Header, Settings, Toaster)
  */
 function RootComponent() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const showSkipToMain = !pluginMode
+  const pwaRegisteredRef = useRef(false)
+
+  useEffect(() => {
+    if (pluginMode || pwaRegisteredRef.current) return
+    pwaRegisteredRef.current = true
+
+    const updateToastId = 'pwa-update-available'
+
+    registerPwaUpdates({
+      onNeedRefresh: (applyUpdate) => {
+        toast.info(i18n.t('pwa.updateAvailableTitle', 'New version available'), {
+          id: updateToastId,
+          description: i18n.t(
+            'pwa.updateAvailableDescription',
+            'A new app version is ready. Refresh to apply the update.',
+          ),
+          duration: Infinity,
+          action: {
+            label: i18n.t('pwa.updateNow', 'Update now'),
+            onClick: () => {
+              void applyUpdate()
+            },
+          },
+          cancel: {
+            label: i18n.t('pwa.later', 'Later'),
+            onClick: () => {
+              toast.dismiss(updateToastId)
+            },
+          },
+        })
+      },
+    })
+
+    return () => {
+      toast.dismiss(updateToastId)
+    }
+  }, [i18n])
 
   // Unified connection initialization for both plugin and standalone modes
   const { showWizard } = useConnectionInit()

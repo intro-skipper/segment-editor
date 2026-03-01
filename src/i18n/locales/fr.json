@@ -126,7 +126,14 @@
     "go_back": "Retour",
     "goBack": "Retour",
     "home": "Accueil",
+    "reload": "Recharger",
     "retry": "Réessayer"
+  },
+  "pwa": {
+    "updateAvailableTitle": "Nouvelle version disponible",
+    "updateAvailableDescription": "Une nouvelle version de l'application est prête. Rechargez pour appliquer la mise à jour.",
+    "updateNow": "Mettre à jour",
+    "later": "Plus tard"
   },
   "player": {
     "videoPlayer": "Lecteur vidéo",

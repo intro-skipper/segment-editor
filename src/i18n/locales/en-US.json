@@ -193,6 +193,12 @@
     "reload": "Reload",
     "retry": "Retry"
   },
+  "pwa": {
+    "updateAvailableTitle": "New version available",
+    "updateAvailableDescription": "A new app version is ready. Refresh to apply the update.",
+    "updateNow": "Update now",
+    "later": "Later"
+  },
   "player": {
     "videoPlayer": "Video player",
     "volume": "Volume",

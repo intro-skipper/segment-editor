@@ -193,6 +193,12 @@
     "reload": "Neu laden",
     "retry": "Erneut versuchen"
   },
+  "pwa": {
+    "updateAvailableTitle": "Neue Version verfügbar",
+    "updateAvailableDescription": "Eine neue App-Version ist bereit. Aktualisiere die Seite, um das Update anzuwenden.",
+    "updateNow": "Jetzt aktualisieren",
+    "later": "Später"
+  },
   "player": {
     "videoPlayer": "Videoplayer",
     "volume": "Lautstärke",
