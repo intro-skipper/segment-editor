@@ -2,6 +2,9 @@
   RewriteEngine On
   RewriteBase /
 
+  # Block direct access to sensitive deployment/server files.
+  RewriteRule (^|/)(\.ftp-deploy-sync-state\.json|\.htaccess)$ - [F,L,NC]
+
   # If the request is for an existing file or directory, serve it directly.
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
