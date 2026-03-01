@@ -45,6 +45,8 @@ export default defineConfig({
     format: 'es',
   },
   build: {
+    // Keep warning useful, but avoid noise for intentionally large media/vendor chunks
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -68,6 +70,7 @@ export default defineConfig({
           // Media libraries
           'media-vendor': ['node-vibrant', 'culori', 'blurhash'],
           'hls-vendor': ['hls.js'],
+          'subtitle-vendor': ['jassub'],
           // Jellyfin SDK
           'jellyfin-vendor': ['@jellyfin/sdk', 'axios'],
           // i18n
