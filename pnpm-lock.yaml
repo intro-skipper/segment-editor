@@ -138,8 +138,8 @@ importers:
         specifier: ^10.0.2
         version: 10.0.2(jiti@2.6.1)
       eslint-plugin-react-you-might-not-need-an-effect:
-        specifier: ^0.9.1
-        version: 0.9.1(eslint@10.0.2(jiti@2.6.1))
+        specifier: ^0.9.2
+        version: 0.9.2(eslint@10.0.2(jiti@2.6.1))
       fast-check:
         specifier: ^4.5.3
         version: 4.5.3
@@ -2587,8 +2587,8 @@ packages:
     peerDependencies:
       eslint: '>=8.23.0'
 
-  eslint-plugin-react-you-might-not-need-an-effect@0.9.1:
-    resolution: {integrity: sha512-P6Zq5hAKc10Zg5V6vusm3+WZc59OHqHeCTTH2soW3r9fBmeJssuHzltIEKtrONXqFwHVWw3bz2qGlYuO2rBk1g==}
+  eslint-plugin-react-you-might-not-need-an-effect@0.9.2:
+    resolution: {integrity: sha512-VplJMf2kAYI4bF1KSCOygQ9BHzOqM/0P3cqpnBTylnSVv9aNxVrz2RDMs8bKJtITcp2CV9kuAUkzjUP0zgxbSw==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       eslint: '>=8.40.0'
@@ -7422,7 +7422,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  eslint-plugin-react-you-might-not-need-an-effect@0.9.1(eslint@10.0.2(jiti@2.6.1)):
+  eslint-plugin-react-you-might-not-need-an-effect@0.9.2(eslint@10.0.2(jiti@2.6.1)):
     dependencies:
       eslint: 10.0.2(jiti@2.6.1)
       globals: 16.5.0
