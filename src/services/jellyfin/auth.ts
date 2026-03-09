@@ -7,6 +7,7 @@
 import { getSystemApi, getUserApi } from '@jellyfin/sdk/lib/utils/api'
 import { createApi, getRequestConfig, isAborted } from './core'
 import type { ApiOptions, AuthCredentials, AuthResult } from './types'
+import { ConnectionAuthSchema } from '@/lib/forms/connection-form'
 import { AppError, ErrorCodes, isAbortError } from '@/lib/unified-error'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,25 +21,25 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   [ErrorCodes.TIMEOUT]: 'Connection timed out',
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function validateCredentials(
-  creds: AuthCredentials,
+function getCredentialValidationError(
+  serverAddress: string,
+  credentials: AuthCredentials,
 ): string | undefined {
-  if (creds.method === 'apiKey') {
-    return creds.apiKey.trim() ? undefined : 'API key is required'
-  }
-  if (!creds.username.trim()) return 'Username is required'
-  if (creds.password.length > 0 && !creds.password.trim()) {
-    return 'Password cannot be only whitespace'
-  }
-  return undefined
-}
+  const validationAddress =
+    serverAddress.trim() || 'https://placeholder.invalid'
+  const result = ConnectionAuthSchema.safeParse({
+    address: validationAddress,
+    selectedServerAddress: validationAddress,
+    authMethod: credentials.method,
+    apiKey: credentials.method === 'apiKey' ? credentials.apiKey : '',
+    username: credentials.method === 'userPass' ? credentials.username : '',
+    password: credentials.method === 'userPass' ? credentials.password : '',
+  })
 
-export const isValidPassword = (password: string): boolean =>
-  password === '' || password.trim().length > 0
+  return result.success
+    ? undefined
+    : (result.error.issues[0]?.message ?? 'Invalid credentials')
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Authentication
@@ -53,7 +54,10 @@ export async function authenticate(
     return { success: false, error: 'Authentication cancelled' }
   }
 
-  const validationError = validateCredentials(credentials)
+  const validationError = getCredentialValidationError(
+    serverAddress,
+    credentials,
+  )
   if (validationError) return { success: false, error: validationError }
 
   const address = serverAddress.trim()

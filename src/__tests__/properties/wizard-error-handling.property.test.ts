@@ -1,71 +1,31 @@
 /**
  * Feature: server-discovery
  *
- * Tests for network error handling, auth failure recovery, and timeout handling
- * in the connection wizard.
+ * Tests for network error handling, auth failure recovery, and schema-backed
+ * wizard validation after the TanStack Form migration.
  */
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
-import type { WizardState } from '@/components/connection/use-wizard-state'
+
 import {
-  authenticate,
-  discoverServers,
-  validateCredentials,
-} from '@/services/jellyfin'
-import {
-  canGoBack,
-  getPreviousStep,
-  initialWizardState,
-  wizardReducer,
-} from '@/components/connection/use-wizard-state'
+  ConnectionAuthSchema,
+  ConnectionDiscoverSchema,
+} from '@/lib/forms/connection-form'
+import { authenticate, discoverServers } from '@/services/jellyfin'
 import { AppError, ErrorCodes } from '@/lib/unified-error'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Test Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Creates a mock wizard state with user input.
- */
-function createStateWithInput(
-  overrides: Partial<WizardState> = {},
-): WizardState {
-  return {
-    ...initialWizardState,
-    address: 'test.jellyfin.local',
-    ...overrides,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Network Error Handling Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('Network Error Handling', () => {
-  /**
-   * IF the server address is unreachable on all probed endpoints,
-   * THEN THE Server_Discovery SHALL return an empty list with an appropriate error indication
-   */
   it('returns error indication for unreachable servers', async () => {
-    // Test with an invalid/unreachable address
     const result = await discoverServers('invalid.nonexistent.local.test', {
       signal: AbortSignal.timeout(5000),
     })
 
-    // Should return empty servers with an error
     expect(result.servers).toHaveLength(0)
-    // Error should be defined (either error message or empty servers indicates failure)
     expect(result.servers.length === 0 || result.error !== undefined).toBe(true)
   })
 
-  /**
-   * IF a timeout occurs during server probing,
-   * THEN THE Server_Discovery SHALL mark that endpoint as unreachable
-   */
   it('handles timeout during discovery gracefully', async () => {
-    // Create an already-aborted signal to simulate timeout
     const controller = new AbortController()
     controller.abort()
 
@@ -73,15 +33,11 @@ describe('Network Error Handling', () => {
       signal: controller.signal,
     })
 
-    // Should handle abort gracefully
     expect(result.servers).toHaveLength(0)
     expect(result.error).toBeDefined()
     expect(result.error).toContain('cancelled')
   })
 
-  /**
-   * Test that discovery handles pre-aborted signals correctly
-   */
   it('returns cancelled error for pre-aborted signal', async () => {
     const controller = new AbortController()
     controller.abort()
@@ -95,40 +51,27 @@ describe('Network Error Handling', () => {
   })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Authentication Failure Recovery Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('Authentication Failure Recovery', () => {
-  /**
-   * IF a network error occurs during discovery,
-   * THEN THE Discovery_UI SHALL display a user-friendly error message with retry option
-   */
   it('provides user-friendly error messages for auth failures', async () => {
-    // Test with invalid credentials against a non-existent server
     const result = await authenticate(
       'https://invalid.test.local',
-      { method: 'apiKey', apiKey: 'invalid-key' },
+      { apiKey: 'invalid-key', method: 'apiKey' },
       { signal: AbortSignal.timeout(5000) },
     )
 
     expect(result.success).toBe(false)
     expect(result.error).toBeDefined()
-    // Error message should be user-friendly (not a raw stack trace)
     expect(result.error).not.toContain('at ')
     expect(result.error).not.toContain('Error:')
   })
 
-  /**
-   * Test that authentication handles pre-aborted signals correctly
-   */
   it('returns cancelled error for pre-aborted auth signal', async () => {
     const controller = new AbortController()
     controller.abort()
 
     const result = await authenticate(
       'https://test.server.com',
-      { method: 'apiKey', apiKey: 'test-key' },
+      { apiKey: 'test-key', method: 'apiKey' },
       { signal: controller.signal },
     )
 
@@ -136,244 +79,89 @@ describe('Authentication Failure Recovery', () => {
     expect(result.error).toBe('Authentication cancelled')
   })
 
-  /**
-   * Test validation errors are returned before API call
-   */
-  it('validates credentials before making API call', () => {
-    fc.assert(
-      fc.property(fc.constantFrom('', '   ', '\t\n'), (emptyValue) => {
-        // Empty API key should fail validation
-        const apiKeyResult = validateCredentials({
-          method: 'apiKey',
-          apiKey: emptyValue,
-        })
-        expect(apiKeyResult).toBeDefined()
-        expect(apiKeyResult).toContain('required')
+  it('rejects invalid credentials before making the API call', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom('', '   ', '\t\n'),
+        async (emptyValue) => {
+          await expect(
+            authenticate('https://demo.local', {
+              apiKey: emptyValue,
+              method: 'apiKey',
+            }),
+          ).resolves.toMatchObject({
+            error: expect.stringContaining('required'),
+            success: false,
+          })
 
-        // Empty username should fail validation
-        const userPassResult = validateCredentials({
-          method: 'userPass',
-          username: emptyValue,
-          password: 'valid-password',
-        })
-        expect(userPassResult).toBeDefined()
-        expect(userPassResult).toContain('required')
+          await expect(
+            authenticate('https://demo.local', {
+              method: 'userPass',
+              password: 'valid-password',
+              username: emptyValue,
+            }),
+          ).resolves.toMatchObject({
+            error: expect.stringContaining('required'),
+            success: false,
+          })
 
-        return true
-      }),
+          return true
+        },
+      ),
       { numRuns: 10 },
     )
   })
-
-  /**
-   * Test whitespace-only password validation
-   */
-  it('rejects whitespace-only passwords', () => {
-    // Test specific whitespace-only passwords
-    const whitespacePasswords = [
-      ' ',
-      '  ',
-      '\t',
-      '\n',
-      '\r',
-      '   ',
-      '\t\t',
-      ' \t \n ',
-    ]
-
-    for (const whitespacePassword of whitespacePasswords) {
-      const result = validateCredentials({
-        method: 'userPass',
-        username: 'validuser',
-        password: whitespacePassword,
-      })
-      expect(result).toBeDefined()
-      expect(result).toContain('whitespace')
-    }
-  })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Wizard State Preservation Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Wizard State Preservation on Error', () => {
-  /**
-   * WHEN an error occurs, THE Connection_Wizard SHALL preserve user input
-   */
-  it('preserves user input when error occurs', () => {
+describe('Wizard Schema Validation', () => {
+  it('reports an address error for blank discovery submissions', () => {
     fc.assert(
-      fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }),
-        fc.string({ minLength: 1, maxLength: 200 }),
-        (address, errorMessage) => {
-          const stateWithInput = createStateWithInput({ address })
+      fc.property(fc.constantFrom('', ' ', '   ', '\t\n'), (address) => {
+        const result = ConnectionDiscoverSchema.safeParse({
+          address,
+          apiKey: '',
+          authMethod: 'apiKey' as const,
+          password: '',
+          selectedServerAddress: '',
+          username: '',
+        })
 
-          // Simulate error occurring
-          const stateAfterError = wizardReducer(stateWithInput, {
-            type: 'SET_ERROR',
-            payload: errorMessage,
-          })
-
-          // Address should be preserved
-          expect(stateAfterError.address).toBe(address)
-          // Error should be set
-          expect(stateAfterError.error).toBe(errorMessage)
-          // Loading should be false
-          expect(stateAfterError.isLoading).toBe(false)
-
-          return true
-        },
-      ),
-      { numRuns: 50 },
+        expect(result.success).toBe(false)
+        expect(result.error?.issues[0]?.message).toBe(
+          'Please enter a server address',
+        )
+        return true
+      }),
+      { numRuns: 20 },
     )
   })
 
-  /**
-   * Test that going back preserves all user input
-   */
-  it('preserves all input when navigating back', () => {
+  it('reports the selected server requirement during auth submit', () => {
     fc.assert(
-      fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }),
-        fc.constantFrom('apiKey', 'userPass'),
-        (address, authMethod) => {
-          // Start with state on auth step with user input
-          const stateOnAuth = createStateWithInput({
-            step: 'auth',
-            address,
-            authMethod,
-            servers: [
-              {
-                address: 'https://test.server.com',
-                responseTime: 100,
-                score: RecommendedServerInfoScore.GREAT,
-                issues: [],
-              },
-            ],
-            selectedServer: {
-              address: 'https://test.server.com',
-              responseTime: 100,
-              score: RecommendedServerInfoScore.GREAT,
-              issues: [],
-            },
-          })
+      fc.property(fc.webUrl(), (apiKey) => {
+        const result = ConnectionAuthSchema.safeParse({
+          address: 'demo.local',
+          apiKey,
+          authMethod: 'apiKey' as const,
+          password: '',
+          selectedServerAddress: '',
+          username: '',
+        })
 
-          // Go back
-          const stateAfterBack = wizardReducer(stateOnAuth, { type: 'GO_BACK' })
-
-          // All input should be preserved
-          expect(stateAfterBack.address).toBe(address)
-          expect(stateAfterBack.authMethod).toBe(authMethod)
-          expect(stateAfterBack.servers).toHaveLength(1)
-          expect(stateAfterBack.selectedServer).toBeDefined()
-          // Error should be cleared
-          expect(stateAfterBack.error).toBeNull()
-          // Step should go back
-          expect(stateAfterBack.step).toBe('select')
-
-          return true
-        },
-      ),
-      { numRuns: 50 },
+        expect(result.success).toBe(false)
+        expect(
+          result.error?.issues.some(
+            (issue) => issue.message === 'Please select a server',
+          ),
+        ).toBe(true)
+        return true
+      }),
+      { numRuns: 20 },
     )
   })
-
-  /**
-   * Test that error clears when user modifies input
-   */
-  it('clears error when user modifies address', () => {
-    fc.assert(
-      fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }),
-        fc.string({ minLength: 1, maxLength: 100 }),
-        (originalAddress, newAddress) => {
-          // Start with error state
-          const stateWithError = createStateWithInput({
-            address: originalAddress,
-            error: 'Some error occurred',
-          })
-
-          // User modifies address
-          const stateAfterModify = wizardReducer(stateWithError, {
-            type: 'SET_ADDRESS',
-            payload: newAddress,
-          })
-
-          // Error should be cleared
-          expect(stateAfterModify.error).toBeNull()
-          // New address should be set
-          expect(stateAfterModify.address).toBe(newAddress)
-
-          return true
-        },
-      ),
-      { numRuns: 50 },
-    )
-  })
-
-  /**
-   * Test that loading state clears error
-   */
-  it('clears error when starting new operation', () => {
-    const stateWithError = createStateWithInput({
-      error: 'Previous error',
-    })
-
-    const stateAfterLoading = wizardReducer(stateWithError, {
-      type: 'SET_LOADING',
-      payload: true,
-    })
-
-    expect(stateAfterLoading.error).toBeNull()
-    expect(stateAfterLoading.isLoading).toBe(true)
-  })
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step Navigation Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Wizard Step Navigation', () => {
-  /**
-   * Test getPreviousStep returns correct values
-   */
-  it('returns correct previous step for each step', () => {
-    expect(getPreviousStep('entry')).toBeNull()
-    expect(getPreviousStep('select')).toBe('entry')
-    expect(getPreviousStep('auth')).toBe('select')
-    expect(getPreviousStep('success')).toBe('auth')
-  })
-
-  /**
-   * Test canGoBack returns correct values
-   */
-  it('returns correct canGoBack for each step', () => {
-    expect(canGoBack('entry')).toBe(false)
-    expect(canGoBack('select')).toBe(true)
-    expect(canGoBack('auth')).toBe(true)
-    expect(canGoBack('success')).toBe(false)
-  })
-
-  /**
-   * Test that GO_BACK from entry step does nothing
-   */
-  it('GO_BACK from entry step preserves state', () => {
-    const entryState = createStateWithInput({ step: 'entry' })
-    const stateAfterBack = wizardReducer(entryState, { type: 'GO_BACK' })
-
-    expect(stateAfterBack).toEqual(entryState)
-  })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Error Code Mapping Tests
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('Error Code Mapping', () => {
-  /**
-   * Test that AppError correctly maps HTTP status codes
-   */
   it('maps 401 status to UNAUTHORIZED code', () => {
     const error = AppError.fromStatus(401)
     expect(error.code).toBe(ErrorCodes.UNAUTHORIZED)
@@ -394,7 +182,7 @@ describe('Error Code Mapping', () => {
 
   it('maps 5xx status to SERVER_ERROR code', () => {
     fc.assert(
-      fc.property(fc.integer({ min: 500, max: 599 }), (status) => {
+      fc.property(fc.integer({ max: 599, min: 500 }), (status) => {
         const error = AppError.fromStatus(status)
         expect(error.code).toBe(ErrorCodes.SERVER_ERROR)
         expect(error.recoverable).toBe(true)

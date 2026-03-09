@@ -6,7 +6,7 @@
  * @module components/connection/StepIndicator
  */
 
-import type { WizardStep } from './use-wizard-state'
+import type { WizardStep } from './connection-wizard-flow'
 import { cn } from '@/lib/utils'
 
 const STEPS: Array<{ key: WizardStep; label: string }> = [

@@ -1,288 +1,168 @@
 /**
  * Property: Input Validation Rejection
  *
- * For any authentication attempt with username/password where the password field
- * is empty or whitespace-only, the validation SHALL reject the submission
- * before making an API call.
- *
- * @vitest-environment jsdom
+ * For any authentication attempt with invalid active credentials, the schema
+ * wrappers SHALL reject the submission before any API call is attempted.
  */
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import type {
-  ApiKeyCredentials,
-  AuthCredentials as Credentials,
-  UserPassCredentials,
-} from '@/services/jellyfin'
-import { isValidPassword, validateCredentials } from '@/services/jellyfin'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Arbitraries
-// ─────────────────────────────────────────────────────────────────────────────
+import { ConnectionAuthSchema } from '@/lib/forms/connection-form'
 
-// Generate whitespace-only strings (spaces, tabs, newlines)
 const whitespaceOnlyArb = fc
   .array(fc.constantFrom(' ', '\t', '\n', '\r', '  ', '\t\t'), {
-    minLength: 1,
     maxLength: 20,
+    minLength: 1,
   })
   .map((chars) => chars.join(''))
 
-// Generate valid usernames (non-empty, non-whitespace-only)
 const validUsernameArb = fc
-  .string({ minLength: 1, maxLength: 50 })
-  .filter((s) => s.trim().length > 0)
+  .string({ maxLength: 50, minLength: 1 })
+  .filter((value) => value.trim().length > 0)
 
-// Generate valid passwords (either empty or non-whitespace-only)
 const validPasswordArb = fc.oneof(
-  fc.constant(''), // Empty password is valid
-  fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0), // Non-empty, non-whitespace
+  fc.constant(''),
+  fc
+    .string({ maxLength: 50, minLength: 1 })
+    .filter((value) => value.trim().length > 0),
 )
 
-// Generate valid API keys (non-empty, non-whitespace-only)
 const validApiKeyArb = fc
   .array(fc.constantFrom(...'0123456789abcdef'.split('')), {
-    minLength: 32,
     maxLength: 64,
+    minLength: 32,
   })
   .map((chars) => chars.join(''))
 
-// Generate empty or whitespace-only API keys
 const invalidApiKeyArb = fc.oneof(fc.constant(''), whitespaceOnlyArb)
-
-// Generate empty or whitespace-only usernames
 const invalidUsernameArb = fc.oneof(fc.constant(''), whitespaceOnlyArb)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests
-// ─────────────────────────────────────────────────────────────────────────────
+const validSelectedServerAddressArb = fc.webUrl()
 
 describe('Property: Input Validation Rejection', () => {
-  describe('isValidPassword', () => {
-    /**
-     * Feature: server-discovery, Property: Input Validation Rejection
-     *
-     * For any whitespace-only password string, isValidPassword SHALL return false.
-     */
+  describe('ConnectionAuthSchema', () => {
     it('rejects whitespace-only passwords', () => {
       fc.assert(
         fc.property(whitespaceOnlyArb, (password) => {
-          expect(isValidPassword(password)).toBe(false)
+          const result = ConnectionAuthSchema.safeParse({
+            address: 'demo.local',
+            apiKey: 'unused-api-key',
+            authMethod: 'userPass' as const,
+            password,
+            selectedServerAddress: 'https://demo.local',
+            username: 'demo-user',
+          })
+
+          expect(result.success).toBe(false)
+          expect(
+            result.error?.issues.some((issue) => issue.path[0] === 'password'),
+          ).toBe(true)
           return true
         }),
         { numRuns: 100 },
       )
     })
 
-    /**
-     * Empty passwords are valid (some Jellyfin users have no password).
-     */
     it('accepts empty passwords', () => {
-      expect(isValidPassword('')).toBe(true)
+      expect(
+        ConnectionAuthSchema.safeParse({
+          address: 'demo.local',
+          apiKey: 'unused-api-key',
+          authMethod: 'userPass' as const,
+          password: '',
+          selectedServerAddress: 'https://demo.local',
+          username: 'demo-user',
+        }).success,
+      ).toBe(true)
     })
 
-    /**
-     * For any non-empty, non-whitespace-only password, isValidPassword SHALL return true.
-     */
-    it('accepts valid non-empty passwords', () => {
-      fc.assert(
-        fc.property(
-          fc
-            .string({ minLength: 1, maxLength: 50 })
-            .filter((s) => s.trim().length > 0),
-          (password) => {
-            expect(isValidPassword(password)).toBe(true)
-            return true
-          },
-        ),
-        { numRuns: 100 },
-      )
-    })
-  })
-
-  describe('validateCredentials - UserPass', () => {
-    /**
-     * Feature: server-discovery, Property: Input Validation Rejection
-     *
-     * For any authentication attempt with username/password where the password
-     * is whitespace-only, validation SHALL reject before API call.
-     */
-    it('rejects whitespace-only passwords in userPass credentials', () => {
-      fc.assert(
-        fc.property(
-          validUsernameArb,
-          whitespaceOnlyArb,
-          (username, password) => {
-            const credentials: UserPassCredentials = {
-              method: 'userPass',
-              username,
-              password,
-            }
-
-            const error = validateCredentials(credentials)
-
-            // Should return an error message
-            expect(error).toBeDefined()
-            expect(typeof error).toBe('string')
-            expect(error!.length).toBeGreaterThan(0)
-
-            return true
-          },
-        ),
-        { numRuns: 100 },
-      )
-    })
-
-    /**
-     * For any authentication attempt with empty or whitespace-only username,
-     * validation SHALL reject before API call.
-     */
     it('rejects empty or whitespace-only usernames', () => {
       fc.assert(
-        fc.property(
-          invalidUsernameArb,
-          validPasswordArb,
-          (username, password) => {
-            const credentials: UserPassCredentials = {
-              method: 'userPass',
-              username,
-              password,
-            }
+        fc.property(invalidUsernameArb, (username) => {
+          const result = ConnectionAuthSchema.safeParse({
+            address: 'demo.local',
+            apiKey: 'unused-api-key',
+            authMethod: 'userPass' as const,
+            password: 'valid-password',
+            selectedServerAddress: 'https://demo.local',
+            username,
+          })
 
-            const error = validateCredentials(credentials)
-
-            // Should return an error message
-            expect(error).toBeDefined()
-            expect(typeof error).toBe('string')
-            expect(error!.length).toBeGreaterThan(0)
-
-            return true
-          },
-        ),
+          expect(result.success).toBe(false)
+          expect(
+            result.error?.issues.some((issue) => issue.path[0] === 'username'),
+          ).toBe(true)
+          return true
+        }),
         { numRuns: 100 },
       )
     })
 
-    /**
-     * For any valid username and valid password (empty or non-whitespace),
-     * validation SHALL pass.
-     */
-    it('accepts valid userPass credentials', () => {
-      fc.assert(
-        fc.property(
-          validUsernameArb,
-          validPasswordArb,
-          (username, password) => {
-            const credentials: UserPassCredentials = {
-              method: 'userPass',
-              username,
-              password,
-            }
-
-            const error = validateCredentials(credentials)
-
-            // Should not return an error
-            expect(error).toBeUndefined()
-
-            return true
-          },
-        ),
-        { numRuns: 100 },
-      )
-    })
-  })
-
-  describe('validateCredentials - ApiKey', () => {
-    /**
-     * For any empty or whitespace-only API key,
-     * validation SHALL reject before API call.
-     */
     it('rejects empty or whitespace-only API keys', () => {
       fc.assert(
         fc.property(invalidApiKeyArb, (apiKey) => {
-          const credentials: ApiKeyCredentials = {
-            method: 'apiKey',
+          const result = ConnectionAuthSchema.safeParse({
+            address: 'demo.local',
             apiKey,
-          }
+            authMethod: 'apiKey' as const,
+            password: '',
+            selectedServerAddress: 'https://demo.local',
+            username: 'ignored-user',
+          })
 
-          const error = validateCredentials(credentials)
-
-          // Should return an error message
-          expect(error).toBeDefined()
-          expect(typeof error).toBe('string')
-          expect(error!.length).toBeGreaterThan(0)
-
+          expect(result.success).toBe(false)
+          expect(
+            result.error?.issues.some((issue) => issue.path[0] === 'apiKey'),
+          ).toBe(true)
           return true
         }),
         { numRuns: 100 },
       )
     })
 
-    /**
-     * For any valid API key (non-empty, non-whitespace-only),
-     * validation SHALL pass.
-     */
-    it('accepts valid API keys', () => {
-      fc.assert(
-        fc.property(validApiKeyArb, (apiKey) => {
-          const credentials: ApiKeyCredentials = {
-            method: 'apiKey',
-            apiKey,
-          }
-
-          const error = validateCredentials(credentials)
-
-          // Should not return an error
-          expect(error).toBeUndefined()
-
-          return true
-        }),
-        { numRuns: 100 },
-      )
-    })
-  })
-
-  describe('Validation happens before API call', () => {
-    /**
-     * For any invalid credentials, validateCredentials returns synchronously
-     * without making any network requests.
-     */
-    it('validates synchronously without network calls', () => {
+    it('validates only the active apiKey credentials', () => {
       fc.assert(
         fc.property(
-          fc.oneof(
-            // Invalid userPass: whitespace password
-            fc.record<UserPassCredentials>({
-              method: fc.constant('userPass' as const),
-              username: validUsernameArb,
-              password: whitespaceOnlyArb,
-            }),
-            // Invalid userPass: empty username
-            fc.record<UserPassCredentials>({
-              method: fc.constant('userPass' as const),
-              username: invalidUsernameArb,
-              password: validPasswordArb,
-            }),
-            // Invalid apiKey: empty or whitespace
-            fc.record<ApiKeyCredentials>({
-              method: fc.constant('apiKey' as const),
-              apiKey: invalidApiKeyArb,
-            }),
-          ),
-          (credentials: Credentials) => {
-            // validateCredentials is synchronous - if it were async or made
-            // network calls, this would fail or hang
-            const startTime = performance.now()
-            const error = validateCredentials(credentials)
-            const endTime = performance.now()
+          validApiKeyArb,
+          validSelectedServerAddressArb,
+          invalidUsernameArb,
+          whitespaceOnlyArb,
+          (apiKey, selectedServerAddress, username, password) => {
+            const result = ConnectionAuthSchema.safeParse({
+              address: 'demo.local',
+              apiKey,
+              authMethod: 'apiKey' as const,
+              password,
+              selectedServerAddress,
+              username,
+            })
 
-            // Should complete in under 1ms (no network call)
-            expect(endTime - startTime).toBeLessThan(10)
+            expect(result.success).toBe(true)
+            return true
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
 
-            // Should return an error
-            expect(error).toBeDefined()
+    it('validates only the active userPass credentials', () => {
+      fc.assert(
+        fc.property(
+          validUsernameArb,
+          validPasswordArb,
+          validSelectedServerAddressArb,
+          invalidApiKeyArb,
+          (username, password, selectedServerAddress, apiKey) => {
+            const result = ConnectionAuthSchema.safeParse({
+              address: 'demo.local',
+              apiKey,
+              authMethod: 'userPass' as const,
+              password,
+              selectedServerAddress,
+              username,
+            })
 
+            expect(result.success).toBe(true)
             return true
           },
         ),

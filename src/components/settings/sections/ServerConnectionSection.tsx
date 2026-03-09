@@ -6,8 +6,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { SettingsSection } from '../primitives'
 import { useApiStore } from '@/stores/api-store'
 import { showNotification } from '@/lib/notifications'
+import { ConnectionWizard } from '@/components/connection/ConnectionWizard'
 import { Button } from '@/components/ui/button'
-import { ConnectionWizard } from '@/components/connection'
 
 export function ServerConnectionSection() {
   const { t } = useTranslation()

@@ -1,6 +1,6 @@
 /**
  * Feature: codebase-audit-refactor, Property: Segment Timestamp Validation
- * For any segment where StartTicks >= EndTicks, the validateSegment function
+ * For any segment where StartTicks >= EndTicks, the segment form validation
  * SHALL return { valid: false } with an appropriate error message.
  * For any segment where StartTicks < EndTicks and both are non-negative,
  * validation SHALL return { valid: true }.
@@ -9,7 +9,10 @@
 import { describe, it } from 'vitest'
 import * as fc from 'fast-check'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import { validateSegment } from '@/lib/segment-utils'
+import {
+  getSegmentFormDefaults,
+  validateSegmentFormValues,
+} from '@/lib/forms/segment-form'
 
 /** Valid segment types for testing */
 const SEGMENT_TYPES: Array<MediaSegmentType> = [
@@ -24,11 +27,24 @@ const SEGMENT_TYPES: Array<MediaSegmentType> = [
 // Arbitrary for segment types
 const segmentTypeArb = fc.constantFrom(...SEGMENT_TYPES)
 
+const validateSegmentValues = (
+  segment: Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>,
+  maxDuration?: number | null,
+) =>
+  validateSegmentFormValues(
+    getSegmentFormDefaults({
+      Type: segment.Type ?? 'Unknown',
+      StartTicks: segment.StartTicks ?? 0,
+      EndTicks: segment.EndTicks ?? 0,
+    }),
+    maxDuration,
+  )
+
 describe('Segment Timestamp Validation', () => {
   /**
    * Property: Valid segments (StartTicks < EndTicks, both non-negative) pass validation
    * For any segment where StartTicks < EndTicks and both are non-negative,
-   * validateSegment SHALL return { valid: true }.
+   * the segment schema SHALL return { valid: true }.
    */
   it('returns valid=true when StartTicks < EndTicks and both non-negative', () => {
     fc.assert(
@@ -45,7 +61,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: start + gap, // Ensures EndTicks > StartTicks
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return result.valid === true && result.error === undefined
         },
       ),
@@ -55,7 +71,7 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Invalid segments (StartTicks > EndTicks) fail validation
-   * For any segment where StartTicks > EndTicks, validateSegment SHALL
+   * For any segment where StartTicks > EndTicks, the segment schema SHALL
    * return { valid: false } with error message about start/end relationship.
    */
   it('returns valid=false when StartTicks > EndTicks', () => {
@@ -73,7 +89,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: end,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return (
             result.valid === false &&
             result.error === 'Start time must be less than end time'
@@ -86,7 +102,7 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Invalid segments (StartTicks === EndTicks) fail validation
-   * For any segment where StartTicks === EndTicks, validateSegment SHALL
+   * For any segment where StartTicks === EndTicks, the segment schema SHALL
    * return { valid: false } with error message about start/end relationship.
    */
   it('returns valid=false when StartTicks === EndTicks', () => {
@@ -103,7 +119,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: time, // Same as StartTicks
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return (
             result.valid === false &&
             result.error === 'Start time must be less than end time'
@@ -116,7 +132,7 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Negative StartTicks fails validation
-   * For any segment with negative StartTicks, validateSegment SHALL
+   * For any segment with negative StartTicks, the segment schema SHALL
    * return { valid: false } with appropriate error message.
    */
   it('returns valid=false when StartTicks is negative', () => {
@@ -134,7 +150,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: end,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return (
             result.valid === false &&
             result.error === 'Start time cannot be negative'
@@ -148,7 +164,7 @@ describe('Segment Timestamp Validation', () => {
   /**
    * Property: Negative EndTicks fails validation
    * For any segment with negative EndTicks (and non-negative StartTicks),
-   * validateSegment SHALL return { valid: false } with appropriate error message.
+   * the segment schema SHALL return { valid: false } with appropriate error message.
    */
   it('returns valid=false when EndTicks is negative', () => {
     fc.assert(
@@ -165,7 +181,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: end,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return (
             result.valid === false &&
             result.error === 'End time cannot be negative'
@@ -173,27 +189,6 @@ describe('Segment Timestamp Validation', () => {
         },
       ),
       { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: Null segment fails validation
-   * For null or undefined segment, validateSegment SHALL return { valid: false }.
-   */
-  it('returns valid=false for null or undefined segment', () => {
-    const nullResult = validateSegment(null)
-    const undefinedResult = validateSegment(undefined)
-
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        return (
-          nullResult.valid === false &&
-          nullResult.error === 'Segment is required' &&
-          undefinedResult.valid === false &&
-          undefinedResult.error === 'Segment is required'
-        )
-      }),
-      { numRuns: 1 },
     )
   })
 
@@ -217,7 +212,7 @@ describe('Segment Timestamp Validation', () => {
               StartTicks: start,
               EndTicks: end,
             }
-            return validateSegment(segment)
+            return validateSegmentValues(segment)
           })
 
           // All results should be valid since start < end
@@ -231,7 +226,7 @@ describe('Segment Timestamp Validation', () => {
   /**
    * Property: Minimal valid gap is accepted
    * For any segment with StartTicks just 1 less than EndTicks,
-   * validateSegment SHALL return { valid: true }.
+   * the segment schema SHALL return { valid: true }.
    */
   it('accepts minimal valid gap (EndTicks = StartTicks + 1)', () => {
     fc.assert(
@@ -247,7 +242,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: start + 1, // Minimal valid gap
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return result.valid === true
         },
       ),
@@ -273,7 +268,7 @@ describe('Segment Timestamp Validation', () => {
             EndTicks: end,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return result.valid === true
         },
       ),

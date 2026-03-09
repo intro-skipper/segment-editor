@@ -50,7 +50,8 @@ interface MyRouterContext {
 }
 
 const loadSettingsDialog = () => import('../components/settings')
-const loadConnectionWizard = () => import('../components/connection')
+const loadConnectionWizard = () =>
+  import('../components/connection/ConnectionWizard')
 
 const SettingsDialog = lazy(() =>
   loadSettingsDialog().then((module) => ({

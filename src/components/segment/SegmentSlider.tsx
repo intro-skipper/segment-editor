@@ -13,16 +13,20 @@ import {
   Play,
   Trash2,
 } from 'lucide-react'
+import { useForm, useStore } from '@tanstack/react-form'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { SegmentUpdate } from '@/types/segment'
 import { formatTime, snapToFrame } from '@/lib/time-utils'
 import {
-  getSegmentColor,
-  getSegmentCssVar,
-  validateSegment,
-} from '@/lib/segment-utils'
+  buildSegmentFromFormValues,
+  formatSegmentInputSeconds,
+  getSegmentDraftState,
+  getSegmentFormDefaults,
+  validateSegmentFormValues,
+} from '@/lib/forms/segment-form'
+import { getSegmentColor, getSegmentCssVar } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -45,13 +49,6 @@ const { MIN_SEGMENT_GAP } = SEGMENT_CONFIG
 
 /** Handle width in pixels for positioning calculations */
 const HANDLE_WIDTH = 14
-
-/** Keep numeric input readable while preserving millisecond precision */
-const TIME_INPUT_DECIMALS = 3
-
-function formatInputSeconds(value: number): string {
-  return value.toFixed(TIME_INPUT_DECIMALS).replace(/\.?0+$/, '')
-}
 
 function clampStartToBounds(start: number, end: number): number {
   return Math.max(0, Math.min(start, end - MIN_SEGMENT_GAP))
@@ -97,10 +94,8 @@ interface SegmentSliderProps {
   onPlayerTimestamp: (timestamp: number) => void
   /** Callback to set this segment as active */
   onSetActive: (index: number) => void
-  /** Callback to set this segment's start time from current player position */
-  onSetStartFromPlayer?: (index: number) => void
-  /** Callback to set this segment's end time from current player position */
-  onSetEndFromPlayer?: (index: number) => void
+  /** Returns the current player position in seconds when available */
+  getPlayerTime?: () => number | undefined
   /** Callback to copy all segments to system clipboard as JSON */
   onCopyAllAsJson?: () => void
   /** Callback to open the segment edit dialog */
@@ -123,47 +118,92 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   onDelete,
   onPlayerTimestamp,
   onSetActive,
-  onSetStartFromPlayer,
-  onSetEndFromPlayer,
+  getPlayerTime,
   onCopyAllAsJson,
   onEdit,
   vibrantColors,
 }: SegmentSliderProps) {
   const { t } = useTranslation()
   const sliderRef = React.useRef<HTMLDivElement>(null)
+  const form = useForm({
+    defaultValues: getSegmentFormDefaults(segment),
+  })
+  const formValues = useStore(form.store, (state) => state.values)
   const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
     null,
   )
-  // Local edits are applied immediately; external prop updates are synced
-  // back in when the user is not actively dragging or typing.
-  const [localRange, setLocalRange] = React.useState(() => ({
-    start: segment.StartTicks ?? 0,
-    end: segment.EndTicks ?? 0,
-  }))
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
   const [activeInput, setActiveInput] = React.useState<'start' | 'end' | null>(
     null,
   )
-  const [timeInputDraft, setTimeInputDraft] = React.useState<{
-    start?: string
-    end?: string
-  }>({})
-  const localStart = localRange.start
-  const localEnd = localRange.end
-
-  const localStartRef = React.useRef(localStart)
-  const localEndRef = React.useRef(localEnd)
+  const [stableRange, setStableRange] = React.useState({
+    start: segment.StartTicks ?? 0,
+    end: segment.EndTicks ?? 0,
+  })
+  const stableRangeRef = React.useRef(stableRange)
   const isDraggingRef = React.useRef(isDragging)
   const pointerCaptureTargetRef = React.useRef<HTMLElement | null>(null)
   const pointerIdRef = React.useRef<number | null>(null)
   const rafRef = React.useRef<number | null>(null)
   const pendingPositionRef = React.useRef<number | null>(null)
 
+  const updateStableRange = React.useCallback(
+    (nextRange: { start: number; end: number }) => {
+      stableRangeRef.current = nextRange
+      setStableRange((current) =>
+        current.start === nextRange.start && current.end === nextRange.end
+          ? current
+          : nextRange,
+      )
+    },
+    [],
+  )
+
+  const applyDraftBoundary = React.useCallback(
+    (type: 'start' | 'end', nextValue: number) => {
+      const nextRange =
+        type === 'start'
+          ? { ...stableRangeRef.current, start: nextValue }
+          : { ...stableRangeRef.current, end: nextValue }
+
+      updateStableRange(nextRange)
+      form.setFieldValue(
+        type === 'start' ? 'startText' : 'endText',
+        formatSegmentInputSeconds(nextValue),
+        { dontValidate: true },
+      )
+
+      return nextRange
+    },
+    [form, updateStableRange],
+  )
+
+  const { draftRange, validation } = React.useMemo(
+    () =>
+      getSegmentDraftState(
+        formValues,
+        {
+          startSeconds: stableRange.start,
+          endSeconds: stableRange.end,
+        },
+        runtimeSeconds,
+      ),
+    [formValues, runtimeSeconds, stableRange.end, stableRange.start],
+  )
+
+  const liveRange = validation.valid
+    ? {
+        start: draftRange.startSeconds,
+        end: draftRange.endSeconds,
+      }
+    : stableRange
+
+  const localStart = liveRange.start
+  const localEnd = liveRange.end
+
   React.useLayoutEffect(() => {
-    localStartRef.current = localStart
-    localEndRef.current = localEnd
     isDraggingRef.current = isDragging
-  }, [localStart, localEnd, isDragging])
+  }, [isDragging])
 
   React.useEffect(
     () => () => {
@@ -174,35 +214,24 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
   React.useLayoutEffect(() => {
     if (isDragging || activeInput !== null) return
-
-    const nextStart = segment.StartTicks ?? 0
-    const nextEnd = segment.EndTicks ?? 0
-
-    setLocalRange((current) =>
-      current.start === nextStart && current.end === nextEnd
-        ? current
-        : { start: nextStart, end: nextEnd },
-    )
+    updateStableRange({
+      start: segment.StartTicks ?? 0,
+      end: segment.EndTicks ?? 0,
+    })
+    form.reset(getSegmentFormDefaults(segment))
   }, [
+    form,
     segment.Id,
     segment.StartTicks,
     segment.EndTicks,
+    segment.Type,
     isDragging,
     activeInput,
+    updateStableRange,
   ])
 
-  const segmentColor = getSegmentColor(segment.Type)
-  const segmentCssVar = getSegmentCssVar(segment.Type)
-
-  const validation = React.useMemo(
-    () =>
-      validateSegment({
-        ...segment,
-        StartTicks: localStart,
-        EndTicks: localEnd,
-      }),
-    [segment, localStart, localEnd],
-  )
+  const segmentColor = getSegmentColor(formValues.type)
+  const segmentCssVar = getSegmentCssVar(formValues.type)
 
   const segmentStyles = React.useMemo(() => {
     const startPercent =
@@ -229,15 +258,6 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
   const inputStep = frameStep ?? MIN_SEGMENT_GAP
 
-  const startInputValue =
-    activeInput === 'start'
-      ? (timeInputDraft.start ?? formatInputSeconds(localStart))
-      : formatInputSeconds(localStart)
-  const endInputValue =
-    activeInput === 'end'
-      ? (timeInputDraft.end ?? formatInputSeconds(localEnd))
-      : formatInputSeconds(localEnd)
-
   const commitSegmentUpdate = React.useCallback(
     (start: number, end: number) => {
       if (!segment.Id) return
@@ -246,11 +266,13 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       const currentEnd = segment.EndTicks ?? 0
       if (start === currentStart && end === currentEnd) return
 
-      const nextValidation = validateSegment({
-        ...segment,
-        StartTicks: start,
-        EndTicks: end,
-      })
+      const nextValidation = validateSegmentFormValues(
+        getSegmentFormDefaults({
+          Type: segment.Type ?? 'Unknown',
+          StartTicks: start,
+          EndTicks: end,
+        }),
+      )
       if (!nextValidation.valid) return
 
       onUpdate({ id: segment.Id, start, end })
@@ -295,24 +317,23 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
           const currentDragging = isDraggingRef.current
           if (currentDragging === 'start') {
-            setLocalRange((current) => ({
-              ...current,
-              start: clampStartToBounds(pendingTime, localEndRef.current),
-            }))
+            const nextStart = clampStartToBounds(
+              pendingTime,
+              stableRangeRef.current.end,
+            )
+            applyDraftBoundary('start', nextStart)
           } else if (currentDragging === 'end') {
-            setLocalRange((current) => ({
-              ...current,
-              end: clampEndToBounds(
-                pendingTime,
-                localStartRef.current,
-                runtimeSeconds,
-              ),
-            }))
+            const nextEnd = clampEndToBounds(
+              pendingTime,
+              stableRangeRef.current.start,
+              runtimeSeconds,
+            )
+            applyDraftBoundary('end', nextEnd)
           }
         })
       }
     },
-    [runtimeSeconds],
+    [applyDraftBoundary, runtimeSeconds],
   )
 
   const handlePointerUp = React.useCallback(
@@ -330,20 +351,18 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
         if (currentDragging === 'start') {
           const newStart = snapAndClampStart(
             pendingTime,
-            localEndRef.current,
+            stableRangeRef.current.end,
             frameStep,
           )
-          localStartRef.current = newStart
-          setLocalRange((current) => ({ ...current, start: newStart }))
+          applyDraftBoundary('start', newStart)
         } else {
           const newEnd = snapAndClampEnd(
             pendingTime,
-            localStartRef.current,
+            stableRangeRef.current.start,
             runtimeSeconds,
             frameStep,
           )
-          localEndRef.current = newEnd
-          setLocalRange((current) => ({ ...current, end: newEnd }))
+          applyDraftBoundary('end', newEnd)
         }
         pendingPositionRef.current = null
       }
@@ -357,71 +376,88 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       pointerIdRef.current = null
 
       setIsDragging(null)
-      commitSegmentUpdate(localStartRef.current, localEndRef.current)
+      commitSegmentUpdate(
+        stableRangeRef.current.start,
+        stableRangeRef.current.end,
+      )
     },
-    [runtimeSeconds, frameStep, commitSegmentUpdate],
+    [applyDraftBoundary, commitSegmentUpdate, runtimeSeconds, frameStep],
   )
 
   const handleInputChange = React.useCallback(
-    (type: 'start' | 'end') => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const rawValue = e.target.value
-      setTimeInputDraft((current) => ({ ...current, [type]: rawValue }))
+    (type: 'start' | 'end', value: string) => {
+      form.setFieldValue(type === 'start' ? 'startText' : 'endText', value)
 
-      if (!rawValue.trim()) return
+      const nextValues =
+        type === 'start'
+          ? { ...formValues, startText: value }
+          : { ...formValues, endText: value }
+      const nextDraftState = getSegmentDraftState(
+        nextValues,
+        {
+          startSeconds: stableRangeRef.current.start,
+          endSeconds: stableRangeRef.current.end,
+        },
+        runtimeSeconds,
+      )
 
-      const value = Number(rawValue)
-      if (!Number.isFinite(value) || value < 0) return
-
-      if (type === 'start') {
-        setLocalRange((current) => ({
-          ...current,
-          start: clampStartToBounds(value, current.end),
-        }))
-      } else {
-        setLocalRange((current) => ({
-          ...current,
-          end: clampEndToBounds(value, current.start, runtimeSeconds),
-        }))
+      if (nextDraftState.validation.valid) {
+        updateStableRange({
+          start: nextDraftState.draftRange.startSeconds,
+          end: nextDraftState.draftRange.endSeconds,
+        })
       }
     },
-    [runtimeSeconds],
+    [form, formValues, runtimeSeconds, updateStableRange],
   )
 
   const handleInputBlur = React.useCallback(
     (type: 'start' | 'end') => {
-      let nextStart = localStart
-      let nextEnd = localEnd
+      setActiveInput(null)
+
+      if (!validation.valid) return
+
+      let nextStart = stableRangeRef.current.start
+      let nextEnd = stableRangeRef.current.end
 
       if (type === 'start') {
-        nextStart = snapAndClampStart(localStart, localEnd, frameStep)
-        setLocalRange((current) => ({ ...current, start: nextStart }))
-      } else {
-        nextEnd = snapAndClampEnd(
-          localEnd,
-          localStart,
-          runtimeSeconds,
-          frameStep,
+        const nextRange = applyDraftBoundary(
+          'start',
+          snapAndClampStart(nextStart, nextEnd, frameStep),
         )
-        setLocalRange((current) => ({ ...current, end: nextEnd }))
+        nextStart = nextRange.start
+        nextEnd = nextRange.end
+      } else {
+        const nextRange = applyDraftBoundary(
+          'end',
+          snapAndClampEnd(nextEnd, nextStart, runtimeSeconds, frameStep),
+        )
+        nextStart = nextRange.start
+        nextEnd = nextRange.end
       }
-
-      setActiveInput(null)
-      setTimeInputDraft((current) => {
-        const next = { ...current }
-        delete next[type]
-        return next
-      })
 
       commitSegmentUpdate(nextStart, nextEnd)
     },
-    [localStart, localEnd, runtimeSeconds, frameStep, commitSegmentUpdate],
+    [
+      applyDraftBoundary,
+      commitSegmentUpdate,
+      runtimeSeconds,
+      frameStep,
+      validation.valid,
+    ],
   )
 
   // Copy segment to system clipboard as JSON
   const handleCopy = React.useCallback(async () => {
     setCopyMenuOpen(false)
+    const nextSegment = buildSegmentFromFormValues(
+      segment,
+      formValues,
+      runtimeSeconds,
+    )
+    const segmentToCopy = nextSegment.success ? nextSegment.segment : segment
     try {
-      const result = segmentsToIntroSkipperClipboardText([segment])
+      const result = segmentsToIntroSkipperClipboardText([segmentToCopy])
       await navigator.clipboard.writeText(result.text)
       showNotification({
         type: 'positive',
@@ -433,7 +469,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
         message: t('editor.copyFailed', 'Clipboard access denied'),
       })
     }
-  }, [segment, t])
+  }, [formValues, runtimeSeconds, segment, t])
 
   // Copy all segments to system clipboard as JSON
   const handleCopyAllAsJson = React.useCallback(() => {
@@ -455,34 +491,63 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   )
 
   // Set timestamp from current player position
-  const handleSetStartFromPlayer = React.useCallback(
-    () => onSetStartFromPlayer?.(index),
-    [index, onSetStartFromPlayer],
-  )
-  const handleSetEndFromPlayer = React.useCallback(
-    () => onSetEndFromPlayer?.(index),
-    [index, onSetEndFromPlayer],
-  )
+  const handleSetStartFromPlayer = React.useCallback(() => {
+    const currentTime = getPlayerTime?.()
+    if (currentTime === undefined) return
+    const nextStart = snapAndClampStart(
+      currentTime,
+      stableRangeRef.current.end,
+      frameStep,
+    )
+    const nextRange = applyDraftBoundary('start', nextStart)
+    commitSegmentUpdate(nextRange.start, nextRange.end)
+  }, [applyDraftBoundary, commitSegmentUpdate, frameStep, getPlayerTime])
+  const handleSetEndFromPlayer = React.useCallback(() => {
+    const currentTime = getPlayerTime?.()
+    if (currentTime === undefined) return
+    const nextEnd = snapAndClampEnd(
+      currentTime,
+      stableRangeRef.current.start,
+      runtimeSeconds,
+      frameStep,
+    )
+    const nextRange = applyDraftBoundary('end', nextEnd)
+    commitSegmentUpdate(nextRange.start, nextRange.end)
+  }, [
+    applyDraftBoundary,
+    commitSegmentUpdate,
+    frameStep,
+    getPlayerTime,
+    runtimeSeconds,
+  ])
 
   const handleHandleBlur = React.useCallback(
     (type: 'start' | 'end') => {
       if (type === 'start') {
-        const snappedStart = snapAndClampStart(localStart, localEnd, frameStep)
-        setLocalRange((current) => ({ ...current, start: snappedStart }))
-        commitSegmentUpdate(snappedStart, localEnd)
+        const nextRange = applyDraftBoundary(
+          'start',
+          snapAndClampStart(
+            stableRangeRef.current.start,
+            stableRangeRef.current.end,
+            frameStep,
+          ),
+        )
+        commitSegmentUpdate(nextRange.start, nextRange.end)
         return
       }
 
-      const snappedEnd = snapAndClampEnd(
-        localEnd,
-        localStart,
-        runtimeSeconds,
-        frameStep,
+      const nextRange = applyDraftBoundary(
+        'end',
+        snapAndClampEnd(
+          stableRangeRef.current.end,
+          stableRangeRef.current.start,
+          runtimeSeconds,
+          frameStep,
+        ),
       )
-      setLocalRange((current) => ({ ...current, end: snappedEnd }))
-      commitSegmentUpdate(localStart, snappedEnd)
+      commitSegmentUpdate(nextRange.start, nextRange.end)
     },
-    [localStart, localEnd, runtimeSeconds, frameStep, commitSegmentUpdate],
+    [applyDraftBoundary, commitSegmentUpdate, runtimeSeconds, frameStep],
   )
 
   const handleStartKeyDown = React.useCallback(
@@ -490,19 +555,21 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       const result = handleStartHandleKeyboard(
         e.key,
         e.shiftKey,
-        localStart,
-        localEnd,
+        stableRangeRef.current.start,
+        stableRangeRef.current.end,
         MIN_SEGMENT_GAP,
       )
       if (result.handled) {
         e.preventDefault()
-        setLocalRange((current) => ({
-          ...current,
-          start: snapAndClampStart(result.newValue, current.end, frameStep),
-        }))
+        const nextStart = snapAndClampStart(
+          result.newValue,
+          stableRangeRef.current.end,
+          frameStep,
+        )
+        applyDraftBoundary('start', nextStart)
       }
     },
-    [localStart, localEnd, frameStep],
+    [applyDraftBoundary, frameStep],
   )
 
   const handleEndKeyDown = React.useCallback(
@@ -510,25 +577,23 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       const result = handleEndHandleKeyboard(
         e.key,
         e.shiftKey,
-        localStart,
-        localEnd,
+        stableRangeRef.current.start,
+        stableRangeRef.current.end,
         runtimeSeconds,
         MIN_SEGMENT_GAP,
       )
       if (result.handled) {
         e.preventDefault()
-        setLocalRange((current) => ({
-          ...current,
-          end: snapAndClampEnd(
-            result.newValue,
-            current.start,
-            runtimeSeconds,
-            frameStep,
-          ),
-        }))
+        const nextEnd = snapAndClampEnd(
+          result.newValue,
+          stableRangeRef.current.start,
+          runtimeSeconds,
+          frameStep,
+        )
+        applyDraftBoundary('end', nextEnd)
       }
     },
-    [localStart, localEnd, runtimeSeconds, frameStep],
+    [applyDraftBoundary, runtimeSeconds, frameStep],
   )
 
   // Memoize style objects to prevent re-renders
@@ -756,7 +821,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           >
             <Play className="size-3" aria-hidden="true" style={iconStyle} />
           </Button>
-          {onSetStartFromPlayer && (
+          {getPlayerTime && (
             <Button
               variant="ghost"
               size="icon-sm"
@@ -778,19 +843,26 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           >
             {t('segment.start')}:
           </label>
-          <Input
-            id={`segment-${segment.Id}-start`}
-            type="number"
-            step={inputStep}
-            min="0"
-            max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
-            value={startInputValue}
-            onFocus={() => setActiveInput('start')}
-            onChange={handleInputChange('start')}
-            onBlur={() => handleInputBlur('start')}
-            className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
-            aria-describedby={`segment-${segment.Id}-start-formatted`}
-          />
+          <form.Field name="startText">
+            {(field) => (
+              <Input
+                id={`segment-${segment.Id}-start`}
+                type="number"
+                step={inputStep}
+                min="0"
+                max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
+                value={String(field.state.value)}
+                onFocus={() => setActiveInput('start')}
+                onChange={(e) => handleInputChange('start', e.target.value)}
+                onBlur={() => {
+                  field.handleBlur()
+                  handleInputBlur('start')
+                }}
+                className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
+                aria-describedby={`segment-${segment.Id}-start-formatted`}
+              />
+            )}
+          </form.Field>
           <span
             id={`segment-${segment.Id}-start-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"
@@ -811,7 +883,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           >
             <Play className="size-3" aria-hidden="true" style={iconStyle} />
           </Button>
-          {onSetEndFromPlayer && (
+          {getPlayerTime && (
             <Button
               variant="ghost"
               size="icon-sm"
@@ -833,19 +905,26 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           >
             {t('segment.end')}:
           </label>
-          <Input
-            id={`segment-${segment.Id}-end`}
-            type="number"
-            step={inputStep}
-            min={localStart + MIN_SEGMENT_GAP}
-            max={runtimeSeconds}
-            value={endInputValue}
-            onFocus={() => setActiveInput('end')}
-            onChange={handleInputChange('end')}
-            onBlur={() => handleInputBlur('end')}
-            className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
-            aria-describedby={`segment-${segment.Id}-end-formatted`}
-          />
+          <form.Field name="endText">
+            {(field) => (
+              <Input
+                id={`segment-${segment.Id}-end`}
+                type="number"
+                step={inputStep}
+                min={localStart + MIN_SEGMENT_GAP}
+                max={runtimeSeconds}
+                value={String(field.state.value)}
+                onFocus={() => setActiveInput('end')}
+                onChange={(e) => handleInputChange('end', e.target.value)}
+                onBlur={() => {
+                  field.handleBlur()
+                  handleInputBlur('end')
+                }}
+                className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
+                aria-describedby={`segment-${segment.Id}-end-formatted`}
+              />
+            )}
+          </form.Field>
           <span
             id={`segment-${segment.Id}-end-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"
