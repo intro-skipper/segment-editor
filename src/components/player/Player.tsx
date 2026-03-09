@@ -443,6 +443,12 @@ function useRenderPlayer({
     preferredAudioStreamIndex,
     onError: handleVideoError,
     onStrategyChange: handleStrategyChange,
+    onRecoveryStart: () => {
+      dispatch({ type: 'RECOVERY_START' })
+    },
+    onRecoveryEnd: () => {
+      dispatch({ type: 'RECOVERY_END' })
+    },
     t,
   })
 

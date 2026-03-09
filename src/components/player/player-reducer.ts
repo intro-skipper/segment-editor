@@ -43,6 +43,7 @@ export type PlayerAction =
   | { type: 'SKIP_TIME_CHANGE'; skipTimeIndex: number }
   | { type: 'ERROR_STATE'; error: HlsPlayerError | null; isRecovering: boolean }
   | { type: 'RECOVERY_START' }
+  | { type: 'RECOVERY_END' }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
   | { type: 'CYCLE_SPEED'; direction: 1 | -1 }
@@ -113,6 +114,11 @@ export function playerReducer(
 
     case 'RECOVERY_START':
       return state.isRecovering ? state : { ...state, isRecovering: true }
+
+    case 'RECOVERY_END':
+      return !state.isRecovering && state.playerError === null
+        ? state
+        : { ...state, isRecovering: false, playerError: null }
 
     case 'CYCLE_SKIP': {
       const newIndex = Math.max(

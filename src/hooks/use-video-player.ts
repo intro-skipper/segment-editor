@@ -67,6 +67,10 @@ interface UseVideoPlayerOptions {
   onError?: (error: VideoPlayerError) => void
   /** Callback when playback strategy changes */
   onStrategyChange?: (strategy: PlaybackStrategy) => void
+  /** Callback when HLS error recovery begins */
+  onRecoveryStart?: () => void
+  /** Callback when HLS error recovery completes */
+  onRecoveryEnd?: () => void
   /** Translation function for error messages */
   t: (key: string) => string
 }
@@ -156,6 +160,8 @@ export function useVideoPlayer({
   preferredAudioStreamIndex,
   onError,
   onStrategyChange,
+  onRecoveryStart,
+  onRecoveryEnd,
   t,
 }: UseVideoPlayerOptions): UseVideoPlayerReturn {
   const [strategy, setStrategy] = useState<PlaybackStrategy>('hls')
@@ -258,10 +264,10 @@ export function useVideoPlayer({
       }
     },
     onRecoveryStart: () => {
-      // HLS is recovering
+      onRecoveryStart?.()
     },
     onRecoveryEnd: () => {
-      // HLS recovery complete
+      onRecoveryEnd?.()
     },
     t,
   })
