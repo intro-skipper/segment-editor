@@ -122,7 +122,7 @@ describe('SegmentSlider TanStack Form migration', () => {
     })
   })
 
-  it('keeps invalid typed drafts visible and does not commit them on blur', async () => {
+  it('reverts invalid typed input to the last valid value on blur without committing', async () => {
     const { onUpdate } = renderSlider()
 
     const startInput = document.getElementById(
@@ -133,7 +133,8 @@ describe('SegmentSlider TanStack Form migration', () => {
     await screen.findByText('Start time must be less than end time')
     fireEvent.blur(startInput)
 
-    expect(startInput.value).toBe('25')
+    // Blur restores the last committed valid value (original start = 10)
+    expect(startInput.value).toBe('10')
     expect(onUpdate).not.toHaveBeenCalled()
   })
 

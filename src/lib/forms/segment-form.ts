@@ -4,7 +4,7 @@ import type { ValidationResult } from '@/types/segment'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import { SEGMENT_TYPES } from '@/lib/constants'
 
-const SEGMENT_TIME_TEXT_REGEX = /^-?[\d:. ]+$/
+const SEGMENT_TIME_TEXT_REGEX = /^-?[\d:.eE+\- ]+$/
 const MAX_DECIMALS = 3
 const TIME_MULTIPLIERS = [1, 60, 3600] as const
 

@@ -141,6 +141,12 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     end: segment.EndTicks ?? 0,
   })
   const stableRangeRef = React.useRef(stableRange)
+  const lastSyncedPropsRef = React.useRef({
+    id: segment.Id,
+    startTicks: segment.StartTicks,
+    endTicks: segment.EndTicks,
+    type: segment.Type,
+  })
   const isDraggingRef = React.useRef(isDragging)
   const pointerCaptureTargetRef = React.useRef<HTMLElement | null>(null)
   const pointerIdRef = React.useRef<number | null>(null)
@@ -214,6 +220,23 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
   React.useLayoutEffect(() => {
     if (isDragging || activeInput !== null) return
+
+    const prev = lastSyncedPropsRef.current
+    const propsChanged =
+      prev.id !== segment.Id ||
+      prev.startTicks !== segment.StartTicks ||
+      prev.endTicks !== segment.EndTicks ||
+      prev.type !== segment.Type
+
+    if (!propsChanged) return
+
+    lastSyncedPropsRef.current = {
+      id: segment.Id,
+      startTicks: segment.StartTicks,
+      endTicks: segment.EndTicks,
+      type: segment.Type,
+    }
+
     updateStableRange({
       start: segment.StartTicks ?? 0,
       end: segment.EndTicks ?? 0,
@@ -415,7 +438,19 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     (type: 'start' | 'end') => {
       setActiveInput(null)
 
-      if (!validation.valid) return
+      if (!validation.valid) {
+        // Revert the edited field to the last committed valid value
+        form.setFieldValue(
+          type === 'start' ? 'startText' : 'endText',
+          formatSegmentInputSeconds(
+            type === 'start'
+              ? stableRangeRef.current.start
+              : stableRangeRef.current.end,
+          ),
+          { dontValidate: true },
+        )
+        return
+      }
 
       let nextStart = stableRangeRef.current.start
       let nextEnd = stableRangeRef.current.end
