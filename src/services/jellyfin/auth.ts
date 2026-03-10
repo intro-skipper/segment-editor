@@ -25,8 +25,7 @@ function getCredentialValidationError(
   serverAddress: string,
   credentials: AuthCredentials,
 ): string | undefined {
-  const validationAddress =
-    serverAddress.trim() || 'https://placeholder.invalid'
+  const validationAddress = serverAddress.trim()
   const result = ConnectionAuthSchema.safeParse({
     address: validationAddress,
     selectedServerAddress: validationAddress,

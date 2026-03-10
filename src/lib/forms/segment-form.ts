@@ -64,11 +64,11 @@ function getNumericFieldMessage(field: SegmentTimeField): string {
 function parseUncheckedTimeText(value: string): number {
   const delimiter = value.includes(':') ? ':' : ' '
   const parts = value.split(delimiter).filter(Boolean)
+  if (parts.length > TIME_MULTIPLIERS.length) return Number.NaN
   return parts.reverse().reduce((sum, part, index) => {
     const parsed = Number(part)
     if (!Number.isFinite(parsed)) return Number.NaN
-    const multiplier = TIME_MULTIPLIERS[index] ?? 0
-    return sum + parsed * multiplier
+    return sum + parsed * TIME_MULTIPLIERS[index]!
   }, 0)
 }
 
