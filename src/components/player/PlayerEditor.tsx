@@ -305,27 +305,11 @@ function useRenderPlayerEditor({
     [activeIndex, updateEditingSegments],
   )
 
-  // Handle setting a segment's start time from current player position
-  const handleSetStartFromPlayer = React.useCallback(
-    (index: number) => {
-      const raw = getCurrentTimeRef.current?.()
-      if (raw === undefined) return
-      const currentTime = snapToFrame(raw, frameStepSeconds)
-      handleUpdateSegmentTimestamp({ currentTime, start: true, index })
-    },
-    [handleUpdateSegmentTimestamp, frameStepSeconds],
-  )
-
-  // Handle setting a segment's end time from current player position
-  const handleSetEndFromPlayer = React.useCallback(
-    (index: number) => {
-      const raw = getCurrentTimeRef.current?.()
-      if (raw === undefined) return
-      const currentTime = snapToFrame(raw, frameStepSeconds)
-      handleUpdateSegmentTimestamp({ currentTime, start: false, index })
-    },
-    [handleUpdateSegmentTimestamp, frameStepSeconds],
-  )
+  const getPlayerTime = React.useCallback(() => {
+    const raw = getCurrentTimeRef.current?.()
+    if (raw === undefined) return undefined
+    return snapToFrame(raw, frameStepSeconds)
+  }, [frameStepSeconds])
 
   // Handle segment update from slider
   const handleUpdateSegment = React.useCallback(
@@ -666,12 +650,7 @@ function useRenderPlayerEditor({
                   onEdit={handleOpenEditDialog}
                   onPlayerTimestamp={handlePlayerTimestamp}
                   onSetActive={setActiveIndex}
-                  onSetStartFromPlayer={
-                    showVideoPlayer ? handleSetStartFromPlayer : undefined
-                  }
-                  onSetEndFromPlayer={
-                    showVideoPlayer ? handleSetEndFromPlayer : undefined
-                  }
+                  getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
                   vibrantColors={vibrantColors}
                 />

@@ -9,7 +9,10 @@
 import { describe, it } from 'vitest'
 import * as fc from 'fast-check'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import { validateSegment } from '@/lib/segment-utils'
+import {
+  getSegmentFormDefaults,
+  validateSegmentFormValues,
+} from '@/lib/forms/segment-form'
 
 /** Valid segment types for testing */
 const SEGMENT_TYPES: Array<MediaSegmentType> = [
@@ -46,6 +49,19 @@ const uuidArb = fc
 
 // Arbitrary for segment types
 const segmentTypeArb = fc.constantFrom(...SEGMENT_TYPES)
+
+const validateSegmentValues = (
+  segment: Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>,
+  maxDuration?: number | null,
+) =>
+  validateSegmentFormValues(
+    getSegmentFormDefaults({
+      Type: segment.Type ?? 'Unknown',
+      StartTicks: segment.StartTicks ?? 0,
+      EndTicks: segment.EndTicks ?? 0,
+    }),
+    maxDuration,
+  )
 
 /**
  * Arbitrary for valid segment (StartTicks < EndTicks with meaningful gap)
@@ -172,7 +188,7 @@ describe('Segment Boundary Validation', () => {
   it('validates segments with StartTicks < EndTicks as valid', () => {
     fc.assert(
       fc.property(validSegmentArb, (segment) => {
-        const result = validateSegment(segment)
+        const result = validateSegmentValues(segment)
         return result.valid === true && result.error === undefined
       }),
       { numRuns: 100 },
@@ -187,7 +203,7 @@ describe('Segment Boundary Validation', () => {
   it('rejects segments with StartTicks >= EndTicks', () => {
     fc.assert(
       fc.property(invalidSegmentArb, (segment) => {
-        const result = validateSegment(segment)
+        const result = validateSegmentValues(segment)
         return (
           result.valid === false &&
           result.error === 'Start time must be less than end time'
@@ -205,7 +221,7 @@ describe('Segment Boundary Validation', () => {
   it('rejects segments with negative start time', () => {
     fc.assert(
       fc.property(negativeStartSegmentArb, (segment) => {
-        const result = validateSegment(segment)
+        const result = validateSegmentValues(segment)
         return (
           result.valid === false &&
           result.error === 'Start time cannot be negative'
@@ -223,7 +239,7 @@ describe('Segment Boundary Validation', () => {
   it('rejects segments with negative end time', () => {
     fc.assert(
       fc.property(negativeEndSegmentArb, (segment) => {
-        const result = validateSegment(segment)
+        const result = validateSegmentValues(segment)
         return (
           result.valid === false &&
           result.error === 'End time cannot be negative'
@@ -410,7 +426,7 @@ describe('Segment Boundary Validation', () => {
             EndTicks: maxDuration + 100,
           }
 
-          const result = validateSegment(testSegment, maxDuration)
+          const result = validateSegmentValues(testSegment, maxDuration)
           return (
             result.valid === false &&
             result.error === 'End time exceeds media duration'
@@ -444,7 +460,7 @@ describe('Segment Boundary Validation', () => {
             return true // Skip invalid test cases
           }
 
-          const result = validateSegment(testSegment, maxDuration)
+          const result = validateSegmentValues(testSegment, maxDuration)
           return result.valid === true
         },
       ),
@@ -472,7 +488,7 @@ describe('Segment Boundary Validation', () => {
             EndTicks: end,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
 
           // All types SHALL be validated the same way
           return result.valid === true
@@ -501,7 +517,7 @@ describe('Segment Boundary Validation', () => {
             EndTicks: start + gap,
           }
 
-          const result = validateSegment(segment)
+          const result = validateSegmentValues(segment)
           return result.valid === true
         },
       ),

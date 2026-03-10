@@ -11,10 +11,10 @@
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import {
-  generateUUID,
-  sortSegmentsByStart,
-  validateSegment,
-} from '@/lib/segment-utils'
+  getSegmentFormDefaults,
+  validateSegmentFormValues,
+} from '@/lib/forms/segment-form'
+import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 
 type IntroSkipperEventType = 'SKIP_INTRO' | 'SKIP_RECAP' | 'END_CREDITS'
 
@@ -244,8 +244,9 @@ export function introSkipperClipboardTextToSegments(
           EndTicks: endSeconds,
         }
 
-        const validation = validateSegment(segment, options.maxDurationSeconds)
-        if (!validation.valid) return null
+        if (!isValidImportedSegment(segment, options.maxDurationSeconds)) {
+          return null
+        }
         return segment
       }
 
@@ -324,8 +325,7 @@ export function introSkipperClipboardTextToSegments(
       EndTicks: msToSeconds(timing.endMs),
     }
 
-    const validation = validateSegment(segment, options.maxDurationSeconds)
-    if (!validation.valid) {
+    if (!isValidImportedSegment(segment, options.maxDurationSeconds)) {
       skipped += 1
       continue
     }
@@ -354,6 +354,20 @@ interface IntroSkipperExportResult {
   payload: IntroSkipperExportPayload
   excludedTypes: Array<MediaSegmentType>
   excludedCount: number
+}
+
+function isValidImportedSegment(
+  segment: MediaSegmentDto,
+  maxDurationSeconds?: number,
+): boolean {
+  return validateSegmentFormValues(
+    getSegmentFormDefaults({
+      Type: segment.Type ?? 'Unknown',
+      StartTicks: segment.StartTicks ?? 0,
+      EndTicks: segment.EndTicks ?? 0,
+    }),
+    maxDurationSeconds,
+  ).valid
 }
 
 /**

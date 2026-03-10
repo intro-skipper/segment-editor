@@ -7,24 +7,20 @@
  * @module components/connection/ConnectionWizard
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useRef } from 'react'
 
-import { useWizardState } from './use-wizard-state'
-import { AuthStep, EntryStep, SelectStep, SuccessStep } from './steps'
+import { AuthStep } from './steps/AuthStep'
+import { EntryStep } from './steps/EntryStep'
+import { SelectStep } from './steps/SelectStep'
+import { SuccessStep } from './steps/SuccessStep'
+import { useConnectionWizardController } from './use-connection-wizard-controller'
 import { StepIndicator } from './StepIndicator'
 import type { RefObject } from 'react'
-import type { AuthCredentials as Credentials } from '@/services/jellyfin'
 import {
   Dialog,
   DialogCloseButton,
   DialogContent,
 } from '@/components/ui/dialog'
-import {
-  authenticate,
-  discoverServers,
-  storeAuthResult,
-} from '@/services/jellyfin'
-import { useAbortController } from '@/hooks/use-abort-controller'
 import { withErrorBoundary } from '@/components/with-error-boundary'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,42 +37,26 @@ interface ConnectionWizardProps {
 }
 
 interface WizardStepContentProps {
-  state: ReturnType<typeof useWizardState>['state']
-  setAddress: ReturnType<typeof useWizardState>['setAddress']
-  setAuthMethod: ReturnType<typeof useWizardState>['setAuthMethod']
-  handleDiscover: () => void
-  handleServerSelect: (
-    server: ReturnType<typeof useWizardState>['state']['selectedServer'],
-  ) => void
-  goBack: ReturnType<typeof useWizardState>['goBack']
-  handleProceedToAuth: () => void
-  handleAuthenticate: (credentials: Credentials) => void
+  controller: ReturnType<typeof useConnectionWizardController>
   handleComplete: () => void
   serverAddressInputRef: RefObject<HTMLInputElement | null>
 }
 
 function WizardStepContent({
-  state,
-  setAddress,
-  setAuthMethod,
-  handleDiscover,
-  handleServerSelect,
-  goBack,
-  handleProceedToAuth,
-  handleAuthenticate,
+  controller,
   handleComplete,
   serverAddressInputRef,
 }: WizardStepContentProps) {
-  switch (state.step) {
+  switch (controller.step) {
     case 'entry':
       return (
         <EntryStep
-          address={state.address}
-          error={state.error}
-          isLoading={state.isLoading}
-          onAddressChange={setAddress}
-          onDiscover={handleDiscover}
-          onRetry={handleDiscover}
+          form={controller.form}
+          error={controller.requestError}
+          isLoading={controller.isLoading}
+          onClearError={controller.clearRequestError}
+          onDiscover={controller.handleDiscoverSubmit}
+          onRetry={controller.handleRetryDiscovery}
           inputRef={serverAddressInputRef}
         />
       )
@@ -84,33 +64,34 @@ function WizardStepContent({
     case 'select':
       return (
         <SelectStep
-          servers={state.servers}
-          selectedServer={state.selectedServer}
-          isLoading={state.isLoading}
-          error={state.error}
-          onSelect={handleServerSelect}
-          onBack={goBack}
-          onContinue={handleProceedToAuth}
+          servers={controller.servers}
+          selectedServer={controller.selectedServer}
+          isLoading={controller.isLoading}
+          error={null}
+          onSelect={controller.handleServerSelect}
+          onBack={controller.handleBack}
+          onContinue={controller.handleProceedToAuth}
         />
       )
 
     case 'auth':
       return (
         <AuthStep
-          serverAddress={state.selectedServer?.address ?? ''}
-          onSubmit={handleAuthenticate}
-          onBack={goBack}
-          isLoading={state.isLoading}
-          error={state.error}
-          authMethod={state.authMethod}
-          onAuthMethodChange={setAuthMethod}
+          serverAddress={controller.selectedServer?.address ?? ''}
+          form={controller.form}
+          onSubmit={controller.handleAuthSubmit}
+          onBack={controller.handleBack}
+          isLoading={controller.isLoading}
+          error={controller.requestError}
+          onClearError={controller.clearRequestError}
+          onRetry={controller.handleRetryAuth}
         />
       )
 
     case 'success':
       return (
         <SuccessStep
-          selectedServer={state.selectedServer}
+          selectedServer={controller.selectedServer}
           onComplete={handleComplete}
         />
       )
@@ -129,139 +110,25 @@ function ConnectionWizardBase({
   onOpenChange,
   onComplete,
 }: ConnectionWizardProps) {
-  const { createController, abort } = useAbortController()
-
   // Ref for the server address input — passed as initialFocus to the dialog
   // so Base UI focuses it reliably when the wizard opens, without a setTimeout.
   const serverAddressInputRef = useRef<HTMLInputElement>(null)
 
-  const {
-    state,
-    setAddress,
-    selectServer,
-    setAuthMethod,
-    setError,
-    setLoading,
-    goToStep,
-    goBack,
-    reset,
-    discoverySuccess,
-    authSuccess,
-  } = useWizardState()
-
-  // Cancel any in-flight requests when wizard closes
-  useEffect(() => {
-    if (!open) {
-      abort()
-    }
-  }, [open, abort])
+  const controller = useConnectionWizardController({ open })
 
   // Handle dialog close
-  const handleOpenChange = useCallback(
-    (newOpen: boolean) => {
-      if (!newOpen) {
-        abort()
-        reset()
-      }
-      onOpenChange(newOpen)
-    },
-    [onOpenChange, reset, abort],
-  )
-
-  // Handle server discovery
-  const handleDiscover = useCallback(async () => {
-    if (!state.address.trim()) {
-      setError('Please enter a server address')
-      return
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      controller.reset()
     }
-
-    const controller = createController()
-    setLoading(true)
-
-    const result = await discoverServers(state.address, {
-      signal: controller.signal,
-    })
-
-    // Check if cancelled
-    if (controller.signal.aborted) return
-
-    if (result.error) {
-      setError(result.error)
-      return
-    }
-
-    if (result.servers.length === 0) {
-      setError(
-        'No servers found at this address. Check the address and try again.',
-      )
-      return
-    }
-
-    discoverySuccess(result.servers)
-  }, [state.address, setError, setLoading, discoverySuccess, createController])
-
-  // Handle server selection and proceed to auth
-  const handleServerSelect = useCallback(
-    (server: typeof state.selectedServer) => {
-      if (server) {
-        selectServer(server)
-      }
-    },
-    [selectServer],
-  )
-
-  // Handle proceeding to auth step
-  const handleProceedToAuth = useCallback(() => {
-    if (state.selectedServer) {
-      goToStep('auth')
-    }
-  }, [state.selectedServer, goToStep])
-
-  // Handle authentication
-  const handleAuthenticate = useCallback(
-    async (credentials: Credentials) => {
-      if (!state.selectedServer) return
-
-      const controller = createController()
-      setLoading(true)
-      setAuthMethod(credentials.method)
-
-      const result = await authenticate(
-        state.selectedServer.address,
-        credentials,
-        {
-          signal: controller.signal,
-        },
-      )
-
-      // Check if cancelled
-      if (controller.signal.aborted) return
-
-      if (!result.success) {
-        setError(result.error ?? 'Authentication failed')
-        return
-      }
-
-      // Store credentials
-      storeAuthResult(state.selectedServer.address, result, credentials.method)
-
-      authSuccess()
-    },
-    [
-      state.selectedServer,
-      setLoading,
-      setAuthMethod,
-      setError,
-      authSuccess,
-      createController,
-    ],
-  )
+    onOpenChange(newOpen)
+  }
 
   // Handle completion
-  const handleComplete = useCallback(() => {
+  const handleComplete = () => {
     handleOpenChange(false)
     onComplete?.()
-  }, [handleOpenChange, onComplete])
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -270,22 +137,15 @@ function ConnectionWizardBase({
         aria-describedby="wizard-description"
         initialFocus={serverAddressInputRef}
       >
-        {state.step !== 'success' && <DialogCloseButton />}
+        {controller.step !== 'success' && <DialogCloseButton />}
         <span id="wizard-description" className="sr-only">
           Connection wizard to set up your Jellyfin server
         </span>
 
-        <StepIndicator currentStep={state.step} />
+        <StepIndicator currentStep={controller.step} />
 
         <WizardStepContent
-          state={state}
-          setAddress={setAddress}
-          setAuthMethod={setAuthMethod}
-          handleDiscover={handleDiscover}
-          handleServerSelect={handleServerSelect}
-          goBack={goBack}
-          handleProceedToAuth={handleProceedToAuth}
-          handleAuthenticate={handleAuthenticate}
+          controller={controller}
           handleComplete={handleComplete}
           serverAddressInputRef={serverAddressInputRef}
         />

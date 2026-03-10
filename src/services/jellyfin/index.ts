@@ -90,4 +90,4 @@ export {
 // Public API - Authentication
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { authenticate, validateCredentials, isValidPassword } from './auth'
+export { authenticate } from './auth'
