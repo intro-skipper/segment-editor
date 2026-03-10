@@ -79,7 +79,7 @@ export function EntryStep({
                 id="server-address"
                 type="text"
                 inputMode="url"
-                placeholder="jellyfin.example.com"
+                placeholder="jellyfin.example.com…"
                 value={address}
                 onChange={(e) => {
                   field.handleChange(e.target.value)
@@ -88,6 +88,7 @@ export function EntryStep({
                 onBlur={field.handleBlur}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
+                spellCheck={false}
                 aria-invalid={!!displayError}
                 aria-describedby={
                   displayError ? 'address-error' : 'address-hint'
@@ -120,7 +121,7 @@ export function EntryStep({
                   <div className="animate-spin" aria-hidden>
                     <Loader2 className="size-4" />
                   </div>
-                  Discovering...
+                  Discovering…
                 </>
               ) : (
                 <>

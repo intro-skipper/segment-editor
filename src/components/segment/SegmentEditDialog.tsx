@@ -112,12 +112,6 @@ export function SegmentEditDialog({
   }, [open])
 
   React.useEffect(() => {
-    if (!open) return
-    const timeoutId = window.setTimeout(() => startInputRef.current?.focus(), 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [open])
-
-  React.useEffect(() => {
     const justOpened = open && !wasOpenRef.current
     wasOpenRef.current = open
 
@@ -167,7 +161,7 @@ export function SegmentEditDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" initialFocus={startInputRef}>
           <DialogCloseButton />
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

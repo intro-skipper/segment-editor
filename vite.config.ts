@@ -93,6 +93,8 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'zod'],
           // TanStack libraries
           'tanstack-vendor': [
+            '@tanstack/react-form',
+            '@tanstack/react-hotkeys',
             '@tanstack/react-query',
             '@tanstack/react-router',
           ],

@@ -142,7 +142,7 @@ export function AuthStep({
                   ref={apiKeyInputRef}
                   id="api-key"
                   type="password"
-                  placeholder="Enter your API key"
+                  placeholder="Enter your API key…"
                   value={String(field.state.value)}
                   onChange={(e) => {
                     field.handleChange(e.target.value)
@@ -170,7 +170,7 @@ export function AuthStep({
                     ref={usernameInputRef}
                     id="username"
                     type="text"
-                    placeholder="Enter your username"
+                    placeholder="Enter your username…"
                     value={String(field.state.value)}
                     onChange={(e) => {
                       field.handleChange(e.target.value)
@@ -179,6 +179,7 @@ export function AuthStep({
                     onBlur={field.handleBlur}
                     disabled={isLoading}
                     aria-invalid={!!displayError}
+                    spellCheck={false}
                     autoComplete="username"
                   />
                 </div>
@@ -192,7 +193,7 @@ export function AuthStep({
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
+                      placeholder="Enter your password…"
                       value={String(field.state.value)}
                       onChange={(e) => {
                         field.handleChange(e.target.value)
