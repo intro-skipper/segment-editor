@@ -12,6 +12,9 @@
     "format": "prettier",
     "check": "prettier --write . && eslint --config ./eslint.config.js --fix ."
   },
+  "vitest": {
+    "setup": ["./src/vitest.setup.ts"]
+  },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
     "@fontsource-variable/dm-sans": "^5.2.8",
