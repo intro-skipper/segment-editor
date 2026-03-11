@@ -26,8 +26,8 @@ importers:
         specifier: ^1.28.4
         version: 1.28.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@tanstack/react-hotkeys':
-        specifier: ^0.4.0
-        version: 0.4.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.4.1
+        version: 0.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@tanstack/react-query':
         specifier: ^5.90.21
         version: 5.90.21(react@19.2.4)
@@ -1585,8 +1585,8 @@ packages:
     resolution: {integrity: sha512-Kp/WSt411ZWYvgXy6uiv5RmhHrz9cAml05AQPrtdAp7eUqvIDbMGPnML25OKbzR3RJ1q4wgENxDTvlGPa9+Mww==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/hotkeys@0.4.0':
-    resolution: {integrity: sha512-VH+jGC5pszD1AmcDJKMcV52AETQVBKiALomY9Xgo13GihTdyEeEwBnS7RI6WDHIV03UFcWpCfwu2k8fBaKN7bw==}
+  '@tanstack/hotkeys@0.4.1':
+    resolution: {integrity: sha512-EGHqcdKP2jzy0dEkahA3ABtEXohMqPlU3Ac04sBQjgesJqr9xWuesJotOfWPh3P68kQQg8krNAtFTydIN3+WSw==}
     engines: {node: '>=18'}
 
   '@tanstack/pacer-lite@0.1.1':
@@ -1617,8 +1617,8 @@ packages:
       '@tanstack/react-start':
         optional: true
 
-  '@tanstack/react-hotkeys@0.4.0':
-    resolution: {integrity: sha512-ttAaGZZtkLOx30xoS3zNCrGvbA93cqvoWu7kaAFyJrHuxMcnswhtEAk4xxz2QbCL0XoQ5uB6fxf6n/PbCZ+pdQ==}
+  '@tanstack/react-hotkeys@0.4.1':
+    resolution: {integrity: sha512-hFh/kKQODn4kSytfIsEE/Vf1AaAb+NAFi4lx+OB49NmKY5z/BNH1/uEdYlVgOEvnDm4QrCISIMBOVpMgK5QNQg==}
     engines: {node: '>=18'}
     peerDependencies:
       react: '>=16.8'
@@ -6328,7 +6328,7 @@ snapshots:
 
   '@tanstack/history@1.161.4': {}
 
-  '@tanstack/hotkeys@0.4.0':
+  '@tanstack/hotkeys@0.4.1':
     dependencies:
       '@tanstack/store': 0.9.2
 
@@ -6359,9 +6359,9 @@ snapshots:
     transitivePeerDependencies:
       - react-dom
 
-  '@tanstack/react-hotkeys@0.4.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@tanstack/react-hotkeys@0.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@tanstack/hotkeys': 0.4.0
+      '@tanstack/hotkeys': 0.4.1
       '@tanstack/react-store': 0.9.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
