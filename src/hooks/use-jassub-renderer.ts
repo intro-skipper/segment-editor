@@ -252,12 +252,19 @@ export function useJassubRenderer({
       }
     }
 
-    init()
+    void init()
 
     return () => {
       cancelled = true
     }
-  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer])
+  }, [
+    activeTrack,
+    item,
+    videoRef,
+    transcodingOffsetTicks,
+    destroyRenderer,
+    teardownRenderer,
+  ])
 
   const needsJassubNow =
     !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id

@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from 'vite-plus/test'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -90,9 +90,7 @@ Object.defineProperty(globalThis, 'navigator', {
 })
 
 // Mock crypto.randomUUID - generates proper UUID v4 format
-let uuidCounter = 0
 function generateMockUUID(): string {
-  uuidCounter++
   const hex = '0123456789abcdef'
   // Generate random hex digits
   const randomHex = () => hex[Math.floor(Math.random() * 16)]
@@ -102,11 +100,30 @@ function generateMockUUID(): string {
   // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   // - Position 14 (index 14) is '4' (version)
   // - Position 19 (index 19) is variant (8, 9, a, or b)
-  const part1 = Array(8).fill(0).map(() => randomHex()).join('')
-  const part2 = Array(4).fill(0).map(() => randomHex()).join('')
-  const part3 = '4' + Array(3).fill(0).map(() => randomHex()).join('')
-  const part4 = variantHex() + Array(3).fill(0).map(() => randomHex()).join('')
-  const part5 = Array(12).fill(0).map(() => randomHex()).join('')
+  const part1 = Array(8)
+    .fill(0)
+    .map(() => randomHex())
+    .join('')
+  const part2 = Array(4)
+    .fill(0)
+    .map(() => randomHex())
+    .join('')
+  const part3 =
+    '4' +
+    Array(3)
+      .fill(0)
+      .map(() => randomHex())
+      .join('')
+  const part4 =
+    variantHex() +
+    Array(3)
+      .fill(0)
+      .map(() => randomHex())
+      .join('')
+  const part5 = Array(12)
+    .fill(0)
+    .map(() => randomHex())
+    .join('')
 
   return `${part1}-${part2}-${part3}-${part4}-${part5}`
 }

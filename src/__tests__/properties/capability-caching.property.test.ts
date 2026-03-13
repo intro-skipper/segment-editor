@@ -6,7 +6,7 @@
  * (not re-query the browser APIs).
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import {
   DIRECT_PLAY_AUDIO_CODECS,

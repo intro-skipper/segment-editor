@@ -6,7 +6,7 @@
  * return an empty object.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { getAuthHeaders } from '@/lib/header-utils'
 

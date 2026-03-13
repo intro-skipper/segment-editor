@@ -130,7 +130,7 @@ export default function Header() {
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
   const handleCollectionSelect = (collectionId: string | null) => {
-    navigate({
+    void navigate({
       to: '/',
       search: {
         collection: collectionId ?? undefined,
@@ -191,7 +191,7 @@ export default function Header() {
     }
 
     if (isEpisode && seriesId) {
-      navigate({
+      void navigate({
         to: '/series/$itemId',
         params: { itemId: seriesId },
         replace: true,
@@ -200,7 +200,7 @@ export default function Header() {
     }
 
     // Preserve selected collection when going back to home
-    navigate({
+    void navigate({
       to: '/',
       search: selectedCollection
         ? { collection: selectedCollection }

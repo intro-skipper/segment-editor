@@ -78,7 +78,7 @@ const rollbackSegments = (
     current.length !== previous.length ||
     !previous.every((s) => current.some((c) => c.Id === s.Id))
   ) {
-    qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+    void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
   }
   ctx.rolledBack = true
 }

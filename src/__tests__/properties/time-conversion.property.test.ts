@@ -6,7 +6,7 @@
  * SHALL produce an equivalent value.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 

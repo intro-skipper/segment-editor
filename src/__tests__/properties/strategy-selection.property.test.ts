@@ -7,7 +7,7 @@
  * - The URL type SHALL match the selected strategy
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type * as CompatibilityModule from '@/services/video/compatibility'

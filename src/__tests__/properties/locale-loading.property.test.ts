@@ -7,7 +7,7 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { SupportedLocale } from '@/i18n/config'
 import i18n, { changeLocale, supportedLocales } from '@/i18n/config'
@@ -67,7 +67,7 @@ describe('Locale Loading and Application', () => {
 
   afterEach(() => {
     // Restore original language
-    i18n.changeLanguage(originalLanguage)
+    void i18n.changeLanguage(originalLanguage)
   })
 
   /**

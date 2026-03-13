@@ -8,7 +8,7 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { AuthMethod } from '@/stores/api-store'
 import type { AuthResult } from '@/services/jellyfin'

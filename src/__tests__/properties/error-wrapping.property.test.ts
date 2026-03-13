@@ -5,7 +5,7 @@
  * error code and recoverable flag.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { ErrorCode } from '@/lib/unified-error'
 import { AppError, ErrorCodes } from '@/lib/unified-error'

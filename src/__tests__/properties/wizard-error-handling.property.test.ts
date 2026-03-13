@@ -5,7 +5,7 @@
  * wizard validation after the TanStack Form migration.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 
 import {

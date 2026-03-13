@@ -5,7 +5,7 @@
  * target the new pure flow helpers and schema-backed auth value handling.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 
 import type { ConnectionWizardFormValues } from '@/lib/forms/connection-form'

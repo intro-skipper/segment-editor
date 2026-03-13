@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { DEFAULT_FRAME_STEP, PLAYER_CONFIG } from '@/lib/constants'

@@ -13,8 +13,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Home } from 'lucide-react'
 import { LazyMotion, domAnimation } from 'motion/react'
@@ -33,8 +32,6 @@ import {
   CardTitle,
 } from '../components/ui/card'
 
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
-
 import { useConnectionInit } from '../hooks/use-connection-init'
 import { registerPwaUpdates } from '../lib/pwa'
 import { isPluginMode } from '../services/jellyfin/core'
@@ -52,6 +49,14 @@ interface MyRouterContext {
 const loadSettingsDialog = () => import('../components/settings')
 const loadConnectionWizard = () =>
   import('../components/connection/ConnectionWizard')
+
+const DevTools = import.meta.env.DEV
+  ? lazy(() =>
+      import('../components/DevTools').then((module) => ({
+        default: module.DevTools,
+      })),
+    )
+  : null
 
 const SettingsDialog = lazy(() =>
   loadSettingsDialog().then((module) => ({
@@ -111,7 +116,7 @@ function NotFoundComponent() {
 
   // Safe back navigation that stays within the app
   const handleGoBack = useCallback(() => {
-    navigate({ to: '/' })
+    void navigate({ to: '/' })
   }, [navigate])
 
   return (
@@ -259,18 +264,11 @@ function RootComponent() {
             </Suspense>
           ) : null}
           <Toaster />
-          <TanStackDevtools
-            config={{
-              position: 'bottom-right',
-            }}
-            plugins={[
-              {
-                name: 'Tanstack Router',
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-              TanStackQueryDevtools,
-            ]}
-          />
+          {DevTools ? (
+            <Suspense fallback={null}>
+              <DevTools />
+            </Suspense>
+          ) : null}
         </div>
       </LazyMotion>
     </HotkeysProvider>

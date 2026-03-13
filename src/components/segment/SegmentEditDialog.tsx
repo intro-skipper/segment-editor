@@ -126,6 +126,7 @@ export function SegmentEditDialog({
     form,
     isDirty,
     open,
+    segment,
     segment.EndTicks,
     segment.Id,
     segment.StartTicks,

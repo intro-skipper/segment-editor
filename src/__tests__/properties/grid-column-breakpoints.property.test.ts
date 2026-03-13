@@ -5,7 +5,7 @@
  * and 6 for width >= 1280px.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS, VIEWPORT_BREAKPOINTS } from '@/lib/constants'

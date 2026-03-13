@@ -244,6 +244,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     form.reset(getSegmentFormDefaults(segment))
   }, [
     form,
+    segment,
     segment.Id,
     segment.StartTicks,
     segment.EndTicks,
@@ -476,6 +477,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [
       applyDraftBoundary,
       commitSegmentUpdate,
+      form,
       runtimeSeconds,
       frameStep,
       validation.valid,

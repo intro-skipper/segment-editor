@@ -5,7 +5,7 @@
  * wrappers SHALL reject the submission before any API call is attempted.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 
 import { ConnectionAuthSchema } from '@/lib/forms/connection-form'

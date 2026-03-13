@@ -7,7 +7,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'

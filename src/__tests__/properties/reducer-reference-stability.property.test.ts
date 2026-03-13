@@ -5,7 +5,7 @@
  * that changes at least one value, the reducer SHALL return a new object reference.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type {
   PlayerAction,

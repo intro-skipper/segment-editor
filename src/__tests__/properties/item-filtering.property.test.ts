@@ -5,7 +5,7 @@
  * and the original list SHALL remain unmodified.
  */
 
-import { describe, it } from 'vitest'
+import { describe, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { filterItemsByName } from '@/lib/utils'
 

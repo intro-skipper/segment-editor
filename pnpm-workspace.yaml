@@ -1,3 +1,8 @@
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@^0.1.11
+  vite-plus: ^0.1.11
+  vitest: npm:@voidzero-dev/vite-plus-test@^0.1.11
+
 onlyBuiltDependencies:
   - esbuild
   - msw
@@ -7,3 +12,13 @@ overrides:
   hono@<4.11.4: '>=4.11.4'
   seroval@<1.4.1: '>=1.4.1'
   seroval@<=1.4.0: '>=1.4.1'
+  vite: 'catalog:'
+  vitest: 'catalog:'
+
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: '*'
+    vitest: '*'
