@@ -55,11 +55,11 @@ function FeatureErrorFallback({
   const router = useRouter()
 
   const handleGoBack = useCallback(() => {
-    navigate({ to: '/' })
+    void navigate({ to: '/' })
   }, [navigate])
 
   const handleGoHome = useCallback(() => {
-    navigate({ to: '/' })
+    void navigate({ to: '/' })
   }, [navigate])
 
   const handleRetry = useCallback(() => {

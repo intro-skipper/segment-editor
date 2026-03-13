@@ -7,7 +7,7 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { toast } from 'sonner'
 import type { NotificationType } from '@/lib/notifications'

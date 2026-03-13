@@ -8,7 +8,7 @@
  * - Be a valid URL that can be parsed
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { getDirectPlayUrl } from '@/services/video/api'
 

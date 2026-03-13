@@ -5,7 +5,7 @@
  * segments SHALL produce valid segments with correct boundaries.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { EdlEntry } from '@/services/plugins/edl'
 import type { ChapterMarker } from '@/services/plugins/chapter'

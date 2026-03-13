@@ -7,7 +7,7 @@
  * - The playback position at time of error SHALL be preserved in the fallback session
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import * as fc from 'fast-check'
 
 // ============================================================================

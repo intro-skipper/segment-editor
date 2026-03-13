@@ -6,7 +6,7 @@
  * validation SHALL return { valid: true }.
  */
 
-import { describe, it } from 'vitest'
+import { describe, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import {

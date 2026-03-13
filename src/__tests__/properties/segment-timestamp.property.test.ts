@@ -5,7 +5,7 @@
  * external timestamp is set, the player SHALL seek to that exact position.
  */
 
-import { describe, it } from 'vitest'
+import { describe, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
 import type { MediaSegmentType } from '@/types/jellyfin'

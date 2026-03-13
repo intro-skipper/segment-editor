@@ -6,7 +6,7 @@
  * this invariant. If the invariant is violated, a validation error SHALL be displayed.
  */
 
-import { describe, it } from 'vitest'
+import { describe, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import {

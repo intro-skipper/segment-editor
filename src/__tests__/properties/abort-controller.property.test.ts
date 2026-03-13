@@ -5,7 +5,7 @@
  * result) without throwing unhandled exceptions.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { createTimeoutController, delay, withRetry } from '@/lib/retry-utils'
 import { isAbortError } from '@/lib/unified-error'
@@ -16,8 +16,8 @@ describe('AbortController Cancellation Safety', () => {
    * For any delay duration, if the signal is already aborted,
    * the delay SHALL reject immediately with an AbortError.
    */
-  it('delay rejects immediately with pre-aborted signal', () => {
-    fc.assert(
+  it('delay rejects immediately with pre-aborted signal', async () => {
+    await fc.assert(
       fc.asyncProperty(fc.integer({ min: 0, max: 10000 }), async (delayMs) => {
         const controller = new AbortController()
         controller.abort()
@@ -58,8 +58,8 @@ describe('AbortController Cancellation Safety', () => {
    * For any operation, if the signal is already aborted,
    * withRetry SHALL throw an AbortError without executing the operation.
    */
-  it('withRetry throws immediately with pre-aborted signal', () => {
-    fc.assert(
+  it('withRetry throws immediately with pre-aborted signal', async () => {
+    await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async (maxRetries) => {
         const controller = new AbortController()
         controller.abort()
@@ -185,8 +185,8 @@ describe('AbortController Cancellation Safety', () => {
    * For any operation that succeeds, withRetry SHALL return the result
    * when no abort occurs.
    */
-  it('successful operations complete normally', () => {
-    fc.assert(
+  it('successful operations complete normally', async () => {
+    await fc.assert(
       fc.asyncProperty(fc.string({ minLength: 1 }), async (expectedResult) => {
         const operation = () => Promise.resolve(expectedResult)
 

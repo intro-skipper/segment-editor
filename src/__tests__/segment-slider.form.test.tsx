@@ -9,7 +9,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vite-plus/test'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'

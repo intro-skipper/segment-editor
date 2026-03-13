@@ -34,7 +34,7 @@ export function useBlobUrl(url: string | null | undefined): string {
 
     const controller = new AbortController()
 
-    fetchBlobUrl(url, { signal: controller.signal }).then((result) => {
+    void fetchBlobUrl(url, { signal: controller.signal }).then((result) => {
       if (!controller.signal.aborted && result) {
         setBlobUrl(result)
       }

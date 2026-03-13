@@ -2,7 +2,7 @@
  * Property-based tests for trickplay utilities.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 
 import type { TrickplayInfoDto } from '@/types/jellyfin'

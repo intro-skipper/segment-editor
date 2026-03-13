@@ -6,7 +6,7 @@
  * returning a CompatibilityResult that accurately reflects browser support.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { MediaSourceInfo } from '@/services/video/compatibility'
 import {

@@ -4,7 +4,7 @@
  * and conform to UUID v4 format.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import { generateUUID, isValidUUID } from '@/lib/segment-utils'
 

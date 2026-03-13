@@ -6,7 +6,7 @@
  * (within acceptable tolerance for currentTime).
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import * as fc from 'fast-check'
 import type { PlaybackState } from '@/services/video/playback-state'
 import {
@@ -131,6 +131,7 @@ describe('Feature: direct-play-fallback, Property 5: State Preservation Round-Tr
 
         // If state was not paused, play should have been called
         if (!state.paused) {
+          // eslint-disable-next-line @typescript-eslint/unbound-method
           expect(video.play).toHaveBeenCalled()
         }
         return true
@@ -214,8 +215,10 @@ describe('Feature: direct-play-fallback, Property 5: State Preservation Round-Tr
 
         // If source was playing (not paused), play should be called
         if (!paused) {
+          // eslint-disable-next-line @typescript-eslint/unbound-method
           expect(targetVideo.play).toHaveBeenCalled()
         } else {
+          // eslint-disable-next-line @typescript-eslint/unbound-method
           expect(targetVideo.play).not.toHaveBeenCalled()
         }
         return true
@@ -244,6 +247,7 @@ describe('Feature: direct-play-fallback, Property 5: State Preservation Round-Tr
 
         // Verify play/pause behavior
         if (!state.paused) {
+          // eslint-disable-next-line @typescript-eslint/unbound-method
           expect(targetVideo.play).toHaveBeenCalled()
         }
 
