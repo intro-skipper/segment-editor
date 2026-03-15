@@ -5,7 +5,8 @@
     "src/**/*.d.ts",
     "eslint.config.js",
     "prettier.config.js",
-    "vite.config*.ts"
+    "vite.config*.ts",
+    "vitest.config.ts"
   ],
 
   "compilerOptions": {
