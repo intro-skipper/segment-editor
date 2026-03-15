@@ -38,6 +38,9 @@ const CLIENT_INFO = { name: 'Segment Editor', version: '1.0.0' } as const
 const DEVICE_ID_KEY = 'segment-editor-device-id'
 const PLUGIN_CONFIGURATION_PATH = '/configurationpage'
 
+/** Base route name used for the standalone app URL (e.g. `/SegmentEditor`). */
+export const APP_BASE_ROUTE = 'SegmentEditor' as const
+
 export const PLUGIN_ROUTER_BASE_PATH = PLUGIN_CONFIGURATION_PATH
 export const PLUGIN_ROUTER_ENTRY =
   '/configurationpage?name=Segment%20Editor' as const
@@ -83,20 +86,43 @@ function getPluginApiClient(): JellyfinApiClient | undefined {
   }
 }
 
+// ── Compatibility shims for private ApiClient fields ──────────────────────────
+// Older Jellyfin web clients expose `_serverAddress` and `_serverInfo` as
+// private (underscore-prefixed) properties instead of public accessor methods.
+// These helpers isolate that access so breakage is easy to track if the
+// internal API changes. Prefer the public methods when available.
+
+/** Read the server address, falling back to the private `_serverAddress` field. */
+function readServerAddress(client: JellyfinApiClient): string {
+  return client.serverAddress?.() ?? client._serverAddress ?? ''
+}
+
+/** Read the access token, falling back to `_serverInfo.AccessToken`. */
+function readAccessToken(client: JellyfinApiClient): string {
+  return client.accessToken?.() ?? client._serverInfo?.AccessToken ?? ''
+}
+
 export function getPluginCredentials(): Credentials | null {
   const client = getPluginApiClient()
   if (!client) return null
 
-  const serverAddress = client.serverAddress?.() ?? client._serverAddress ?? ''
-  const accessToken =
-    client.accessToken?.() ?? client._serverInfo?.AccessToken ?? ''
+  const serverAddress = readServerAddress(client)
+  const accessToken = readAccessToken(client)
 
   return serverAddress && accessToken ? { serverAddress, accessToken } : null
 }
 
 export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
 
-const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
+/**
+ * User-agent patterns that identify Jellyfin desktop clients.
+ * Known values (case-insensitive):
+ *  - `JellyfinDesktop`      — Jellyfin Desktop (Electron-based)
+ *  - `JellyfinMediaPlayer`  — Jellyfin Media Player (Qt/mpv-based)
+ *
+ * Exported for reuse and testing.
+ */
+export const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
 
 /** Returns true when running inside a Jellyfin desktop client (Desktop or Media Player). */
 export function isJellyfinDesktopClient(): boolean {
@@ -108,7 +134,7 @@ export function isJellyfinDesktopClient(): boolean {
 export function getPluginServerAddress(): string {
   const client = getPluginApiClient()
   if (!client) return ''
-  return client.serverAddress?.() ?? client._serverAddress ?? ''
+  return readServerAddress(client)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
