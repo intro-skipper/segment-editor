@@ -137,6 +137,17 @@ export function getPluginServerAddress(): string {
   return readServerAddress(client)
 }
 
+/**
+ * Returns the standalone editor URL, using the plugin server address when
+ * available and falling back to a root-relative path.
+ */
+export function getStandaloneEditorUrl(): string {
+  const serverAddress = getPluginServerAddress()
+  return serverAddress
+    ? `${serverAddress.replace(/\/+$/, '')}/${APP_BASE_ROUTE}`
+    : `/${APP_BASE_ROUTE}`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Client Factory
 // ─────────────────────────────────────────────────────────────────────────────

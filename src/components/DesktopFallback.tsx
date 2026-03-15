@@ -4,20 +4,10 @@
  * Directs users to open the standalone browser version instead.
  */
 
-import {
-  APP_BASE_ROUTE,
-  getPluginServerAddress,
-} from '@/services/jellyfin/core'
-
-function getEditorUrl(): string {
-  const serverAddress = getPluginServerAddress()
-  return serverAddress
-    ? `${serverAddress.replace(/\/+$/, '')}/${APP_BASE_ROUTE}`
-    : `/${APP_BASE_ROUTE}`
-}
+import { getStandaloneEditorUrl } from '@/services/jellyfin/core'
 
 export function DesktopFallback() {
-  const editorUrl = getEditorUrl()
+  const editorUrl = getStandaloneEditorUrl()
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8 font-sans text-foreground">
