@@ -93,7 +93,9 @@ if (rootElement) {
   if (pluginMode && isJellyfinDesktopClient()) {
     root.render(
       <StrictMode>
-        <DesktopFallback />
+        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+          <DesktopFallback />
+        </TanStackQueryProvider.Provider>
       </StrictMode>,
     )
   } else {

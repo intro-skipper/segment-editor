@@ -120,6 +120,10 @@ export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
  *  - `JellyfinDesktop`      — Jellyfin Desktop (Electron-based)
  *  - `JellyfinMediaPlayer`  — Jellyfin Media Player (Qt/mpv-based)
  *
+ * To add a new desktop client variant, append its UA substring to the
+ * alternation (e.g. `JellyfinDesktop|JellyfinMediaPlayer|NewClient`).
+ * The pattern is tested via {@link isJellyfinDesktopClient}.
+ *
  * Exported for reuse and testing.
  */
 export const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
