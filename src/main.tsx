@@ -31,67 +31,87 @@ function renderDesktopFallback(container: HTMLElement): void {
     ? `${serverAddress.replace(/\/+$/, '')}/SegmentEditor`
     : '/SegmentEditor'
 
-  container.innerHTML = `
-    <div style="
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #09090b;
-      color: #fafafa;
-    ">
-      <div style="
-        max-width: 28rem;
-        width: 100%;
-        text-align: center;
-        border: 1px solid #27272a;
-        border-radius: 0.75rem;
-        padding: 2.5rem 2rem;
-        background: #18181b;
-      ">
-        <h1 style="margin: 0 0 0.75rem; font-size: 1.25rem; font-weight: 600;">
-          Segment Editor
-        </h1>
-        <p style="margin: 0 0 1.5rem; font-size: 0.875rem; color: #a1a1aa; line-height: 1.5;">
-          This app is not supported in the Jellyfin desktop client.
-          Please open it in your browser instead.
-        </p>
-        <a
-          href="${editorUrl}"
-          target="_blank"
-          rel="noopener noreferrer"
-          style="
-            display: inline-block;
-            padding: 0.5rem 1.25rem;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #fafafa;
-            background: #3b82f6;
-            border: none;
-            border-radius: 0.375rem;
-            text-decoration: none;
-            cursor: pointer;
-            margin-bottom: 1rem;
-          "
-        >Open in Browser</a>
-        <div style="
-          margin-top: 0.25rem;
-          padding: 0.625rem 1rem;
-          background: #09090b;
-          border: 1px solid #27272a;
-          border-radius: 0.375rem;
-          font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-          font-size: 0.8125rem;
-          color: #a1a1aa;
-          word-break: break-all;
-          user-select: all;
-          cursor: text;
-        ">${editorUrl}</div>
-      </div>
-    </div>
-  `
+  const wrapper = document.createElement('div')
+  Object.assign(wrapper.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    padding: '2rem',
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+    background: '#09090b',
+    color: '#fafafa',
+  })
+
+  const card = document.createElement('div')
+  Object.assign(card.style, {
+    maxWidth: '28rem',
+    width: '100%',
+    textAlign: 'center',
+    border: '1px solid #27272a',
+    borderRadius: '0.75rem',
+    padding: '2.5rem 2rem',
+    background: '#18181b',
+  })
+
+  const heading = document.createElement('h1')
+  Object.assign(heading.style, {
+    margin: '0 0 0.75rem',
+    fontSize: '1.25rem',
+    fontWeight: '600',
+  })
+  heading.textContent = 'Segment Editor'
+
+  const description = document.createElement('p')
+  Object.assign(description.style, {
+    margin: '0 0 1.5rem',
+    fontSize: '0.875rem',
+    color: '#a1a1aa',
+    lineHeight: '1.5',
+  })
+  description.textContent =
+    'This app is not supported in the Jellyfin desktop client. Please open it in your browser instead.'
+
+  const link = document.createElement('a')
+  link.href = editorUrl
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.textContent = 'Open in Browser'
+  Object.assign(link.style, {
+    display: 'inline-block',
+    padding: '0.5rem 1.25rem',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#fafafa',
+    background: '#3b82f6',
+    border: 'none',
+    borderRadius: '0.375rem',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    marginBottom: '1rem',
+  })
+
+  const urlDisplay = document.createElement('div')
+  Object.assign(urlDisplay.style, {
+    marginTop: '0.25rem',
+    padding: '0.625rem 1rem',
+    background: '#09090b',
+    border: '1px solid #27272a',
+    borderRadius: '0.375rem',
+    fontFamily:
+      "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+    fontSize: '0.8125rem',
+    color: '#a1a1aa',
+    wordBreak: 'break-all',
+    userSelect: 'all',
+    cursor: 'text',
+  })
+  urlDisplay.textContent = editorUrl
+
+  card.append(heading, description, link, urlDisplay)
+  wrapper.append(card)
+  container.append(wrapper)
 }
 
 // Create a new router instance
