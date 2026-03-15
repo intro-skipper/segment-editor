@@ -12,18 +12,20 @@ import * as TanStackQueryProvider from './integrations/tanstack-query/root-provi
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
 import {
+  APP_BASE_ROUTE,
   PLUGIN_ROUTER_BASE_PATH,
   PLUGIN_ROUTER_ENTRY,
+  isJellyfinDesktopClient,
   isPluginMode,
 } from './services/jellyfin/core'
+import { DesktopFallback } from './components/DesktopFallback'
 
 import './styles.css'
 
 // Create a new router instance
-
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 const pluginMode = isPluginMode()
-const pluginBuild = import.meta.env.BASE_URL.startsWith('/SegmentEditor/')
+const pluginBuild = import.meta.env.BASE_URL.startsWith(`/${APP_BASE_ROUTE}/`)
 
 // Use memory history in plugin mode, browser history otherwise
 const history = pluginMode
@@ -32,7 +34,7 @@ const history = pluginMode
 const basePath = pluginMode
   ? PLUGIN_ROUTER_BASE_PATH
   : pluginBuild
-    ? '/SegmentEditor'
+    ? `/${APP_BASE_ROUTE}`
     : '/'
 const router = createRouter({
   routeTree,
@@ -87,11 +89,22 @@ declare module '@tanstack/react-router' {
 const rootElement = document.getElementById('app')
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement)
-  root.render(
-    <StrictMode>
-      <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-        <RouterProvider router={router} />
-      </TanStackQueryProvider.Provider>
-    </StrictMode>,
-  )
+
+  if (pluginMode && isJellyfinDesktopClient()) {
+    root.render(
+      <StrictMode>
+        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+          <DesktopFallback />
+        </TanStackQueryProvider.Provider>
+      </StrictMode>,
+    )
+  } else {
+    root.render(
+      <StrictMode>
+        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+          <RouterProvider router={router} />
+        </TanStackQueryProvider.Provider>
+      </StrictMode>,
+    )
+  }
 }
