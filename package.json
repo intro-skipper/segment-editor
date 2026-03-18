@@ -64,7 +64,7 @@
     "eslint": "^10.0.3",
     "eslint-plugin-react-you-might-not-need-an-effect": "^0.9.2",
     "fast-check": "^4.6.0",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.0.0",
     "prettier": "^3.8.1",
     "shadcn": "^4.0.8",
     "tailwindcss": "^4.2.2",
