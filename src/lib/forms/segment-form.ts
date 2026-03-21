@@ -68,7 +68,9 @@ function parseUncheckedTimeText(value: string): number {
   return parts.reverse().reduce((sum, part, index) => {
     const parsed = Number(part)
     if (!Number.isFinite(parsed)) return Number.NaN
-    return sum + parsed * TIME_MULTIPLIERS[index]!
+    const multiplier = TIME_MULTIPLIERS[index]
+    if (multiplier === undefined) return Number.NaN
+    return sum + parsed * multiplier
   }, 0)
 }
 
