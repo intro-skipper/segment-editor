@@ -20,7 +20,7 @@ const ROUTE_MAP: Record<string, string> = {
  * Container types that should browse into their children
  * rather than opening the player/editor.
  */
-const CONTAINER_TYPES = new Set<string>([
+const CONTAINER_TYPES = new Set<BaseItemKind>([
   BaseItemKind.BoxSet,
   BaseItemKind.Folder,
   BaseItemKind.CollectionFolder,
@@ -54,7 +54,7 @@ function asRouteArg<TConsumer extends RouteConsumer>(
  * its children rather than opening the player.
  */
 function isContainerItem(item: BaseItemDto): boolean {
-  return CONTAINER_TYPES.has(item.Type ?? '')
+  return item.Type != null && CONTAINER_TYPES.has(item.Type)
 }
 
 /**
