@@ -121,6 +121,7 @@ export function useJassubRenderer({
   const rendererRef = useRef<JassubRendererResult | null>(null)
   const userOffsetRef = useRef(userOffset)
   const transcodingRef = useRef(transcodingOffsetTicks)
+  const itemRef = useRef(item)
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevActiveTrackRef = useRef(activeTrack)
   const prevItemIdRef = useRef(item?.Id)
@@ -128,6 +129,11 @@ export function useJassubRenderer({
 
   userOffsetRef.current = userOffset
   transcodingRef.current = transcodingOffsetTicks
+  itemRef.current = item
+
+  // Narrow primitive dep for the init effect — only re-run when the item
+  // identity changes, not when unrelated fields on the BaseItemDto mutate.
+  const itemId = item?.Id
 
   // Cleanup helper — also cancels any pending debounced resize to prevent
   // the timer from firing after the renderer has been destroyed.
@@ -199,7 +205,7 @@ export function useJassubRenderer({
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
 
     // Cleanup if no longer needed
-    if (!needsJassub || !video || !item?.Id) {
+    if (!needsJassub || !video || !itemId) {
       teardownRenderer()
       return
     }
@@ -210,7 +216,7 @@ export function useJassubRenderer({
     // and JASSUB must be re-created against the new element.
     if (
       activeTrack === prevActiveTrackRef.current &&
-      item.Id === prevItemIdRef.current &&
+      itemId === prevItemIdRef.current &&
       video === prevVideoRef.current &&
       rendererRef.current
     ) {
@@ -218,7 +224,7 @@ export function useJassubRenderer({
     }
 
     prevActiveTrackRef.current = activeTrack
-    prevItemIdRef.current = item.Id
+    prevItemIdRef.current = itemId
     prevVideoRef.current = video
 
     let cancelled = false
@@ -234,11 +240,17 @@ export function useJassubRenderer({
         await waitForVideoMetadata(video)
         if (cancelled) return
 
+        // Read latest item and transcodingOffsetTicks from refs at init time,
+        // not at effect setup time — avoids stale closure without adding them
+        // as deps that would cause unnecessary renderer teardown/recreation.
+        const currentItem = itemRef.current
+        const currentOffset = transcodingRef.current
+
         const result = await createJassubRenderer({
           video,
           track: activeTrack,
-          item,
-          transcodingOffsetTicks,
+          item: currentItem!,
+          transcodingOffsetTicks: currentOffset,
           userOffset: userOffsetRef.current,
         })
 
@@ -252,12 +264,12 @@ export function useJassubRenderer({
       }
     }
 
-    init()
+    void init()
 
     return () => {
       cancelled = true
     }
-  }, [activeTrack, item, videoRef, transcodingOffsetTicks, destroyRenderer])
+  }, [activeTrack, itemId, videoRef, destroyRenderer, teardownRenderer])
 
   const needsJassubNow =
     !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id

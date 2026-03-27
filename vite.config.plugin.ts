@@ -1,12 +1,19 @@
 import { defineConfig, mergeConfig } from 'vite'
-import baseConfig from './vite.config'
+import type { UserConfig } from 'vite'
+import baseConfig, { pwaPlugin } from './vite.config'
+
+const withoutPwa: UserConfig = {
+  ...baseConfig,
+  plugins: (baseConfig.plugins ?? []).filter((p) => p !== pwaPlugin),
+}
 
 export default defineConfig(
-  mergeConfig(baseConfig, {
+  mergeConfig(withoutPwa, {
     base: '/SegmentEditor/',
     build: {
       outDir: 'dist-plugin',
-      rollupOptions: {
+      rolldownOptions: {
+        external: ['virtual:pwa-register'],
         output: {
           entryFileNames: 'assets/[name].js',
           chunkFileNames: 'assets/[name].js',

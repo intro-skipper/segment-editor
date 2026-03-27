@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useForm, useStore } from '@tanstack/react-form'
 import { canGoBack, getPreviousStep } from './connection-wizard-flow'
@@ -74,6 +74,8 @@ export function useConnectionWizardController({
   const [isLoading, setIsLoading] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
 
+  const formRef = useRef<ConnectionWizardFormApi | null>(null)
+
   const handleFormSubmit = useCallback(
     async (value: ConnectionWizardFormValues) => {
       if (step === 'entry') {
@@ -110,7 +112,7 @@ export function useConnectionWizardController({
         setRequestError(null)
         setIsLoading(false)
         setStep('select')
-        form.setFieldValue(
+        formRef.current?.setFieldValue(
           'selectedServerAddress',
           nextSelectedServer?.address ?? '',
           {
@@ -158,6 +160,10 @@ export function useConnectionWizardController({
   )
 
   const form = useConnectionWizardForm(step, handleFormSubmit)
+
+  useEffect(() => {
+    formRef.current = form
+  }, [form])
 
   useEffect(() => {
     if (!open) {

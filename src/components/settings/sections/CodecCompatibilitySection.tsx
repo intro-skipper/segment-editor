@@ -6,7 +6,7 @@
  * @module components/settings/sections/CodecCompatibilitySection
  */
 
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
 
 import { SettingsSection } from '../primitives'
@@ -171,7 +171,7 @@ export function CodecCompatibilitySection() {
     codecCompatibilityReducer,
     initialCodecCompatibilityState,
   )
-  const supportedContainers = getDirectPlayContainers()
+  const supportedContainers = useMemo(() => getDirectPlayContainers(), [])
 
   const runCodecProbe = useCallback(async (clearProbeCache: boolean) => {
     if (clearProbeCache) {

@@ -37,13 +37,7 @@ useApiStore.subscribe((state, prev) => {
 // Public API - Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type {
-  ApiOptions,
-  AuthCredentials,
-  ApiKeyCredentials,
-  UserPassCredentials,
-  AuthResult,
-} from './types'
+export type { ApiOptions, AuthCredentials, AuthResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API - Core
