@@ -68,7 +68,7 @@ function parseUncheckedTimeText(value: string): number {
   return parts.reverse().reduce((sum, part, index) => {
     const parsed = Number(part)
     if (!Number.isFinite(parsed)) return Number.NaN
-    return sum + parsed * TIME_MULTIPLIERS[index]!
+    return sum + parsed * TIME_MULTIPLIERS[index]
   }, 0)
 }
 
@@ -222,7 +222,7 @@ export function getSegmentDraftState(
   }
 }
 
-export function parseSegmentFormValues(
+function parseSegmentFormValues(
   values: SegmentFormValues,
   maxDuration?: number | null,
 ):

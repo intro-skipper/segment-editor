@@ -110,7 +110,7 @@ export function useConnectionInit(): ConnectionState {
       setHasValidated(true)
     }
 
-    init()
+    void init()
     return () => controller.abort()
   }, [isPlugin, validAuth, serverAddress, apiKey])
 

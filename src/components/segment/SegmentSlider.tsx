@@ -242,16 +242,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       end: segment.EndTicks ?? 0,
     })
     form.reset(getSegmentFormDefaults(segment))
-  }, [
-    form,
-    segment.Id,
-    segment.StartTicks,
-    segment.EndTicks,
-    segment.Type,
-    isDragging,
-    activeInput,
-    updateStableRange,
-  ])
+  }, [form, segment, isDragging, activeInput, updateStableRange])
 
   const segmentColor = getSegmentColor(formValues.type)
   const segmentCssVar = getSegmentCssVar(formValues.type)
@@ -476,6 +467,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [
       applyDraftBoundary,
       commitSegmentUpdate,
+      form,
       runtimeSeconds,
       frameStep,
       validation.valid,

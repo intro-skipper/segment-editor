@@ -48,6 +48,12 @@ import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
 import { SegmentLoadingState } from '@/components/ui/async-state'
 
+/** Shared style for content-visibility virtualization on segment cards. */
+const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: '0 280px',
+}
+
 interface PlayerEditorProps {
   /** Media item to edit segments for */
   item: BaseItemDto
@@ -634,10 +640,7 @@ function useRenderPlayerEditor({
             {editingSegments.map((segment, index) => (
               <div
                 key={segment.Id ?? `segment-${index}`}
-                style={{
-                  contentVisibility: 'auto',
-                  containIntrinsicSize: '0 280px',
-                }}
+                style={SEGMENT_VIRTUALIZATION_STYLE}
               >
                 <SegmentSlider
                   segment={segment}

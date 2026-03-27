@@ -136,7 +136,7 @@ export async function createJassubRenderer(
       ),
     ),
   ]).catch((err) => {
-    instance.destroy()
+    void instance.destroy()
     throw err
   })
 
@@ -148,7 +148,7 @@ export async function createJassubRenderer(
       if (destroyed) return
       destroyed = true
       try {
-        instance.destroy()
+        void instance.destroy()
       } catch {
         // Ignore
       }

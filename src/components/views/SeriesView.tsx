@@ -225,7 +225,7 @@ function SeasonEpisodes({
 
   const handleEpisodeClick = React.useCallback(
     (episodeId: string) => {
-      navigate({
+      void navigate({
         to: '/player/$itemId',
         params: { itemId: episodeId },
         search: { fetchSegments: 'true' },
