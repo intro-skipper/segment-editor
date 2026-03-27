@@ -125,7 +125,7 @@ export async function getItems(
         sortOrder: [...SORT_ASCENDING],
         isMissing: false,
         excludeItemTypes,
-        recursive: !!searchTerm,
+        recursive: true,
         fields: includeMediaStreams
           ? [ItemFields.MediaStreams, ItemFields.MediaSources]
           : undefined,
