@@ -570,7 +570,10 @@ export function useVideoPlayer({
       }
 
       isActiveRef.current = false
-      playbackRequestIdRef.current = requestId + 1
+      playbackRequestIdRef.current = Math.max(
+        playbackRequestIdRef.current,
+        requestId + 1,
+      )
       intentionalSwitchRef.current = false
       pendingHlsStateRestoreRef.current = false
       clearHlsStateRestoreSubscription()

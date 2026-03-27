@@ -121,6 +121,7 @@ export function useJassubRenderer({
   const rendererRef = useRef<JassubRendererResult | null>(null)
   const userOffsetRef = useRef(userOffset)
   const transcodingRef = useRef(transcodingOffsetTicks)
+  const itemRef = useRef(item)
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevActiveTrackRef = useRef(activeTrack)
   const prevItemIdRef = useRef(item?.Id)
@@ -128,6 +129,7 @@ export function useJassubRenderer({
 
   userOffsetRef.current = userOffset
   transcodingRef.current = transcodingOffsetTicks
+  itemRef.current = item
 
   // Narrow primitive dep for the init effect — only re-run when the item
   // identity changes, not when unrelated fields on the BaseItemDto mutate.
@@ -197,21 +199,7 @@ export function useJassubRenderer({
     console.error('[JASSUB] Init error:', err)
   })
 
-  /**
-   * Captures latest `item` and `transcodingOffsetTicks` for the init effect
-   * so that only genuinely reactive values (activeTrack, videoRef, item.Id)
-   * trigger renderer teardown/recreation.
-   */
-  const getInitParams = useEffectEvent(() => ({
-    item,
-    transcodingOffsetTicks,
-  }))
-
   // Main effect: create/destroy renderer based on track
-  // oxlint-disable-next-line react-hooks/exhaustive-deps -- item and
-  // transcodingOffsetTicks are read via getInitParams useEffectEvent so that
-  // object-identity changes to `item` (same Id) and ticking offset updates
-  // don't teardown+recreate the renderer unnecessarily.
   useEffect(() => {
     const video = videoRef.current
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
@@ -252,10 +240,11 @@ export function useJassubRenderer({
         await waitForVideoMetadata(video)
         if (cancelled) return
 
-        // Read latest item and transcodingOffsetTicks at init time, not at
-        // effect setup time — avoids stale closure without adding them as deps.
-        const { item: currentItem, transcodingOffsetTicks: currentOffset } =
-          getInitParams()
+        // Read latest item and transcodingOffsetTicks from refs at init time,
+        // not at effect setup time — avoids stale closure without adding them
+        // as deps that would cause unnecessary renderer teardown/recreation.
+        const currentItem = itemRef.current
+        const currentOffset = transcodingRef.current
 
         const result = await createJassubRenderer({
           video,

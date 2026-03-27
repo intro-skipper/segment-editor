@@ -27,6 +27,7 @@ import {
 
 import { AnimatePresence, m, useIsPresent } from 'motion/react'
 import type { ReactNode } from 'react'
+import type { BaseItemDto } from '@/types/jellyfin'
 import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
@@ -91,7 +92,7 @@ const getCollectionIcon = (name: string) => {
 }
 
 // Stable empty array to avoid re-creating a new reference every render
-const EMPTY_ITEMS: Array<never> = []
+const EMPTY_ITEMS: Array<BaseItemDto> = []
 
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
