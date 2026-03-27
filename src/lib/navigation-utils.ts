@@ -54,8 +54,7 @@ function asRouteArg<TConsumer extends RouteConsumer>(
  * its children rather than opening the player.
  */
 function isContainerItem(item: BaseItemDto): boolean {
-  if (item.IsFolder && CONTAINER_TYPES.has(item.Type ?? '')) return true
-  return false
+  return CONTAINER_TYPES.has(item.Type ?? '')
 }
 
 /**
