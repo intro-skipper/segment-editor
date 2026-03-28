@@ -84,7 +84,7 @@ declare module '@tanstack/react-router' {
 }
 
 // Render the app
-const rootElement = document.getElementById('app')
+const rootElement = document.getElementById('segment-editor-root')
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
