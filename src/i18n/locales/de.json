@@ -1,6 +1,7 @@
 {
   "accessibility": {
     "copySegment": "Segment in Zwischenablage kopieren",
+    "shareSegment": "Segment mit SkipMe.db teilen",
     "deleteSegment": "Segment löschen",
     "seekToStart": "Zur Startzeit springen",
     "seekToEnd": "Zur Endzeit springen",
@@ -142,7 +143,17 @@
     },
     "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
-    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert"
+    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
+    "share": {
+      "button": "Mit SkipMe.db teilen",
+      "success": "Segment mit SkipMe.db geteilt",
+      "unsupportedType": "Segmenttyp kann nicht mit SkipMe.db geteilt werden",
+      "noIds": "Teilen nicht möglich: keine TMDB- oder TVDB-ID",
+      "noDuration": "Teilen nicht möglich: Episodendauer unbekannt",
+      "invalidTiming": "Teilen nicht möglich: ungültige Segmentzeitstempel",
+      "exceedsDuration": "Teilen nicht möglich: Segment überschreitet Episodendauer",
+      "failed": "Teilen mit SkipMe.db fehlgeschlagen"
+    }
   },
   "yes": "Ja",
   "no": "Nein",

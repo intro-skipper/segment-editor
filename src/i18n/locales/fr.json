@@ -1,6 +1,7 @@
 {
   "accessibility": {
     "copySegment": "Copier le segment dans le presse-papiers",
+    "shareSegment": "Partager le segment avec SkipMe.db",
     "deleteSegment": "Supprimer le segment",
     "seekToStart": "Aller au temps de début",
     "seekToEnd": "Aller au temps de fin",
@@ -82,7 +83,17 @@
     },
     "noSegments": "Aucun segment disponible, créez-en un avec '+'",
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
-    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers"
+    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
+    "share": {
+      "button": "Partager avec SkipMe.db",
+      "success": "Segment partagé avec SkipMe.db",
+      "unsupportedType": "Ce type de segment ne peut pas être partagé avec SkipMe.db",
+      "noIds": "Partage impossible : aucun identifiant TMDB ou TVDB",
+      "noDuration": "Partage impossible : durée de l'épisode inconnue",
+      "invalidTiming": "Partage impossible : horodatage du segment invalide",
+      "exceedsDuration": "Partage impossible : le segment dépasse la durée de l'épisode",
+      "failed": "Échec du partage avec SkipMe.db"
+    }
   },
   "yes": "Oui",
   "no": "Non",
