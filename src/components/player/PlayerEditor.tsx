@@ -4,6 +4,7 @@
  */
 
 import * as React from 'react'
+import axios from 'axios'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
@@ -30,6 +31,10 @@ import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
+import {
+  submitSegmentToSkipMe,
+  toSkipMeSegmentType,
+} from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
@@ -573,6 +578,102 @@ function useRenderPlayerEditor({
     setImportDialogOpen(false)
   }, [])
 
+  // Share a segment to SkipMe.db
+  const handleShareSegment = React.useCallback(
+    async (segment: MediaSegmentDto) => {
+      const skipMeType = toSkipMeSegmentType(segment.Type)
+      if (skipMeType === null) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.unsupportedType'),
+        })
+        return
+      }
+
+      const providerIds = (item as { ProviderIds?: Record<string, string> })
+        .ProviderIds
+
+      // Parse a provider ID string to a valid integer, returning undefined for
+      // missing or non-numeric values.
+      const parseId = (value: string | undefined): number | undefined => {
+        if (!value) return undefined
+        const n = parseInt(value, 10)
+        return Number.isNaN(n) ? undefined : n
+      }
+
+      const tmdbId = parseId(providerIds?.Tmdb)
+      const tvdbId = parseId(providerIds?.Tvdb)
+
+      if (tmdbId === undefined && tvdbId === undefined) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.noIds'),
+        })
+        return
+      }
+
+      const durationMs = item.RunTimeTicks
+        ? Math.round(item.RunTimeTicks / 10_000)
+        : undefined
+      if (!durationMs || durationMs <= 0) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.noDuration'),
+        })
+        return
+      }
+
+      // StartTicks/EndTicks are stored in seconds by toUiSegment in the segment
+      // API service layer. Convert to milliseconds for the SkipMe.db API.
+      const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
+      const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
+
+      if (startMs >= endMs) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.invalidTiming'),
+        })
+        return
+      }
+
+      if (endMs > durationMs) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.exceedsDuration'),
+        })
+        return
+      }
+
+      try {
+        await submitSegmentToSkipMe({
+          tmdb_id: tmdbId,
+          tvdb_id: tvdbId,
+          segment: skipMeType,
+          season: item.ParentIndexNumber ?? undefined,
+          episode: item.IndexNumber ?? undefined,
+          duration_ms: durationMs,
+          start_ms: startMs,
+          end_ms: endMs,
+        })
+        showNotification({
+          type: 'positive',
+          message: t('editor.share.success'),
+        })
+      } catch (e) {
+        const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+        showNotification({
+          type: 'negative',
+          message: t(
+            isForbidden
+              ? 'editor.share.clientNotSupported'
+              : 'editor.share.failed',
+          ),
+        })
+      }
+    },
+    [item, t],
+  )
+
   // Keyboard shortcut: Mod+S to save all segments
   useHotkey('Mod+S', () => {
     void handleSaveAll()
@@ -655,6 +756,7 @@ function useRenderPlayerEditor({
                   onSetActive={setActiveIndex}
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
+                  onShare={handleShareSegment}
                   vibrantColors={vibrantColors}
                 />
               </div>
