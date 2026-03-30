@@ -34,7 +34,6 @@ export function toSkipMeSegmentType(type: string | undefined): string | null {
 
 export interface SkipMeSubmitRequest {
   tmdb_id?: number
-  tvdb_season_id?: number
   tvdb_id?: number
   segment: string
   season?: number

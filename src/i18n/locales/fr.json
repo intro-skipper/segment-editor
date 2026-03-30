@@ -92,6 +92,7 @@
       "noDuration": "Partage impossible : durée de l'épisode inconnue",
       "invalidTiming": "Partage impossible : horodatage du segment invalide",
       "exceedsDuration": "Partage impossible : le segment dépasse la durée de l'épisode",
+      "clientNotSupported": "Partage impossible : votre client n'est pas pris en charge",
       "failed": "Échec du partage avec SkipMe.db"
     }
   },

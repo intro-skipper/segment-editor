@@ -4,6 +4,7 @@
  */
 
 import * as React from 'react'
+import axios from 'axios'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
@@ -646,7 +647,6 @@ function useRenderPlayerEditor({
       try {
         await submitSegmentToSkipMe({
           tmdb_id: tmdbId,
-          tvdb_season_id: parseId(providerIds?.TvdbSeason),
           tvdb_id: tvdbId,
           segment: skipMeType,
           season: item.ParentIndexNumber ?? undefined,
@@ -659,10 +659,15 @@ function useRenderPlayerEditor({
           type: 'positive',
           message: t('editor.share.success'),
         })
-      } catch {
+      } catch (e) {
+        const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
         showNotification({
           type: 'negative',
-          message: t('editor.share.failed'),
+          message: t(
+            isForbidden
+              ? 'editor.share.clientNotSupported'
+              : 'editor.share.failed',
+          ),
         })
       }
     },

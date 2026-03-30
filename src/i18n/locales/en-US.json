@@ -152,6 +152,7 @@
       "noDuration": "Cannot share: episode duration unknown",
       "invalidTiming": "Cannot share: segment timing invalid",
       "exceedsDuration": "Cannot share: segment exceeds episode duration",
+      "clientNotSupported": "Cannot share: your client is not supported",
       "failed": "Failed to share with SkipMe.db"
     }
   },

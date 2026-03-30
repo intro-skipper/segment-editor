@@ -152,6 +152,7 @@
       "noDuration": "Teilen nicht möglich: Episodendauer unbekannt",
       "invalidTiming": "Teilen nicht möglich: ungültige Segmentzeitstempel",
       "exceedsDuration": "Teilen nicht möglich: Segment überschreitet Episodendauer",
+      "clientNotSupported": "Teilen nicht möglich: Ihr Client wird nicht unterstützt",
       "failed": "Teilen mit SkipMe.db fehlgeschlagen"
     }
   },
