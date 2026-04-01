@@ -54,8 +54,8 @@ importers:
         specifier: ^26.0.1
         version: 26.0.3(typescript@6.0.2)
       jassub:
-        specifier: 2.4.1
-        version: 2.4.1
+        specifier: 2.4.2
+        version: 2.4.2
       lucide-react:
         specifier: ^1.7.0
         version: 1.7.0(react@19.2.4)
@@ -3150,8 +3150,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  jassub@2.4.1:
-    resolution: {integrity: sha512-gwCy1hkDvgrPSIQpdBa8/LZe6Pp5/Jq508ZX4KK+ABnWAe31yD6LGBNJCDTyIaXwtxahDFkbZUin6pwvx1wtVA==}
+  jassub@2.4.2:
+    resolution: {integrity: sha512-qWECKZWADUYAlXrzTEKPw+zY06XNy4tuZhTTWyk/ML+axRSMuOcbI0tAxL6tdXg+wdROd+EZU83SQFh/frugCg==}
 
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
@@ -7731,7 +7731,7 @@ snapshots:
       filelist: 1.0.6
       picocolors: 1.1.1
 
-  jassub@2.4.1:
+  jassub@2.4.2:
     dependencies:
       abslink: 1.1.6
       lfa-ponyfill: 1.1.0
