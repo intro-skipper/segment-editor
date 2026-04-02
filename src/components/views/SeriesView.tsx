@@ -6,7 +6,8 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Play } from 'lucide-react'
+import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
+import axios from 'axios'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
@@ -14,12 +15,21 @@ import { useEpisodes } from '@/hooks/queries/use-items'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
+import { Button } from '@/components/ui/button'
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
+import { showNotification } from '@/lib/notifications'
+import { getEpisodes } from '@/services/items/api'
+import { getSegmentsById } from '@/services/segments/api'
+import {
+  submitCollectionToSkipMe,
+  toSkipMeSegmentType,
+  type SkipMeSubmitRequest,
+} from '@/services/skipme/api'
 
 interface SeriesViewProps {
   /** The series item */
@@ -286,6 +296,145 @@ function SeasonEpisodes({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SubmitAllButton - Submits all series segments to SkipMe.db
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SubmitAllButtonProps {
+  series: BaseItemDto
+  seasons: Array<BaseItemDto>
+}
+
+/** Parse a provider ID string to a valid integer, returning undefined for missing or non-numeric values. */
+const parseProviderId = (value: string | undefined): number | undefined => {
+  if (!value) return undefined
+  const n = parseInt(value, 10)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
+  const { t } = useTranslation()
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  const handleSubmitAll = React.useCallback(async () => {
+    if (!series.Id) return
+    setIsSubmitting(true)
+    try {
+      const seriesProviderIds = (
+        series as { ProviderIds?: Record<string, string> }
+      ).ProviderIds
+
+      const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
+      const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
+      const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
+
+      const requests: Array<SkipMeSubmitRequest> = []
+
+      for (const season of seasons) {
+        if (!season.Id) continue
+
+        const seasonProviderIds = (
+          season as { ProviderIds?: Record<string, string> }
+        ).ProviderIds
+        const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
+
+        const episodes = await getEpisodes(series.Id, season.Id)
+
+        for (const episode of episodes) {
+          if (!episode.Id) continue
+
+          const episodeProviderIds = (
+            episode as { ProviderIds?: Record<string, string> }
+          ).ProviderIds
+          const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
+
+          // Skip episodes where no ID will be provided
+          if (
+            seriesTmdbId === undefined &&
+            episodeTvdbId === undefined &&
+            seriesAniListId === undefined
+          ) {
+            continue
+          }
+
+          const durationMs = episode.RunTimeTicks
+            ? Math.round(episode.RunTimeTicks / 10_000)
+            : undefined
+          if (!durationMs || durationMs <= 0) continue
+
+          const segments = await getSegmentsById(episode.Id)
+
+          for (const segment of segments) {
+            const skipMeType = toSkipMeSegmentType(segment.Type)
+            if (!skipMeType) continue
+
+            const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
+            const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
+
+            if (startMs >= endMs || endMs > durationMs) continue
+
+            requests.push({
+              tmdb_id: seriesTmdbId,
+              tvdb_id: episodeTvdbId,
+              anilist_id: seriesAniListId,
+              tvdb_series_id: seriesTvdbId,
+              tvdb_season_id: tvdbSeasonId,
+              segment: skipMeType,
+              season: episode.ParentIndexNumber ?? undefined,
+              episode: episode.IndexNumber ?? undefined,
+              duration_ms: durationMs,
+              start_ms: startMs,
+              end_ms: endMs,
+            })
+          }
+        }
+      }
+
+      if (requests.length === 0) {
+        showNotification({
+          type: 'warning',
+          message: t('series.submitAllNone'),
+        })
+        return
+      }
+
+      await submitCollectionToSkipMe(requests)
+      showNotification({
+        type: 'positive',
+        message: t('series.submitAllSuccess', { count: requests.length }),
+      })
+    } catch (e) {
+      const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+      showNotification({
+        type: 'negative',
+        message: t(
+          isForbidden
+            ? 'series.submitAllClientNotSupported'
+            : 'series.submitAllFailed',
+        ),
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [series, seasons, t])
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleSubmitAll}
+      disabled={isSubmitting}
+      aria-busy={isSubmitting}
+    >
+      {isSubmitting ? (
+        <Loader2 className="animate-spin" aria-hidden="true" />
+      ) : (
+        <Share2 aria-hidden="true" />
+      )}
+      {t('series.submitAll')}
+    </Button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SeriesView - Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -349,6 +498,12 @@ export function SeriesView({
           />
         )}
       </div>
+
+      {series.Id && (
+        <div className="mt-6 md:mt-8 flex justify-center">
+          <SubmitAllButton series={series} seasons={seasons} />
+        </div>
+      )}
     </div>
   )
 }

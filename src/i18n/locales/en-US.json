@@ -313,7 +313,12 @@
     "seasonNumber": "Season {{number}}",
     "episodes": "Episodes",
     "loadError": "Failed to load episodes",
-    "episode": "Episode"
+    "episode": "Episode",
+    "submitAll": "Submit All to SkipMe.db",
+    "submitAllSuccess": "{{count}} segments submitted to SkipMe.db",
+    "submitAllNone": "No submittable segments found",
+    "submitAllFailed": "Failed to submit segments to SkipMe.db",
+    "submitAllClientNotSupported": "Cannot submit: your client is not supported"
   },
   "search": {
     "open": "Open search",

@@ -2,8 +2,10 @@
  * SkipMe.db API service.
  * Handles submission of media segments to the crowd-sourced SkipMe.db database.
  *
- * API endpoint: POST https://db.skipme.workers.dev/v1/submit
- * At least one of tmdbId or tvdbId is required per submission.
+ * API endpoints:
+ * - POST https://db.skipme.workers.dev/v1/submit  (single segment)
+ * - POST https://db.skipme.workers.dev/v1/collection  (batch)
+ * At least one of tmdb_id, tvdb_id, or anilist_id is required per submission.
  *
  * Security: Request body is strictly typed; no user-controlled URL construction.
  */
@@ -35,6 +37,9 @@ export function toSkipMeSegmentType(type: string | undefined): string | null {
 export interface SkipMeSubmitRequest {
   tmdb_id?: number
   tvdb_id?: number
+  anilist_id?: number
+  tvdb_season_id?: number
+  tvdb_series_id?: number
   segment: string
   season?: number
   episode?: number
@@ -51,6 +56,11 @@ export interface SkipMeSubmitResponse {
   }
 }
 
+export interface SkipMeCollectionSubmitResponse {
+  ok: boolean
+  submitted?: number
+}
+
 /**
  * Submits a single segment to the SkipMe.db API.
  * Throws on network error or non-2xx response.
@@ -61,6 +71,21 @@ export async function submitSegmentToSkipMe(
   const response = await axios.post<SkipMeSubmitResponse>(
     `${SKIPME_BASE_URL}/v1/submit`,
     request,
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+  return response.data
+}
+
+/**
+ * Submits a collection of segments to the SkipMe.db API.
+ * Throws on network error or non-2xx response.
+ */
+export async function submitCollectionToSkipMe(
+  requests: Array<SkipMeSubmitRequest>,
+): Promise<SkipMeCollectionSubmitResponse> {
+  const response = await axios.post<SkipMeCollectionSubmitResponse>(
+    `${SKIPME_BASE_URL}/v1/collection`,
+    requests,
     { headers: { 'Content-Type': 'application/json' } },
   )
   return response.data
