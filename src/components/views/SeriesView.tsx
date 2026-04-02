@@ -327,65 +327,79 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
       const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
       const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
 
+      const validSeasons = seasons.filter((s) => !!s.Id)
+
+      // Fetch all seasons' episodes in parallel
+      const episodesPerSeason = await Promise.all(
+        validSeasons.map((season) => getEpisodes(series.Id!, season.Id!)),
+      )
+
+      // Flatten to (episode, season) pairs, keeping only episodes with an ID
+      const episodeEntries = episodesPerSeason.flatMap((episodes, i) =>
+        episodes
+          .filter((e) => !!e.Id)
+          .map((episode) => ({ episode, season: validSeasons[i]! })),
+      )
+
+      // Fetch all episodes' segments in parallel
+      const segmentsPerEpisode = await Promise.all(
+        episodeEntries.map(({ episode }) => getSegmentsById(episode.Id!)),
+      )
+
       const requests: Array<SkipMeSubmitRequest> = []
 
-      for (const season of seasons) {
-        if (!season.Id) continue
+      for (let i = 0; i < episodeEntries.length; i++) {
+        const { episode, season } = episodeEntries[i]!
+        const segments = segmentsPerEpisode[i]!
 
         const seasonProviderIds = (
           season as { ProviderIds?: Record<string, string> }
         ).ProviderIds
         const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
 
-        const episodes = await getEpisodes(series.Id, season.Id)
+        const episodeProviderIds = (
+          episode as { ProviderIds?: Record<string, string> }
+        ).ProviderIds
+        const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
 
-        for (const episode of episodes) {
-          if (!episode.Id) continue
+        // Skip episodes where no ID will be provided
+        if (
+          seriesTmdbId === undefined &&
+          episodeTvdbId === undefined &&
+          seriesAniListId === undefined
+        ) {
+          continue
+        }
 
-          const episodeProviderIds = (
-            episode as { ProviderIds?: Record<string, string> }
-          ).ProviderIds
-          const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
+        const durationMs = episode.RunTimeTicks
+          ? Math.round(episode.RunTimeTicks / 10_000)
+          : undefined
+        if (!durationMs || durationMs <= 0) continue
 
-          // Skip episodes where no ID will be provided
-          if (
-            seriesTmdbId === undefined &&
-            episodeTvdbId === undefined &&
-            seriesAniListId === undefined
-          ) {
-            continue
-          }
+        for (const segment of segments) {
+          const skipMeType = toSkipMeSegmentType(segment.Type)
+          if (!skipMeType) continue
 
-          const durationMs = episode.RunTimeTicks
-            ? Math.round(episode.RunTimeTicks / 10_000)
-            : undefined
-          if (!durationMs || durationMs <= 0) continue
+          // StartTicks/EndTicks are stored in seconds by toUiSegment in the
+          // segment API service layer. Convert to milliseconds for SkipMe.db.
+          const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
+          const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
 
-          const segments = await getSegmentsById(episode.Id)
+          if (startMs >= endMs || endMs > durationMs) continue
 
-          for (const segment of segments) {
-            const skipMeType = toSkipMeSegmentType(segment.Type)
-            if (!skipMeType) continue
-
-            const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
-            const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
-
-            if (startMs >= endMs || endMs > durationMs) continue
-
-            requests.push({
-              tmdb_id: seriesTmdbId,
-              tvdb_id: episodeTvdbId,
-              anilist_id: seriesAniListId,
-              tvdb_series_id: seriesTvdbId,
-              tvdb_season_id: tvdbSeasonId,
-              segment: skipMeType,
-              season: episode.ParentIndexNumber ?? undefined,
-              episode: episode.IndexNumber ?? undefined,
-              duration_ms: durationMs,
-              start_ms: startMs,
-              end_ms: endMs,
-            })
-          }
+          requests.push({
+            tmdb_id: seriesTmdbId,
+            tvdb_id: episodeTvdbId,
+            anilist_id: seriesAniListId,
+            tvdb_series_id: seriesTvdbId,
+            tvdb_season_id: tvdbSeasonId,
+            segment: skipMeType,
+            season: episode.ParentIndexNumber ?? undefined,
+            episode: episode.IndexNumber ?? undefined,
+            duration_ms: durationMs,
+            start_ms: startMs,
+            end_ms: endMs,
+          })
         }
       }
 
