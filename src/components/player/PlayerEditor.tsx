@@ -603,9 +603,9 @@ function useRenderPlayerEditor({
 
       const tmdbId = parseId(providerIds?.Tmdb)
       const tvdbId = parseId(providerIds?.Tvdb)
-      const anilistId = parseId(providerIds?.AniList)
+      const aniListId = parseId(providerIds?.AniList)
 
-      if (tmdbId === undefined && tvdbId === undefined && anilistId === undefined) {
+      if (tmdbId === undefined && tvdbId === undefined && aniListId === undefined) {
         showNotification({
           type: 'negative',
           message: t('editor.share.noIds'),
@@ -649,7 +649,7 @@ function useRenderPlayerEditor({
         await submitSegmentToSkipMe({
           tmdb_id: tmdbId,
           tvdb_id: tvdbId,
-          anilist_id: anilistId,
+          anilist_id: aniListId,
           segment: skipMeType,
           season: item.ParentIndexNumber ?? undefined,
           episode: item.IndexNumber ?? undefined,
