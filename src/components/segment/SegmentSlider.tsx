@@ -11,6 +11,7 @@ import {
   GripVertical,
   Pencil,
   Play,
+  Share2,
   Trash2,
 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
@@ -98,6 +99,8 @@ interface SegmentSliderProps {
   getPlayerTime?: () => number | undefined
   /** Callback to copy all segments to system clipboard as JSON */
   onCopyAllAsJson?: () => void
+  /** Callback to share this segment with SkipMe.db */
+  onShare?: (segment: MediaSegmentDto) => Promise<void>
   /** Callback to open the segment edit dialog */
   onEdit?: (index: number) => void
   /** Vibrant theme colors derived from the current item artwork */
@@ -120,6 +123,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   onSetActive,
   getPlayerTime,
   onCopyAllAsJson,
+  onShare,
   onEdit,
   vibrantColors,
 }: SegmentSliderProps) {
@@ -132,6 +136,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
     null,
   )
+  const [isSharing, setIsSharing] = React.useState(false)
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
   const [activeInput, setActiveInput] = React.useState<'start' | 'end' | null>(
     null,
@@ -504,6 +509,23 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     onCopyAllAsJson?.()
   }, [onCopyAllAsJson])
 
+  // Share current segment to SkipMe.db
+  const handleShare = React.useCallback(async () => {
+    if (!onShare || isSharing) return
+    const nextSegment = buildSegmentFromFormValues(
+      segment,
+      formValues,
+      runtimeSeconds,
+    )
+    const segmentToShare = nextSegment.success ? nextSegment.segment : segment
+    setIsSharing(true)
+    try {
+      await onShare(segmentToShare)
+    } finally {
+      setIsSharing(false)
+    }
+  }, [formValues, isSharing, onShare, runtimeSeconds, segment])
+
   const handleDelete = React.useCallback(
     () => onDelete(index),
     [index, onDelete],
@@ -709,6 +731,24 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           </span>
         </div>
         <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          {/* Share button */}
+          {onShare && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleShare}
+              disabled={isSharing}
+              aria-label={t('accessibility.shareSegment')}
+              aria-busy={isSharing}
+              className="hover:bg-primary/10"
+            >
+              <Share2
+                className="size-4"
+                aria-hidden="true"
+                style={isSharing ? undefined : iconStyle}
+              />
+            </Button>
+          )}
           {/* Copy dropdown menu */}
           <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
             <DropdownMenuTrigger
