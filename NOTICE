@@ -1,0 +1,49 @@
+Segment Editor — Notices
+========================
+
+Software License
+----------------
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, version 3 only.
+
+See the LICENSE file for the full GPL-3.0-only text.
+
+The following additional terms apply to this program pursuant to Section 7
+of the GNU General Public License, version 3:
+
+  (i)  You must retain this NOTICE file, unmodified, in all copies or
+       substantial portions of the software (GPL-3.0 Section 7(b)).
+
+  (ii) You may not misrepresent the origin of the segment timestamp data
+       created or modified by this software (GPL-3.0 Section 7(c)).
+
+Segment Data Terms
+------------------
+The media segment timestamp data created, edited, or exported by this plugin
+and stored through the Jellyfin MediaSegments API is community-contributed
+data and is distinct from the plugin's source code.  It is NOT licensed
+under the GPL.
+
+The segment timestamp data ("Segment Data") is provided solely to supply
+media segment positions to the Jellyfin media server through this plugin.
+By using this plugin you agree that:
+
+  1. The Segment Data may only be used to provide skip-segment information
+     within the Jellyfin media server via this plugin or compatible
+     Intro Skipper tooling.
+
+  2. Extraction, redistribution, or use of the Segment Data for any purpose
+     other than providing media segments within Jellyfin — including but
+     not limited to populating competing or alternative skip-segment
+     services, automated harvesting, or bulk redistribution — is not
+     permitted without the express written consent of the Intro Skipper
+     project maintainers (https://github.com/intro-skipper).
+
+  3. The Segment Data must not be presented as independently collected or
+     owned by any party other than the contributors who created it.
+
+Note: These data terms govern only the segment timestamp data produced
+by this software.  Your rights to use, study, modify, and distribute the
+software source code remain fully governed by GPL-3.0-only and are not
+affected by the data terms above.
