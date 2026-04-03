@@ -26,6 +26,16 @@ const SKIPME_TYPE_MAP: Partial<Record<string, string>> = {
 }
 
 /**
+ * Parses a provider ID string to a valid integer.
+ * Returns undefined for missing, empty, or non-numeric values.
+ */
+export function parseProviderId(value: string | undefined): number | undefined {
+  if (!value) return undefined
+  const n = parseInt(value, 10)
+  return Number.isNaN(n) ? undefined : n
+}
+
+/**
  * Converts a Jellyfin segment type string to its SkipMe.db equivalent.
  * Returns null for unsupported types (Commercial, Unknown).
  */

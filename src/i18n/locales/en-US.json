@@ -318,7 +318,8 @@
     "submitAllSuccess": "{{count}} segments submitted to SkipMe.db",
     "submitAllNone": "No submittable segments found",
     "submitAllFailed": "Failed to submit segments to SkipMe.db",
-    "submitAllClientNotSupported": "Cannot submit: your client is not supported"
+    "submitAllClientNotSupported": "Cannot submit: your client is not supported",
+    "submitAllPartial": "Only {{submitted}} of {{count}} segments were accepted by SkipMe.db"
   },
   "search": {
     "open": "Open search",

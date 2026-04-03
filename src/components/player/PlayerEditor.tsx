@@ -34,6 +34,7 @@ import {
 import {
   submitSegmentToSkipMe,
   toSkipMeSegmentType,
+  parseProviderId,
 } from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -593,17 +594,9 @@ function useRenderPlayerEditor({
       const providerIds = (item as { ProviderIds?: Record<string, string> })
         .ProviderIds
 
-      // Parse a provider ID string to a valid integer, returning undefined for
-      // missing or non-numeric values.
-      const parseId = (value: string | undefined): number | undefined => {
-        if (!value) return undefined
-        const n = parseInt(value, 10)
-        return Number.isNaN(n) ? undefined : n
-      }
-
-      const tmdbId = parseId(providerIds?.Tmdb)
-      const tvdbId = parseId(providerIds?.Tvdb)
-      const aniListId = parseId(providerIds?.AniList)
+      const tmdbId = parseProviderId(providerIds?.Tmdb)
+      const tvdbId = parseProviderId(providerIds?.Tvdb)
+      const aniListId = parseProviderId(providerIds?.AniList)
 
       if (tmdbId === undefined && tvdbId === undefined && aniListId === undefined) {
         showNotification({

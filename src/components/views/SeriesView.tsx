@@ -28,6 +28,7 @@ import { getSegmentsById } from '@/services/segments/api'
 import {
   submitCollectionToSkipMe,
   toSkipMeSegmentType,
+  parseProviderId,
   type SkipMeSubmitRequest,
 } from '@/services/skipme/api'
 
@@ -304,13 +305,6 @@ interface SubmitAllButtonProps {
   seasons: Array<BaseItemDto>
 }
 
-/** Parse a provider ID string to a valid integer, returning undefined for missing or non-numeric values. */
-const parseProviderId = (value: string | undefined): number | undefined => {
-  if (!value) return undefined
-  const n = parseInt(value, 10)
-  return Number.isNaN(n) ? undefined : n
-}
-
 function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
   const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -411,11 +405,29 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
         return
       }
 
-      await submitCollectionToSkipMe(requests)
-      showNotification({
-        type: 'positive',
-        message: t('series.submitAllSuccess', { count: requests.length }),
-      })
+      const result = await submitCollectionToSkipMe(requests)
+      if (!result.ok) {
+        showNotification({
+          type: 'negative',
+          message: t('series.submitAllFailed'),
+        })
+      } else if (
+        result.submitted !== undefined &&
+        result.submitted < requests.length
+      ) {
+        showNotification({
+          type: 'warning',
+          message: t('series.submitAllPartial', {
+            submitted: result.submitted,
+            count: requests.length,
+          }),
+        })
+      } else {
+        showNotification({
+          type: 'positive',
+          message: t('series.submitAllSuccess', { count: requests.length }),
+        })
+      }
     } catch (e) {
       const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
       showNotification({
