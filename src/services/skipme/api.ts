@@ -44,6 +44,38 @@ export function toSkipMeSegmentType(type: string | undefined): string | null {
   return SKIPME_TYPE_MAP[type] ?? null
 }
 
+/**
+ * Converts Jellyfin RunTimeTicks to milliseconds.
+ * Returns undefined if the value is missing or non-positive.
+ */
+export function runTimeTicksToMs(
+  runTimeTicks: number | null | undefined,
+): number | undefined {
+  if (!runTimeTicks) return undefined
+  const ms = Math.round(runTimeTicks / 10_000)
+  return ms > 0 ? ms : undefined
+}
+
+/**
+ * Converts segment ticks (stored in seconds by toUiSegment) to milliseconds
+ * and validates the result against the episode duration.
+ *
+ * Returns `{ valid: false }` when timing is invalid, otherwise the converted values.
+ */
+export function convertAndValidateSegmentTiming(
+  startTicks: number | null | undefined,
+  endTicks: number | null | undefined,
+  durationMs: number,
+):
+  | { valid: false; reason: 'invalidTiming' | 'exceedsDuration' }
+  | { valid: true; startMs: number; endMs: number } {
+  const startMs = Math.round((startTicks ?? 0) * 1000)
+  const endMs = Math.round((endTicks ?? 0) * 1000)
+  if (startMs >= endMs) return { valid: false, reason: 'invalidTiming' }
+  if (endMs > durationMs) return { valid: false, reason: 'exceedsDuration' }
+  return { valid: true, startMs, endMs }
+}
+
 export interface SkipMeSubmitRequest {
   tmdb_id?: number
   tvdb_id?: number

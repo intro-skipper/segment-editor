@@ -19,6 +19,9 @@ export async function mapWithLimit<T, R>(
   limit: number,
   fn: (item: T) => Promise<R>,
 ): Promise<Array<R>> {
+  if (items.length === 0) return []
+  const effectiveLimit = Math.max(1, limit)
+
   const results = new Array<R>(items.length)
   let nextIndex = 0
 
@@ -30,7 +33,9 @@ export async function mapWithLimit<T, R>(
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+    Array.from({ length: Math.min(effectiveLimit, items.length) }, () =>
+      worker(),
+    ),
   )
   return results
 }

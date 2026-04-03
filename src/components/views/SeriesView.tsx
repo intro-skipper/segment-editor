@@ -31,6 +31,8 @@ import {
   submitCollectionToSkipMe,
   toSkipMeSegmentType,
   parseProviderId,
+  runTimeTicksToMs,
+  convertAndValidateSegmentTiming,
 } from '@/services/skipme/api'
 import type { SkipMeSubmitRequest } from '@/services/skipme/api'
 
@@ -363,21 +365,19 @@ function buildSubmitRequests(
       continue
     }
 
-    const durationMs = episode.RunTimeTicks
-      ? Math.round(episode.RunTimeTicks / 10_000)
-      : undefined
-    if (!durationMs || durationMs <= 0) continue
+    const durationMs = runTimeTicksToMs(episode.RunTimeTicks)
+    if (!durationMs) continue
 
     for (const segment of segments) {
       const skipMeType = toSkipMeSegmentType(segment.Type)
       if (!skipMeType) continue
 
-      // StartTicks/EndTicks are stored in seconds by toUiSegment in the
-      // segment API service layer. Convert to milliseconds for SkipMe.db.
-      const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
-      const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
-
-      if (startMs >= endMs || endMs > durationMs) continue
+      const timing = convertAndValidateSegmentTiming(
+        segment.StartTicks,
+        segment.EndTicks,
+        durationMs,
+      )
+      if (!timing.valid) continue
 
       requests.push({
         tmdb_id: seriesTmdbId,
@@ -389,8 +389,8 @@ function buildSubmitRequests(
         season: episode.ParentIndexNumber ?? undefined,
         episode: episode.IndexNumber ?? undefined,
         duration_ms: durationMs,
-        start_ms: startMs,
-        end_ms: endMs,
+        start_ms: timing.startMs,
+        end_ms: timing.endMs,
       })
     }
   }

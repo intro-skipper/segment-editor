@@ -26,9 +26,7 @@ export function getProviderIds(
     | null
     | undefined,
 ): Record<string, string> | undefined {
-  const raw = (
-    item as { ProviderIds?: Record<string, string | null> } | undefined
-  )?.ProviderIds
+  const raw = item?.ProviderIds
   if (!raw) return undefined
 
   const result: Record<string, string> = {}
@@ -37,5 +35,5 @@ export function getProviderIds(
       result[key] = value
     }
   }
-  return result
+  return Object.keys(result).length > 0 ? result : undefined
 }
