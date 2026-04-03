@@ -337,9 +337,8 @@ function buildSubmitRequests(
 ): Array<SkipMeSubmitRequest> {
   const requests: Array<SkipMeSubmitRequest> = []
 
-  for (let i = 0; i < episodeEntries.length; i++) {
-    const { episode, season } = episodeEntries[i]!
-    const segments = segmentsPerEpisode[i]!
+  for (const [i, { episode, season }] of episodeEntries.entries()) {
+    const segments = segmentsPerEpisode[i] ?? []
 
     const seasonProviderIds = (
       season as { ProviderIds?: Record<string, string> }
@@ -407,17 +406,6 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
   const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-  // Keep a ref to the latest seasons so the callback doesn't need the full
-  // array in its dependency list — only the stable season IDs trigger re-creation.
-  const seasonsRef = React.useRef(seasons)
-  React.useEffect(() => {
-    seasonsRef.current = seasons
-  }, [seasons])
-  const seasonIds = React.useMemo(
-    () => seasons.map((s) => s.Id).join(','),
-    [seasons],
-  )
-
   const handleSubmitAll = React.useCallback(async () => {
     if (!series.Id) return
     setIsSubmitting(true)
@@ -430,7 +418,7 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
       const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
       const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
 
-      const validSeasons = seasonsRef.current.filter((s) => !!s.Id)
+      const validSeasons = seasons.filter((s) => !!s.Id)
       const { episodeEntries, segmentsPerEpisode } =
         await fetchSeriesEpisodeData(series.Id, validSeasons)
 
@@ -486,7 +474,7 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
     } finally {
       setIsSubmitting(false)
     }
-  }, [series, seasonIds, t])
+  }, [series, seasons, t])
 
   return (
     <Button
