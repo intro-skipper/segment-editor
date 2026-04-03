@@ -78,6 +78,7 @@ const DETAIL_FIELDS = [
   ItemFields.Genres,
   ItemFields.Chapters,
   ItemFields.Trickplay,
+  ItemFields.ProviderIds,
 ] as const
 
 const SORT_ASCENDING = [SortOrder.Ascending] as const
@@ -177,6 +178,7 @@ export async function getSeasons(
       {
         seriesId,
         isMissing: false,
+        fields: [ItemFields.ProviderIds],
       },
       getRequestConfig(options),
     )
@@ -202,7 +204,7 @@ export async function getEpisodes(
         seriesId,
         seasonId,
         isMissing: false,
-        fields: [ItemFields.MediaStreams, ItemFields.MediaSources],
+        fields: [ItemFields.MediaStreams, ItemFields.MediaSources, ItemFields.ProviderIds],
         limit: options?.limit,
         startIndex: options?.startIndex,
       },
