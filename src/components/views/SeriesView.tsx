@@ -353,7 +353,6 @@ function buildSubmitRequests(
     if (
       seriesTmdbId === undefined &&
       episodeTvdbId === undefined &&
-      seriesTvdbId === undefined &&
       seriesAniListId === undefined
     ) {
       continue
@@ -377,7 +376,7 @@ function buildSubmitRequests(
 
       requests.push({
         tmdb_id: seriesTmdbId,
-        tvdb_id: episodeTvdbId ?? seriesTvdbId,
+        tvdb_id: episodeTvdbId,
         anilist_id: seriesAniListId,
         tvdb_series_id: seriesTvdbId,
         tvdb_season_id: tvdbSeasonId,
