@@ -7,7 +7,6 @@ import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
-import axios from 'axios'
 
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import { getProviderIds } from '@/types/jellyfin'
@@ -22,12 +21,18 @@ import {
   ErrorState,
   LoadingState,
 } from '@/components/ui/async-state'
+import { mapWithLimit } from '@/lib/async-utils'
 import { cn } from '@/lib/utils'
+import { getAxiosMessageKey } from '@/lib/error-utils'
 import { showNotification } from '@/lib/notifications'
 import { getEpisodes } from '@/services/items/api'
 import { getSegmentsById } from '@/services/segments/api'
-import { submitCollectionToSkipMe, toSkipMeSegmentType, parseProviderId } from '@/services/skipme/api';
-import type { SkipMeSubmitRequest } from '@/services/skipme/api';
+import {
+  submitCollectionToSkipMe,
+  toSkipMeSegmentType,
+  parseProviderId,
+} from '@/services/skipme/api'
+import type { SkipMeSubmitRequest } from '@/services/skipme/api'
 
 interface SeriesViewProps {
   /** The series item */
@@ -305,31 +310,6 @@ interface EpisodeEntry {
 /** Maximum number of concurrent API requests to Jellyfin when fetching episode/segment data. */
 const MAX_CONCURRENCY = 6
 
-/**
- * Run an array of async tasks with bounded concurrency.
- * Preserves input order in the returned results.
- */
-async function mapWithLimit<T, R>(
-  items: ReadonlyArray<T>,
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<Array<R>> {
-  const results = new Array<R>(items.length)
-  let nextIndex = 0
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const i = nextIndex++
-      results[i] = await fn(items[i])
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
-  )
-  return results
-}
-
 /** Fetch all episodes for every valid season, then all their segments, with bounded concurrency. */
 async function fetchSeriesEpisodeData(
   seriesId: string,
@@ -496,14 +476,10 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
       const result = await submitCollectionToSkipMe(requests)
       notifyCollectionResult(result, requests.length, t)
     } catch (e) {
-      let messageKey = 'series.submitAllFailed'
-      if (axios.isAxiosError(e)) {
-        if (e.response) {
-          if (e.response.status === 403) {
-            messageKey = 'series.submitAllClientNotSupported'
-          }
-        }
-      }
+      const messageKey = getAxiosMessageKey(e, {
+        defaultKey: 'series.submitAllFailed',
+        forbiddenKey: 'series.submitAllClientNotSupported',
+      })
       showNotification({
         type: 'negative',
         message: t(messageKey),

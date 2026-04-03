@@ -4,7 +4,6 @@
  */
 
 import * as React from 'react'
-import axios from 'axios'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
@@ -39,6 +38,7 @@ import {
   parseProviderId,
 } from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
+import { getAxiosMessageKey } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import {
@@ -674,14 +674,10 @@ function useRenderPlayerEditor({
           message: t('editor.share.success'),
         })
       } catch (e) {
-        let messageKey = 'editor.share.failed'
-        if (axios.isAxiosError(e)) {
-          if (e.response) {
-            if (e.response.status === 403) {
-              messageKey = 'editor.share.clientNotSupported'
-            }
-          }
-        }
+        const messageKey = getAxiosMessageKey(e, {
+          defaultKey: 'editor.share.failed',
+          forbiddenKey: 'editor.share.clientNotSupported',
+        })
         showNotification({
           type: 'negative',
           message: t(messageKey),
