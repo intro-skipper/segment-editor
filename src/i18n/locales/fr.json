@@ -241,7 +241,13 @@
     "loadingEpisodes": "Chargement des épisodes pour {{season}}...",
     "episodeLoadError": "Échec du chargement des épisodes",
     "seasonNumber": "Saison {{number}}",
-    "episodes": "Épisodes"
+    "episodes": "Épisodes",
+    "submitAll": "Tout soumettre à SkipMe.db",
+    "submitAllSuccess": "{{count}} segments soumis à SkipMe.db",
+    "submitAllNone": "Aucun segment à soumettre",
+    "submitAllFailed": "Échec de la soumission des segments à SkipMe.db",
+    "submitAllClientNotSupported": "Soumission impossible : votre client n'est pas pris en charge",
+    "submitAllPartial": "Seulement {{submitted}} sur {{count}} segments ont été acceptés par SkipMe.db"
   },
   "segmentType": {
     "Intro": "Introduction",

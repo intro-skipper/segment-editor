@@ -313,7 +313,13 @@
     "seasonNumber": "Staffel {{number}}",
     "episodes": "Episoden",
     "loadError": "Episoden konnten nicht geladen werden",
-    "episode": "Episode"
+    "episode": "Episode",
+    "submitAll": "Alle an SkipMe.db senden",
+    "submitAllSuccess": "{{count}} Segmente an SkipMe.db gesendet",
+    "submitAllNone": "Keine sendebaren Segmente gefunden",
+    "submitAllFailed": "Senden der Segmente an SkipMe.db fehlgeschlagen",
+    "submitAllClientNotSupported": "Senden nicht möglich: Ihr Client wird nicht unterstützt",
+    "submitAllPartial": "Nur {{submitted}} von {{count}} Segmenten wurden von SkipMe.db akzeptiert"
   },
   "search": {
     "open": "Suche öffnen",

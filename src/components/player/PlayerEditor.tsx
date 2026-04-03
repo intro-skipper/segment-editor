@@ -34,6 +34,7 @@ import {
 import {
   submitSegmentToSkipMe,
   toSkipMeSegmentType,
+  parseProviderId,
 } from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -593,18 +594,11 @@ function useRenderPlayerEditor({
       const providerIds = (item as { ProviderIds?: Record<string, string> })
         .ProviderIds
 
-      // Parse a provider ID string to a valid integer, returning undefined for
-      // missing or non-numeric values.
-      const parseId = (value: string | undefined): number | undefined => {
-        if (!value) return undefined
-        const n = parseInt(value, 10)
-        return Number.isNaN(n) ? undefined : n
-      }
+      const tmdbId = parseProviderId(providerIds?.Tmdb)
+      const tvdbId = parseProviderId(providerIds?.Tvdb)
+      const aniListId = parseProviderId(providerIds?.AniList)
 
-      const tmdbId = parseId(providerIds?.Tmdb)
-      const tvdbId = parseId(providerIds?.Tvdb)
-
-      if (tmdbId === undefined && tvdbId === undefined) {
+      if (tmdbId === undefined && tvdbId === undefined && aniListId === undefined) {
         showNotification({
           type: 'negative',
           message: t('editor.share.noIds'),
@@ -648,6 +642,7 @@ function useRenderPlayerEditor({
         await submitSegmentToSkipMe({
           tmdb_id: tmdbId,
           tvdb_id: tvdbId,
+          anilist_id: aniListId,
           segment: skipMeType,
           season: item.ParentIndexNumber ?? undefined,
           episode: item.IndexNumber ?? undefined,

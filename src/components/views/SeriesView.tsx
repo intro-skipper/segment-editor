@@ -6,20 +6,31 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Play } from 'lucide-react'
+import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
+import axios from 'axios'
 
-import type { BaseItemDto } from '@/types/jellyfin'
+import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/hooks/queries/use-items'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
+import { Button } from '@/components/ui/button'
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
+import { showNotification } from '@/lib/notifications'
+import { getEpisodes } from '@/services/items/api'
+import { getSegmentsById } from '@/services/segments/api'
+import {
+  submitCollectionToSkipMe,
+  toSkipMeSegmentType,
+  parseProviderId,
+  type SkipMeSubmitRequest,
+} from '@/services/skipme/api'
 
 interface SeriesViewProps {
   /** The series item */
@@ -286,6 +297,203 @@ function SeasonEpisodes({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SubmitAllButton helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface EpisodeEntry {
+  episode: BaseItemDto
+  season: BaseItemDto
+}
+
+/** Fetch all episodes for every valid season in parallel, then all their segments in parallel. */
+async function fetchSeriesEpisodeData(
+  seriesId: string,
+  validSeasons: Array<BaseItemDto>,
+): Promise<{
+  episodeEntries: Array<EpisodeEntry>
+  segmentsPerEpisode: Array<Array<MediaSegmentDto>>
+}> {
+  const episodesPerSeason = await Promise.all(
+    validSeasons.map((season) => getEpisodes(seriesId, season.Id!)),
+  )
+  const episodeEntries = episodesPerSeason.flatMap((episodes, i) =>
+    episodes
+      .filter((e) => !!e.Id)
+      .map((episode) => ({ episode, season: validSeasons[i]! })),
+  )
+  const segmentsPerEpisode = await Promise.all(
+    episodeEntries.map(({ episode }) => getSegmentsById(episode.Id!)),
+  )
+  return { episodeEntries, segmentsPerEpisode }
+}
+
+/** Build the list of SkipMe submit requests from fetched episode/segment data. */
+function buildSubmitRequests(
+  seriesTmdbId: number | undefined,
+  seriesTvdbId: number | undefined,
+  seriesAniListId: number | undefined,
+  episodeEntries: Array<EpisodeEntry>,
+  segmentsPerEpisode: Array<Array<MediaSegmentDto>>,
+): Array<SkipMeSubmitRequest> {
+  const requests: Array<SkipMeSubmitRequest> = []
+
+  for (const [i, { episode, season }] of episodeEntries.entries()) {
+    const segments = segmentsPerEpisode[i] ?? []
+
+    const seasonProviderIds = (
+      season as { ProviderIds?: Record<string, string> }
+    ).ProviderIds
+    const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
+
+    const episodeProviderIds = (
+      episode as { ProviderIds?: Record<string, string> }
+    ).ProviderIds
+    const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
+
+    if (
+      seriesTmdbId === undefined &&
+      episodeTvdbId === undefined &&
+      seriesAniListId === undefined
+    ) {
+      continue
+    }
+
+    const durationMs = episode.RunTimeTicks
+      ? Math.round(episode.RunTimeTicks / 10_000)
+      : undefined
+    if (!durationMs || durationMs <= 0) continue
+
+    for (const segment of segments) {
+      const skipMeType = toSkipMeSegmentType(segment.Type)
+      if (!skipMeType) continue
+
+      // StartTicks/EndTicks are stored in seconds by toUiSegment in the
+      // segment API service layer. Convert to milliseconds for SkipMe.db.
+      const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
+      const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
+
+      if (startMs >= endMs || endMs > durationMs) continue
+
+      requests.push({
+        tmdb_id: seriesTmdbId,
+        tvdb_id: episodeTvdbId,
+        anilist_id: seriesAniListId,
+        tvdb_series_id: seriesTvdbId,
+        tvdb_season_id: tvdbSeasonId,
+        segment: skipMeType,
+        season: episode.ParentIndexNumber ?? undefined,
+        episode: episode.IndexNumber ?? undefined,
+        duration_ms: durationMs,
+        start_ms: startMs,
+        end_ms: endMs,
+      })
+    }
+  }
+
+  return requests
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SubmitAllButton - Submits all series segments to SkipMe.db
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SubmitAllButtonProps {
+  series: BaseItemDto
+  seasons: Array<BaseItemDto>
+}
+
+function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
+  const { t } = useTranslation()
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  const handleSubmitAll = React.useCallback(async () => {
+    if (!series.Id) return
+    setIsSubmitting(true)
+    try {
+      const seriesProviderIds = (
+        series as { ProviderIds?: Record<string, string> }
+      ).ProviderIds
+
+      const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
+      const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
+      const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
+
+      const validSeasons = seasons.filter((s) => !!s.Id)
+      const { episodeEntries, segmentsPerEpisode } =
+        await fetchSeriesEpisodeData(series.Id, validSeasons)
+
+      const requests = buildSubmitRequests(
+        seriesTmdbId,
+        seriesTvdbId,
+        seriesAniListId,
+        episodeEntries,
+        segmentsPerEpisode,
+      )
+
+      if (requests.length === 0) {
+        showNotification({
+          type: 'warning',
+          message: t('series.submitAllNone'),
+        })
+        return
+      }
+
+      const result = await submitCollectionToSkipMe(requests)
+      if (!result.ok) {
+        showNotification({
+          type: 'negative',
+          message: t('series.submitAllFailed'),
+        })
+      } else if (
+        result.submitted !== undefined &&
+        result.submitted < requests.length
+      ) {
+        showNotification({
+          type: 'warning',
+          message: t('series.submitAllPartial', {
+            submitted: result.submitted,
+            count: requests.length,
+          }),
+        })
+      } else {
+        showNotification({
+          type: 'positive',
+          message: t('series.submitAllSuccess', { count: requests.length }),
+        })
+      }
+    } catch (e) {
+      const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+      showNotification({
+        type: 'negative',
+        message: t(
+          isForbidden
+            ? 'series.submitAllClientNotSupported'
+            : 'series.submitAllFailed',
+        ),
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [series, seasons, t])
+
+  return (
+    <Button
+      variant="outline"
+      onClick={handleSubmitAll}
+      disabled={isSubmitting}
+      aria-busy={isSubmitting}
+    >
+      {isSubmitting ? (
+        <Loader2 className="animate-spin" aria-hidden="true" />
+      ) : (
+        <Share2 aria-hidden="true" />
+      )}
+      {t('series.submitAll')}
+    </Button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SeriesView - Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -349,6 +557,12 @@ export function SeriesView({
           />
         )}
       </div>
+
+      {series.Id && (
+        <div className="mt-6 md:mt-8 flex justify-center">
+          <SubmitAllButton series={series} seasons={seasons} />
+        </div>
+      )}
     </div>
   )
 }
