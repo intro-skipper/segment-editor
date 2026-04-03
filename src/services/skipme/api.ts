@@ -58,7 +58,7 @@ export interface SkipMeSubmitRequest {
   end_ms: number
 }
 
-export interface SkipMeSubmitResponse {
+interface SkipMeSubmitResponse {
   ok: boolean
   submission?: {
     id: string
@@ -66,7 +66,7 @@ export interface SkipMeSubmitResponse {
   }
 }
 
-export interface SkipMeCollectionSubmitResponse {
+interface SkipMeCollectionSubmitResponse {
   ok: boolean
   submitted?: number
 }

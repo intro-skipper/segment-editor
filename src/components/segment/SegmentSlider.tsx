@@ -521,9 +521,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     setIsSharing(true)
     try {
       await onShare(segmentToShare)
-    } finally {
-      setIsSharing(false)
+    } catch {
+      // Error handling is done by the onShare callback itself
     }
+    setIsSharing(false)
   }, [formValues, isSharing, onShare, runtimeSeconds, segment])
 
   const handleDelete = React.useCallback(

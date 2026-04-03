@@ -15,6 +15,7 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
+import { getProviderIds } from '@/types/jellyfin'
 import type {
   CreateSegmentData,
   SegmentUpdate,
@@ -31,6 +32,7 @@ import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
+import { getItemById } from '@/services/items/api'
 import {
   submitSegmentToSkipMe,
   toSkipMeSegmentType,
@@ -591,14 +593,17 @@ function useRenderPlayerEditor({
         return
       }
 
-      const providerIds = (item as { ProviderIds?: Record<string, string> })
-        .ProviderIds
+      const providerIds = getProviderIds(item)
 
       const tmdbId = parseProviderId(providerIds?.Tmdb)
       const tvdbId = parseProviderId(providerIds?.Tvdb)
       const aniListId = parseProviderId(providerIds?.AniList)
 
-      if (tmdbId === undefined && tvdbId === undefined && aniListId === undefined) {
+      if (
+        tmdbId === undefined &&
+        tvdbId === undefined &&
+        aniListId === undefined
+      ) {
         showNotification({
           type: 'negative',
           message: t('editor.share.noIds'),
@@ -638,14 +643,28 @@ function useRenderPlayerEditor({
         return
       }
 
+      // Fetch series/season TVDB IDs.
+      const seriesId = (item as { SeriesId?: string }).SeriesId
+      const seasonId = (item as { SeasonId?: string }).SeasonId
+      const [seriesItem, seasonItem] = await Promise.all([
+        seriesId ? getItemById(seriesId).catch(() => null) : null,
+        seasonId ? getItemById(seasonId).catch(() => null) : null,
+      ])
+      const tvdbSeriesId = parseProviderId(getProviderIds(seriesItem)?.Tvdb)
+      const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
+      const seasonNum = item.ParentIndexNumber ?? undefined
+      const episodeNum = item.IndexNumber ?? undefined
+
       try {
         await submitSegmentToSkipMe({
           tmdb_id: tmdbId,
           tvdb_id: tvdbId,
           anilist_id: aniListId,
+          tvdb_series_id: tvdbSeriesId,
+          tvdb_season_id: tvdbSeasonId,
           segment: skipMeType,
-          season: item.ParentIndexNumber ?? undefined,
-          episode: item.IndexNumber ?? undefined,
+          season: seasonNum,
+          episode: episodeNum,
           duration_ms: durationMs,
           start_ms: startMs,
           end_ms: endMs,
@@ -655,14 +674,17 @@ function useRenderPlayerEditor({
           message: t('editor.share.success'),
         })
       } catch (e) {
-        const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+        let messageKey = 'editor.share.failed'
+        if (axios.isAxiosError(e)) {
+          if (e.response) {
+            if (e.response.status === 403) {
+              messageKey = 'editor.share.clientNotSupported'
+            }
+          }
+        }
         showNotification({
           type: 'negative',
-          message: t(
-            isForbidden
-              ? 'editor.share.clientNotSupported'
-              : 'editor.share.failed',
-          ),
+          message: t(messageKey),
         })
       }
     },

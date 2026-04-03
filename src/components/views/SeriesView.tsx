@@ -10,6 +10,7 @@ import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
 import axios from 'axios'
 
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
+import { getProviderIds } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/hooks/queries/use-items'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
@@ -25,12 +26,8 @@ import { cn } from '@/lib/utils'
 import { showNotification } from '@/lib/notifications'
 import { getEpisodes } from '@/services/items/api'
 import { getSegmentsById } from '@/services/segments/api'
-import {
-  submitCollectionToSkipMe,
-  toSkipMeSegmentType,
-  parseProviderId,
-  type SkipMeSubmitRequest,
-} from '@/services/skipme/api'
+import { submitCollectionToSkipMe, toSkipMeSegmentType, parseProviderId } from '@/services/skipme/api';
+import type { SkipMeSubmitRequest } from '@/services/skipme/api';
 
 interface SeriesViewProps {
   /** The series item */
@@ -305,7 +302,35 @@ interface EpisodeEntry {
   season: BaseItemDto
 }
 
-/** Fetch all episodes for every valid season in parallel, then all their segments in parallel. */
+/** Maximum number of concurrent API requests to Jellyfin when fetching episode/segment data. */
+const MAX_CONCURRENCY = 6
+
+/**
+ * Run an array of async tasks with bounded concurrency.
+ * Preserves input order in the returned results.
+ */
+async function mapWithLimit<T, R>(
+  items: ReadonlyArray<T>,
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<Array<R>> {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++
+      results[i] = await fn(items[i])
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  )
+  return results
+}
+
+/** Fetch all episodes for every valid season, then all their segments, with bounded concurrency. */
 async function fetchSeriesEpisodeData(
   seriesId: string,
   validSeasons: Array<BaseItemDto>,
@@ -313,16 +338,20 @@ async function fetchSeriesEpisodeData(
   episodeEntries: Array<EpisodeEntry>
   segmentsPerEpisode: Array<Array<MediaSegmentDto>>
 }> {
-  const episodesPerSeason = await Promise.all(
-    validSeasons.map((season) => getEpisodes(seriesId, season.Id!)),
+  const episodesPerSeason = await mapWithLimit(
+    validSeasons,
+    MAX_CONCURRENCY,
+    (season) => getEpisodes(seriesId, season.Id!),
   )
   const episodeEntries = episodesPerSeason.flatMap((episodes, i) =>
     episodes
       .filter((e) => !!e.Id)
-      .map((episode) => ({ episode, season: validSeasons[i]! })),
+      .map((episode) => ({ episode, season: validSeasons[i] })),
   )
-  const segmentsPerEpisode = await Promise.all(
-    episodeEntries.map(({ episode }) => getSegmentsById(episode.Id!)),
+  const segmentsPerEpisode = await mapWithLimit(
+    episodeEntries,
+    MAX_CONCURRENCY,
+    ({ episode }) => getSegmentsById(episode.Id!),
   )
   return { episodeEntries, segmentsPerEpisode }
 }
@@ -340,14 +369,10 @@ function buildSubmitRequests(
   for (const [i, { episode, season }] of episodeEntries.entries()) {
     const segments = segmentsPerEpisode[i] ?? []
 
-    const seasonProviderIds = (
-      season as { ProviderIds?: Record<string, string> }
-    ).ProviderIds
+    const seasonProviderIds = getProviderIds(season)
     const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
 
-    const episodeProviderIds = (
-      episode as { ProviderIds?: Record<string, string> }
-    ).ProviderIds
+    const episodeProviderIds = getProviderIds(episode)
     const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
 
     if (
@@ -397,6 +422,36 @@ function buildSubmitRequests(
 // SubmitAllButton - Submits all series segments to SkipMe.db
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Show the appropriate notification after a collection submission. */
+function notifyCollectionResult(
+  result: { ok: boolean; submitted?: number },
+  totalCount: number,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): void {
+  if (!result.ok) {
+    showNotification({
+      type: 'negative',
+      message: t('series.submitAllFailed'),
+    })
+    return
+  }
+  const submitted = result.submitted
+  if (submitted !== undefined && submitted < totalCount) {
+    showNotification({
+      type: 'warning',
+      message: t('series.submitAllPartial', {
+        submitted,
+        count: totalCount,
+      }),
+    })
+    return
+  }
+  showNotification({
+    type: 'positive',
+    message: t('series.submitAllSuccess', { count: totalCount }),
+  })
+}
+
 interface SubmitAllButtonProps {
   series: BaseItemDto
   seasons: Array<BaseItemDto>
@@ -409,16 +464,15 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
   const handleSubmitAll = React.useCallback(async () => {
     if (!series.Id) return
     setIsSubmitting(true)
+
+    // Hoist value-block expressions out of try/catch for React Compiler
+    const seriesProviderIds = getProviderIds(series)
+    const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
+    const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
+    const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
+    const validSeasons = seasons.filter((s) => !!s.Id)
+
     try {
-      const seriesProviderIds = (
-        series as { ProviderIds?: Record<string, string> }
-      ).ProviderIds
-
-      const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
-      const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
-      const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
-
-      const validSeasons = seasons.filter((s) => !!s.Id)
       const { episodeEntries, segmentsPerEpisode } =
         await fetchSeriesEpisodeData(series.Id, validSeasons)
 
@@ -435,45 +489,27 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
           type: 'warning',
           message: t('series.submitAllNone'),
         })
+        setIsSubmitting(false)
         return
       }
 
       const result = await submitCollectionToSkipMe(requests)
-      if (!result.ok) {
-        showNotification({
-          type: 'negative',
-          message: t('series.submitAllFailed'),
-        })
-      } else if (
-        result.submitted !== undefined &&
-        result.submitted < requests.length
-      ) {
-        showNotification({
-          type: 'warning',
-          message: t('series.submitAllPartial', {
-            submitted: result.submitted,
-            count: requests.length,
-          }),
-        })
-      } else {
-        showNotification({
-          type: 'positive',
-          message: t('series.submitAllSuccess', { count: requests.length }),
-        })
-      }
+      notifyCollectionResult(result, requests.length, t)
     } catch (e) {
-      const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+      let messageKey = 'series.submitAllFailed'
+      if (axios.isAxiosError(e)) {
+        if (e.response) {
+          if (e.response.status === 403) {
+            messageKey = 'series.submitAllClientNotSupported'
+          }
+        }
+      }
       showNotification({
         type: 'negative',
-        message: t(
-          isForbidden
-            ? 'series.submitAllClientNotSupported'
-            : 'series.submitAllFailed',
-        ),
+        message: t(messageKey),
       })
-    } finally {
-      setIsSubmitting(false)
     }
+    setIsSubmitting(false)
   }, [series, seasons, t])
 
   return (
