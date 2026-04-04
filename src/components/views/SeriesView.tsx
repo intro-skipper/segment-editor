@@ -450,7 +450,7 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
     const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
     const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
     const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
-    const validSeasons = seasons.filter((s) => !!s.Id)
+    const validSeasons = seasons.filter((s) => !!s.Id && !isSpecialSeason(s))
 
     try {
       const { episodeEntries, segmentsPerEpisode } =
