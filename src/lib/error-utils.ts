@@ -6,6 +6,8 @@
  * @module lib/error-utils
  */
 
+import axios from 'axios'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Network Error Detection
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,4 +64,36 @@ export function getErrorSuggestion(error: string): string {
     return 'The server took too long to respond. Try again or check if the server is busy.'
   }
   return 'Please verify your input and try again.'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Axios Error Classification
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AxiosMessageKeyOptions {
+  /** Translation key returned for non-Axios or non-403 errors. */
+  defaultKey: string
+  /** Translation key returned when the server responds with 403 Forbidden. */
+  forbiddenKey: string
+}
+
+/**
+ * Maps an Axios error to a translation key based on HTTP status.
+ * Returns `forbiddenKey` for 403 responses, `defaultKey` otherwise.
+ *
+ * Structured to avoid value-block expressions (ternaries, optional chaining)
+ * so the result can be used inside a React Compiler-compatible try/catch.
+ */
+export function getAxiosMessageKey(
+  error: unknown,
+  { defaultKey, forbiddenKey }: AxiosMessageKeyOptions,
+): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      if (error.response.status === 403) {
+        return forbiddenKey
+      }
+    }
+  }
+  return defaultKey
 }

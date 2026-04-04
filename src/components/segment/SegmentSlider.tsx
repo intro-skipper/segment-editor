@@ -299,11 +299,26 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [segment, onUpdate],
   )
 
-  const handlePointerDown = React.useCallback(
-    (handle: 'start' | 'end') => (e: React.PointerEvent) => {
+  const handleStartPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      setIsDragging(handle)
+      setIsDragging('start')
+      onSetActive(index)
+
+      const captureTarget = e.currentTarget as HTMLElement
+      captureTarget.setPointerCapture(e.pointerId)
+      pointerCaptureTargetRef.current = captureTarget
+      pointerIdRef.current = e.pointerId
+    },
+    [index, onSetActive],
+  )
+
+  const handleEndPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging('end')
       onSetActive(index)
 
       const captureTarget = e.currentTarget as HTMLElement
@@ -487,9 +502,9 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       formValues,
       runtimeSeconds,
     )
-    const segmentToCopy = nextSegment.success ? nextSegment.segment : segment
+    const resolvedSegment = nextSegment.success ? nextSegment.segment : segment
     try {
-      const result = segmentsToIntroSkipperClipboardText([segmentToCopy])
+      const result = segmentsToIntroSkipperClipboardText([resolvedSegment])
       await navigator.clipboard.writeText(result.text)
       showNotification({
         type: 'positive',
@@ -517,14 +532,17 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       formValues,
       runtimeSeconds,
     )
-    const segmentToShare = nextSegment.success ? nextSegment.segment : segment
+    const resolvedSegment = nextSegment.success ? nextSegment.segment : segment
     setIsSharing(true)
     try {
-      await onShare(segmentToShare)
-    } finally {
-      setIsSharing(false)
+      await onShare(resolvedSegment)
+    } catch {
+      // Error handling is done by the onShare callback itself
     }
+    setIsSharing(false)
   }, [formValues, isSharing, onShare, runtimeSeconds, segment])
+
+  const handleEdit = React.useCallback(() => onEdit?.(index), [index, onEdit])
 
   const handleDelete = React.useCallback(
     () => onDelete(index),
@@ -778,7 +796,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => onEdit(index)}
+              onClick={handleEdit}
               aria-label={t('segment.edit')}
               className="hover:bg-primary/10"
             >
@@ -842,7 +860,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             aria-valuetext={formatTime(localStart)}
             aria-orientation="horizontal"
             tabIndex={0}
-            onPointerDown={handlePointerDown('start')}
+            onPointerDown={handleStartPointerDown}
             onKeyDown={handleStartKeyDown}
             onBlur={() => handleHandleBlur('start')}
           >
@@ -865,7 +883,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             aria-valuetext={formatTime(localEnd)}
             aria-orientation="horizontal"
             tabIndex={0}
-            onPointerDown={handlePointerDown('end')}
+            onPointerDown={handleEndPointerDown}
             onKeyDown={handleEndKeyDown}
             onBlur={() => handleHandleBlur('end')}
           >

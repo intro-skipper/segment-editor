@@ -204,7 +204,11 @@ export async function getEpisodes(
         seriesId,
         seasonId,
         isMissing: false,
-        fields: [ItemFields.MediaStreams, ItemFields.MediaSources, ItemFields.ProviderIds],
+        fields: [
+          ItemFields.MediaStreams,
+          ItemFields.MediaSources,
+          ItemFields.ProviderIds,
+        ],
         limit: options?.limit,
         startIndex: options?.startIndex,
       },

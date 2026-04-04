@@ -4,7 +4,6 @@
  */
 
 import * as React from 'react'
-import axios from 'axios'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { ClipboardPaste, Loader2, Save } from 'lucide-react'
@@ -15,6 +14,7 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
+import { getProviderIds } from '@/types/jellyfin'
 import type {
   CreateSegmentData,
   SegmentUpdate,
@@ -31,12 +31,16 @@ import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
+import { getItemById } from '@/services/items/api'
 import {
   submitSegmentToSkipMe,
   toSkipMeSegmentType,
   parseProviderId,
+  runTimeTicksToMs,
+  convertAndValidateSegmentTiming,
 } from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
+import { getAxiosMessageKey } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import {
@@ -532,6 +536,11 @@ function useRenderPlayerEditor({
     }
   }, [t])
 
+  const dismissImportDialog = React.useCallback(() => {
+    pendingImportRef.current = null
+    setImportDialogOpen(false)
+  }, [])
+
   // Handle import confirmation: replace all segments
   const handleImportReplace = React.useCallback(() => {
     const pending = pendingImportRef.current
@@ -549,9 +558,8 @@ function useRenderPlayerEditor({
       message: `Replaced with ${pending.segments.length} segments${infoSuffix}`,
     })
 
-    pendingImportRef.current = null
-    setImportDialogOpen(false)
-  }, [updateEditingSegments])
+    dismissImportDialog()
+  }, [dismissImportDialog, updateEditingSegments])
 
   // Handle import confirmation: merge with existing segments
   const handleImportMerge = React.useCallback(() => {
@@ -569,15 +577,11 @@ function useRenderPlayerEditor({
       message: `Added ${pending.segments.length} segments${infoSuffix}`,
     })
 
-    pendingImportRef.current = null
-    setImportDialogOpen(false)
-  }, [updateEditingSegments])
+    dismissImportDialog()
+  }, [dismissImportDialog, updateEditingSegments])
 
   // Handle import dialog cancel
-  const handleImportCancel = React.useCallback(() => {
-    pendingImportRef.current = null
-    setImportDialogOpen(false)
-  }, [])
+  const handleImportCancel = dismissImportDialog
 
   // Share a segment to SkipMe.db
   const handleShareSegment = React.useCallback(
@@ -591,14 +595,17 @@ function useRenderPlayerEditor({
         return
       }
 
-      const providerIds = (item as { ProviderIds?: Record<string, string> })
-        .ProviderIds
+      const providerIds = getProviderIds(item)
 
       const tmdbId = parseProviderId(providerIds?.Tmdb)
       const tvdbId = parseProviderId(providerIds?.Tvdb)
       const aniListId = parseProviderId(providerIds?.AniList)
 
-      if (tmdbId === undefined && tvdbId === undefined && aniListId === undefined) {
+      if (
+        tmdbId === undefined &&
+        tvdbId === undefined &&
+        aniListId === undefined
+      ) {
         showNotification({
           type: 'negative',
           message: t('editor.share.noIds'),
@@ -606,10 +613,8 @@ function useRenderPlayerEditor({
         return
       }
 
-      const durationMs = item.RunTimeTicks
-        ? Math.round(item.RunTimeTicks / 10_000)
-        : undefined
-      if (!durationMs || durationMs <= 0) {
+      const durationMs = runTimeTicksToMs(item.RunTimeTicks)
+      if (!durationMs) {
         showNotification({
           type: 'negative',
           message: t('editor.share.noDuration'),
@@ -619,50 +624,62 @@ function useRenderPlayerEditor({
 
       // StartTicks/EndTicks are stored in seconds by toUiSegment in the segment
       // API service layer. Convert to milliseconds for the SkipMe.db API.
-      const startMs = Math.round((segment.StartTicks ?? 0) * 1000)
-      const endMs = Math.round((segment.EndTicks ?? 0) * 1000)
-
-      if (startMs >= endMs) {
+      const timing = convertAndValidateSegmentTiming(
+        segment.StartTicks,
+        segment.EndTicks,
+        durationMs,
+      )
+      if (!timing.valid) {
         showNotification({
           type: 'negative',
-          message: t('editor.share.invalidTiming'),
+          message:
+            timing.reason === 'invalidTiming'
+              ? t('editor.share.invalidTiming')
+              : t('editor.share.exceedsDuration'),
         })
         return
       }
 
-      if (endMs > durationMs) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.exceedsDuration'),
-        })
-        return
-      }
+      // Fetch series/season provider IDs for TVDB and TMDB fallback.
+      const seriesId = item.SeriesId ?? undefined
+      const seasonId = item.SeasonId ?? undefined
+      const [seriesItem, seasonItem] = await Promise.all([
+        seriesId ? getItemById(seriesId).catch(() => null) : null,
+        seasonId ? getItemById(seasonId).catch(() => null) : null,
+      ])
+      const seriesProviderIds = getProviderIds(seriesItem)
+      const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
+      const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
+      const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
+      const seasonNum = item.ParentIndexNumber ?? undefined
+      const episodeNum = item.IndexNumber ?? undefined
 
       try {
         await submitSegmentToSkipMe({
-          tmdb_id: tmdbId,
+          tmdb_id: effectiveTmdbId,
           tvdb_id: tvdbId,
           anilist_id: aniListId,
+          tvdb_series_id: tvdbSeriesId,
+          tvdb_season_id: tvdbSeasonId,
           segment: skipMeType,
-          season: item.ParentIndexNumber ?? undefined,
-          episode: item.IndexNumber ?? undefined,
+          season: seasonNum,
+          episode: episodeNum,
           duration_ms: durationMs,
-          start_ms: startMs,
-          end_ms: endMs,
+          start_ms: timing.startMs,
+          end_ms: timing.endMs,
         })
         showNotification({
           type: 'positive',
           message: t('editor.share.success'),
         })
       } catch (e) {
-        const isForbidden = axios.isAxiosError(e) && e.response?.status === 403
+        const messageKey = getAxiosMessageKey(e, {
+          defaultKey: 'editor.share.failed',
+          forbiddenKey: 'editor.share.clientNotSupported',
+        })
         showNotification({
           type: 'negative',
-          message: t(
-            isForbidden
-              ? 'editor.share.clientNotSupported'
-              : 'editor.share.failed',
-          ),
+          message: t(messageKey),
         })
       }
     },
@@ -828,7 +845,7 @@ function useRenderPlayerEditor({
         </button>
         <button
           data-interactive-transition="true"
-          onClick={handleSaveAll}
+          onClick={() => void handleSaveAll()}
           disabled={isSaving}
           aria-label={t('editor.saveSegment', 'Save all segments')}
           aria-busy={isSaving}
