@@ -768,7 +768,11 @@ function useRenderPlayerEditor({
                   onSetActive={setActiveIndex}
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
-                  onShare={item.ParentIndexNumber !== 0 ? handleShareSegment : undefined}
+                  onShare={
+                    item.ParentIndexNumber !== 0
+                      ? handleShareSegment
+                      : undefined
+                  }
                   vibrantColors={vibrantColors}
                 />
               </div>
