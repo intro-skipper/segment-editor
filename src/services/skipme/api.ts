@@ -4,7 +4,7 @@
  *
  * API endpoints:
  * - POST https://db.skipme.workers.dev/v1/submit  (single segment)
- * - POST https://db.skipme.workers.dev/v1/collection  (batch)
+ * - POST https://db.skipme.workers.dev/v1/submit/collection  (batch)
  * At least one of tmdb_id, tvdb_id, or anilist_id is required per submission.
  *
  * Security: Request body is strictly typed; no user-controlled URL construction.
@@ -126,7 +126,7 @@ export async function submitCollectionToSkipMe(
   requests: Array<SkipMeSubmitRequest>,
 ): Promise<SkipMeCollectionSubmitResponse> {
   const response = await axios.post<SkipMeCollectionSubmitResponse>(
-    `${SKIPME_BASE_URL}/v1/collection`,
+    `${SKIPME_BASE_URL}/v1/submit/collection`,
     requests,
     { headers: { 'Content-Type': 'application/json' } },
   )
