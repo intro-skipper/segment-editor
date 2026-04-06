@@ -434,15 +434,15 @@ function notifyCollectionResult(
 
 interface SubmitAllButtonProps {
   series: BaseItemDto
-  seasons: Array<BaseItemDto>
+  season: BaseItemDto
 }
 
-function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
+function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
   const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const handleSubmitAll = React.useCallback(async () => {
-    if (!series.Id) return
+    if (!series.Id || !season.Id) return
     setIsSubmitting(true)
 
     // Hoist value-block expressions out of try/catch for React Compiler
@@ -450,7 +450,7 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
     const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
     const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
     const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
-    const validSeasons = seasons.filter((s) => !!s.Id && !isSpecialSeason(s))
+    const validSeasons = [season]
 
     try {
       const { episodeEntries, segmentsPerEpisode } =
@@ -486,7 +486,7 @@ function SubmitAllButton({ series, seasons }: SubmitAllButtonProps) {
       })
     }
     setIsSubmitting(false)
-  }, [series, seasons, t])
+  }, [series, season, t])
 
   return (
     <Button
@@ -570,9 +570,9 @@ export function SeriesView({
         )}
       </div>
 
-      {series.Id && (
+      {series.Id && selectedSeason && !isSpecialSeason(selectedSeason) && (
         <div className="mt-6 md:mt-8 flex justify-center">
-          <SubmitAllButton series={series} seasons={seasons} />
+          <SubmitAllButton series={series} season={selectedSeason} />
         </div>
       )}
     </div>
