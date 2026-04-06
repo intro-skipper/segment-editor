@@ -242,7 +242,7 @@
     "episodeLoadError": "Échec du chargement des épisodes",
     "seasonNumber": "Saison {{number}}",
     "episodes": "Épisodes",
-    "submitAll": "Tout soumettre à SkipMe.db",
+    "submitAll": "Soumettre la saison à SkipMe.db",
     "submitAllSuccess": "{{count}} segments soumis à SkipMe.db",
     "submitAllNone": "Aucun segment à soumettre",
     "submitAllFailed": "Échec de la soumission des segments à SkipMe.db",

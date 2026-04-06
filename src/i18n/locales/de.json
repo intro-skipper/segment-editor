@@ -314,7 +314,7 @@
     "episodes": "Episoden",
     "loadError": "Episoden konnten nicht geladen werden",
     "episode": "Episode",
-    "submitAll": "Alle an SkipMe.db senden",
+    "submitAll": "Saison an SkipMe.db senden",
     "submitAllSuccess": "{{count}} Segmente an SkipMe.db gesendet",
     "submitAllNone": "Keine sendebaren Segmente gefunden",
     "submitAllFailed": "Senden der Segmente an SkipMe.db fehlgeschlagen",
