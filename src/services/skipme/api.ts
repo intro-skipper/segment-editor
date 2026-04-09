@@ -90,6 +90,7 @@ export interface SkipMeSubmitRequest {
   end_ms: number
 }
 
+/** Per-episode segment entry within a season submission. */
 export interface SkipMeSeasonItem {
   tvdb_id?: number
   episode?: number
@@ -99,6 +100,10 @@ export interface SkipMeSeasonItem {
   end_ms: number
 }
 
+/**
+ * Season-level payload for the submit/season endpoint.
+ * At least one of tmdb_id, tvdb_series_id, or anilist_id must be provided.
+ */
 export interface SkipMeSeasonRequest {
   tmdb_id?: number
   tvdb_series_id?: number
