@@ -4,7 +4,7 @@
  *
  * API endpoints:
  * - POST https://db.skipme.workers.dev/v1/submit  (single segment)
- * - POST https://db.skipme.workers.dev/v1/submit/collection  (batch)
+ * - POST https://db.skipme.workers.dev/v1/submit/season  (full season batch)
  * At least one of tmdb_id, tvdb_id, or anilist_id is required per submission.
  *
  * Security: Request body is strictly typed; no user-controlled URL construction.
@@ -90,6 +90,24 @@ export interface SkipMeSubmitRequest {
   end_ms: number
 }
 
+export interface SkipMeSeasonItem {
+  tvdb_id?: number
+  episode?: number
+  segment: string
+  duration_ms: number
+  start_ms: number
+  end_ms: number
+}
+
+export interface SkipMeSeasonRequest {
+  tmdb_id?: number
+  tvdb_series_id?: number
+  tvdb_season_id?: number
+  anilist_id?: number
+  season?: number
+  items: Array<SkipMeSeasonItem>
+}
+
 interface SkipMeSubmitResponse {
   ok: boolean
   submission?: {
@@ -119,15 +137,15 @@ export async function submitSegmentToSkipMe(
 }
 
 /**
- * Submits a collection of segments to the SkipMe.db API.
+ * Submits a full season's segments to the SkipMe.db API.
  * Throws on network error or non-2xx response.
  */
-export async function submitCollectionToSkipMe(
-  requests: Array<SkipMeSubmitRequest>,
+export async function submitSeasonToSkipMe(
+  seasons: Array<SkipMeSeasonRequest>,
 ): Promise<SkipMeCollectionSubmitResponse> {
   const response = await axios.post<SkipMeCollectionSubmitResponse>(
-    `${SKIPME_BASE_URL}/v1/submit/collection`,
-    requests,
+    `${SKIPME_BASE_URL}/v1/submit/season`,
+    seasons,
     { headers: { 'Content-Type': 'application/json' } },
   )
   return response.data

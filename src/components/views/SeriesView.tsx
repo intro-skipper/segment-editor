@@ -28,13 +28,13 @@ import { showNotification } from '@/lib/notifications'
 import { getEpisodes } from '@/services/items/api'
 import { getSegmentsById } from '@/services/segments/api'
 import {
-  submitCollectionToSkipMe,
+  submitSeasonToSkipMe,
   toSkipMeSegmentType,
   parseProviderId,
   runTimeTicksToMs,
   convertAndValidateSegmentTiming,
 } from '@/services/skipme/api'
-import type { SkipMeSubmitRequest } from '@/services/skipme/api'
+import type { SkipMeSeasonItem, SkipMeSeasonRequest } from '@/services/skipme/api'
 
 interface SeriesViewProps {
   /** The series item */
@@ -338,21 +338,22 @@ async function fetchSeriesEpisodeData(
   return { episodeEntries, segmentsPerEpisode }
 }
 
-/** Build the list of SkipMe submit requests from fetched episode/segment data. */
-function buildSubmitRequests(
+/** Build the SkipMe season submit request from fetched episode/segment data. */
+function buildSeasonSubmitRequest(
   seriesTmdbId: number | undefined,
   seriesTvdbId: number | undefined,
   seriesAniListId: number | undefined,
+  season: BaseItemDto,
   episodeEntries: Array<EpisodeEntry>,
   segmentsPerEpisode: Array<Array<MediaSegmentDto>>,
-): Array<SkipMeSubmitRequest> {
-  const requests: Array<SkipMeSubmitRequest> = []
+): SkipMeSeasonRequest | null {
+  const seasonProviderIds = getProviderIds(season)
+  const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
 
-  for (const [i, { episode, season }] of episodeEntries.entries()) {
+  const items: Array<SkipMeSeasonItem> = []
+
+  for (const [i, { episode }] of episodeEntries.entries()) {
     const segments = segmentsPerEpisode[i] ?? []
-
-    const seasonProviderIds = getProviderIds(season)
-    const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
 
     const episodeProviderIds = getProviderIds(episode)
     const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
@@ -379,15 +380,10 @@ function buildSubmitRequests(
       )
       if (!timing.valid) continue
 
-      requests.push({
-        tmdb_id: seriesTmdbId,
+      items.push({
         tvdb_id: episodeTvdbId,
-        anilist_id: seriesAniListId,
-        tvdb_series_id: seriesTvdbId,
-        tvdb_season_id: tvdbSeasonId,
-        segment: skipMeType,
-        season: episode.ParentIndexNumber ?? undefined,
         episode: episode.IndexNumber ?? undefined,
+        segment: skipMeType,
         duration_ms: durationMs,
         start_ms: timing.startMs,
         end_ms: timing.endMs,
@@ -395,7 +391,16 @@ function buildSubmitRequests(
     }
   }
 
-  return requests
+  if (items.length === 0) return null
+
+  return {
+    tmdb_id: seriesTmdbId,
+    tvdb_series_id: seriesTvdbId,
+    tvdb_season_id: tvdbSeasonId,
+    anilist_id: seriesAniListId,
+    season: season.IndexNumber ?? undefined,
+    items,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -456,15 +461,16 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
       const { episodeEntries, segmentsPerEpisode } =
         await fetchSeriesEpisodeData(series.Id, validSeasons)
 
-      const requests = buildSubmitRequests(
+      const seasonRequest = buildSeasonSubmitRequest(
         seriesTmdbId,
         seriesTvdbId,
         seriesAniListId,
+        season,
         episodeEntries,
         segmentsPerEpisode,
       )
 
-      if (requests.length === 0) {
+      if (!seasonRequest) {
         showNotification({
           type: 'warning',
           message: t('series.submitAllNone'),
@@ -473,8 +479,8 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
         return
       }
 
-      const result = await submitCollectionToSkipMe(requests)
-      notifyCollectionResult(result, requests.length, t)
+      const result = await submitSeasonToSkipMe([seasonRequest])
+      notifyCollectionResult(result, seasonRequest.items.length, t)
     } catch (e) {
       const messageKey = getAxiosMessageKey(e, {
         defaultKey: 'series.submitAllFailed',
