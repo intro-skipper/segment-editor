@@ -349,6 +349,10 @@ function buildSeasonSubmitRequest(
 ): SkipMeSeasonRequest | null {
   const seasonProviderIds = getProviderIds(season)
   const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
+  // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
+  // a unique ID per season. Only use the series AniList ID for season 1.
+  const seasonNum = season.IndexNumber ?? undefined
+  const effectiveAniListId = seasonNum === 1 ? seriesAniListId : undefined
 
   const items: Array<SkipMeSeasonItem> = []
 
@@ -361,7 +365,7 @@ function buildSeasonSubmitRequest(
     if (
       seriesTmdbId === undefined &&
       episodeTvdbId === undefined &&
-      seriesAniListId === undefined
+      effectiveAniListId === undefined
     ) {
       continue
     }
@@ -397,8 +401,8 @@ function buildSeasonSubmitRequest(
     tmdb_id: seriesTmdbId,
     tvdb_series_id: seriesTvdbId,
     tvdb_season_id: tvdbSeasonId,
-    anilist_id: seriesAniListId,
-    season: season.IndexNumber ?? undefined,
+    anilist_id: effectiveAniListId,
+    season: seasonNum,
     items,
   }
 }

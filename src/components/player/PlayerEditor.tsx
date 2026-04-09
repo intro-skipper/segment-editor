@@ -600,11 +600,15 @@ function useRenderPlayerEditor({
       const tmdbId = parseProviderId(providerIds?.Tmdb)
       const tvdbId = parseProviderId(providerIds?.Tvdb)
       const aniListId = parseProviderId(providerIds?.AniList)
+      // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
+      // a unique ID per season. Only use the AniList ID for season 1.
+      const seasonNum = item.ParentIndexNumber ?? undefined
+      const effectiveAniListId = seasonNum === 1 ? aniListId : undefined
 
       if (
         tmdbId === undefined &&
         tvdbId === undefined &&
-        aniListId === undefined
+        effectiveAniListId === undefined
       ) {
         showNotification({
           type: 'negative',
@@ -651,14 +655,13 @@ function useRenderPlayerEditor({
       const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
       const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
       const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
-      const seasonNum = item.ParentIndexNumber ?? undefined
       const episodeNum = item.IndexNumber ?? undefined
 
       try {
         await submitSegmentToSkipMe({
           tmdb_id: effectiveTmdbId,
           tvdb_id: tvdbId,
-          anilist_id: aniListId,
+          anilist_id: effectiveAniListId,
           tvdb_series_id: tvdbSeriesId,
           tvdb_season_id: tvdbSeasonId,
           segment: skipMeType,
