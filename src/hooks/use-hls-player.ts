@@ -179,9 +179,9 @@ export function useHlsPlayer({
   }, [videoUrl, destroyHls, clearRecoveryTimer])
 
   const retry = useCallback(() => {
-    onError(null)
+    reportError(null)
     hlsRef.current?.loadSource(videoUrl)
-  }, [onError, videoUrl])
+  }, [videoUrl])
 
   return { videoRef, hlsRef, retry }
 }

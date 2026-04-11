@@ -85,11 +85,14 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
 
   const artistName = artist.Name || albums[0]?.AlbumArtist || 'Unknown Artist'
 
-  const handleBack = React.useCallback(() => navigate({ to: '/' }), [navigate])
+  const handleBack = React.useCallback(
+    () => void navigate({ to: '/' }),
+    [navigate],
+  )
 
   const handleAlbumClick = React.useCallback(
     (albumId: string) => {
-      navigate({ to: '/album/$itemId', params: { itemId: albumId } })
+      void navigate({ to: '/album/$itemId', params: { itemId: albumId } })
     },
     [navigate],
   )

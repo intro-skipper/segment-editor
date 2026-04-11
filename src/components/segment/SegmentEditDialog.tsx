@@ -122,15 +122,7 @@ export function SegmentEditDialog({
     }
     if (isDirty) return
     form.reset(getSegmentFormDefaults(segment))
-  }, [
-    form,
-    isDirty,
-    open,
-    segment.EndTicks,
-    segment.Id,
-    segment.StartTicks,
-    segment.Type,
-  ])
+  }, [form, isDirty, open, segment])
 
   const handleSave = React.useCallback(() => {
     void form.handleSubmit()

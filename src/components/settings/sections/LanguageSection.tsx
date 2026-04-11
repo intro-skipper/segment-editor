@@ -33,7 +33,7 @@ export function LanguageSection() {
   const handleChange = useCallback(
     (value: Locale) => {
       setLocale(value)
-      i18n.changeLanguage(getEffectiveLocale(value))
+      void i18n.changeLanguage(getEffectiveLocale(value))
     },
     [setLocale, i18n],
   )

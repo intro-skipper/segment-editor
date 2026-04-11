@@ -3,7 +3,7 @@
  * Single-responsibility: Navigation + collection selection + settings access
  */
 
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useCallback, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   useCanGoBack,
@@ -129,17 +129,20 @@ export default function Header() {
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
-  const handleCollectionSelect = (collectionId: string | null) => {
-    navigate({
-      to: '/',
-      search: {
-        collection: collectionId ?? undefined,
-        page: undefined,
-        search: undefined,
-      },
-      replace: true,
-    })
-  }
+  const handleCollectionSelect = useCallback(
+    (collectionId: string | null) => {
+      void navigate({
+        to: '/',
+        search: {
+          collection: collectionId ?? undefined,
+          page: undefined,
+          search: undefined,
+        },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   // Collections query
   const { data: collections } = useCollections()
@@ -191,7 +194,7 @@ export default function Header() {
     }
 
     if (isEpisode && seriesId) {
-      navigate({
+      void navigate({
         to: '/series/$itemId',
         params: { itemId: seriesId },
         replace: true,
@@ -200,7 +203,7 @@ export default function Header() {
     }
 
     // Preserve selected collection when going back to home
-    navigate({
+    void navigate({
       to: '/',
       search: selectedCollection
         ? { collection: selectedCollection }

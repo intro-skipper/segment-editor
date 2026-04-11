@@ -104,7 +104,7 @@ const SearchResultItem = memo(function SearchResultItemComponent({
         >
           {item.Name ?? 'Unknown'}
         </p>
-        {item.ProductionYear && (
+        {item.ProductionYear != null && item.ProductionYear > 0 && (
           <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
             {item.ProductionYear}
           </p>

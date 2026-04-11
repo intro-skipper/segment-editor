@@ -224,7 +224,7 @@ export function getSegmentDraftState(
   }
 }
 
-export function parseSegmentFormValues(
+function parseSegmentFormValues(
   values: SegmentFormValues,
   maxDuration?: number | null,
 ):

@@ -570,14 +570,17 @@ export function useVideoPlayer({
       }
 
       isActiveRef.current = false
-      playbackRequestIdRef.current++
+      playbackRequestIdRef.current = Math.max(
+        playbackRequestIdRef.current,
+        requestId + 1,
+      )
       intentionalSwitchRef.current = false
       pendingHlsStateRestoreRef.current = false
       clearHlsStateRestoreSubscription()
       // Stop playback session on cleanup to trigger server-side transcoding cleanup
       // Use refs to get current values, avoiding stale closure issues
       const video = getActiveVideoElement()
-      stopPlaybackSession(getPositionTicks(video))
+      void stopPlaybackSession(getPositionTicks(video))
     }
   }, [
     itemId,

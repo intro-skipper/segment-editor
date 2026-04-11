@@ -17,7 +17,7 @@ const DANGEROUS_PROTOCOLS = [
 ]
 const PATH_TRAVERSAL = /(?:^|[\\/])\.\.(?:[\\/]|$)/
 const ENCODED_TRAVERSAL = /%2e%2e|%252e%252e|%c0%ae|%c1%9c/i
-// eslint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex
 const DANGEROUS_CHARS = /[\x00-\x1f\x7f]/
 
 // ─────────────────────────────────────────────────────────────────────────────

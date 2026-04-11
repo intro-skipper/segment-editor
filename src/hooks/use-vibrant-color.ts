@@ -302,7 +302,7 @@ export function useVibrantColor(
     }
 
     let cancelled = false
-    getColors(imageUrl, resolvedTheme).then((result) => {
+    void getColors(imageUrl, resolvedTheme).then((result) => {
       if (!cancelled && result) setColors(result)
     })
 

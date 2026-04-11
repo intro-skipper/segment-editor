@@ -5,7 +5,7 @@
  * wizard validation after the TanStack Form migration.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
 
 import {
@@ -13,16 +13,28 @@ import {
   ConnectionDiscoverSchema,
 } from '@/lib/forms/connection-form'
 import { authenticate, discoverServers } from '@/services/jellyfin'
+import { getJellyfinClient } from '@/services/jellyfin/core'
 import { AppError, ErrorCodes } from '@/lib/unified-error'
 
 describe('Network Error Handling', () => {
   it('returns error indication for unreachable servers', async () => {
-    const result = await discoverServers('invalid.nonexistent.local.test', {
-      signal: AbortSignal.timeout(5000),
-    })
+    const jellyfin = getJellyfinClient()
+    const discoverySpy = vi
+      .spyOn(jellyfin.discovery, 'getRecommendedServerCandidates')
+      .mockRejectedValueOnce(new Error('Network connection failed'))
 
-    expect(result.servers).toHaveLength(0)
-    expect(result.servers.length === 0 || result.error !== undefined).toBe(true)
+    try {
+      const result = await discoverServers('invalid.nonexistent.local.test', {
+        signal: AbortSignal.timeout(5000),
+      })
+
+      expect(result.servers).toHaveLength(0)
+      expect(result.servers.length === 0 || result.error !== undefined).toBe(
+        true,
+      )
+    } finally {
+      discoverySpy.mockRestore()
+    }
   })
 
   it('handles timeout during discovery gracefully', async () => {

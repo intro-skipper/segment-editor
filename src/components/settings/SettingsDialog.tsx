@@ -51,6 +51,18 @@ function SettingsDialogBase() {
           <PageSizeSection />
           <CodecCompatibilitySection />
         </div>
+        {!pluginMode && (
+          <div className="px-5 py-3 border-t border-border/50 text-center">
+            <a
+              href="https://github.com/intro-skipper/.github/blob/main/PRIVACY.md#website-privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t('settings.privacyPolicy', 'Privacy Policy')}
+            </a>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

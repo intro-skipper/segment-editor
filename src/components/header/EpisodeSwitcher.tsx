@@ -416,7 +416,7 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
   const handleEpisodeSelect = useCallback(
     (episodeId: string) => {
       setOpen(false)
-      navigate({
+      void navigate({
         to: '/player/$itemId',
         params: { itemId: episodeId },
         search: { fetchSegments: 'true' },

@@ -54,7 +54,7 @@ function getInitialLocale(): SupportedLocale {
   return 'en-US'
 }
 
-i18n.use(initReactI18next).init({
+void i18n.use(initReactI18next).init({
   resources,
   lng: getInitialLocale(),
   fallbackLng: 'en-US',
@@ -72,9 +72,9 @@ i18n.use(initReactI18next).init({
 export function changeLocale(locale: SupportedLocale | 'auto'): void {
   if (locale === 'auto') {
     const detected = detectBrowserLocale()
-    i18n.changeLanguage(detected)
+    void i18n.changeLanguage(detected)
   } else {
-    i18n.changeLanguage(locale)
+    void i18n.changeLanguage(locale)
   }
 }
 

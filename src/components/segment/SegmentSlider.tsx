@@ -11,6 +11,7 @@ import {
   GripVertical,
   Pencil,
   Play,
+  Share2,
   Trash2,
 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
@@ -98,6 +99,8 @@ interface SegmentSliderProps {
   getPlayerTime?: () => number | undefined
   /** Callback to copy all segments to system clipboard as JSON */
   onCopyAllAsJson?: () => void
+  /** Callback to share this segment with SkipMe.db */
+  onShare?: (segment: MediaSegmentDto) => Promise<void>
   /** Callback to open the segment edit dialog */
   onEdit?: (index: number) => void
   /** Vibrant theme colors derived from the current item artwork */
@@ -120,6 +123,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   onSetActive,
   getPlayerTime,
   onCopyAllAsJson,
+  onShare,
   onEdit,
   vibrantColors,
 }: SegmentSliderProps) {
@@ -132,6 +136,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
     null,
   )
+  const [isSharing, setIsSharing] = React.useState(false)
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
   const [activeInput, setActiveInput] = React.useState<'start' | 'end' | null>(
     null,
@@ -242,16 +247,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       end: segment.EndTicks ?? 0,
     })
     form.reset(getSegmentFormDefaults(segment))
-  }, [
-    form,
-    segment.Id,
-    segment.StartTicks,
-    segment.EndTicks,
-    segment.Type,
-    isDragging,
-    activeInput,
-    updateStableRange,
-  ])
+  }, [form, segment, isDragging, activeInput, updateStableRange])
 
   const segmentColor = getSegmentColor(formValues.type)
   const segmentCssVar = getSegmentCssVar(formValues.type)
@@ -303,11 +299,26 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [segment, onUpdate],
   )
 
-  const handlePointerDown = React.useCallback(
-    (handle: 'start' | 'end') => (e: React.PointerEvent) => {
+  const handleStartPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      setIsDragging(handle)
+      setIsDragging('start')
+      onSetActive(index)
+
+      const captureTarget = e.currentTarget as HTMLElement
+      captureTarget.setPointerCapture(e.pointerId)
+      pointerCaptureTargetRef.current = captureTarget
+      pointerIdRef.current = e.pointerId
+    },
+    [index, onSetActive],
+  )
+
+  const handleEndPointerDown = React.useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging('end')
       onSetActive(index)
 
       const captureTarget = e.currentTarget as HTMLElement
@@ -476,6 +487,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [
       applyDraftBoundary,
       commitSegmentUpdate,
+      form,
       runtimeSeconds,
       frameStep,
       validation.valid,
@@ -490,9 +502,9 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       formValues,
       runtimeSeconds,
     )
-    const segmentToCopy = nextSegment.success ? nextSegment.segment : segment
+    const resolvedSegment = nextSegment.success ? nextSegment.segment : segment
     try {
-      const result = segmentsToIntroSkipperClipboardText([segmentToCopy])
+      const result = segmentsToIntroSkipperClipboardText([resolvedSegment])
       await navigator.clipboard.writeText(result.text)
       showNotification({
         type: 'positive',
@@ -511,6 +523,26 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     setCopyMenuOpen(false)
     onCopyAllAsJson?.()
   }, [onCopyAllAsJson])
+
+  // Share current segment to SkipMe.db
+  const handleShare = React.useCallback(async () => {
+    if (!onShare || isSharing) return
+    const nextSegment = buildSegmentFromFormValues(
+      segment,
+      formValues,
+      runtimeSeconds,
+    )
+    const resolvedSegment = nextSegment.success ? nextSegment.segment : segment
+    setIsSharing(true)
+    try {
+      await onShare(resolvedSegment)
+    } catch {
+      // Error handling is done by the onShare callback itself
+    }
+    setIsSharing(false)
+  }, [formValues, isSharing, onShare, runtimeSeconds, segment])
+
+  const handleEdit = React.useCallback(() => onEdit?.(index), [index, onEdit])
 
   const handleDelete = React.useCallback(
     () => onDelete(index),
@@ -717,6 +749,24 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           </span>
         </div>
         <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          {/* Share button */}
+          {onShare && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleShare}
+              disabled={isSharing}
+              aria-label={t('accessibility.shareSegment')}
+              aria-busy={isSharing}
+              className="hover:bg-primary/10"
+            >
+              <Share2
+                className="size-4"
+                aria-hidden="true"
+                style={isSharing ? undefined : iconStyle}
+              />
+            </Button>
+          )}
           {/* Copy dropdown menu */}
           <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
             <DropdownMenuTrigger
@@ -746,7 +796,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => onEdit(index)}
+              onClick={handleEdit}
               aria-label={t('segment.edit')}
               className="hover:bg-primary/10"
             >
@@ -810,7 +860,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             aria-valuetext={formatTime(localStart)}
             aria-orientation="horizontal"
             tabIndex={0}
-            onPointerDown={handlePointerDown('start')}
+            onPointerDown={handleStartPointerDown}
             onKeyDown={handleStartKeyDown}
             onBlur={() => handleHandleBlur('start')}
           >
@@ -833,7 +883,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             aria-valuetext={formatTime(localEnd)}
             aria-orientation="horizontal"
             tabIndex={0}
-            onPointerDown={handlePointerDown('end')}
+            onPointerDown={handleEndPointerDown}
             onKeyDown={handleEndKeyDown}
             onBlur={() => handleHandleBlur('end')}
           >

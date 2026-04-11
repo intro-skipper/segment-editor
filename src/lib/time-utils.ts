@@ -22,7 +22,7 @@ const MIN_TIME_VALUE = 0
  * @param value - Any value to convert
  * @returns A finite number, or 0 for invalid inputs
  */
-export function toSafeNumber(value: unknown): number {
+function toSafeNumber(value: unknown): number {
   if (value == null) return 0
   const num = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(num) ? num : 0

@@ -3,7 +3,13 @@
  * Displays library picker, search, and paginated media grid.
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
@@ -21,6 +27,7 @@ import {
 
 import { AnimatePresence, m, useIsPresent } from 'motion/react'
 import type { ReactNode } from 'react'
+import type { BaseItemDto } from '@/types/jellyfin'
 import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
@@ -83,6 +90,9 @@ const getCollectionIcon = (name: string) => {
   }
   return Library
 }
+
+// Stable empty array to avoid re-creating a new reference every render
+const EMPTY_ITEMS: Array<BaseItemDto> = []
 
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
@@ -203,16 +213,19 @@ function useRenderFilterView() {
   const requestedPage = Math.max(1, currentPage)
   const startIndex = (requestedPage - 1) * effectivePageSize
 
-  const setCurrentPage = (pageNum: number) => {
-    navigate({
-      to: '/',
-      search: (prev) => ({
-        ...prev,
-        page: pageNum > 1 ? pageNum : undefined,
-      }),
-      replace: true,
-    })
-  }
+  const setCurrentPage = useCallback(
+    (pageNum: number) => {
+      void navigate({
+        to: '/',
+        search: (prev) => ({
+          ...prev,
+          page: pageNum > 1 ? pageNum : undefined,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   const columns = useGridColumns()
 
@@ -246,7 +259,7 @@ function useRenderFilterView() {
   const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize))
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
 
-  const paginatedItems = itemsData?.items ?? []
+  const paginatedItems = itemsData?.items ?? EMPTY_ITEMS
   const shouldVirtualizeGrid =
     paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
   const [virtualizedGridElement, setVirtualizedGridElement] =
@@ -358,7 +371,7 @@ function useRenderFilterView() {
 
   const handleCollectionChange = (value: string | null) => {
     setFocusedIndex(-1)
-    navigate({
+    void navigate({
       to: '/',
       search: {
         collection: value ?? undefined,
@@ -376,8 +389,8 @@ function useRenderFilterView() {
   }
 
   const handleRetry = () => {
-    if (collectionsError) refetchCollections()
-    else refetchItems()
+    if (collectionsError) void refetchCollections()
+    else void refetchItems()
   }
 
   const pageNumbers = getPageNumbers(validCurrentPage, totalPages)
