@@ -598,24 +598,13 @@ function useRenderPlayerEditor({
       const providerIds = getProviderIds(item)
 
       const tmdbId = parseProviderId(providerIds?.Tmdb)
+      const imdbId = providerIds?.Imdb ?? providerIds?.IMDb
       const tvdbId = parseProviderId(providerIds?.Tvdb)
       const aniListId = parseProviderId(providerIds?.AniList)
       // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
       // a unique ID per season. Only use the AniList ID for season 1.
       const seasonNum = item.ParentIndexNumber ?? undefined
       const effectiveAniListId = seasonNum === 1 ? aniListId : undefined
-
-      if (
-        tmdbId === undefined &&
-        tvdbId === undefined &&
-        effectiveAniListId === undefined
-      ) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.noIds'),
-        })
-        return
-      }
 
       const durationMs = runTimeTicksToMs(item.RunTimeTicks)
       if (!durationMs) {
@@ -655,11 +644,27 @@ function useRenderPlayerEditor({
       const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
       const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
       const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
+      const effectiveImdbId =
+        imdbId ?? seriesProviderIds?.Imdb ?? seriesProviderIds?.IMDb
       const episodeNum = item.IndexNumber ?? undefined
+
+      if (
+        effectiveTmdbId === undefined &&
+        effectiveImdbId === undefined &&
+        tvdbId === undefined &&
+        effectiveAniListId === undefined
+      ) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.noIds'),
+        })
+        return
+      }
 
       try {
         await submitSegmentToSkipMe({
           tmdb_id: effectiveTmdbId,
+          imdb_id: effectiveImdbId,
           tvdb_id: tvdbId,
           anilist_id: effectiveAniListId,
           tvdb_series_id: tvdbSeriesId,
