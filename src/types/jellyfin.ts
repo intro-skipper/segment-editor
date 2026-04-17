@@ -37,3 +37,13 @@ export function getProviderIds(
   }
   return Object.keys(result).length > 0 ? result : undefined
 }
+
+/**
+ * Retrieves an IMDb provider ID from Jellyfin ProviderIds, supporting
+ * both common key casings seen in metadata providers.
+ */
+export function getImdbProviderId(
+  providerIds: Record<string, string> | undefined,
+): string | undefined {
+  return providerIds?.Imdb ?? providerIds?.IMDb
+}

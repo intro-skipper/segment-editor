@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
 
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
-import { getProviderIds } from '@/types/jellyfin'
+import { getImdbProviderId, getProviderIds } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/hooks/queries/use-items'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
@@ -460,7 +460,7 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
     // Hoist value-block expressions out of try/catch for React Compiler
     const seriesProviderIds = getProviderIds(series)
     const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
-    const seriesImdbId = seriesProviderIds?.Imdb ?? seriesProviderIds?.IMDb
+    const seriesImdbId = getImdbProviderId(seriesProviderIds)
     const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
     const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
     const validSeasons = [season]

@@ -14,7 +14,7 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
-import { getProviderIds } from '@/types/jellyfin'
+import { getImdbProviderId, getProviderIds } from '@/types/jellyfin'
 import type {
   CreateSegmentData,
   SegmentUpdate,
@@ -598,7 +598,7 @@ function useRenderPlayerEditor({
       const providerIds = getProviderIds(item)
 
       const tmdbId = parseProviderId(providerIds?.Tmdb)
-      const imdbId = providerIds?.Imdb ?? providerIds?.IMDb
+      const itemImdbId = getImdbProviderId(providerIds)
       const tvdbId = parseProviderId(providerIds?.Tvdb)
       const aniListId = parseProviderId(providerIds?.AniList)
       // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
@@ -644,8 +644,7 @@ function useRenderPlayerEditor({
       const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
       const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
       const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
-      const effectiveImdbId =
-        imdbId ?? seriesProviderIds?.Imdb ?? seriesProviderIds?.IMDb
+      const effectiveImdbId = itemImdbId ?? getImdbProviderId(seriesProviderIds)
       const episodeNum = item.IndexNumber ?? undefined
 
       if (
