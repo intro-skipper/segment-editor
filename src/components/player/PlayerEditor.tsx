@@ -595,6 +595,34 @@ function useRenderPlayerEditor({
         return
       }
 
+      // Validate synchronous fields first to avoid unnecessary network requests.
+      const durationMs = runTimeTicksToMs(item.RunTimeTicks)
+      if (!durationMs) {
+        showNotification({
+          type: 'negative',
+          message: t('editor.share.noDuration'),
+        })
+        return
+      }
+
+      // StartTicks/EndTicks are stored in seconds by toUiSegment in the segment
+      // API service layer. Convert to milliseconds for the SkipMe.db API.
+      const timing = convertAndValidateSegmentTiming(
+        segment.StartTicks,
+        segment.EndTicks,
+        durationMs,
+      )
+      if (!timing.valid) {
+        showNotification({
+          type: 'negative',
+          message:
+            timing.reason === 'invalidTiming'
+              ? t('editor.share.invalidTiming')
+              : t('editor.share.exceedsDuration'),
+        })
+        return
+      }
+
       const providerIds = getProviderIds(item)
 
       const tmdbId = parseProviderId(providerIds?.Tmdb)
@@ -629,33 +657,6 @@ function useRenderPlayerEditor({
         showNotification({
           type: 'negative',
           message: t('editor.share.noIds'),
-        })
-        return
-      }
-
-      const durationMs = runTimeTicksToMs(item.RunTimeTicks)
-      if (!durationMs) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.noDuration'),
-        })
-        return
-      }
-
-      // StartTicks/EndTicks are stored in seconds by toUiSegment in the segment
-      // API service layer. Convert to milliseconds for the SkipMe.db API.
-      const timing = convertAndValidateSegmentTiming(
-        segment.StartTicks,
-        segment.EndTicks,
-        durationMs,
-      )
-      if (!timing.valid) {
-        showNotification({
-          type: 'negative',
-          message:
-            timing.reason === 'invalidTiming'
-              ? t('editor.share.invalidTiming')
-              : t('editor.share.exceedsDuration'),
         })
         return
       }
