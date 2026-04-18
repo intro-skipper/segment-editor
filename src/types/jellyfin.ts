@@ -19,6 +19,7 @@ export {
  *
  * The Jellyfin SDK types `ProviderIds` as `{ [key: string]: string | null } | null | undefined`.
  * This helper filters out nullish values so callers can safely assume all values are strings.
+ * IMDb keys are normalised to `Imdb` to handle both casings seen in metadata providers.
  */
 export function getProviderIds(
   item:
@@ -32,7 +33,8 @@ export function getProviderIds(
   const result: Record<string, string> = {}
   for (const [key, value] of Object.entries(raw)) {
     if (value != null) {
-      result[key] = value
+      const normalizedKey = key === 'IMDb' ? 'Imdb' : key
+      result[normalizedKey] = value
     }
   }
   return Object.keys(result).length > 0 ? result : undefined

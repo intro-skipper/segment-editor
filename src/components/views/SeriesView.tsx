@@ -341,6 +341,7 @@ async function fetchSeriesEpisodeData(
 /** Build the SkipMe season submit request from fetched episode/segment data. */
 function buildSeasonSubmitRequest(
   seriesTmdbId: number | undefined,
+  seriesImdbId: string | undefined,
   seriesTvdbId: number | undefined,
   seriesAniListId: number | undefined,
   season: BaseItemDto,
@@ -364,6 +365,7 @@ function buildSeasonSubmitRequest(
 
     if (
       seriesTmdbId === undefined &&
+      seriesImdbId === undefined &&
       episodeTvdbId === undefined &&
       effectiveAniListId === undefined
     ) {
@@ -399,6 +401,7 @@ function buildSeasonSubmitRequest(
 
   return {
     tmdb_id: seriesTmdbId,
+    imdb_id: seriesImdbId,
     tvdb_series_id: seriesTvdbId,
     tvdb_season_id: tvdbSeasonId,
     anilist_id: effectiveAniListId,
@@ -457,6 +460,7 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
     // Hoist value-block expressions out of try/catch for React Compiler
     const seriesProviderIds = getProviderIds(series)
     const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
+    const seriesImdbId = seriesProviderIds?.Imdb
     const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
     const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
     const validSeasons = [season]
@@ -467,6 +471,7 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
 
       const seasonRequest = buildSeasonSubmitRequest(
         seriesTmdbId,
+        seriesImdbId,
         seriesTvdbId,
         seriesAniListId,
         season,
