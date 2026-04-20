@@ -645,12 +645,12 @@ function useRenderPlayerEditor({
       const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
       const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
       const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
-      const effectiveImdbId = itemImdbId ?? seriesProviderIds?.Imdb
+      const seriesImdbId = seriesProviderIds?.Imdb
       const episodeNum = item.IndexNumber ?? undefined
 
       if (
         effectiveTmdbId === undefined &&
-        effectiveImdbId === undefined &&
+        seriesImdbId === undefined &&
         tvdbId === undefined &&
         effectiveAniListId === undefined
       ) {
@@ -664,7 +664,8 @@ function useRenderPlayerEditor({
       try {
         await submitSegmentToSkipMe({
           tmdb_id: effectiveTmdbId,
-          imdb_id: effectiveImdbId,
+          imdb_series_id: seriesImdbId,
+          imdb_id: itemImdbId,
           tvdb_id: tvdbId,
           anilist_id: effectiveAniListId,
           tvdb_series_id: tvdbSeriesId,
