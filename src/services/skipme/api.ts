@@ -5,7 +5,8 @@
  * API endpoints:
  * - POST https://db.skipme.workers.dev/v1/submit  (single segment)
  * - POST https://db.skipme.workers.dev/v1/submit/season  (full season batch)
- * At least one of tmdb_id, imdb_series_id, tvdb_id, or anilist_id is required per submission.
+ * Minimum requirement per submission: tvdb_id, imdb_id, tmdb_id with season+episode,
+ * imdb_series_id with season+episode, tvdb_series_id with season+episode, or anilist_id with episode.
  *
  * Security: Request body is strictly typed; no user-controlled URL construction.
  */
@@ -105,7 +106,8 @@ export interface SkipMeSeasonItem {
 
 /**
  * Season-level payload for the submit/season endpoint.
- * At least one of tmdb_id, imdb_series_id, tvdb_series_id, or anilist_id must be provided.
+ * At least one of tmdb_id, imdb_series_id, tvdb_series_id, or anilist_id must be provided,
+ * or each item must carry its own tvdb_id or imdb_id.
  */
 export interface SkipMeSeasonRequest {
   tmdb_id?: number

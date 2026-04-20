@@ -367,6 +367,7 @@ function buildSeasonSubmitRequest(
     if (
       seriesTmdbId === undefined &&
       seriesImdbId === undefined &&
+      seriesTvdbId === undefined &&
       episodeImdbId === undefined &&
       episodeTvdbId === undefined &&
       effectiveAniListId === undefined

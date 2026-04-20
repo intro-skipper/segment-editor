@@ -651,6 +651,7 @@ function useRenderPlayerEditor({
       if (
         effectiveTmdbId === undefined &&
         seriesImdbId === undefined &&
+        tvdbSeriesId === undefined &&
         itemImdbId === undefined &&
         tvdbId === undefined &&
         effectiveAniListId === undefined
