@@ -362,10 +362,13 @@ function buildSeasonSubmitRequest(
 
     const episodeProviderIds = getProviderIds(episode)
     const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
+    const episodeImdbId = episodeProviderIds?.Imdb
 
     if (
       seriesTmdbId === undefined &&
       seriesImdbId === undefined &&
+      seriesTvdbId === undefined &&
+      episodeImdbId === undefined &&
       episodeTvdbId === undefined &&
       effectiveAniListId === undefined
     ) {
@@ -388,6 +391,7 @@ function buildSeasonSubmitRequest(
 
       items.push({
         tvdb_id: episodeTvdbId,
+        imdb_id: episodeImdbId,
         episode: episode.IndexNumber ?? undefined,
         segment: skipMeType,
         duration_ms: durationMs,
@@ -401,7 +405,7 @@ function buildSeasonSubmitRequest(
 
   return {
     tmdb_id: seriesTmdbId,
-    imdb_id: seriesImdbId,
+    imdb_series_id: seriesImdbId,
     tvdb_series_id: seriesTvdbId,
     tvdb_season_id: tvdbSeasonId,
     anilist_id: effectiveAniListId,
