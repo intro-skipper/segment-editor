@@ -37,6 +37,18 @@ export function parseProviderId(value: string | undefined): number | undefined {
 }
 
 /**
+ * Parses a provider ID string to a non-empty trimmed value.
+ * Returns undefined for missing, empty, or whitespace-only values.
+ */
+export function parseProviderString(
+  value: string | null | undefined,
+): string | undefined {
+  if (!value) return undefined
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : undefined
+}
+
+/**
  * Converts a Jellyfin segment type string to its SkipMe.db equivalent.
  * Returns null for unsupported types (Commercial, Unknown).
  */

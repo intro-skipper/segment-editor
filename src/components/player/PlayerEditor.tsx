@@ -36,6 +36,7 @@ import {
   submitSegmentToSkipMe,
   toSkipMeSegmentType,
   parseProviderId,
+  parseProviderString,
   runTimeTicksToMs,
   convertAndValidateSegmentTiming,
 } from '@/services/skipme/api'
@@ -645,7 +646,7 @@ function useRenderPlayerEditor({
       const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
       const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
       const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
-      const seriesImdbId = seriesProviderIds?.Imdb
+      const seriesImdbId = parseProviderString(seriesProviderIds?.Imdb)
       const episodeNum = item.IndexNumber ?? undefined
 
       if (
