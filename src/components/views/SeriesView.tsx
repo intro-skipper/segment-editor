@@ -31,6 +31,7 @@ import {
   submitSeasonToSkipMe,
   toSkipMeSegmentType,
   parseProviderId,
+  parseProviderString,
   runTimeTicksToMs,
   convertAndValidateSegmentTiming,
 } from '@/services/skipme/api'
@@ -464,7 +465,7 @@ function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
     // Hoist value-block expressions out of try/catch for React Compiler
     const seriesProviderIds = getProviderIds(series)
     const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
-    const seriesImdbId = seriesProviderIds?.Imdb
+    const seriesImdbId = parseProviderString(seriesProviderIds?.Imdb)
     const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
     const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
     const validSeasons = [season]
