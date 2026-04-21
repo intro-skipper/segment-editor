@@ -1,7 +1,6 @@
 {
   "accessibility": {
     "copySegment": "Copy segment to clipboard",
-    "shareSegment": "Share segment with SkipMe.db",
     "deleteSegment": "Delete segment",
     "seekToStart": "Seek to start time",
     "seekToEnd": "Seek to end time",
@@ -143,18 +142,7 @@
     },
     "noSegments": "No Segments available, create one with '+'",
     "noSegmentInClipboard": "No segment in clipboard",
-    "segmentCopiedToClipboard": "Segment copied to clipboard",
-    "share": {
-      "button": "Share with SkipMe.db",
-      "success": "Segment shared with SkipMe.db",
-      "unsupportedType": "Segment type cannot be shared with SkipMe.db",
-      "noIds": "Cannot share: no TMDB or TVDB ID",
-      "noDuration": "Cannot share: episode duration unknown",
-      "invalidTiming": "Cannot share: segment timing invalid",
-      "exceedsDuration": "Cannot share: segment exceeds episode duration",
-      "clientNotSupported": "Cannot share: your client is not supported",
-      "failed": "Failed to share with SkipMe.db"
-    }
+    "segmentCopiedToClipboard": "Segment copied to clipboard"
   },
   "yes": "Yes",
   "no": "No",
@@ -313,13 +301,7 @@
     "seasonNumber": "Season {{number}}",
     "episodes": "Episodes",
     "loadError": "Failed to load episodes",
-    "episode": "Episode",
-    "submitAll": "Submit season to SkipMe.db",
-    "submitAllSuccess": "{{count}} segments submitted to SkipMe.db",
-    "submitAllNone": "No submittable segments found",
-    "submitAllFailed": "Failed to submit segments to SkipMe.db",
-    "submitAllClientNotSupported": "Cannot submit: your client is not supported",
-    "submitAllPartial": "Only {{submitted}} of {{count}} segments were accepted by SkipMe.db"
+    "episode": "Episode"
   },
   "search": {
     "open": "Open search",
