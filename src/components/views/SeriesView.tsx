@@ -6,36 +6,20 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Loader2, Play, Share2 } from 'lucide-react'
+import { AlertCircle, Play } from 'lucide-react'
 
-import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
-import { getProviderIds } from '@/types/jellyfin'
+import type { BaseItemDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/hooks/queries/use-items'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
-import { Button } from '@/components/ui/button'
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/ui/async-state'
-import { mapWithLimit } from '@/lib/async-utils'
 import { cn } from '@/lib/utils'
-import { getAxiosMessageKey } from '@/lib/error-utils'
-import { showNotification } from '@/lib/notifications'
-import { getEpisodes } from '@/services/items/api'
-import { getSegmentsById } from '@/services/segments/api'
-import {
-  submitSeasonToSkipMe,
-  toSkipMeSegmentType,
-  parseProviderId,
-  parseProviderString,
-  runTimeTicksToMs,
-  convertAndValidateSegmentTiming,
-} from '@/services/skipme/api'
-import type { SkipMeSeasonItem, SkipMeSeasonRequest } from '@/services/skipme/api'
 
 interface SeriesViewProps {
   /** The series item */
@@ -302,230 +286,6 @@ function SeasonEpisodes({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SubmitAllButton helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface EpisodeEntry {
-  episode: BaseItemDto
-  season: BaseItemDto
-}
-
-/** Maximum number of concurrent API requests to Jellyfin when fetching episode/segment data. */
-const MAX_CONCURRENCY = 6
-
-/** Fetch all episodes for every valid season, then all their segments, with bounded concurrency. */
-async function fetchSeriesEpisodeData(
-  seriesId: string,
-  validSeasons: Array<BaseItemDto>,
-): Promise<{
-  episodeEntries: Array<EpisodeEntry>
-  segmentsPerEpisode: Array<Array<MediaSegmentDto>>
-}> {
-  const episodesPerSeason = await mapWithLimit(
-    validSeasons,
-    MAX_CONCURRENCY,
-    (season) => getEpisodes(seriesId, season.Id!),
-  )
-  const episodeEntries = episodesPerSeason.flatMap((episodes, i) =>
-    episodes
-      .filter((e) => !!e.Id)
-      .map((episode) => ({ episode, season: validSeasons[i] })),
-  )
-  const segmentsPerEpisode = await mapWithLimit(
-    episodeEntries,
-    MAX_CONCURRENCY,
-    ({ episode }) => getSegmentsById(episode.Id!),
-  )
-  return { episodeEntries, segmentsPerEpisode }
-}
-
-/** Build the SkipMe season submit request from fetched episode/segment data. */
-function buildSeasonSubmitRequest(
-  seriesTmdbId: number | undefined,
-  seriesImdbId: string | undefined,
-  seriesTvdbId: number | undefined,
-  seriesAniListId: number | undefined,
-  season: BaseItemDto,
-  episodeEntries: Array<EpisodeEntry>,
-  segmentsPerEpisode: Array<Array<MediaSegmentDto>>,
-): SkipMeSeasonRequest | null {
-  const seasonProviderIds = getProviderIds(season)
-  const tvdbSeasonId = parseProviderId(seasonProviderIds?.Tvdb)
-  // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
-  // a unique ID per season. Only use the series AniList ID for season 1.
-  const seasonNum = season.IndexNumber ?? undefined
-  const effectiveAniListId = seasonNum === 1 ? seriesAniListId : undefined
-
-  const items: Array<SkipMeSeasonItem> = []
-
-  for (const [i, { episode }] of episodeEntries.entries()) {
-    const segments = segmentsPerEpisode[i] ?? []
-
-    const episodeProviderIds = getProviderIds(episode)
-    const episodeTvdbId = parseProviderId(episodeProviderIds?.Tvdb)
-    const episodeImdbId = episodeProviderIds?.Imdb
-
-    if (
-      seriesTmdbId === undefined &&
-      seriesImdbId === undefined &&
-      seriesTvdbId === undefined &&
-      episodeImdbId === undefined &&
-      episodeTvdbId === undefined &&
-      effectiveAniListId === undefined
-    ) {
-      continue
-    }
-
-    const durationMs = runTimeTicksToMs(episode.RunTimeTicks)
-    if (!durationMs) continue
-
-    for (const segment of segments) {
-      const skipMeType = toSkipMeSegmentType(segment.Type)
-      if (!skipMeType) continue
-
-      const timing = convertAndValidateSegmentTiming(
-        segment.StartTicks,
-        segment.EndTicks,
-        durationMs,
-      )
-      if (!timing.valid) continue
-
-      items.push({
-        tvdb_id: episodeTvdbId,
-        imdb_id: episodeImdbId,
-        episode: episode.IndexNumber ?? undefined,
-        segment: skipMeType,
-        duration_ms: durationMs,
-        start_ms: timing.startMs,
-        end_ms: timing.endMs,
-      })
-    }
-  }
-
-  if (items.length === 0) return null
-
-  return {
-    tmdb_id: seriesTmdbId,
-    imdb_series_id: seriesImdbId,
-    tvdb_series_id: seriesTvdbId,
-    tvdb_season_id: tvdbSeasonId,
-    anilist_id: effectiveAniListId,
-    season: seasonNum,
-    items,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SubmitAllButton - Submits all series segments to SkipMe.db
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Show the appropriate notification after a collection submission. */
-function notifyCollectionResult(
-  result: { ok: boolean; submitted?: number },
-  totalCount: number,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): void {
-  if (!result.ok) {
-    showNotification({
-      type: 'negative',
-      message: t('series.submitAllFailed'),
-    })
-    return
-  }
-  const submitted = result.submitted
-  if (submitted !== undefined && submitted < totalCount) {
-    showNotification({
-      type: 'warning',
-      message: t('series.submitAllPartial', {
-        submitted,
-        count: totalCount,
-      }),
-    })
-    return
-  }
-  showNotification({
-    type: 'positive',
-    message: t('series.submitAllSuccess', { count: totalCount }),
-  })
-}
-
-interface SubmitAllButtonProps {
-  series: BaseItemDto
-  season: BaseItemDto
-}
-
-function SubmitAllButton({ series, season }: SubmitAllButtonProps) {
-  const { t } = useTranslation()
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
-
-  const handleSubmitAll = React.useCallback(async () => {
-    if (!series.Id || !season.Id) return
-    setIsSubmitting(true)
-
-    // Hoist value-block expressions out of try/catch for React Compiler
-    const seriesProviderIds = getProviderIds(series)
-    const seriesTmdbId = parseProviderId(seriesProviderIds?.Tmdb)
-    const seriesImdbId = parseProviderString(seriesProviderIds?.Imdb)
-    const seriesTvdbId = parseProviderId(seriesProviderIds?.Tvdb)
-    const seriesAniListId = parseProviderId(seriesProviderIds?.AniList)
-    const validSeasons = [season]
-
-    try {
-      const { episodeEntries, segmentsPerEpisode } =
-        await fetchSeriesEpisodeData(series.Id, validSeasons)
-
-      const seasonRequest = buildSeasonSubmitRequest(
-        seriesTmdbId,
-        seriesImdbId,
-        seriesTvdbId,
-        seriesAniListId,
-        season,
-        episodeEntries,
-        segmentsPerEpisode,
-      )
-
-      if (!seasonRequest) {
-        showNotification({
-          type: 'warning',
-          message: t('series.submitAllNone'),
-        })
-        setIsSubmitting(false)
-        return
-      }
-
-      const result = await submitSeasonToSkipMe([seasonRequest])
-      notifyCollectionResult(result, seasonRequest.items.length, t)
-    } catch (e) {
-      const messageKey = getAxiosMessageKey(e, {
-        defaultKey: 'series.submitAllFailed',
-        forbiddenKey: 'series.submitAllClientNotSupported',
-      })
-      showNotification({
-        type: 'negative',
-        message: t(messageKey),
-      })
-    }
-    setIsSubmitting(false)
-  }, [series, season, t])
-
-  return (
-    <Button
-      variant="outline"
-      onClick={handleSubmitAll}
-      disabled={isSubmitting}
-      aria-busy={isSubmitting}
-    >
-      {isSubmitting ? (
-        <Loader2 className="animate-spin" aria-hidden="true" />
-      ) : (
-        <Share2 aria-hidden="true" />
-      )}
-      {t('series.submitAll')}
-    </Button>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SeriesView - Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -589,12 +349,6 @@ export function SeriesView({
           />
         )}
       </div>
-
-      {series.Id && selectedSeason && !isSpecialSeason(selectedSeason) && (
-        <div className="mt-6 md:mt-8 flex justify-center">
-          <SubmitAllButton series={series} season={selectedSeason} />
-        </div>
-      )}
     </div>
   )
 }

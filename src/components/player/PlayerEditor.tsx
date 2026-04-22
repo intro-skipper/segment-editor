@@ -14,7 +14,6 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
-import { getProviderIds } from '@/types/jellyfin'
 import type {
   CreateSegmentData,
   SegmentUpdate,
@@ -31,17 +30,7 @@ import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
-import { getItemById } from '@/services/items/api'
-import {
-  submitSegmentToSkipMe,
-  toSkipMeSegmentType,
-  parseProviderId,
-  parseProviderString,
-  runTimeTicksToMs,
-  convertAndValidateSegmentTiming,
-} from '@/services/skipme/api'
 import { showNotification } from '@/lib/notifications'
-import { getAxiosMessageKey } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import {
@@ -584,120 +573,6 @@ function useRenderPlayerEditor({
   // Handle import dialog cancel
   const handleImportCancel = dismissImportDialog
 
-  // Share a segment to SkipMe.db
-  const handleShareSegment = React.useCallback(
-    async (segment: MediaSegmentDto) => {
-      const skipMeType = toSkipMeSegmentType(segment.Type)
-      if (skipMeType === null) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.unsupportedType'),
-        })
-        return
-      }
-
-      // Validate synchronous fields first to avoid unnecessary network requests.
-      const durationMs = runTimeTicksToMs(item.RunTimeTicks)
-      if (!durationMs) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.noDuration'),
-        })
-        return
-      }
-
-      // StartTicks/EndTicks are stored in seconds by toUiSegment in the segment
-      // API service layer. Convert to milliseconds for the SkipMe.db API.
-      const timing = convertAndValidateSegmentTiming(
-        segment.StartTicks,
-        segment.EndTicks,
-        durationMs,
-      )
-      if (!timing.valid) {
-        showNotification({
-          type: 'negative',
-          message:
-            timing.reason === 'invalidTiming'
-              ? t('editor.share.invalidTiming')
-              : t('editor.share.exceedsDuration'),
-        })
-        return
-      }
-
-      const providerIds = getProviderIds(item)
-
-      const tmdbId = parseProviderId(providerIds?.Tmdb)
-      const itemImdbId = providerIds?.Imdb
-      const tvdbId = parseProviderId(providerIds?.Tvdb)
-      const aniListId = parseProviderId(providerIds?.AniList)
-      // AniList IDs in Jellyfin are assigned at the series level, but AniList uses
-      // a unique ID per season. Only use the AniList ID for season 1.
-      const seasonNum = item.ParentIndexNumber ?? undefined
-      const effectiveAniListId = seasonNum === 1 ? aniListId : undefined
-
-      // Fetch series/season provider IDs for TVDB and TMDB fallback.
-      const seriesId = item.SeriesId ?? undefined
-      const seasonId = item.SeasonId ?? undefined
-      const [seriesItem, seasonItem] = await Promise.all([
-        seriesId ? getItemById(seriesId).catch(() => null) : null,
-        seasonId ? getItemById(seasonId).catch(() => null) : null,
-      ])
-      const seriesProviderIds = getProviderIds(seriesItem)
-      const tvdbSeriesId = parseProviderId(seriesProviderIds?.Tvdb)
-      const tvdbSeasonId = parseProviderId(getProviderIds(seasonItem)?.Tvdb)
-      const effectiveTmdbId = tmdbId ?? parseProviderId(seriesProviderIds?.Tmdb)
-      const seriesImdbId = parseProviderString(seriesProviderIds?.Imdb)
-      const episodeNum = item.IndexNumber ?? undefined
-
-      if (
-        effectiveTmdbId === undefined &&
-        seriesImdbId === undefined &&
-        tvdbSeriesId === undefined &&
-        itemImdbId === undefined &&
-        tvdbId === undefined &&
-        effectiveAniListId === undefined
-      ) {
-        showNotification({
-          type: 'negative',
-          message: t('editor.share.noIds'),
-        })
-        return
-      }
-
-      try {
-        await submitSegmentToSkipMe({
-          tmdb_id: effectiveTmdbId,
-          imdb_series_id: seriesImdbId,
-          imdb_id: itemImdbId,
-          tvdb_id: tvdbId,
-          anilist_id: effectiveAniListId,
-          tvdb_series_id: tvdbSeriesId,
-          tvdb_season_id: tvdbSeasonId,
-          segment: skipMeType,
-          season: seasonNum,
-          episode: episodeNum,
-          duration_ms: durationMs,
-          start_ms: timing.startMs,
-          end_ms: timing.endMs,
-        })
-        showNotification({
-          type: 'positive',
-          message: t('editor.share.success'),
-        })
-      } catch (e) {
-        const messageKey = getAxiosMessageKey(e, {
-          defaultKey: 'editor.share.failed',
-          forbiddenKey: 'editor.share.clientNotSupported',
-        })
-        showNotification({
-          type: 'negative',
-          message: t(messageKey),
-        })
-      }
-    },
-    [item, t],
-  )
-
   // Keyboard shortcut: Mod+S to save all segments
   useHotkey('Mod+S', () => {
     void handleSaveAll()
@@ -780,11 +655,6 @@ function useRenderPlayerEditor({
                   onSetActive={setActiveIndex}
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
-                  onShare={
-                    item.ParentIndexNumber !== 0
-                      ? handleShareSegment
-                      : undefined
-                  }
                   vibrantColors={vibrantColors}
                 />
               </div>
