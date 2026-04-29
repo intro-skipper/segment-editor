@@ -39,7 +39,7 @@
     "node-vibrant": "^4.0.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-i18next": "^17.0.4",
+    "react-i18next": "^17.0.6",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6",
