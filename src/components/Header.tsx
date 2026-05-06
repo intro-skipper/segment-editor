@@ -13,7 +13,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronLeft, Search, Settings } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Home, Search, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -211,6 +211,16 @@ export default function Header() {
     })
   }
 
+  // Home navigation - always goes to root library view with collection preserved
+  const handleGoHome = () => {
+    void navigate({
+      to: '/',
+      search: selectedCollection
+        ? { collection: selectedCollection }
+        : undefined,
+    })
+  }
+
   const headerStyle: React.CSSProperties | undefined = vibrantColors
     ? { backgroundColor: `${vibrantColors.background}00` }
     : undefined
@@ -306,6 +316,21 @@ export default function Header() {
                   title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
                 >
                   <Search className="size-5" aria-hidden />
+                </Button>
+              )}
+              {isDetailPage && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleGoHome}
+                  className={cn(
+                    iconButtonClass,
+                    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+                  )}
+                  style={accentButtonStyle}
+                  aria-label={t('navigation.home', 'Go to library')}
+                >
+                  <Home className="size-5" aria-hidden />
                 </Button>
               )}
               <Button

@@ -156,7 +156,10 @@ export const CommandPalette = memo(function CommandPaletteComponent({
   const trimmedSearch = useMemo(() => deferredSearch.trim(), [deferredSearch])
   const canSearch = debouncedSearch.length >= MIN_SEARCH_LENGTH
   const excludedItemTypes = useMemo(
-    () => (includeEpisodes ? undefined : [BaseItemKind.Episode]),
+    () =>
+      includeEpisodes
+        ? undefined
+        : [BaseItemKind.Episode, BaseItemKind.Season],
     [includeEpisodes],
   )
 
@@ -187,7 +190,11 @@ export const CommandPalette = memo(function CommandPaletteComponent({
       return items
     }
 
-    return items.filter((item) => item.Type !== BaseItemKind.Episode)
+    return items.filter(
+      (item) =>
+        item.Type !== BaseItemKind.Episode &&
+        item.Type !== BaseItemKind.Season,
+    )
   }, [itemsData, includeEpisodes])
 
   const handleSearchChange = useCallback(

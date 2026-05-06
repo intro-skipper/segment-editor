@@ -61,6 +61,7 @@ function isContainerItem(item: BaseItemDto): boolean {
  * Gets the navigation route for a media item based on its type.
  * - Container types (BoxSet, Folder, Playlist, etc.) browse into their children.
  * - Series, artists, and albums navigate to their detail views.
+ * - Season items navigate to their parent series view.
  * - Other items navigate to the player with segment fetching enabled.
  *
  * @param item - The media item to get navigation route for
@@ -74,6 +75,14 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
     return {
       to: '/',
       search: { collection: itemId, page: undefined, search: undefined },
+    }
+  }
+
+  // Season items navigate to their parent series view
+  if (item.Type === BaseItemKind.Season && item.SeriesId) {
+    return {
+      to: '/series/$itemId',
+      params: { itemId: item.SeriesId },
     }
   }
 
