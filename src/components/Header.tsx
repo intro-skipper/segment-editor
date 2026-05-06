@@ -312,21 +312,19 @@ export default function Header() {
                   <Search className="size-5" aria-hidden />
                 </Button>
               )}
-              {isDetailPage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleGoHome}
-                  className={cn(
-                    iconButtonClass,
-                    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
-                  )}
-                  style={accentButtonStyle}
-                  aria-label={t('navigation.home', 'Go to library')}
-                >
-                  <Home className="size-5" aria-hidden />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleGoHome}
+                className={cn(
+                  iconButtonClass,
+                  !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+                )}
+                style={accentButtonStyle}
+                aria-label={t('navigation.home', 'Go to library')}
+              >
+                <Home className="size-5" aria-hidden />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
