@@ -191,7 +191,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
     }
 
     return items.filter(
-      (item) => item.Type == null || !excludedItemTypes.includes(item.Type),
+      (item) => item.Type === null || item.Type === undefined || !excludedItemTypes.includes(item.Type),
     )
   }, [itemsData, excludedItemTypes])
 
