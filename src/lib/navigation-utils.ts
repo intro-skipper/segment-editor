@@ -79,7 +79,14 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   }
 
   // Season items navigate to their parent series view
-  if (item.Type === BaseItemKind.Season && item.SeriesId) {
+  if (item.Type === BaseItemKind.Season) {
+    if (!item.SeriesId) {
+      console.warn(
+        '[navigation-utils] Season item is missing SeriesId; falling back to home.',
+        item,
+      )
+      return { to: '/' }
+    }
     return {
       to: '/series/$itemId',
       params: { itemId: item.SeriesId },

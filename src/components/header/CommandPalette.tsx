@@ -186,16 +186,14 @@ export const CommandPalette = memo(function CommandPaletteComponent({
   const resultItems = useMemo(() => {
     const items = itemsData?.items ?? []
 
-    if (includeEpisodes) {
+    if (!excludedItemTypes) {
       return items
     }
 
     return items.filter(
-      (item) =>
-        item.Type !== BaseItemKind.Episode &&
-        item.Type !== BaseItemKind.Season,
+      (item) => item.Type == null || !excludedItemTypes.includes(item.Type),
     )
-  }, [itemsData, includeEpisodes])
+  }, [itemsData, excludedItemTypes])
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
