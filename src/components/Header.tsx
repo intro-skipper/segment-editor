@@ -186,6 +186,16 @@ export default function Header() {
   // "/" key — ignored in inputs by default (single-key smart default)
   useHotkey('/', openCommandPalette)
 
+  // Home navigation - always goes to root library view with collection preserved
+  const handleGoHome = () => {
+    void navigate({
+      to: '/',
+      search: selectedCollection
+        ? { collection: selectedCollection }
+        : undefined,
+    })
+  }
+
   // Back navigation - go to series page if viewing episode, otherwise home with collection preserved
   const handleBack = () => {
     if (canGoBack) {
@@ -202,23 +212,7 @@ export default function Header() {
       return
     }
 
-    // Preserve selected collection when going back to home
-    void navigate({
-      to: '/',
-      search: selectedCollection
-        ? { collection: selectedCollection }
-        : undefined,
-    })
-  }
-
-  // Home navigation - always goes to root library view with collection preserved
-  const handleGoHome = () => {
-    void navigate({
-      to: '/',
-      search: selectedCollection
-        ? { collection: selectedCollection }
-        : undefined,
-    })
+    handleGoHome()
   }
 
   const headerStyle: React.CSSProperties | undefined = vibrantColors
