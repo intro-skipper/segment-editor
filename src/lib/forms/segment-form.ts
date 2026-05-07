@@ -56,7 +56,11 @@ export function getSegmentTimeBounds(maxDuration?: number | null): {
   return {
     min: 0,
     max:
-      typeof maxDuration === 'number' && maxDuration > 0 ? maxDuration : Infinity,
+      typeof maxDuration === 'number' &&
+      Number.isFinite(maxDuration) &&
+      maxDuration > 0
+        ? maxDuration
+        : Infinity,
   }
 }
 
@@ -165,6 +169,7 @@ function getSegmentBoundaryError(
   endSeconds: number,
   maxDuration?: number | null,
 ): string | null {
+  // min is always 0 (see getSegmentTimeBounds); max is the media duration when known.
   const { min, max } = getSegmentTimeBounds(maxDuration)
   if (startSeconds < min) return 'Start time cannot be negative'
   if (endSeconds < min) return 'End time cannot be negative'
