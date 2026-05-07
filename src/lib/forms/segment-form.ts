@@ -44,6 +44,23 @@ export function formatSegmentInputSeconds(value: number): string {
 }
 
 /**
+ * Returns the valid time bounds for segment fields: min is always 0; max is
+ * the media duration when it is a positive finite number, or Infinity otherwise.
+ * Both the blur-time clamping and the form schema boundary checks derive their
+ * range from this single function so the two never drift apart.
+ */
+export function getSegmentTimeBounds(maxDuration?: number | null): {
+  min: 0
+  max: number
+} {
+  return {
+    min: 0,
+    max:
+      typeof maxDuration === 'number' && maxDuration > 0 ? maxDuration : Infinity,
+  }
+}
+
+/**
  * Attempts to parse a time text value and clamp it to [min, max].
  * Returns the formatted clamped value if clamping was needed, or null if the
  * value is already in bounds or unparseable (no change required).
@@ -148,14 +165,11 @@ function getSegmentBoundaryError(
   endSeconds: number,
   maxDuration?: number | null,
 ): string | null {
-  if (startSeconds < 0) return 'Start time cannot be negative'
-  if (endSeconds < 0) return 'End time cannot be negative'
+  const { min, max } = getSegmentTimeBounds(maxDuration)
+  if (startSeconds < min) return 'Start time cannot be negative'
+  if (endSeconds < min) return 'End time cannot be negative'
   if (startSeconds >= endSeconds) return 'Start time must be less than end time'
-  if (
-    typeof maxDuration === 'number' &&
-    maxDuration > 0 &&
-    endSeconds > maxDuration
-  ) {
+  if (Number.isFinite(max) && endSeconds > max) {
     return 'End time exceeds media duration'
   }
   return null

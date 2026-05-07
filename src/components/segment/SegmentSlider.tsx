@@ -544,6 +544,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   }, [applyDraftBoundary, commitSegmentUpdate, frameStep])
 
   const handleSetEndToDuration = React.useCallback(() => {
+    if (!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0) return
     const nextEnd = snapAndClampEnd(
       runtimeSeconds,
       stableRangeRef.current.start,
@@ -976,6 +977,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             variant="ghost"
             size="icon-sm"
             onClick={handleSetEndToDuration}
+            disabled={!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0}
             aria-label={t('editor.setEndToDuration', 'Set end to duration')}
             title={t('editor.setEndToDuration', 'Set end to duration')}
             className="shrink-0 hover:bg-primary/10"

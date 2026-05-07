@@ -15,6 +15,7 @@ import {
   createSegmentFormSchema,
   getSegmentDraftState,
   getSegmentFormDefaults,
+  getSegmentTimeBounds,
 } from '@/lib/forms/segment-form'
 import { SEGMENT_TYPES, getSegmentColor } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
@@ -132,14 +133,11 @@ export function SegmentEditDialog({
     void form.handleSubmit()
   }, [form])
 
-  /** Clamps a field value to [0, runtimeSeconds] on blur, then triggers validation. */
+  /** Clamps a field value to the valid time range on blur, then triggers validation. */
   const handleTimeFieldBlur = React.useCallback(
     (field: { state: { value: unknown }; handleChange: (v: string) => void; handleBlur: () => void }) => {
-      const clamped = clampTimeText(
-        String(field.state.value),
-        0,
-        runtimeSeconds ?? Infinity,
-      )
+      const { min, max } = getSegmentTimeBounds(runtimeSeconds)
+      const clamped = clampTimeText(String(field.state.value), min, max)
       if (clamped !== null) field.handleChange(clamped)
       field.handleBlur()
     },
