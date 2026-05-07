@@ -26,7 +26,8 @@ import {
 } from 'lucide-react'
 
 import { AnimatePresence, m, useIsPresent } from 'motion/react'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 import { LightRays } from '@/components/ui/light-rays'
@@ -118,6 +119,15 @@ const MEDIA_LABEL_KEY_MAP: Record<string, string> = {
   [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
 }
 
+function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
+  const name = item.Name ?? 'Unknown'
+  const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
+  const labelKey =
+    MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
+
+  return t(labelKey, { name: `${name}${year}` })
+}
+
 interface FreezeOnExitProps {
   children: ReactNode
 }
@@ -128,7 +138,13 @@ function FreezeOnExit({ children }: FreezeOnExitProps) {
   return <Freeze frozen={!isPresent}>{children}</Freeze>
 }
 
-function MediaListSkeleton({ count }: { count: number }) {
+function MediaListSkeleton({
+  count,
+  loadingLabel,
+}: {
+  count: number
+  loadingLabel: string
+}) {
   return (
     <div
       className={LIST_CLASS}
@@ -136,7 +152,7 @@ function MediaListSkeleton({ count }: { count: number }) {
       aria-live="polite"
       aria-busy="true"
     >
-      <span className="sr-only">Loading media items</span>
+      <span className="sr-only">{loadingLabel}</span>
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
@@ -159,11 +175,7 @@ interface MediaListRowProps {
   item: BaseItemDto
   index: number
   label: string
-  tabIndex?: number
-  role?: 'gridcell'
-  'data-grid-index'?: number
-  'aria-selected'?: boolean
-  onFocus?: (event: React.FocusEvent<HTMLElement>) => void
+  interactiveProps?: ComponentProps<typeof InteractiveCard>
   onActivate: () => void
 }
 
@@ -171,11 +183,7 @@ function MediaListRow({
   item,
   index,
   label,
-  tabIndex,
-  role,
-  'data-grid-index': dataGridIndex,
-  'aria-selected': ariaSelected,
-  onFocus,
+  interactiveProps,
   onActivate,
 }: MediaListRowProps) {
   const animationDelay = Math.min(
@@ -183,28 +191,13 @@ function MediaListRow({
     MAX_ANIMATION_DELAY,
   )
 
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      event.stopPropagation()
-      onActivate()
-    },
-    [onActivate],
-  )
-
   const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
 
   return (
     <InteractiveCard
-      role={role}
-      tabIndex={tabIndex}
-      data-grid-index={dataGridIndex}
-      aria-selected={ariaSelected}
       aria-label={label}
-      onFocus={onFocus}
       onClick={onActivate}
-      onKeyDown={handleKeyDown}
+      {...interactiveProps}
       animate
       animationDelay={animationDelay}
       className={cn(
@@ -674,7 +667,12 @@ function useRenderFilterView() {
             >
               <FreezeOnExit>
                 {viewMode === 'list' ? (
-                  <MediaListSkeleton count={Math.min(effectivePageSize, 12)} />
+                  <MediaListSkeleton
+                    count={Math.min(effectivePageSize, 12)}
+                    loadingLabel={t('items.loadingMediaItems', {
+                      defaultValue: 'Loading media items',
+                    })}
+                  />
                 ) : (
                   <MediaGridSkeleton
                     count={Math.min(effectivePageSize, 24)}
@@ -765,26 +763,16 @@ function useRenderFilterView() {
                   defaultValue: 'Media items',
                 })}
               >
-                {paginatedItems.map((item, index) => {
-                  const name = item.Name ?? 'Unknown'
-                  const year = item.ProductionYear
-                    ? ` (${item.ProductionYear})`
-                    : ''
-                  const labelKey =
-                    MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ??
-                    'accessibility.mediaCard.play'
-
-                  return (
-                    <MediaListRow
-                      key={item.Id}
-                      item={item}
-                      index={index}
-                      label={t(labelKey, { name: `${name}${year}` })}
-                      onActivate={() => navigateToMediaItem(navigate, item)}
-                      {...getItemProps(index)}
-                    />
-                  )
-                })}
+                {paginatedItems.map((item, index) => (
+                  <MediaListRow
+                    key={item.Id}
+                    item={item}
+                    index={index}
+                    label={getMediaItemLabel(t, item)}
+                    onActivate={() => navigateToMediaItem(navigate, item)}
+                    interactiveProps={getItemProps(index)}
+                  />
+                ))}
               </div>
             ) : shouldVirtualizeGrid ? (
               <div

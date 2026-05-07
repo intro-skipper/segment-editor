@@ -127,6 +127,7 @@
     },
     "mediaGrid": "Medienelemente",
     "mediaList": "Medienelemente",
+    "loadingMediaItems": "Medienelemente werden geladen",
     "selectLibrary": "Bibliothek auswählen",
     "selectLibraryDescription": "Wähle eine Bibliothek, um deine Mediensammlung zu durchsuchen",
     "selectLibraryButton": "{{name}}-Bibliothek durchsuchen",

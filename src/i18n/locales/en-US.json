@@ -127,6 +127,7 @@
     },
     "mediaGrid": "Media items",
     "mediaList": "Media items",
+    "loadingMediaItems": "Loading media items",
     "selectLibrary": "Select a Library",
     "selectLibraryDescription": "Choose a library to browse your media collection",
     "selectLibraryButton": "Browse {{name}} library",

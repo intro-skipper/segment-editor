@@ -74,7 +74,8 @@
       "collection": "Collection"
     },
     "mediaGrid": "Éléments multimédias",
-    "mediaList": "Éléments multimédias"
+    "mediaList": "Éléments multimédias",
+    "loadingMediaItems": "Chargement des éléments multimédias"
   },
   "editor": {
     "saveSegment": "Sauvegarder",
