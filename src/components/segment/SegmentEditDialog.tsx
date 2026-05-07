@@ -132,6 +132,20 @@ export function SegmentEditDialog({
     void form.handleSubmit()
   }, [form])
 
+  /** Clamps a field value to [0, runtimeSeconds] on blur, then triggers validation. */
+  const handleTimeFieldBlur = React.useCallback(
+    (field: { state: { value: unknown }; handleChange: (v: string) => void; handleBlur: () => void }) => {
+      const clamped = clampTimeText(
+        String(field.state.value),
+        0,
+        runtimeSeconds ?? Infinity,
+      )
+      if (clamped !== null) field.handleChange(clamped)
+      field.handleBlur()
+    },
+    [runtimeSeconds],
+  )
+
   const handleCopy = React.useCallback(async () => {
     try {
       const result = segmentsToIntroSkipperClipboardText([segment])
@@ -229,15 +243,7 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={() => {
-                        const clamped = clampTimeText(
-                          String(field.state.value),
-                          0,
-                          runtimeSeconds ?? Infinity,
-                        )
-                        if (clamped !== null) field.handleChange(clamped)
-                        field.handleBlur()
-                      }}
+                      onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -261,15 +267,7 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={() => {
-                        const clamped = clampTimeText(
-                          String(field.state.value),
-                          0,
-                          runtimeSeconds ?? Infinity,
-                        )
-                        if (clamped !== null) field.handleChange(clamped)
-                        field.handleBlur()
-                      }}
+                      onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
