@@ -11,6 +11,8 @@ import {
   GripVertical,
   Pencil,
   Play,
+  SkipBack,
+  SkipForward,
   Trash2,
 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
@@ -535,6 +537,24 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   )
 
   // Set timestamp from current player position
+  const handleSetStartToZero = React.useCallback(() => {
+    const nextStart = snapAndClampStart(0, stableRangeRef.current.end, frameStep)
+    const nextRange = applyDraftBoundary('start', nextStart)
+    commitSegmentUpdate(nextRange.start, nextRange.end)
+  }, [applyDraftBoundary, commitSegmentUpdate, frameStep])
+
+  const handleSetEndToDuration = React.useCallback(() => {
+    if (!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0) return
+    const nextEnd = snapAndClampEnd(
+      runtimeSeconds,
+      stableRangeRef.current.start,
+      runtimeSeconds,
+      frameStep,
+    )
+    const nextRange = applyDraftBoundary('end', nextEnd)
+    commitSegmentUpdate(nextRange.start, nextRange.end)
+  }, [applyDraftBoundary, commitSegmentUpdate, frameStep, runtimeSeconds])
+
   const handleSetStartFromPlayer = React.useCallback(() => {
     const currentTime = getPlayerTime?.()
     if (currentTime === undefined) return
@@ -881,6 +901,16 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
               />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleSetStartToZero}
+            aria-label={t('editor.setStartToBeginning', 'Set start to beginning')}
+            title={t('editor.setStartToBeginning', 'Set start to beginning')}
+            className="shrink-0 hover:bg-primary/10"
+          >
+            <SkipBack className="size-3" aria-hidden="true" style={iconStyle} />
+          </Button>
           <label
             htmlFor={`segment-${segment.Id}-start`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0"
@@ -943,6 +973,17 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
               />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleSetEndToDuration}
+            disabled={!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0}
+            aria-label={t('editor.setEndToDuration', 'Set end to duration')}
+            title={t('editor.setEndToDuration', 'Set end to duration')}
+            className="shrink-0 hover:bg-primary/10"
+          >
+            <SkipForward className="size-3" aria-hidden="true" style={iconStyle} />
+          </Button>
           <label
             htmlFor={`segment-${segment.Id}-end`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0"

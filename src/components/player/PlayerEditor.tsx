@@ -6,7 +6,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
-import { ClipboardPaste, Loader2, Save } from 'lucide-react'
+import { ClipboardPaste, Eye, Loader2, Save } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -189,6 +189,7 @@ function useRenderPlayerEditor({
 }: PlayerEditorProps) {
   const { t } = useTranslation()
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
+  const setShowVideoPlayer = useAppStore((state) => state.setShowVideoPlayer)
 
   const { getButtonStyle, iconColor, hasColors } =
     useVibrantButtonStyle(vibrantColors)
@@ -610,9 +611,17 @@ function useRenderPlayerEditor({
         />
       )}
 
-      {/* Segment creation button when player is hidden */}
+      {/* Restore player + segment creation button when player is hidden */}
       {!showVideoPlayer && (
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowVideoPlayer(true)}
+            aria-label={t('player.restore', 'Show player')}
+          >
+            <Eye className="size-4 mr-2" aria-hidden="true" />
+            {t('player.restore', 'Show player')}
+          </Button>
           <Button
             variant="outline"
             onClick={() =>
@@ -669,6 +678,7 @@ function useRenderPlayerEditor({
           key={editingSegments[editingSegmentIndex].Id ?? editingSegmentIndex}
           open={editDialogOpen}
           segment={editingSegments[editingSegmentIndex]}
+          runtimeSeconds={runtimeSeconds}
           onClose={handleCloseEditDialog}
           onSave={handleSaveSegmentFromDialog}
           onDelete={handleDeleteSegmentFromDialog}

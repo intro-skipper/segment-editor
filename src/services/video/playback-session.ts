@@ -55,10 +55,10 @@ export async function startPlaybackSession(
 
 /**
  * Reports playback stopped to Jellyfin, triggering cleanup of transcoding files.
+ * PositionTicks is intentionally omitted to avoid updating the user's watch
+ * position or auto-marking the item as played.
  */
-export async function stopPlaybackSession(
-  positionTicks?: number,
-): Promise<void> {
+export async function stopPlaybackSession(): Promise<void> {
   if (!activeSession) return
 
   const session = activeSession
@@ -70,7 +70,6 @@ export async function stopPlaybackSession(
         ItemId: session.itemId,
         PlaySessionId: session.playSessionId,
         MediaSourceId: session.mediaSourceId,
-        PositionTicks: positionTicks,
       },
     })
   })
@@ -79,8 +78,10 @@ export async function stopPlaybackSession(
 /**
  * Reports playback stopped using a keepalive request.
  * Intended for pagehide/unload flows where async cleanup can be dropped.
+ * PositionTicks is intentionally omitted to avoid updating the user's watch
+ * position or auto-marking the item as played.
  */
-export function stopPlaybackSessionKeepalive(positionTicks?: number): void {
+export function stopPlaybackSessionKeepalive(): void {
   if (!activeSession) return
 
   const session = activeSession
@@ -100,7 +101,6 @@ export function stopPlaybackSessionKeepalive(positionTicks?: number): void {
       ItemId: session.itemId,
       PlaySessionId: session.playSessionId,
       MediaSourceId: session.mediaSourceId,
-      PositionTicks: positionTicks,
     },
   })
 

@@ -21,7 +21,6 @@ import {
   restorePlaybackStateSync,
 } from '@/services/video/playback-state'
 import {
-  getPositionTicks,
   startPlaybackSession,
   stopPlaybackSession,
   stopPlaybackSessionKeepalive,
@@ -493,8 +492,7 @@ export function useVideoPlayer({
   })
 
   const handlePageHide = useEffectEvent(() => {
-    const video = getActiveVideoElement()
-    stopPlaybackSessionKeepalive(getPositionTicks(video))
+    stopPlaybackSessionKeepalive()
   })
 
   useEffect(() => {
@@ -578,9 +576,7 @@ export function useVideoPlayer({
       pendingHlsStateRestoreRef.current = false
       clearHlsStateRestoreSubscription()
       // Stop playback session on cleanup to trigger server-side transcoding cleanup
-      // Use refs to get current values, avoiding stale closure issues
-      const video = getActiveVideoElement()
-      void stopPlaybackSession(getPositionTicks(video))
+      void stopPlaybackSession()
     }
   }, [
     itemId,

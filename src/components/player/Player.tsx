@@ -1014,6 +1014,8 @@ function useRenderPlayer({
   const hasAnyTracks =
     trackState.audioTracks.length > 0 || trackState.subtitleTracks.length > 0
 
+  const setShowVideoPlayer = useAppStore((s) => s.setShowVideoPlayer)
+
   // Props for PlayerControls — used in both normal and fullscreen layouts
   const playerControlsProps = {
     isPlaying,
@@ -1036,6 +1038,7 @@ function useRenderPlayer({
     strategy,
     isFullscreen,
     onToggleFullscreen: toggleFullscreen,
+    onMinimize: () => setShowVideoPlayer(false),
     buttonOpacity: isFullscreen ? 0.3 : undefined,
     subtitleOffset,
     onSubtitleOffsetChange: handleSubtitleOffsetChange,

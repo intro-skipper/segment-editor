@@ -11,9 +11,11 @@ import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import { formatTime } from '@/lib/time-utils'
 import {
   buildSegmentFromFormValues,
+  clampTimeText,
   createSegmentFormSchema,
   getSegmentDraftState,
   getSegmentFormDefaults,
+  getSegmentTimeBounds,
 } from '@/lib/forms/segment-form'
 import { SEGMENT_TYPES, getSegmentColor } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
@@ -53,6 +55,8 @@ import {
 interface SegmentEditDialogProps {
   open: boolean
   segment: MediaSegmentDto
+  /** Total runtime in seconds; used to clamp time inputs and validate end time */
+  runtimeSeconds?: number
   onClose: () => void
   onSave: (segment: MediaSegmentDto) => void
   onDelete: (segment: MediaSegmentDto) => void
@@ -61,6 +65,7 @@ interface SegmentEditDialogProps {
 export function SegmentEditDialog({
   open,
   segment,
+  runtimeSeconds,
   onClose,
   onSave,
   onDelete,
@@ -74,10 +79,10 @@ export function SegmentEditDialog({
   const form = useForm({
     defaultValues: getSegmentFormDefaults(segment),
     validators: {
-      onSubmit: createSegmentFormSchema(),
+      onSubmit: createSegmentFormSchema(runtimeSeconds),
     },
     onSubmit: ({ value }) => {
-      const result = buildSegmentFromFormValues(segment, value)
+      const result = buildSegmentFromFormValues(segment, value, runtimeSeconds)
       if (!result.success) return
       onSave(result.segment)
       handleClose()
@@ -91,8 +96,8 @@ export function SegmentEditDialog({
       getSegmentDraftState(values, {
         startSeconds: segment.StartTicks ?? 0,
         endSeconds: segment.EndTicks ?? 0,
-      }),
-    [segment.EndTicks, segment.StartTicks, values],
+      }, runtimeSeconds),
+    [segment.EndTicks, segment.StartTicks, values, runtimeSeconds],
   )
   const segmentColor = getSegmentColor(values.type)
   const rawDuration = draftRange.endSeconds - draftRange.startSeconds
@@ -127,6 +132,17 @@ export function SegmentEditDialog({
   const handleSave = React.useCallback(() => {
     void form.handleSubmit()
   }, [form])
+
+  /** Clamps a field value to the valid time range on blur, then triggers validation. */
+  const handleTimeFieldBlur = React.useCallback(
+    (field: { state: { value: unknown }; handleChange: (v: string) => void; handleBlur: () => void }) => {
+      const { min, max } = getSegmentTimeBounds(runtimeSeconds)
+      const clamped = clampTimeText(String(field.state.value), min, max)
+      if (clamped !== null) field.handleChange(clamped)
+      field.handleBlur()
+    },
+    [runtimeSeconds],
+  )
 
   const handleCopy = React.useCallback(async () => {
     try {
@@ -225,7 +241,7 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
+                      onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -249,7 +265,7 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
+                      onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">

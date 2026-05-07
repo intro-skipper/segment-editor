@@ -5,6 +5,7 @@
 
 import { useTranslation } from 'react-i18next'
 import {
+  EyeOff,
   Maximize,
   Minimize,
   Pause,
@@ -64,6 +65,8 @@ interface PlayerControlsProps {
   isFullscreen?: boolean
   /** Callback to toggle fullscreen */
   onToggleFullscreen?: () => void
+  /** Callback to minimize (hide) the video player */
+  onMinimize?: () => void
   /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
   buttonOpacity?: number
   /** Current subtitle offset in seconds (positive = delay, negative = advance) */
@@ -101,6 +104,7 @@ export function PlayerControls({
   strategy,
   isFullscreen,
   onToggleFullscreen,
+  onMinimize,
   buttonOpacity,
   subtitleOffset = 0,
   onSubtitleOffsetChange,
@@ -297,6 +301,24 @@ export function PlayerControls({
       </div>
 
       <div className="flex-1" />
+
+      {/* Minimize button */}
+      {onMinimize && !isFullscreen && (
+        <Button
+          variant="outline"
+          onClick={onMinimize}
+          aria-label={t('player.minimize', 'Minimize player')}
+          style={applyButtonStyle()}
+          className={getButtonClass(false, hasColors)}
+        >
+          <EyeOff
+            className={ICON_CLASS}
+            strokeWidth={2.5}
+            aria-hidden="true"
+            style={getIconStyle(iconColor)}
+          />
+        </Button>
+      )}
 
       {/* Fullscreen button */}
       {onToggleFullscreen && (
