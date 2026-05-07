@@ -53,6 +53,11 @@
       "fr": "Français",
       "title": "Langues"
     },
+    "viewMode": {
+      "title": "Vue de navigation",
+      "card": "Carte",
+      "list": "Liste"
+    },
     "plugins": {
       "title": "Plugins de serveur installés"
     },
@@ -67,7 +72,9 @@
     "filter": {
       "name": "Recherche",
       "collection": "Collection"
-    }
+    },
+    "mediaGrid": "Éléments multimédias",
+    "mediaList": "Éléments multimédias"
   },
   "editor": {
     "saveSegment": "Sauvegarder",

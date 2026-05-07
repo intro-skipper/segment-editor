@@ -8,6 +8,7 @@ import {
   LanguageSection,
   PageSizeSection,
   ServerConnectionSection,
+  ViewModeSection,
 } from './sections'
 import { useSessionStore } from '@/stores/session-store'
 import { isPluginMode } from '@/services/jellyfin'
@@ -49,6 +50,7 @@ function SettingsDialogBase() {
           <AppearanceSection />
           <LanguageSection />
           <PageSizeSection />
+          <ViewModeSection />
           <CodecCompatibilitySection />
         </div>
         {!pluginMode && (

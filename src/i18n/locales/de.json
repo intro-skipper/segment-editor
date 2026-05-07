@@ -96,6 +96,11 @@
       "fr": "Französisch",
       "title": "Sprache"
     },
+    "viewMode": {
+      "title": "Ansicht beim Durchsuchen",
+      "card": "Karten",
+      "list": "Liste"
+    },
     "plugins": {
       "title": "Installierte Server Plugins"
     },
@@ -121,6 +126,7 @@
       "selectCollection": "Sammlung auswählen"
     },
     "mediaGrid": "Medienelemente",
+    "mediaList": "Medienelemente",
     "selectLibrary": "Bibliothek auswählen",
     "selectLibraryDescription": "Wähle eine Bibliothek, um deine Mediensammlung zu durchsuchen",
     "selectLibraryButton": "{{name}}-Bibliothek durchsuchen",

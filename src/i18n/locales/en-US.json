@@ -96,6 +96,11 @@
       "fr": "French",
       "title": "Locale"
     },
+    "viewMode": {
+      "title": "Browse view",
+      "card": "Card",
+      "list": "List"
+    },
     "plugins": {
       "title": "Installed Server Plugins"
     },
@@ -121,6 +126,7 @@
       "selectCollection": "Select collection"
     },
     "mediaGrid": "Media items",
+    "mediaList": "Media items",
     "selectLibrary": "Select a Library",
     "selectLibraryDescription": "Choose a library to browse your media collection",
     "selectLibraryButton": "Browse {{name}} library",
