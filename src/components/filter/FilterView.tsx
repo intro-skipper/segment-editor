@@ -26,8 +26,10 @@ import {
 } from 'lucide-react'
 
 import { AnimatePresence, m, useIsPresent } from 'motion/react'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
+import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
+import { BaseItemKind } from '@/types/jellyfin'
 import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
@@ -57,6 +59,8 @@ import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { LibraryCard } from '@/components/filter/LibraryCard'
 import { useSessionStore } from '@/stores/session-store'
+import { ItemImage } from '@/components/media/ItemImage'
+import { InteractiveCard } from '@/components/ui/interactive-card'
 import { getBestImageUrl } from '@/services/video/api'
 import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
@@ -67,6 +71,9 @@ import { navigateToMediaItem } from '@/lib/navigation-utils'
 // Stable selectors to prevent re-renders - defined outside component
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
   state.pageSize
+
+const selectViewMode = (state: ReturnType<typeof useSessionStore.getState>) =>
+  state.viewMode
 
 const selectSetSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
@@ -100,6 +107,26 @@ const COLOR_PRELOAD_ROWS = 1
 const VIRTUALIZED_GRID_THRESHOLD = 180
 const GRID_ROW_ESTIMATE_PX = 360
 const GRID_OVERSCAN_ROWS = 3
+const LIST_CLASS = 'flex flex-col gap-3'
+const MAX_ANIMATION_DELAY = 300
+const ANIMATION_STAGGER = 30
+
+const MEDIA_LABEL_KEY_MAP: Record<string, string> = {
+  [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
+  [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
+  [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
+  [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
+  [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
+}
+
+function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
+  const name = item.Name ?? 'Unknown'
+  const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
+  const labelKey =
+    MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
+
+  return t(labelKey, { name: `${name}${year}` })
+}
 
 interface FreezeOnExitProps {
   children: ReactNode
@@ -109,6 +136,99 @@ function FreezeOnExit({ children }: FreezeOnExitProps) {
   const isPresent = useIsPresent()
 
   return <Freeze frozen={!isPresent}>{children}</Freeze>
+}
+
+function MediaListSkeleton({
+  count,
+  loadingLabel,
+}: {
+  count: number
+  loadingLabel: string
+}) {
+  return (
+    <div
+      className={LIST_CLASS}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">{loadingLabel}</span>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl bg-card/60 backdrop-blur-sm animate-in fade-in duration-300"
+          style={{ animationDelay: `${i * ANIMATION_STAGGER}ms` }}
+          aria-hidden="true"
+        >
+          <div className="size-16 md:size-24 rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
+          <div className="flex-grow min-w-0 space-y-2">
+            <div className="h-5 md:h-6 w-2/3 rounded-md skeleton-shimmer" />
+            <div className="h-4 w-1/3 rounded-md skeleton-shimmer" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+interface MediaListRowProps {
+  item: BaseItemDto
+  index: number
+  label: string
+  interactiveProps?: ComponentProps<typeof InteractiveCard>
+  onActivate: () => void
+}
+
+function MediaListRow({
+  item,
+  index,
+  label,
+  interactiveProps,
+  onActivate,
+}: MediaListRowProps) {
+  const animationDelay = Math.min(
+    index * ANIMATION_STAGGER,
+    MAX_ANIMATION_DELAY,
+  )
+
+  const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
+
+  return (
+    <InteractiveCard
+      aria-label={label}
+      onClick={onActivate}
+      {...interactiveProps}
+      animate
+      animationDelay={animationDelay}
+      className={cn(
+        'group flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl',
+        'bg-card/60 backdrop-blur-sm hover:shadow-lg hover:shadow-black/10',
+      )}
+    >
+      <div className="relative flex-shrink-0 size-16 md:size-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
+        <ItemImage
+          item={item}
+          maxWidth={160}
+          maxHeight={160}
+          aspectRatio="aspect-square"
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="flex-grow min-w-0 py-0.5 md:py-1">
+        <p
+          className="font-semibold truncate leading-tight text-base md:text-lg"
+          title={item.Name || undefined}
+        >
+          {item.Name || 'Unknown'}
+        </p>
+        {secondaryParts.length > 0 && (
+          <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80 text-muted-foreground">
+            {secondaryParts.join(' · ')}
+          </p>
+        )}
+      </div>
+    </InteractiveCard>
+  )
 }
 
 /** Subscribe to window resize events */
@@ -208,6 +328,7 @@ function useRenderFilterView() {
   // Page size is kept in session store as it's a user preference
   // Use individual selector to avoid object creation
   const pageSize = useSessionStore(selectPageSize)
+  const viewMode = useSessionStore(selectViewMode)
   const effectivePageSize =
     Number.isFinite(pageSize) && pageSize > 0 && pageSize <= 240 ? pageSize : 24
   const requestedPage = Math.max(1, currentPage)
@@ -228,6 +349,7 @@ function useRenderFilterView() {
   )
 
   const columns = useGridColumns()
+  const navigationColumns = viewMode === 'list' ? 1 : columns
 
   // Plugin mode and connection state
   const { isPlugin, hasCredentials, isConnected } = usePluginMode()
@@ -261,7 +383,7 @@ function useRenderFilterView() {
 
   const paginatedItems = itemsData?.items ?? EMPTY_ITEMS
   const shouldVirtualizeGrid =
-    paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
+    viewMode === 'card' && paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
   const [virtualizedGridElement, setVirtualizedGridElement] =
     useState<HTMLDivElement | null>(null)
   const rowCount = Math.ceil(paginatedItems.length / columns)
@@ -300,7 +422,7 @@ function useRenderFilterView() {
   const { setFocusedIndex, gridProps, getItemProps, gridRef } =
     useGridKeyboardNavigation({
       itemCount: paginatedItems.length,
-      columns,
+      columns: navigationColumns,
       enabled: paginatedItems.length > 0,
       onActivate: handleItemActivate,
       onScrollToIndex: shouldVirtualizeGrid ? handleScrollToIndex : undefined,
@@ -544,10 +666,19 @@ function useRenderFilterView() {
               transition={{ duration: 0.2 }}
             >
               <FreezeOnExit>
-                <MediaGridSkeleton
-                  count={Math.min(effectivePageSize, 24)}
-                  gridClassName={GRID_CLASS}
-                />
+                {viewMode === 'list' ? (
+                  <MediaListSkeleton
+                    count={Math.min(effectivePageSize, 12)}
+                    loadingLabel={t('items.loadingMediaItems', {
+                      defaultValue: 'Loading media items',
+                    })}
+                  />
+                ) : (
+                  <MediaGridSkeleton
+                    count={Math.min(effectivePageSize, 24)}
+                    gridClassName={GRID_CLASS}
+                  />
+                )}
               </FreezeOnExit>
             </m.div>
           )}
@@ -623,7 +754,27 @@ function useRenderFilterView() {
               </p>
             </div>
 
-            {shouldVirtualizeGrid ? (
+            {viewMode === 'list' ? (
+              <div
+                ref={gridRef}
+                className={LIST_CLASS}
+                {...gridProps}
+                aria-label={t('items.mediaList', {
+                  defaultValue: 'Media items',
+                })}
+              >
+                {paginatedItems.map((item, index) => (
+                  <MediaListRow
+                    key={item.Id}
+                    item={item}
+                    index={index}
+                    label={getMediaItemLabel(t, item)}
+                    onActivate={() => navigateToMediaItem(navigate, item)}
+                    interactiveProps={getItemProps(index)}
+                  />
+                ))}
+              </div>
+            ) : shouldVirtualizeGrid ? (
               <div
                 ref={setVirtualizedGridRef}
                 {...gridProps}
