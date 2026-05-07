@@ -192,7 +192,15 @@ function MediaListRow({
 }: MediaListRowProps) {
   const imageUrl = useMemo(
     () => getBestImageUrl(item, 160, 240) ?? null,
-    [item],
+    [
+      item.Id,
+      item.ImageTags?.Primary,
+      item.ImageTags?.Thumb,
+      item.BackdropImageTags?.[0],
+      item.ParentThumbItemId,
+      item.SeriesId,
+      item.SeriesPrimaryImageTag,
+    ],
   )
   const vibrantColors = useVibrantColor(imageUrl)
   const animationDelay = Math.min(
@@ -236,7 +244,7 @@ function MediaListRow({
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
         <p
           className={cn(
-            'font-semibold line-clamp-2 leading-tight text-base md:text-lg min-h-[2.5em]',
+            'font-semibold line-clamp-2 leading-tight text-base md:text-lg min-h-[calc(2*1lh)]',
             !vibrantColors && 'text-foreground',
           )}
           style={textStyle}
