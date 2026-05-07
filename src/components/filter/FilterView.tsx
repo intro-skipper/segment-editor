@@ -6,6 +6,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -56,13 +57,16 @@ import { useItems } from '@/hooks/queries/use-items'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
+import {
+  preloadVibrantColors,
+  useVibrantColor,
+} from '@/hooks/use-vibrant-color'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { LibraryCard } from '@/components/filter/LibraryCard'
 import { useSessionStore } from '@/stores/session-store'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { getBestImageUrl } from '@/services/video/api'
-import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
@@ -160,7 +164,7 @@ function MediaListSkeleton({
           style={{ animationDelay: `${i * ANIMATION_STAGGER}ms` }}
           aria-hidden="true"
         >
-          <div className="size-16 md:size-24 rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
+          <div className="w-16 md:w-20 aspect-[2/3] rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
           <div className="flex-grow min-w-0 space-y-2">
             <div className="h-5 md:h-6 w-2/3 rounded-md skeleton-shimmer" />
             <div className="h-4 w-1/3 rounded-md skeleton-shimmer" />
@@ -186,12 +190,25 @@ function MediaListRow({
   interactiveProps,
   onActivate,
 }: MediaListRowProps) {
+  const imageUrl = useMemo(
+    () => getBestImageUrl(item, 160, 240) ?? null,
+    [item],
+  )
+  const vibrantColors = useVibrantColor(imageUrl)
   const animationDelay = Math.min(
     index * ANIMATION_STAGGER,
     MAX_ANIMATION_DELAY,
   )
-
   const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
+  const cardStyle = useMemo(
+    () =>
+      vibrantColors ? { backgroundColor: vibrantColors.primary } : undefined,
+    [vibrantColors],
+  )
+  const textStyle = useMemo(
+    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
+    [vibrantColors],
+  )
 
   return (
     <InteractiveCard
@@ -201,28 +218,40 @@ function MediaListRow({
       animate
       animationDelay={animationDelay}
       className={cn(
-        'group flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl',
-        'bg-card/60 backdrop-blur-sm hover:shadow-lg hover:shadow-black/10',
+        'group flex items-center gap-4 md:gap-5 p-3 md:p-4 rounded-2xl md:rounded-3xl',
+        !vibrantColors && 'bg-card/60 backdrop-blur-sm',
+        'hover:shadow-lg hover:shadow-black/10',
       )}
+      style={cardStyle}
     >
-      <div className="relative flex-shrink-0 size-16 md:size-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
+      <div className="relative flex-shrink-0 w-16 md:w-20 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
         <ItemImage
           item={item}
           maxWidth={160}
-          maxHeight={160}
-          aspectRatio="aspect-square"
-          className="w-full h-full object-cover"
+          maxHeight={240}
+          aspectRatio="aspect-[2/3]"
+          className="w-full"
         />
       </div>
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
         <p
-          className="font-semibold truncate leading-tight text-base md:text-lg"
+          className={cn(
+            'font-semibold line-clamp-2 leading-tight text-base md:text-lg',
+            !vibrantColors && 'text-foreground',
+          )}
+          style={textStyle}
           title={item.Name || undefined}
         >
           {item.Name || 'Unknown'}
         </p>
         {secondaryParts.length > 0 && (
-          <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80 text-muted-foreground">
+          <p
+            className={cn(
+              'text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80',
+              !vibrantColors && 'text-muted-foreground',
+            )}
+            style={textStyle}
+          >
             {secondaryParts.join(' · ')}
           </p>
         )}
