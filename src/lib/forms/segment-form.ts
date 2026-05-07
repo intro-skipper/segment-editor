@@ -43,6 +43,25 @@ export function formatSegmentInputSeconds(value: number): string {
   return value.toFixed(MAX_DECIMALS).replace(/\.?0+$/, '')
 }
 
+/**
+ * Attempts to parse a time text value and clamp it to [min, max].
+ * Returns the formatted clamped value if clamping was needed, or null if the
+ * value is already in bounds or unparseable (no change required).
+ */
+export function clampTimeText(
+  value: string,
+  min: number,
+  max: number,
+): string | null {
+  const trimmed = value.trim()
+  if (!SEGMENT_TIME_TEXT_REGEX.test(trimmed)) return null
+  const parsed = parseUncheckedTimeText(trimmed)
+  if (!Number.isFinite(parsed)) return null
+  if (parsed < min) return formatSegmentInputSeconds(min)
+  if (parsed > max) return formatSegmentInputSeconds(max)
+  return null
+}
+
 export function getSegmentFormDefaults(
   segment: Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>,
 ): SegmentFormValues {

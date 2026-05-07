@@ -82,7 +82,9 @@
     },
     "noSegments": "Aucun segment disponible, créez-en un avec '+'",
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
-    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers"
+    "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
+    "setStartToBeginning": "Définir le début à zéro",
+    "setEndToDuration": "Définir la fin à la durée"
   },
   "yes": "Oui",
   "no": "Non",
@@ -205,7 +207,9 @@
     "subtitleReset": "Réinitialiser",
     "keyboardShortcuts": "Raccourcis clavier",
     "playbackSpeed": "Vitesse de lecture",
-    "speedValue": "Vitesse {{speed}}x"
+    "speedValue": "Vitesse {{speed}}x",
+    "minimize": "Réduire le lecteur",
+    "restore": "Afficher le lecteur"
   },
   "shortcuts": {
     "playPause": "Lecture/Pause",

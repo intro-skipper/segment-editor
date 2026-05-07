@@ -11,6 +11,7 @@ import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import { formatTime } from '@/lib/time-utils'
 import {
   buildSegmentFromFormValues,
+  clampTimeText,
   createSegmentFormSchema,
   getSegmentDraftState,
   getSegmentFormDefaults,
@@ -53,6 +54,8 @@ import {
 interface SegmentEditDialogProps {
   open: boolean
   segment: MediaSegmentDto
+  /** Total runtime in seconds; used to clamp time inputs and validate end time */
+  runtimeSeconds?: number
   onClose: () => void
   onSave: (segment: MediaSegmentDto) => void
   onDelete: (segment: MediaSegmentDto) => void
@@ -61,6 +64,7 @@ interface SegmentEditDialogProps {
 export function SegmentEditDialog({
   open,
   segment,
+  runtimeSeconds,
   onClose,
   onSave,
   onDelete,
@@ -74,10 +78,10 @@ export function SegmentEditDialog({
   const form = useForm({
     defaultValues: getSegmentFormDefaults(segment),
     validators: {
-      onSubmit: createSegmentFormSchema(),
+      onSubmit: createSegmentFormSchema(runtimeSeconds),
     },
     onSubmit: ({ value }) => {
-      const result = buildSegmentFromFormValues(segment, value)
+      const result = buildSegmentFromFormValues(segment, value, runtimeSeconds)
       if (!result.success) return
       onSave(result.segment)
       handleClose()
@@ -91,8 +95,8 @@ export function SegmentEditDialog({
       getSegmentDraftState(values, {
         startSeconds: segment.StartTicks ?? 0,
         endSeconds: segment.EndTicks ?? 0,
-      }),
-    [segment.EndTicks, segment.StartTicks, values],
+      }, runtimeSeconds),
+    [segment.EndTicks, segment.StartTicks, values, runtimeSeconds],
   )
   const segmentColor = getSegmentColor(values.type)
   const rawDuration = draftRange.endSeconds - draftRange.startSeconds
@@ -225,7 +229,15 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
+                      onBlur={() => {
+                        const clamped = clampTimeText(
+                          String(field.state.value),
+                          0,
+                          runtimeSeconds ?? Infinity,
+                        )
+                        if (clamped !== null) field.handleChange(clamped)
+                        field.handleBlur()
+                      }}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -249,7 +261,15 @@ export function SegmentEditDialog({
                       inputMode="decimal"
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
+                      onBlur={() => {
+                        const clamped = clampTimeText(
+                          String(field.state.value),
+                          0,
+                          runtimeSeconds ?? Infinity,
+                        )
+                        if (clamped !== null) field.handleChange(clamped)
+                        field.handleBlur()
+                      }}
                       className="font-mono flex-1"
                     />
                     <span className="text-sm text-muted-foreground whitespace-nowrap">

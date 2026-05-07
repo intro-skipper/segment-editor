@@ -142,7 +142,9 @@
     },
     "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
-    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert"
+    "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
+    "setStartToBeginning": "Start auf Anfang setzen",
+    "setEndToDuration": "Ende auf Dauer setzen"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -275,7 +277,9 @@
     "subtitleReset": "Zurücksetzen",
     "keyboardShortcuts": "Tastaturkürzel",
     "playbackSpeed": "Wiedergabegeschwindigkeit",
-    "speedValue": "{{speed}}x Geschwindigkeit"
+    "speedValue": "{{speed}}x Geschwindigkeit",
+    "minimize": "Player minimieren",
+    "restore": "Player anzeigen"
   },
   "shortcuts": {
     "playPause": "Abspielen/Pause",
