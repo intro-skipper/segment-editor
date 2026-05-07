@@ -236,7 +236,7 @@ function MediaListRow({
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
         <p
           className={cn(
-            'font-semibold line-clamp-2 leading-tight text-base md:text-lg',
+            'font-semibold line-clamp-2 leading-tight text-base md:text-lg min-h-[2.5rem] md:min-h-[3.25rem]',
             !vibrantColors && 'text-foreground',
           )}
           style={textStyle}
