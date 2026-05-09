@@ -16,7 +16,7 @@ export default defineConfig(
         external: ['virtual:pwa-register'],
         output: {
           entryFileNames: 'assets/[name].js',
-          chunkFileNames: 'assets/[name].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name][extname]',
         },
       },
