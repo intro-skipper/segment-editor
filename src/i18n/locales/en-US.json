@@ -286,7 +286,8 @@
     "playbackSpeed": "Playback Speed",
     "speedValue": "{{speed}}x speed",
     "minimize": "Minimize player",
-    "restore": "Show player"
+    "restore": "Show player",
+    "skipSegment": "Skip {{type}}"
   },
   "shortcuts": {
     "playPause": "Play/Pause",
@@ -324,7 +325,13 @@
     "start_typing": "Start typing to search..."
   },
   "settings": {
-    "open": "Open settings"
+    "open": "Open settings",
+    "segmentSkipMode": {
+      "title": "Segment Playback",
+      "button": "Display skip button",
+      "auto": "Automatically skip",
+      "disabled": "Default playback only"
+    }
   },
   "navigation": {
     "back": "Go back"

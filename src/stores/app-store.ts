@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type Theme = 'auto' | 'dark' | 'light'
 export type Locale = 'en-US' | 'de' | 'fr' | 'auto'
+export type SegmentSkipMode = 'button' | 'auto' | 'disabled'
 type ResolvedLocale = Exclude<Locale, 'auto'>
 
 /**
@@ -27,6 +28,8 @@ interface AppState {
   enableChapter: boolean
   /** Track preferences for audio and subtitle auto-selection */
   trackPreferences: TrackPreferences
+  /** How to handle segments during playback: show a button, auto-skip, or do nothing */
+  segmentSkipMode: SegmentSkipMode
 }
 
 interface AppActions {
@@ -41,6 +44,8 @@ interface AppActions {
   setPreferredSubtitleLanguage: (language: string | null) => void
   /** Set whether subtitles should be enabled by default */
   setSubtitlesEnabled: (enabled: boolean) => void
+  /** Set how segments are handled during playback */
+  setSegmentSkipMode: (mode: SegmentSkipMode) => void
 }
 
 type AppStore = AppState & AppActions
@@ -79,6 +84,7 @@ const initialState: AppState = {
     preferredSubtitleLanguage: null,
     subtitlesEnabled: false,
   },
+  segmentSkipMode: 'button',
 }
 
 export const useAppStore = create<AppStore>()(
@@ -114,6 +120,7 @@ export const useAppStore = create<AppStore>()(
             subtitlesEnabled: enabled,
           },
         })),
+      setSegmentSkipMode: (segmentSkipMode) => set({ segmentSkipMode }),
     }),
     {
       name: 'segment-editor-app',

@@ -286,7 +286,8 @@
     "playbackSpeed": "Wiedergabegeschwindigkeit",
     "speedValue": "{{speed}}x Geschwindigkeit",
     "minimize": "Player minimieren",
-    "restore": "Player anzeigen"
+    "restore": "Player anzeigen",
+    "skipSegment": "{{type}} überspringen"
   },
   "shortcuts": {
     "playPause": "Abspielen/Pause",
@@ -324,7 +325,13 @@
     "start_typing": "Zum Suchen tippen..."
   },
   "settings": {
-    "open": "Einstellungen öffnen"
+    "open": "Einstellungen öffnen",
+    "segmentSkipMode": {
+      "title": "Segment-Wiedergabe",
+      "button": "Überspringen-Schaltfläche anzeigen",
+      "auto": "Automatisch überspringen",
+      "disabled": "Nur Standard-Wiedergabe"
+    }
   },
   "navigation": {
     "back": "Zurück"

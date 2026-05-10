@@ -11,7 +11,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import { AlertTriangle, Expand, RefreshCw, Shrink } from 'lucide-react'
+import { AlertTriangle, Expand, RefreshCw, Shrink, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -46,7 +46,7 @@ import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { getSkipStepSeconds } from '@/lib/player-timing-utils'
-import { snapToFrame } from '@/lib/time-utils'
+import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
@@ -329,6 +329,23 @@ function useRenderPlayer({
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
 
+  // Segment skip mode from app settings
+  const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
+  const segmentSkipModeRef = useRef(segmentSkipMode)
+  segmentSkipModeRef.current = segmentSkipMode
+
+  // Stable ref for segments to read in time-update handlers without closing over stale values
+  const segmentsRef = useRef(segments)
+  segmentsRef.current = segments
+
+  // Active segment overlapping the current playback position (for button mode)
+  const [activeSkipSegment, setActiveSkipSegment] =
+    useState<MediaSegmentDto | null>(null)
+  // Track the ID of the last active segment to avoid redundant state updates
+  const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
+  // Track the segment ID we last auto-skipped to prevent repeated seeks
+  const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
+
   // Convenience: snap the current playback position to the nearest frame boundary.
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -533,12 +550,63 @@ function useRenderPlayer({
     timelineStore.setState({ currentTime: nextTime })
   }
 
+  /**
+   * Updates the active skip segment state based on the current playback time.
+   * Handles both 'button' (show overlay) and 'auto' (seek past segment) modes.
+   * Uses refs to avoid stale closures and to batch state updates only on changes.
+   */
+  const checkSegmentSkip = (currentTime: number) => {
+    const segs = segmentsRef.current
+    const mode = segmentSkipModeRef.current
+
+    if (mode === 'disabled' || !segs?.length) {
+      if (prevActiveSegmentIdRef.current !== null) {
+        prevActiveSegmentIdRef.current = null
+        lastAutoSkippedSegmentIdRef.current = null
+        setActiveSkipSegment(null)
+      }
+      return
+    }
+
+    const active = segs.find((seg) => {
+      const start = ticksToSeconds(seg.StartTicks)
+      const end = ticksToSeconds(seg.EndTicks)
+      return currentTime >= start && currentTime < end
+    }) ?? null
+
+    const activeId = active?.Id ?? null
+
+    if (activeId !== prevActiveSegmentIdRef.current) {
+      prevActiveSegmentIdRef.current = activeId
+      if (!active) {
+        lastAutoSkippedSegmentIdRef.current = null
+      }
+      if (mode === 'button') {
+        setActiveSkipSegment(active)
+      }
+    }
+
+    if (mode === 'auto' && active && videoRef.current) {
+      if (lastAutoSkippedSegmentIdRef.current !== activeId) {
+        lastAutoSkippedSegmentIdRef.current = activeId
+        const endSecs = ticksToSeconds(active.EndTicks)
+        clearPlaybackUpdateTimer()
+        videoRef.current.currentTime = endSecs
+        currentTimeRef.current = endSecs
+        lastPlaybackUpdateAtRef.current = performance.now()
+        publishTimelineTime(endSecs)
+      }
+    }
+  }
+
   const handleTimeUpdate = () => {
     const video = videoRef.current
     if (!video) return
 
     const nextTime = video.currentTime
     currentTimeRef.current = nextTime
+
+    checkSegmentSkip(nextTime)
 
     const now = performance.now()
     const elapsed = now - lastPlaybackUpdateAtRef.current
@@ -967,6 +1035,22 @@ function useRenderPlayer({
     }
   }, [])
 
+  // Clear the skip button when mode changes away from 'button'
+  useEffect(() => {
+    if (segmentSkipMode !== 'button') {
+      setActiveSkipSegment(null)
+    }
+  }, [segmentSkipMode])
+
+  // Seek past the active segment end when the skip button is clicked
+  const handleSkipSegment = (segment: MediaSegmentDto) => {
+    const endSecs = ticksToSeconds(segment.EndTicks)
+    handleSeek(endSecs)
+    setActiveSkipSegment(null)
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+  }
+
   // Handler for skip time changes from controls
   const handleSkipTimeChange = (index: number) => {
     dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
@@ -1145,6 +1229,32 @@ function useRenderPlayer({
                   ? t('player.recovering', 'Recovering playback')
                   : t('accessibility.loading')}
               </span>
+            </div>
+          ) : null}
+
+          {/* Segment skip button overlay */}
+          {segmentSkipMode === 'button' &&
+          activeSkipSegment &&
+          !playerError &&
+          !isVideoLoading ? (
+            <div
+              className="absolute bottom-4 right-4 z-20"
+              data-player-controls-overlay="true"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSkipSegment(activeSkipSegment)}
+                className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
+                aria-label={t('player.skipSegment', {
+                  type: t(`segmentType.${activeSkipSegment.Type}`),
+                })}
+              >
+                <SkipForward className="size-4" aria-hidden="true" />
+                {t('player.skipSegment', {
+                  type: t(`segmentType.${activeSkipSegment.Type}`),
+                })}
+              </Button>
             </div>
           ) : null}
         </div>
