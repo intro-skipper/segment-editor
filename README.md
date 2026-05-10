@@ -95,7 +95,7 @@ pnpm build:plugin
 ```
 
 - Output: `dist-plugin/`
-- Uses base path `/SegmentEditor/` and non-hashed asset filenames to support embedding.
+- Uses base path `/SegmentEditor/` with a stable entry filename plus hashed chunks/assets for cache-safe embedding.
 
 ## Hosting notes
 
