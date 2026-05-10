@@ -590,11 +590,7 @@ function useRenderPlayer({
       if (lastAutoSkippedSegmentIdRef.current !== activeId) {
         lastAutoSkippedSegmentIdRef.current = activeId
         const endSecs = ticksToSeconds(active.EndTicks)
-        clearPlaybackUpdateTimer()
-        videoRef.current.currentTime = endSecs
-        currentTimeRef.current = endSecs
-        lastPlaybackUpdateAtRef.current = performance.now()
-        publishTimelineTime(endSecs)
+        handleSeek(endSecs)
       }
     }
   }
@@ -1048,7 +1044,6 @@ function useRenderPlayer({
     handleSeek(endSecs)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
-    lastAutoSkippedSegmentIdRef.current = null
   }
 
   // Handler for skip time changes from controls
