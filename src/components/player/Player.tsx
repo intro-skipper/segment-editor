@@ -341,7 +341,8 @@ function useRenderPlayer({
   const segmentSkipModeRef = useRef(segmentSkipMode)
   segmentSkipModeRef.current = segmentSkipMode
 
-  // Precompute segment time ranges once per segment list update.
+  // Precompute segment time ranges once per segment list update, sorted by
+  // startSeconds so binary search can be used during playback hot-path.
   const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
     () =>
       (segments ?? [])
@@ -350,7 +351,8 @@ function useRenderPlayer({
           startSeconds: ticksToSeconds(segment.StartTicks),
           endSeconds: ticksToSeconds(segment.EndTicks),
         }))
-        .filter((segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds),
+        .filter((segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds)
+        .sort((a, b) => a.startSeconds - b.startSeconds),
     [segments],
   )
   // Stable ref for precomputed segment ranges in time-update handlers.
@@ -587,12 +589,23 @@ function useRenderPlayer({
       return
     }
 
-    const activeRange =
-      segmentRanges.find(
-        (segmentRange) =>
-          currentTime >= segmentRange.startSeconds &&
-          currentTime < segmentRange.endSeconds,
-      ) ?? null
+    // Binary search: find the last range whose startSeconds ≤ currentTime,
+    // then verify currentTime falls before its end.
+    let lo = 0
+    let hi = segmentRanges.length - 1
+    let activeRange: SegmentTimeRange | null = null
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1
+      if (segmentRanges[mid].startSeconds <= currentTime) {
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    const candidate = hi >= 0 ? segmentRanges[hi] : null
+    if (candidate !== null && currentTime < candidate.endSeconds) {
+      activeRange = candidate
+    }
     const active = activeRange?.segment ?? null
 
     const activeId = active?.Id ?? null
@@ -1061,7 +1074,8 @@ function useRenderPlayer({
 
   // Seek past the active segment end when the skip button is clicked
   const handleSkipSegment = (segment: MediaSegmentDto) => {
-    const endSecs = ticksToSeconds(segment.EndTicks)
+    const range = segmentTimeRangesRef.current.find((r) => r.segment.Id === segment.Id)
+    const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
     handleSeek(endSecs)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
