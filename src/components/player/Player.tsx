@@ -355,9 +355,21 @@ function useRenderPlayer({
         .sort((a, b) => a.startSeconds - b.startSeconds),
     [segments],
   )
-  // Stable ref for precomputed segment ranges in time-update handlers.
+  // ID-keyed map for O(1) lookup by segment ID (used in handleSkipSegment).
+  const segmentTimeRangeById = useMemo<Map<string, SegmentTimeRange>>(
+    () =>
+      new Map(
+        segmentTimeRanges
+          .filter((r) => r.segment.Id !== undefined)
+          .map((r) => [r.segment.Id as string, r]),
+      ),
+    [segmentTimeRanges],
+  )
+  // Stable refs for precomputed segment ranges in time-update handlers.
   const segmentTimeRangesRef = useRef(segmentTimeRanges)
   segmentTimeRangesRef.current = segmentTimeRanges
+  const segmentTimeRangeByIdRef = useRef(segmentTimeRangeById)
+  segmentTimeRangeByIdRef.current = segmentTimeRangeById
 
   // Active segment overlapping the current playback position (for button mode)
   const [activeSkipSegment, setActiveSkipSegment] =
@@ -595,7 +607,7 @@ function useRenderPlayer({
     let hi = segmentRanges.length - 1
     let activeRange: SegmentTimeRange | null = null
     while (lo <= hi) {
-      const mid = (lo + hi) >>> 1
+      const mid = lo + Math.floor((hi - lo) / 2)
       if (segmentRanges[mid].startSeconds <= currentTime) {
         lo = mid + 1
       } else {
@@ -1074,7 +1086,9 @@ function useRenderPlayer({
 
   // Seek past the active segment end when the skip button is clicked
   const handleSkipSegment = (segment: MediaSegmentDto) => {
-    const range = segmentTimeRangesRef.current.find((r) => r.segment.Id === segment.Id)
+    const range = segment.Id !== undefined
+      ? segmentTimeRangeByIdRef.current.get(segment.Id)
+      : undefined
     const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
     handleSeek(endSecs)
     setActiveSkipSegment(null)
