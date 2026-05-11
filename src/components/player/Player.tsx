@@ -6,6 +6,7 @@ import {
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -67,6 +68,12 @@ interface PlaybackTimelineStore {
   getSnapshot: () => PlaybackTimelineState
   subscribe: (listener: () => void) => () => void
   setState: (partial: Partial<PlaybackTimelineState>) => void
+}
+
+interface SegmentTimeRange {
+  segment: MediaSegmentDto
+  startSeconds: number
+  endSeconds: number
 }
 
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
@@ -334,9 +341,21 @@ function useRenderPlayer({
   const segmentSkipModeRef = useRef(segmentSkipMode)
   segmentSkipModeRef.current = segmentSkipMode
 
-  // Stable ref for segments to read in time-update handlers without closing over stale values
-  const segmentsRef = useRef(segments)
-  segmentsRef.current = segments
+  // Precompute segment time ranges once per segment list update.
+  const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
+    () =>
+      (segments ?? [])
+        .map((segment) => ({
+          segment,
+          startSeconds: ticksToSeconds(segment.StartTicks),
+          endSeconds: ticksToSeconds(segment.EndTicks),
+        }))
+        .filter((segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds),
+    [segments],
+  )
+  // Stable ref for precomputed segment ranges in time-update handlers.
+  const segmentTimeRangesRef = useRef(segmentTimeRanges)
+  segmentTimeRangesRef.current = segmentTimeRanges
 
   // Active segment overlapping the current playback position (for button mode)
   const [activeSkipSegment, setActiveSkipSegment] =
@@ -556,10 +575,10 @@ function useRenderPlayer({
    * Uses refs to avoid stale closures and to batch state updates only on changes.
    */
   const checkSegmentSkip = (currentTime: number) => {
-    const segs = segmentsRef.current
+    const segmentRanges = segmentTimeRangesRef.current
     const mode = segmentSkipModeRef.current
 
-    if (mode === 'disabled' || !segs?.length) {
+    if (mode === 'disabled' || segmentRanges.length === 0) {
       if (prevActiveSegmentIdRef.current !== null) {
         prevActiveSegmentIdRef.current = null
         lastAutoSkippedSegmentIdRef.current = null
@@ -568,11 +587,13 @@ function useRenderPlayer({
       return
     }
 
-    const active = segs.find((seg) => {
-      const start = ticksToSeconds(seg.StartTicks)
-      const end = ticksToSeconds(seg.EndTicks)
-      return currentTime >= start && currentTime < end
-    }) ?? null
+    const activeRange =
+      segmentRanges.find(
+        (segmentRange) =>
+          currentTime >= segmentRange.startSeconds &&
+          currentTime < segmentRange.endSeconds,
+      ) ?? null
+    const active = activeRange?.segment ?? null
 
     const activeId = active?.Id ?? null
 
@@ -586,10 +607,10 @@ function useRenderPlayer({
       }
     }
 
-    if (mode === 'auto' && active && videoRef.current) {
+    if (mode === 'auto' && activeRange && videoRef.current) {
       if (lastAutoSkippedSegmentIdRef.current !== activeId) {
         lastAutoSkippedSegmentIdRef.current = activeId
-        const endSecs = ticksToSeconds(active.EndTicks)
+        const endSecs = activeRange.endSeconds
         handleSeek(endSecs)
       }
     }
@@ -1031,11 +1052,11 @@ function useRenderPlayer({
     }
   }, [])
 
-  // Clear the skip button when mode changes away from 'button'
+  // Reset segment skip tracking when mode changes for predictable behavior.
   useEffect(() => {
-    if (segmentSkipMode !== 'button') {
-      setActiveSkipSegment(null)
-    }
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+    setActiveSkipSegment(null)
   }, [segmentSkipMode])
 
   // Seek past the active segment end when the skip button is clicked
