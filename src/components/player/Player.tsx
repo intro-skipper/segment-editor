@@ -620,7 +620,7 @@ function useRenderPlayer({
     }
     const active = activeRange?.segment ?? null
 
-    const activeId = active?.Id ?? null
+    const activeId = active?.Id ?? (activeRange ? `${activeRange.startSeconds}:${activeRange.endSeconds}:${active?.Type ?? ''}` : null)
 
     if (activeId !== prevActiveSegmentIdRef.current) {
       prevActiveSegmentIdRef.current = activeId
