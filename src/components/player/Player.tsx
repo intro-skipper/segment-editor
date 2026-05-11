@@ -1065,6 +1065,7 @@ function useRenderPlayer({
     handleSeek(endSecs)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
   }
 
   // Handler for skip time changes from controls
