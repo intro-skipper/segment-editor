@@ -117,7 +117,6 @@
     {
       "files": ["**/*.{js,jsx,ts,tsx}"],
       "rules": {
-        "react-you-might-not-need-an-effect/no-empty-effect": "warn",
         "react-you-might-not-need-an-effect/no-adjust-state-on-prop-change": "warn",
         "react-you-might-not-need-an-effect/no-reset-all-state-on-prop-change": "warn",
         "react-you-might-not-need-an-effect/no-event-handler": "warn",
