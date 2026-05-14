@@ -217,7 +217,8 @@
     "playbackSpeed": "Vitesse de lecture",
     "speedValue": "Vitesse {{speed}}x",
     "minimize": "Réduire le lecteur",
-    "restore": "Afficher le lecteur"
+    "restore": "Afficher le lecteur",
+    "skipSegment": "Passer {{type}}"
   },
   "shortcuts": {
     "playPause": "Lecture/Pause",
@@ -242,6 +243,15 @@
     "episodeLoadError": "Échec du chargement des épisodes",
     "seasonNumber": "Saison {{number}}",
     "episodes": "Épisodes"
+  },
+  "settings": {
+    "open": "Ouvrir les paramètres",
+    "segmentSkipMode": {
+      "title": "Lecture des segments",
+      "button": "Afficher le bouton de saut",
+      "auto": "Passer automatiquement",
+      "disabled": "Lecture par défaut uniquement"
+    }
   },
   "segmentType": {
     "Intro": "Introduction",

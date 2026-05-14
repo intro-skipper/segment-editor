@@ -7,6 +7,7 @@ import {
   CodecCompatibilitySection,
   LanguageSection,
   PageSizeSection,
+  SegmentSkipModeSection,
   ServerConnectionSection,
   ViewModeSection,
 } from './sections'
@@ -52,6 +53,7 @@ function SettingsDialogBase() {
           <PageSizeSection />
           <ViewModeSection />
           <CodecCompatibilitySection />
+          <SegmentSkipModeSection />
         </div>
         {!pluginMode && (
           <div className="px-5 py-3 border-t border-border/50 text-center">

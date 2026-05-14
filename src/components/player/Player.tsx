@@ -6,12 +6,13 @@ import {
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
-import { AlertTriangle, Expand, RefreshCw, Shrink } from 'lucide-react'
+import { AlertTriangle, Expand, RefreshCw, Shrink, SkipForward } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -46,7 +47,7 @@ import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { getSkipStepSeconds } from '@/lib/player-timing-utils'
-import { snapToFrame } from '@/lib/time-utils'
+import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
@@ -67,6 +68,12 @@ interface PlaybackTimelineStore {
   getSnapshot: () => PlaybackTimelineState
   subscribe: (listener: () => void) => () => void
   setState: (partial: Partial<PlaybackTimelineState>) => void
+}
+
+interface SegmentTimeRange {
+  segment: MediaSegmentDto
+  startSeconds: number
+  endSeconds: number
 }
 
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
@@ -329,6 +336,49 @@ function useRenderPlayer({
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
 
+  // Segment skip mode from app settings
+  const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
+  const segmentSkipModeRef = useRef(segmentSkipMode)
+  segmentSkipModeRef.current = segmentSkipMode
+
+  // Precompute segment time ranges once per segment list update, sorted by
+  // startSeconds so binary search can be used during playback hot-path.
+  const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
+    () =>
+      (segments ?? [])
+        .map((segment) => ({
+          segment,
+          startSeconds: ticksToSeconds(segment.StartTicks),
+          endSeconds: ticksToSeconds(segment.EndTicks),
+        }))
+        .filter((segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds)
+        .sort((a, b) => a.startSeconds - b.startSeconds),
+    [segments],
+  )
+  // ID-keyed map for O(1) lookup by segment ID (used in handleSkipSegment).
+  const segmentTimeRangeById = useMemo<Map<string, SegmentTimeRange>>(
+    () =>
+      new Map(
+        segmentTimeRanges
+          .filter((r) => r.segment.Id !== undefined)
+          .map((r) => [r.segment.Id as string, r]),
+      ),
+    [segmentTimeRanges],
+  )
+  // Stable refs for precomputed segment ranges in time-update handlers.
+  const segmentTimeRangesRef = useRef(segmentTimeRanges)
+  segmentTimeRangesRef.current = segmentTimeRanges
+  const segmentTimeRangeByIdRef = useRef(segmentTimeRangeById)
+  segmentTimeRangeByIdRef.current = segmentTimeRangeById
+
+  // Active segment overlapping the current playback position (for button mode)
+  const [activeSkipSegment, setActiveSkipSegment] =
+    useState<MediaSegmentDto | null>(null)
+  // Track the ID of the last active segment to avoid redundant state updates
+  const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
+  // Track the segment ID we last auto-skipped to prevent repeated seeks
+  const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
+
   // Convenience: snap the current playback position to the nearest frame boundary.
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -533,12 +583,72 @@ function useRenderPlayer({
     timelineStore.setState({ currentTime: nextTime })
   }
 
+  /**
+   * Updates the active skip segment state based on the current playback time.
+   * Handles both 'button' (show overlay) and 'auto' (seek past segment) modes.
+   * Uses refs to avoid stale closures and to batch state updates only on changes.
+   */
+  const checkSegmentSkip = (currentTime: number) => {
+    const segmentRanges = segmentTimeRangesRef.current
+    const mode = segmentSkipModeRef.current
+
+    if (mode === 'disabled' || segmentRanges.length === 0) {
+      if (prevActiveSegmentIdRef.current !== null) {
+        prevActiveSegmentIdRef.current = null
+        lastAutoSkippedSegmentIdRef.current = null
+        setActiveSkipSegment(null)
+      }
+      return
+    }
+
+    // Binary search: find the last range whose startSeconds ≤ currentTime,
+    // then verify currentTime falls before its end.
+    let lo = 0
+    let hi = segmentRanges.length - 1
+    let activeRange: SegmentTimeRange | null = null
+    while (lo <= hi) {
+      const mid = lo + Math.floor((hi - lo) / 2)
+      if (segmentRanges[mid].startSeconds <= currentTime) {
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    const candidate = hi >= 0 ? segmentRanges[hi] : null
+    if (candidate !== null && currentTime < candidate.endSeconds) {
+      activeRange = candidate
+    }
+    const active = activeRange?.segment ?? null
+
+    const activeId = active?.Id ?? (activeRange ? `${activeRange.startSeconds}:${activeRange.endSeconds}:${active?.Type ?? ''}` : null)
+
+    if (activeId !== prevActiveSegmentIdRef.current) {
+      prevActiveSegmentIdRef.current = activeId
+      if (!active) {
+        lastAutoSkippedSegmentIdRef.current = null
+      }
+      if (mode === 'button') {
+        setActiveSkipSegment(active)
+      }
+    }
+
+    if (mode === 'auto' && activeRange && videoRef.current) {
+      if (lastAutoSkippedSegmentIdRef.current !== activeId) {
+        lastAutoSkippedSegmentIdRef.current = activeId
+        const endSecs = activeRange.endSeconds
+        handleSeek(endSecs)
+      }
+    }
+  }
+
   const handleTimeUpdate = () => {
     const video = videoRef.current
     if (!video) return
 
     const nextTime = video.currentTime
     currentTimeRef.current = nextTime
+
+    checkSegmentSkip(nextTime)
 
     const now = performance.now()
     const elapsed = now - lastPlaybackUpdateAtRef.current
@@ -967,6 +1077,25 @@ function useRenderPlayer({
     }
   }, [])
 
+  // Reset segment skip tracking when mode changes for predictable behavior.
+  useEffect(() => {
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+    setActiveSkipSegment(null)
+  }, [segmentSkipMode])
+
+  // Seek past the active segment end when the skip button is clicked
+  const handleSkipSegment = (segment: MediaSegmentDto) => {
+    const range = segment.Id !== undefined
+      ? segmentTimeRangeByIdRef.current.get(segment.Id)
+      : undefined
+    const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
+    handleSeek(endSecs)
+    setActiveSkipSegment(null)
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+  }
+
   // Handler for skip time changes from controls
   const handleSkipTimeChange = (index: number) => {
     dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
@@ -1145,6 +1274,32 @@ function useRenderPlayer({
                   ? t('player.recovering', 'Recovering playback')
                   : t('accessibility.loading')}
               </span>
+            </div>
+          ) : null}
+
+          {/* Segment skip button overlay */}
+          {segmentSkipMode === 'button' &&
+          activeSkipSegment &&
+          !playerError &&
+          !isVideoLoading ? (
+            <div
+              className="absolute bottom-4 right-4 z-20"
+              data-player-controls-overlay="true"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSkipSegment(activeSkipSegment)}
+                className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
+                aria-label={t('player.skipSegment', {
+                  type: t(`segmentType.${activeSkipSegment.Type}`),
+                })}
+              >
+                <SkipForward className="size-4" aria-hidden="true" />
+                {t('player.skipSegment', {
+                  type: t(`segmentType.${activeSkipSegment.Type}`),
+                })}
+              </Button>
             </div>
           ) : null}
         </div>
