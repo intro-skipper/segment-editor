@@ -327,9 +327,9 @@
   "settings": {
     "open": "Einstellungen öffnen",
     "segmentSkipMode": {
-      "title": "Segment-Wiedergabe",
+      "title": "Segmentaktionen",
       "button": "Überspringen-Schaltfläche anzeigen",
-      "auto": "Automatisch überspringen",
+      "skip": "Automatisch überspringen",
       "disabled": "Nur Standard-Wiedergabe"
     }
   },

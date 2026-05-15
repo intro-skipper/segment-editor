@@ -247,9 +247,9 @@
   "settings": {
     "open": "Ouvrir les paramètres",
     "segmentSkipMode": {
-      "title": "Lecture des segments",
+      "title": "Actions de segment",
       "button": "Afficher le bouton de saut",
-      "auto": "Passer automatiquement",
+      "skip": "Passer automatiquement",
       "disabled": "Lecture par défaut uniquement"
     }
   },

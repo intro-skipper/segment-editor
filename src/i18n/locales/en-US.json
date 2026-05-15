@@ -327,9 +327,9 @@
   "settings": {
     "open": "Open settings",
     "segmentSkipMode": {
-      "title": "Segment Playback",
+      "title": "Segment Actions",
       "button": "Display skip button",
-      "auto": "Automatically skip",
+      "skip": "Automatically skip",
       "disabled": "Default playback only"
     }
   },

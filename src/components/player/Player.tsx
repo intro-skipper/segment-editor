@@ -585,7 +585,7 @@ function useRenderPlayer({
 
   /**
    * Updates the active skip segment state based on the current playback time.
-   * Handles both 'button' (show overlay) and 'auto' (seek past segment) modes.
+   * Handles both 'button' (show overlay) and 'skip' (seek past segment) modes.
    * Uses refs to avoid stale closures and to batch state updates only on changes.
    */
   const checkSegmentSkip = (currentTime: number) => {
@@ -632,7 +632,7 @@ function useRenderPlayer({
       }
     }
 
-    if (mode === 'auto' && activeRange && videoRef.current) {
+    if (mode === 'skip' && activeRange && videoRef.current) {
       if (lastAutoSkippedSegmentIdRef.current !== activeId) {
         lastAutoSkippedSegmentIdRef.current = activeId
         const endSecs = activeRange.endSeconds

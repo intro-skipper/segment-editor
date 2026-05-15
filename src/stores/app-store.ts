@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type Theme = 'auto' | 'dark' | 'light'
 export type Locale = 'en-US' | 'de' | 'fr' | 'auto'
-export type SegmentSkipMode = 'button' | 'auto' | 'disabled'
+export type SegmentSkipMode = 'button' | 'skip' | 'disabled'
 type ResolvedLocale = Exclude<Locale, 'auto'>
 
 /**
@@ -124,6 +124,14 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'segment-editor-app',
+      version: 1,
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>
+        if (version < 1 && state.segmentSkipMode === 'auto') {
+          state.segmentSkipMode = 'skip'
+        }
+        return state
+      },
       onRehydrateStorage: () => (state) => {
         if (state) applyTheme(state.theme)
       },
