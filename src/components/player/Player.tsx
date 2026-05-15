@@ -12,7 +12,13 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import { AlertTriangle, Expand, RefreshCw, Shrink, SkipForward } from 'lucide-react'
+import {
+  AlertTriangle,
+  Expand,
+  RefreshCw,
+  Shrink,
+  SkipForward,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -351,7 +357,9 @@ function useRenderPlayer({
           startSeconds: ticksToSeconds(segment.StartTicks),
           endSeconds: ticksToSeconds(segment.EndTicks),
         }))
-        .filter((segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds)
+        .filter(
+          (segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds,
+        )
         .sort((a, b) => a.startSeconds - b.startSeconds),
     [segments],
   )
@@ -620,7 +628,11 @@ function useRenderPlayer({
     }
     const active = activeRange?.segment ?? null
 
-    const activeId = active?.Id ?? (activeRange ? `${activeRange.startSeconds}:${activeRange.endSeconds}:${active?.Type ?? ''}` : null)
+    const activeId =
+      active?.Id ??
+      (activeRange
+        ? `${activeRange.startSeconds}:${activeRange.endSeconds}:${active?.Type ?? ''}`
+        : null)
 
     if (activeId !== prevActiveSegmentIdRef.current) {
       prevActiveSegmentIdRef.current = activeId
@@ -1086,9 +1098,10 @@ function useRenderPlayer({
 
   // Seek past the active segment end when the skip button is clicked
   const handleSkipSegment = (segment: MediaSegmentDto) => {
-    const range = segment.Id !== undefined
-      ? segmentTimeRangeByIdRef.current.get(segment.Id)
-      : undefined
+    const range =
+      segment.Id !== undefined
+        ? segmentTimeRangeByIdRef.current.get(segment.Id)
+        : undefined
     const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
     handleSeek(endSecs)
     setActiveSkipSegment(null)

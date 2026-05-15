@@ -538,7 +538,11 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
   // Set timestamp from current player position
   const handleSetStartToZero = React.useCallback(() => {
-    const nextStart = snapAndClampStart(0, stableRangeRef.current.end, frameStep)
+    const nextStart = snapAndClampStart(
+      0,
+      stableRangeRef.current.end,
+      frameStep,
+    )
     const nextRange = applyDraftBoundary('start', nextStart)
     commitSegmentUpdate(nextRange.start, nextRange.end)
   }, [applyDraftBoundary, commitSegmentUpdate, frameStep])
@@ -905,7 +909,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             variant="ghost"
             size="icon-sm"
             onClick={handleSetStartToZero}
-            aria-label={t('editor.setStartToBeginning', 'Set start to beginning')}
+            aria-label={t(
+              'editor.setStartToBeginning',
+              'Set start to beginning',
+            )}
             title={t('editor.setStartToBeginning', 'Set start to beginning')}
             className="shrink-0 hover:bg-primary/10"
           >
@@ -982,7 +989,11 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
             title={t('editor.setEndToDuration', 'Set end to duration')}
             className="shrink-0 hover:bg-primary/10"
           >
-            <SkipForward className="size-3" aria-hidden="true" style={iconStyle} />
+            <SkipForward
+              className="size-3"
+              aria-hidden="true"
+              style={iconStyle}
+            />
           </Button>
           <label
             htmlFor={`segment-${segment.Id}-end`}

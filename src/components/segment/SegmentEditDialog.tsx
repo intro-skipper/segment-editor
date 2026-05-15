@@ -93,10 +93,14 @@ export function SegmentEditDialog({
   const isDirty = useStore(form.store, (state) => state.isDirty)
   const { draftRange, validation } = React.useMemo(
     () =>
-      getSegmentDraftState(values, {
-        startSeconds: segment.StartTicks ?? 0,
-        endSeconds: segment.EndTicks ?? 0,
-      }, runtimeSeconds),
+      getSegmentDraftState(
+        values,
+        {
+          startSeconds: segment.StartTicks ?? 0,
+          endSeconds: segment.EndTicks ?? 0,
+        },
+        runtimeSeconds,
+      ),
     [segment.EndTicks, segment.StartTicks, values, runtimeSeconds],
   )
   const segmentColor = getSegmentColor(values.type)
@@ -135,7 +139,11 @@ export function SegmentEditDialog({
 
   /** Clamps a field value to the valid time range on blur, then triggers validation. */
   const handleTimeFieldBlur = React.useCallback(
-    (field: { state: { value: unknown }; handleChange: (v: string) => void; handleBlur: () => void }) => {
+    (field: {
+      state: { value: unknown }
+      handleChange: (v: string) => void
+      handleBlur: () => void
+    }) => {
       const { min, max } = getSegmentTimeBounds(runtimeSeconds)
       const clamped = clampTimeText(String(field.state.value), min, max)
       if (clamped !== null) field.handleChange(clamped)
