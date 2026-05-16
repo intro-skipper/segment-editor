@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { DEFAULT_FRAME_STEP, PLAYER_CONFIG } from '@/lib/constants'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
-import { PLAYER_HOTKEYS } from '@/lib/player-shortcuts'
+import {
+  PLAYER_HOTKEYS,
+  PLAYER_SHORTCUT_CHEATSHEET,
+} from '@/lib/player-shortcuts'
 import {
   formatSkipDurationLabel,
   getFrameStepTargetTime,
@@ -102,5 +105,22 @@ describe('player timing utilities', () => {
     expect(PLAYER_HOTKEYS.stepFrameForward).toBe('.')
     expect(PLAYER_HOTKEYS.decreaseSpeed).toBe('Alt+,')
     expect(PLAYER_HOTKEYS.increaseSpeed).toBe('Alt+.')
+
+    const stepFrameHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.stepFrameBackForward',
+    )?.hotkeys
+    const decreaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.decreaseSpeed',
+    )?.hotkeys
+    const increaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.increaseSpeed',
+    )?.hotkeys
+
+    expect(stepFrameHotkeys).toEqual([
+      PLAYER_HOTKEYS.stepFrameBackward,
+      PLAYER_HOTKEYS.stepFrameForward,
+    ])
+    expect(decreaseSpeedHotkeys).toEqual([PLAYER_HOTKEYS.decreaseSpeed])
+    expect(increaseSpeedHotkeys).toEqual([PLAYER_HOTKEYS.increaseSpeed])
   })
 })
