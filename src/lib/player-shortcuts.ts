@@ -9,13 +9,15 @@ export const PLAYER_HOTKEYS = {
   cycleSkipTimeDown: 'S',
   skipBackward: 'A',
   skipForward: 'D',
+  stepFrameBackward: ',',
+  stepFrameForward: '.',
   pushStartTimestamp: 'E',
   pushEndTimestamp: 'F',
   toggleMute: 'M',
   toggleFullscreen: 'F11',
   toggleSubtitles: 'C',
-  increaseSpeed: '.',
-  decreaseSpeed: ',',
+  increaseSpeed: 'Alt+.',
+  decreaseSpeed: 'Alt+,',
 } as const
 
 /** Display-friendly cheatsheet — a superset of PLAYER_HOTKEYS.
@@ -34,6 +36,7 @@ export const PLAYER_SHORTCUT_CHEATSHEET = Object.freeze([
   { labelKey: 'shortcuts.saveAll', hotkeys: ['Mod+S'] },
   { labelKey: 'shortcuts.prevSegment', hotkeys: ['['] },
   { labelKey: 'shortcuts.nextSegment', hotkeys: [']'] },
-  { labelKey: 'shortcuts.increaseSpeed', hotkeys: ['.'] },
-  { labelKey: 'shortcuts.decreaseSpeed', hotkeys: [','] },
+  { labelKey: 'shortcuts.stepFrameBackForward', hotkeys: [',', '.'] },
+  { labelKey: 'shortcuts.increaseSpeed', hotkeys: ['Alt+.'] },
+  { labelKey: 'shortcuts.decreaseSpeed', hotkeys: ['Alt+,'] },
 ] as const)

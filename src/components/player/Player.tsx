@@ -54,7 +54,10 @@ import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
-import { getSkipStepSeconds } from '@/lib/player-timing-utils'
+import {
+  getFrameStepTargetTime,
+  getSkipStepSeconds,
+} from '@/lib/player-timing-utils'
 import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
@@ -771,44 +774,55 @@ function useRenderPlayer({
   }
 
   const handleSeek = (time: number) => {
-    if (videoRef.current) {
-      clearPlaybackUpdateTimer()
-      videoRef.current.currentTime = time
-      currentTimeRef.current = time
-      lastPlaybackUpdateAtRef.current = performance.now()
-      publishTimelineTime(time)
-    }
+    const video = videoRef.current
+    if (!video) return
+
+    clearPlaybackUpdateTimer()
+    video.currentTime = time
+    currentTimeRef.current = time
+    lastPlaybackUpdateAtRef.current = performance.now()
+    publishTimelineTime(time)
   }
 
   // Skip controls using refs for stable timing
   const skipForward = () => {
-    const video = videoRef.current
-    if (!video) return
-    clearPlaybackUpdateTimer()
     const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.min(
       snapToFrame(currentTimeRef.current + step, frameStep),
       durationRef.current,
     )
-    video.currentTime = newTime
-    currentTimeRef.current = newTime
-    lastPlaybackUpdateAtRef.current = performance.now()
-    publishTimelineTime(newTime)
+    handleSeek(newTime)
   }
 
   const skipBackward = () => {
-    const video = videoRef.current
-    if (!video) return
-    clearPlaybackUpdateTimer()
     const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.max(
       snapToFrame(currentTimeRef.current - step, frameStep),
       0,
     )
-    video.currentTime = newTime
-    currentTimeRef.current = newTime
-    lastPlaybackUpdateAtRef.current = performance.now()
-    publishTimelineTime(newTime)
+    handleSeek(newTime)
+  }
+
+  const stepFrameForward = () => {
+    handleSeek(
+      getFrameStepTargetTime(
+        currentTimeRef.current,
+        1,
+        frameStep,
+        durationRef.current,
+      ),
+    )
+  }
+
+  const stepFrameBackward = () => {
+    handleSeek(
+      getFrameStepTargetTime(
+        currentTimeRef.current,
+        -1,
+        frameStep,
+        durationRef.current,
+      ),
+    )
   }
 
   const cycleSkipTimeUp = () => {
@@ -909,6 +923,8 @@ function useRenderPlayer({
     cycleSkipTimeDown,
     skipBackward,
     skipForward,
+    stepFrameBackward,
+    stepFrameForward,
     pushStartTimestamp,
     pushEndTimestamp,
     toggleMute,
