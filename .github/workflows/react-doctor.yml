@@ -13,10 +13,10 @@ jobs:
   react-doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # required for `diff`
       - uses: millionco/react-doctor@main
         with:
-          diff: main
+          diff: master
           github-token: ${{ secrets.GITHUB_TOKEN }}
