@@ -126,9 +126,12 @@ export const useAppStore = create<AppStore>()(
       name: 'segment-editor-app',
       version: 1,
       migrate: (persistedState: unknown, version: number) => {
+        if (typeof persistedState !== 'object' || persistedState === null) {
+          return persistedState
+        }
         const state = persistedState as Record<string, unknown>
         if (version < 1 && state.segmentSkipMode === 'auto') {
-          state.segmentSkipMode = 'skip'
+          return { ...state, segmentSkipMode: 'skip' }
         }
         return state
       },
