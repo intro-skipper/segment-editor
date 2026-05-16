@@ -47,7 +47,7 @@ interface ConnectionWizardController {
   step: WizardStep
   servers: Array<RecommendedServerInfo>
   selectedServer: RecommendedServerInfo | null
-  isLoading: boolean
+  isRequestPending: boolean
   requestError: string | null
   canGoBack: boolean
   clearRequestError: () => void
@@ -61,17 +61,11 @@ interface ConnectionWizardController {
   reset: () => void
 }
 
-interface UseConnectionWizardControllerOptions {
-  open: boolean
-}
-
-export function useConnectionWizardController({
-  open,
-}: UseConnectionWizardControllerOptions): ConnectionWizardController {
+export function useConnectionWizardController(): ConnectionWizardController {
   const { createController, abort } = useAbortController()
   const [step, setStep] = useState<WizardStep>('entry')
   const [servers, setServers] = useState<Array<RecommendedServerInfo>>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isRequestPending, setIsRequestPending] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
 
   const formRef = useRef<ConnectionWizardFormApi | null>(null)
@@ -80,45 +74,53 @@ export function useConnectionWizardController({
     async (value: ConnectionWizardFormValues) => {
       if (step === 'entry') {
         const controller = createController()
-        setIsLoading(true)
+        setIsRequestPending(true)
         setRequestError(null)
 
-        const result = await discoverServers(value.address, {
-          signal: controller.signal,
-        })
+        try {
+          const result = await discoverServers(value.address, {
+            signal: controller.signal,
+          })
 
-        if (controller.signal.aborted) return
+          if (controller.signal.aborted) return
 
-        if (result.error) {
-          setIsLoading(false)
-          setRequestError(result.error)
-          return
-        }
+          if (result.error) {
+            setIsRequestPending(false)
+            setRequestError(result.error)
+            return
+          }
 
-        if (result.servers.length === 0) {
-          setIsLoading(false)
-          setRequestError(
-            'No servers found at this address. Check the address and try again.',
+          if (result.servers.length === 0) {
+            setIsRequestPending(false)
+            setRequestError(
+              'No servers found at this address. Check the address and try again.',
+            )
+            return
+          }
+
+          const nextSelectedServer =
+            result.servers.find(
+              (server) => server.address === value.selectedServerAddress,
+            ) ?? findBestServer(result.servers)
+
+          setServers(result.servers)
+          setRequestError(null)
+          setIsRequestPending(false)
+          setStep('select')
+          formRef.current?.setFieldValue(
+            'selectedServerAddress',
+            nextSelectedServer?.address ?? '',
+            {
+              dontValidate: true,
+            },
           )
-          return
+        } catch (error) {
+          if (controller.signal.aborted) return
+          setIsRequestPending(false)
+          setRequestError(
+            error instanceof Error ? error.message : 'Server discovery failed',
+          )
         }
-
-        const nextSelectedServer =
-          result.servers.find(
-            (server) => server.address === value.selectedServerAddress,
-          ) ?? findBestServer(result.servers)
-
-        setServers(result.servers)
-        setRequestError(null)
-        setIsLoading(false)
-        setStep('select')
-        formRef.current?.setFieldValue(
-          'selectedServerAddress',
-          nextSelectedServer?.address ?? '',
-          {
-            dontValidate: true,
-          },
-        )
         return
       }
 
@@ -135,26 +137,34 @@ export function useConnectionWizardController({
       }
 
       const controller = createController()
-      setIsLoading(true)
+      setIsRequestPending(true)
       setRequestError(null)
 
       const credentials = buildCredentialsFromForm(value)
-      const result = await authenticate(selectedServer.address, credentials, {
-        signal: controller.signal,
-      })
+      try {
+        const result = await authenticate(selectedServer.address, credentials, {
+          signal: controller.signal,
+        })
 
-      if (controller.signal.aborted) return
+        if (controller.signal.aborted) return
 
-      if (!result.success) {
-        setIsLoading(false)
-        setRequestError(result.error ?? 'Authentication failed')
-        return
+        if (!result.success) {
+          setIsRequestPending(false)
+          setRequestError(result.error ?? 'Authentication failed')
+          return
+        }
+
+        storeAuthResult(selectedServer.address, result, credentials.method)
+        setIsRequestPending(false)
+        setRequestError(null)
+        setStep('success')
+      } catch (error) {
+        if (controller.signal.aborted) return
+        setIsRequestPending(false)
+        setRequestError(
+          error instanceof Error ? error.message : 'Authentication failed',
+        )
       }
-
-      storeAuthResult(selectedServer.address, result, credentials.method)
-      setIsLoading(false)
-      setRequestError(null)
-      setStep('success')
     },
     [createController, servers, step],
   )
@@ -165,11 +175,7 @@ export function useConnectionWizardController({
     formRef.current = form
   }, [form])
 
-  useEffect(() => {
-    if (!open) {
-      abort()
-    }
-  }, [open, abort])
+  useEffect(() => abort, [abort])
 
   const clearRequestError = useCallback(() => {
     setRequestError(null)
@@ -179,7 +185,7 @@ export function useConnectionWizardController({
     abort()
     setStep('entry')
     setServers([])
-    setIsLoading(false)
+    setIsRequestPending(false)
     setRequestError(null)
     form.reset(CONNECTION_WIZARD_DEFAULT_VALUES)
   }, [abort, form])
@@ -229,7 +235,7 @@ export function useConnectionWizardController({
 
   const handleBack = useCallback(() => {
     abort()
-    setIsLoading(false)
+    setIsRequestPending(false)
     setRequestError(null)
 
     const previousStep = getPreviousStep(step)
@@ -242,7 +248,7 @@ export function useConnectionWizardController({
     step,
     servers,
     selectedServer,
-    isLoading,
+    isRequestPending,
     requestError,
     canGoBack: canGoBack(step),
     clearRequestError,

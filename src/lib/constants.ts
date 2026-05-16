@@ -62,8 +62,8 @@ export const DEFAULT_FRAME_STEP = 1 / DEFAULT_FRAME_RATE
  * Subtitle/JASSUB configuration constants.
  */
 export const SUBTITLE_CONFIG = {
-  /** JASSUB initialization timeout in milliseconds */
-  JASSUB_READY_TIMEOUT_MS: 10_000,
+  /** JASSUB initialization timeout; first ASS load may fetch/compile worker/WASM/fonts. */
+  JASSUB_READY_TIMEOUT_MS: 30_000,
   /** ASS/SSA codec identifiers (case-insensitive) */
   ASS_CODECS: ['ass', 'ssa'] as const,
   /** Supported font MIME types for embedded fonts */

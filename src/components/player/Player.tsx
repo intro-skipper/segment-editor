@@ -3,6 +3,7 @@
  */
 
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -24,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerControls } from './PlayerControls'
+import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
 import type {
   BaseItemDto,
@@ -352,25 +354,26 @@ function useRenderPlayer({
   const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
     () =>
       (segments ?? [])
-        .map((segment) => ({
-          segment,
-          startSeconds: ticksToSeconds(segment.StartTicks),
-          endSeconds: ticksToSeconds(segment.EndTicks),
-        }))
-        .filter(
-          (segmentRange) => segmentRange.endSeconds > segmentRange.startSeconds,
-        )
+        .reduce<Array<SegmentTimeRange>>((acc, segment) => {
+          const startSeconds = ticksToSeconds(segment.StartTicks)
+          const endSeconds = ticksToSeconds(segment.EndTicks)
+          if (endSeconds > startSeconds) {
+            acc.push({ segment, startSeconds, endSeconds })
+          }
+          return acc
+        }, [])
         .sort((a, b) => a.startSeconds - b.startSeconds),
     [segments],
   )
   // ID-keyed map for O(1) lookup by segment ID (used in handleSkipSegment).
   const segmentTimeRangeById = useMemo<Map<string, SegmentTimeRange>>(
     () =>
-      new Map(
-        segmentTimeRanges
-          .filter((r) => r.segment.Id !== undefined)
-          .map((r) => [r.segment.Id as string, r]),
-      ),
+      segmentTimeRanges.reduce((map, r) => {
+        if (r.segment.Id !== undefined) {
+          map.set(r.segment.Id, r)
+        }
+        return map
+      }, new Map<string, SegmentTimeRange>()),
     [segmentTimeRanges],
   )
   // Stable refs for precomputed segment ranges in time-update handlers.
@@ -445,7 +448,7 @@ function useRenderPlayer({
   const posterUrl = useBlobUrl(rawPosterUrl)
 
   // Video player error handler
-  const handleVideoError = (error: VideoPlayerError | null) => {
+  const handleVideoError = useCallback((error: VideoPlayerError | null) => {
     if (error) {
       const hlsError: HlsPlayerError = {
         type: mapVideoErrorType(error.type),
@@ -456,26 +459,27 @@ function useRenderPlayer({
     } else {
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
     }
-  }
+  }, [])
 
   // Strategy change handler - shows notification on fallback
-  const handleStrategyChange = (strategy: PlaybackStrategy) => {
-    // Clear any stale error from the previous strategy — the switch succeeded,
-    // so the error overlay (e.g. "directPlayFailed") must not persist.
-    if (state.playerError) {
+  const handleStrategyChange = useCallback(
+    (strategy: PlaybackStrategy) => {
+      // Clear any stale error from the previous strategy — the switch succeeded,
+      // so the error overlay (e.g. "directPlayFailed") must not persist.
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
-    }
 
-    // Show notification when falling back from direct play to HLS
-    if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
-      showNotification({
-        type: 'info',
-        message: t('player.notification.switchedToTranscode'),
-        duration: 3000,
-      })
-    }
-    previousStrategyRef.current = strategy
-  }
+      // Show notification when falling back from direct play to HLS
+      if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
+        showNotification({
+          type: 'info',
+          message: t('player.notification.switchedToTranscode'),
+          duration: 3000,
+        })
+      }
+      previousStrategyRef.current = strategy
+    },
+    [t],
+  )
 
   // Get preferred audio language from app store for initial playback
   const preferredAudioLanguage = useAppStore(
@@ -564,14 +568,14 @@ function useRenderPlayer({
   }
 
   // Handle external timestamp changes
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (timestamp !== undefined && videoRef.current) {
       videoRef.current.currentTime = timestamp
     }
   }, [timestamp, videoRef])
 
   // Sync video element with persisted volume on mount
-  useEffect(() => {
+  useLayoutEffect(() => {
     const video = videoRef.current
     if (video) {
       video.volume = persistedVolume
@@ -829,7 +833,7 @@ function useRenderPlayer({
   }
 
   // Sync video element playback rate when speed index changes
-  useEffect(() => {
+  useLayoutEffect(() => {
     const video = videoRef.current
     if (!video) return
     video.playbackRate = PLAYER_CONFIG.PLAYBACK_SPEEDS[playbackSpeedIndex]
@@ -1160,35 +1164,51 @@ function useRenderPlayer({
 
   // Props for PlayerControls — used in both normal and fullscreen layouts
   const playerControlsProps = {
-    isPlaying,
-    isMuted,
-    volume,
-    skipTimeIndex,
-    vibrantColors,
-    hasColors,
-    iconColor,
-    getButtonStyle,
-    onTogglePlay: togglePlay,
-    onToggleMute: toggleMute,
-    onVolumeChange: handleVolumeChange,
-    onCreateSegment: handleCreateSegment,
-    onSkipTimeChange: handleSkipTimeChange,
-    trackState,
-    onSelectAudioTrack: handleAudioTrackSelect,
-    onSelectSubtitleTrack: handleSubtitleTrackSelect,
-    isTrackSelectorDisabled: !hasAnyTracks || isTrackLoading,
-    strategy,
-    isFullscreen,
-    onToggleFullscreen: toggleFullscreen,
-    onMinimize: () => setShowVideoPlayer(false),
-    buttonOpacity: isFullscreen ? 0.3 : undefined,
-    subtitleOffset,
-    onSubtitleOffsetChange: handleSubtitleOffsetChange,
-    hasActiveSubtitle: activeSubtitleTrack !== null,
-    playbackSpeedIndex,
-    onSpeedChange: handleSpeedChange,
-    portalContainer: containerRef,
-  }
+    playback: {
+      state: isPlaying ? 'playing' : 'paused',
+      onToggle: togglePlay,
+    },
+    volumeControls: {
+      state: isMuted ? 'muted' : 'audible',
+      level: volume,
+      onToggleMute: toggleMute,
+      onChange: handleVolumeChange,
+    },
+    appearance: {
+      colorMode: hasColors ? 'vibrant' : 'default',
+      vibrantColors,
+      iconColor,
+      getButtonStyle,
+      buttonOpacity: isFullscreen ? 0.3 : undefined,
+    },
+    segmentCreation: {
+      onCreate: handleCreateSegment,
+    },
+    skipControls: {
+      timeIndex: skipTimeIndex,
+      onTimeChange: handleSkipTimeChange,
+    },
+    trackControls: {
+      state: trackState,
+      availability: !hasAnyTracks || isTrackLoading ? 'disabled' : 'available',
+      strategy,
+      onSelectAudio: handleAudioTrackSelect,
+      onSelectSubtitle: handleSubtitleTrackSelect,
+    },
+    display: {
+      mode: isFullscreen ? 'fullscreen' : 'inline',
+      onToggleFullscreen: toggleFullscreen,
+      onMinimize: () => setShowVideoPlayer(false),
+      portalContainer: containerRef,
+    },
+    settings: {
+      subtitleOffset,
+      onSubtitleOffsetChange: handleSubtitleOffsetChange,
+      subtitleState: activeSubtitleTrack !== null ? 'active' : 'inactive',
+      playbackSpeedIndex,
+      onSpeedChange: handleSpeedChange,
+    },
+  } satisfies PlayerControlsProps
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

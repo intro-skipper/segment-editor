@@ -38,13 +38,13 @@ const AlbumCard = React.memo(function AlbumCardComponent({
   const year = album.ProductionYear ? ` (${album.ProductionYear})` : ''
   const ariaLabel = `View album: ${albumName}${year}`
 
-  const handleClick = React.useCallback(() => {
+  const handleSelectAlbum = React.useCallback(() => {
     onAlbumSelect(albumId)
   }, [onAlbumSelect, albumId])
 
   return (
     <InteractiveCard
-      onClick={handleClick}
+      onClick={handleSelectAlbum}
       className="group w-full rounded-lg overflow-hidden hover:scale-[1.02] hover:shadow-lg focus-visible:ring-offset-2"
       aria-label={ariaLabel}
     >
@@ -107,10 +107,10 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
           onClick={handleBack}
           className="rounded-full"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="size-5" />
           <span className="sr-only">Go back</span>
         </Button>
-        <h1 className="text-xl font-semibold">{artistName}</h1>
+        <h1 className="text-xl font-semibold text-balance">{artistName}</h1>
       </div>
 
       {/* Albums Grid */}

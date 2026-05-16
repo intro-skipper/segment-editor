@@ -55,10 +55,10 @@ export async function withRetry<T>(
     shouldRetry = isRecoverableError,
   } = options
 
-  let lastError: unknown
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    // Early abort check before each attempt
+  async function attempt(
+    retriesLeft: number,
+    attemptIndex: number,
+  ): Promise<T> {
     if (signal?.aborted) {
       throw new DOMException('Aborted', 'AbortError')
     }
@@ -66,24 +66,24 @@ export async function withRetry<T>(
     try {
       return await fn()
     } catch (error) {
-      lastError = error
-
-      // Don't retry abort errors or if we've exhausted retries
-      if (isAbortError(error) || attempt >= maxRetries || !shouldRetry(error)) {
+      if (isAbortError(error) || retriesLeft <= 0 || !shouldRetry(error)) {
         throw error
       }
 
-      // Wait before retry
       try {
-        await delay(calculateBackoffDelay(attempt, baseDelay, maxDelay), signal)
+        await delay(
+          calculateBackoffDelay(attemptIndex, baseDelay, maxDelay),
+          signal,
+        )
       } catch {
-        // Delay was aborted
         throw new DOMException('Aborted', 'AbortError')
       }
+
+      return attempt(retriesLeft - 1, attemptIndex + 1)
     }
   }
 
-  throw lastError
+  return attempt(maxRetries, 0)
 }
 
 /** Creates an AbortController with automatic timeout */

@@ -7,7 +7,6 @@
 
 import { buildApiUrl, getCredentials, withApi } from '@/services/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
-import { JELLYFIN_CONFIG } from '@/lib/constants'
 
 interface PlaybackSession {
   playSessionId: string
@@ -124,14 +123,4 @@ export function stopPlaybackSessionKeepalive(): void {
  */
 export function getActivePlaySessionId(): string | null {
   return activeSession?.playSessionId ?? null
-}
-
-/**
- * Gets position ticks from a video element for session stop reporting.
- */
-export function getPositionTicks(
-  video: HTMLVideoElement | null | undefined,
-): number | undefined {
-  if (!video || !isFinite(video.currentTime)) return undefined
-  return Math.floor(video.currentTime * JELLYFIN_CONFIG.TICKS_PER_SECOND)
 }

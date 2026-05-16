@@ -10,7 +10,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 export const pwaPlugin = VitePWA({
   registerType: 'prompt',
   workbox: {
-    globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+    globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,woff2}'],
+    maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     navigateFallbackDenylist: [/^\/api\//],
     cleanupOutdatedCaches: true,
   },

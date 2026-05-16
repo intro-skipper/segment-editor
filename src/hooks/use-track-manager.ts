@@ -27,6 +27,10 @@ import {
   switchAudioTrack,
   switchSubtitleTrack,
 } from '@/services/video/track-switching'
+import {
+  preloadJassubRenderer,
+  requiresJassubRenderer,
+} from '@/services/video/subtitle'
 import { showError } from '@/lib/notifications'
 import { languagesMatch } from '@/lib/language-utils'
 import { useAppStore } from '@/stores/app-store'
@@ -158,7 +162,7 @@ export function useTrackManager({
     hasSubtitleSelection: false,
     subtitleIndex: null,
   })
-  const [isLoading, setIsLoading] = useState(false)
+  const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // AbortController for cancelling in-flight subtitle load operations on unmount
@@ -328,7 +332,7 @@ export function useTrackManager({
         return
       }
 
-      setIsLoading(true)
+      setIsTrackOperationPending(true)
       setError(null)
 
       try {
@@ -362,7 +366,7 @@ export function useTrackManager({
         setError(errorMsg)
         showError(errorMsg)
       } finally {
-        setIsLoading(false)
+        setIsTrackOperationPending(false)
       }
     },
     [
@@ -409,10 +413,16 @@ export function useTrackManager({
         return
       }
 
-      setIsLoading(true)
+      setIsTrackOperationPending(true)
       setError(null)
 
       try {
+        const selectedTrack =
+          index === null ? null : subtitleTrackMap.get(index)
+        if (selectedTrack && requiresJassubRenderer(selectedTrack)) {
+          void preloadJassubRenderer().catch(() => {})
+        }
+
         const result: TrackSwitchResult = await switchSubtitleTrack(index, {
           ...createSwitchOptions(video),
         })
@@ -447,7 +457,7 @@ export function useTrackManager({
         setError(errorMsg)
         showError(errorMsg)
       } finally {
-        setIsLoading(false)
+        setIsTrackOperationPending(false)
       }
     },
     [
@@ -468,7 +478,7 @@ export function useTrackManager({
     trackState,
     selectAudioTrack,
     selectSubtitleTrack,
-    isLoading,
+    isLoading: isTrackOperationPending,
     error,
   }
 }

@@ -6,4 +6,4 @@
 // Types
 export type { JassubRendererResult } from './renderer' // Format detection
 export { requiresJassubRenderer } from './utils' // Main renderer
-export { createJassubRenderer } from './renderer'
+export { createJassubRenderer, preloadJassubRenderer } from './renderer'

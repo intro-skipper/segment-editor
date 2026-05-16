@@ -20,28 +20,20 @@ export function useBlobUrl(url: string | null | undefined): string {
   )
 
   useEffect(() => {
-    if (!url) {
-      setBlobUrl('')
-      return
-    }
+    const cached = url ? (blobCache.get(url) ?? '') : ''
+    setBlobUrl(cached)
+    if (!url || cached) return
 
-    // Check cache synchronously first
-    const cached = blobCache.get(url)
-    setBlobUrl(cached ?? '')
-    if (cached) {
-      return
-    }
+    let cancelled = false
 
-    const controller = new AbortController()
-
-    void fetchBlobUrl(url, { signal: controller.signal }).then((result) => {
-      if (!controller.signal.aborted && result) {
+    void fetchBlobUrl(url).then((result) => {
+      if (!cancelled && result) {
         setBlobUrl(result)
       }
     })
 
     return () => {
-      controller.abort()
+      cancelled = true
     }
   }, [url])
 

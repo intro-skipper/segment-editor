@@ -37,83 +37,79 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-interface PlayerControlsProps {
-  isPlaying: boolean
-  isMuted: boolean
-  volume: number
-  skipTimeIndex: number
-  vibrantColors: VibrantColors | null
-  hasColors: boolean
-  iconColor: string | undefined
-  getButtonStyle: (active?: boolean) => React.CSSProperties | undefined
-  onTogglePlay: () => void
-  onToggleMute: () => void
-  onVolumeChange: (volume: number) => void
-  onCreateSegment: (type: MediaSegmentType) => void
-  onSkipTimeChange: (index: number) => void
-  /** Track state for audio/subtitle selection */
-  trackState?: TrackState
-  /** Callback when an audio track is selected */
-  onSelectAudioTrack?: (index: number) => void
-  /** Callback when a subtitle track is selected (null for off) */
-  onSelectSubtitleTrack?: (index: number | null) => void
-  /** Whether the track selector is disabled */
-  isTrackSelectorDisabled?: boolean
-  /** Current playback strategy */
-  strategy?: PlaybackStrategy
-  /** Whether the player is in fullscreen mode */
-  isFullscreen?: boolean
-  /** Callback to toggle fullscreen */
-  onToggleFullscreen?: () => void
-  /** Callback to minimize (hide) the video player */
-  onMinimize?: () => void
-  /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
-  buttonOpacity?: number
-  /** Current subtitle offset in seconds (positive = delay, negative = advance) */
-  subtitleOffset?: number
-  /** Callback when subtitle offset changes */
-  onSubtitleOffsetChange?: (offset: number) => void
-  /** Whether subtitles are currently active */
-  hasActiveSubtitle?: boolean
-  /** Current playback speed index into PLAYBACK_SPEEDS */
-  playbackSpeedIndex?: number
-  /** Callback when playback speed changes */
-  onSpeedChange?: (speedIndex: number) => void
-  /** Container element for dropdown portals (needed for fullscreen) */
-  portalContainer?: React.RefObject<HTMLElement | null>
+export interface PlayerControlsProps {
+  playback: {
+    state: 'playing' | 'paused'
+    onToggle: () => void
+  }
+  volumeControls: {
+    state: 'muted' | 'audible'
+    level: number
+    onToggleMute: () => void
+    onChange: (volume: number) => void
+  }
+  appearance: {
+    colorMode: 'vibrant' | 'default'
+    vibrantColors: VibrantColors | null
+    iconColor: string | undefined
+    getButtonStyle: (active?: boolean) => React.CSSProperties | undefined
+    /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
+    buttonOpacity?: number
+  }
+  segmentCreation: {
+    onCreate: (type: MediaSegmentType) => void
+  }
+  skipControls: {
+    timeIndex: number
+    onTimeChange: (index: number) => void
+  }
+  /** Track controls for audio/subtitle selection */
+  trackControls?: {
+    state: TrackState
+    availability: 'available' | 'disabled'
+    strategy?: PlaybackStrategy
+    onSelectAudio: (index: number) => void
+    onSelectSubtitle: (index: number | null) => void
+  }
+  display: {
+    mode: 'fullscreen' | 'inline'
+    onToggleFullscreen?: () => void
+    onMinimize?: () => void
+    /** Container element for dropdown portals (needed for fullscreen) */
+    portalContainer?: React.RefObject<HTMLElement | null>
+  }
+  settings: {
+    /** Current subtitle offset in seconds (positive = delay, negative = advance) */
+    subtitleOffset: number
+    /** Callback when subtitle offset changes */
+    onSubtitleOffsetChange?: (offset: number) => void
+    subtitleState: 'active' | 'inactive'
+    /** Current playback speed index into PLAYBACK_SPEEDS */
+    playbackSpeedIndex?: number
+    /** Callback when playback speed changes */
+    onSpeedChange?: (speedIndex: number) => void
+  }
 }
 
 export function PlayerControls({
-  isPlaying,
-  isMuted,
-  volume,
-  skipTimeIndex,
-  vibrantColors,
-  hasColors,
-  iconColor,
-  getButtonStyle,
-  onTogglePlay,
-  onToggleMute,
-  onVolumeChange,
-  onCreateSegment,
-  onSkipTimeChange,
-  trackState,
-  onSelectAudioTrack,
-  onSelectSubtitleTrack,
-  isTrackSelectorDisabled,
-  strategy,
-  isFullscreen,
-  onToggleFullscreen,
-  onMinimize,
-  buttonOpacity,
-  subtitleOffset = 0,
-  onSubtitleOffsetChange,
-  hasActiveSubtitle = false,
-  playbackSpeedIndex,
-  onSpeedChange,
-  portalContainer,
+  playback,
+  volumeControls,
+  appearance,
+  segmentCreation,
+  skipControls,
+  trackControls,
+  display,
+  settings,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
+  const isPlaying = playback.state === 'playing'
+  const isMuted = volumeControls.state === 'muted'
+  const hasColors = appearance.colorMode === 'vibrant'
+  const isFullscreen = display.mode === 'fullscreen'
+  const hasActiveSubtitle = settings.subtitleState === 'active'
+  const { vibrantColors, iconColor, getButtonStyle, buttonOpacity } = appearance
+  const { level: volume } = volumeControls
+  const { portalContainer } = display
 
   // Wrap getButtonStyle to apply background opacity if provided
   // Active buttons (like pause) get higher opacity for better visibility
@@ -145,7 +141,7 @@ export function PlayerControls({
   }
 
   const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onVolumeChange(parseFloat(e.target.value))
+    volumeControls.onChange(parseFloat(e.target.value))
   }
 
   return (
@@ -158,7 +154,7 @@ export function PlayerControls({
         {/* Play/Pause */}
         <Button
           variant="outline"
-          onClick={onTogglePlay}
+          onClick={playback.onToggle}
           aria-label={
             isPlaying
               ? t('accessibility.player.paused', 'Pause video')
@@ -244,7 +240,7 @@ export function PlayerControls({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onToggleMute}
+                onClick={volumeControls.onToggleMute}
                 className="text-xs"
               >
                 {isMuted ? t('player.unmute') : t('player.mute')}
@@ -254,13 +250,13 @@ export function PlayerControls({
         </DropdownMenu>
 
         {/* Track selector for audio and subtitles */}
-        {trackState && onSelectAudioTrack && onSelectSubtitleTrack && (
+        {trackControls && (
           <TrackSelector
-            trackState={trackState}
-            onSelectAudio={onSelectAudioTrack}
-            onSelectSubtitle={onSelectSubtitleTrack}
-            strategy={strategy}
-            disabled={isTrackSelectorDisabled}
+            trackState={trackControls.state}
+            onSelectAudio={trackControls.onSelectAudio}
+            onSelectSubtitle={trackControls.onSelectSubtitle}
+            strategy={trackControls.strategy}
+            disabled={trackControls.availability === 'disabled'}
             getButtonStyle={applyButtonStyle}
             iconColor={iconColor}
             hasColors={hasColors}
@@ -291,7 +287,7 @@ export function PlayerControls({
             {SEGMENT_TYPES.map((type) => (
               <DropdownMenuItem
                 key={type}
-                onClick={() => onCreateSegment(type)}
+                onClick={() => segmentCreation.onCreate(type)}
               >
                 {t(`segmentType.${type}`)}
               </DropdownMenuItem>
@@ -303,10 +299,10 @@ export function PlayerControls({
       <div className="flex-1" />
 
       {/* Minimize button */}
-      {onMinimize && !isFullscreen && (
+      {display.onMinimize && !isFullscreen && (
         <Button
           variant="outline"
-          onClick={onMinimize}
+          onClick={display.onMinimize}
           aria-label={t('player.minimize', 'Minimize player')}
           style={applyButtonStyle()}
           className={getButtonClass(false, hasColors)}
@@ -321,10 +317,10 @@ export function PlayerControls({
       )}
 
       {/* Fullscreen button */}
-      {onToggleFullscreen && (
+      {display.onToggleFullscreen && (
         <Button
           variant="outline"
-          onClick={onToggleFullscreen}
+          onClick={display.onToggleFullscreen}
           aria-label={
             isFullscreen
               ? t('player.exitFullscreen', 'Exit fullscreen')
@@ -353,16 +349,16 @@ export function PlayerControls({
 
       {/* Settings menu */}
       <PlayerSettingsMenu
-        skipTimeIndex={skipTimeIndex}
+        skipTimeIndex={skipControls.timeIndex}
         hasColors={hasColors}
         iconColor={iconColor}
         applyButtonStyle={applyButtonStyle}
-        onSkipTimeChange={onSkipTimeChange}
-        subtitleOffset={subtitleOffset}
-        onSubtitleOffsetChange={onSubtitleOffsetChange}
+        onSkipTimeChange={skipControls.onTimeChange}
+        subtitleOffset={settings.subtitleOffset}
+        onSubtitleOffsetChange={settings.onSubtitleOffsetChange}
         hasActiveSubtitle={hasActiveSubtitle}
-        playbackSpeedIndex={playbackSpeedIndex}
-        onSpeedChange={onSpeedChange}
+        playbackSpeedIndex={settings.playbackSpeedIndex}
+        onSpeedChange={settings.onSpeedChange}
         portalContainer={portalContainer}
       />
     </div>

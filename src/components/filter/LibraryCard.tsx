@@ -50,7 +50,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
   // Convert to blob URL for COEP compliance
   const imageUrl = useBlobUrl(rawImageUrl)
 
-  const handleClick = useCallback(() => {
+  const selectLibrary = useCallback(() => {
     onSelect(collection.ItemId ?? null)
   }, [collection.ItemId, onSelect])
 
@@ -69,7 +69,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
     <button
       type="button"
       data-interactive-transition="true"
-      onClick={handleClick}
+      onClick={selectLibrary}
       aria-label={accessibleLabel}
       className={cn(
         'group cursor-pointer rounded-2xl overflow-hidden w-full text-left',

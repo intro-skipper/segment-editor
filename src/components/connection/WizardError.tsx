@@ -67,7 +67,7 @@ export function WizardError({
               <div className="animate-spin" aria-hidden>
                 <Loader2 className="size-4" />
               </div>
-              Retrying...
+              Retrying…
             </>
           ) : (
             <>

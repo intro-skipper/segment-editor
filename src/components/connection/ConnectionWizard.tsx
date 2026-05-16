@@ -53,7 +53,7 @@ function WizardStepContent({
         <EntryStep
           form={controller.form}
           error={controller.requestError}
-          isLoading={controller.isLoading}
+          isLoading={controller.isRequestPending}
           onClearError={controller.clearRequestError}
           onDiscover={controller.handleDiscoverSubmit}
           onRetry={controller.handleRetryDiscovery}
@@ -66,7 +66,7 @@ function WizardStepContent({
         <SelectStep
           servers={controller.servers}
           selectedServer={controller.selectedServer}
-          isLoading={controller.isLoading}
+          isLoading={controller.isRequestPending}
           error={null}
           onSelect={controller.handleServerSelect}
           onBack={controller.handleBack}
@@ -81,7 +81,7 @@ function WizardStepContent({
           form={controller.form}
           onSubmit={controller.handleAuthSubmit}
           onBack={controller.handleBack}
-          isLoading={controller.isLoading}
+          isLoading={controller.isRequestPending}
           error={controller.requestError}
           onClearError={controller.clearRequestError}
           onRetry={controller.handleRetryAuth}
@@ -114,7 +114,7 @@ function ConnectionWizardBase({
   // so Base UI focuses it reliably when the wizard opens, without a setTimeout.
   const serverAddressInputRef = useRef<HTMLInputElement>(null)
 
-  const controller = useConnectionWizardController({ open })
+  const controller = useConnectionWizardController()
 
   // Handle dialog close
   const handleOpenChange = (newOpen: boolean) => {

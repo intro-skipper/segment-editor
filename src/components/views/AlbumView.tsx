@@ -43,13 +43,13 @@ const TrackRow = React.memo(function TrackRowComponent({
     ? formatReadableTime(ticksToSeconds(track.RunTimeTicks))
     : '--:--'
 
-  const handleClick = React.useCallback(() => {
+  const handleSelectTrack = React.useCallback(() => {
     onTrackSelect(trackId)
   }, [onTrackSelect, trackId])
 
   return (
     <InteractiveCard
-      onClick={handleClick}
+      onClick={handleSelectTrack}
       className={cn(
         'flex items-center gap-4 p-3 rounded-lg',
         'hover:bg-accent/50 group',
@@ -59,7 +59,7 @@ const TrackRow = React.memo(function TrackRowComponent({
       {/* Track Number / Play Icon */}
       <div className="w-8 text-center text-muted-foreground" aria-hidden="true">
         <span className="group-hover:hidden">{trackNumber}</span>
-        <Play className="h-4 w-4 hidden group-hover:inline" />
+        <Play className="size-4 hidden group-hover:inline" />
       </div>
 
       {/* Track Name */}
@@ -116,7 +116,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           onClick={handleBack}
           className="rounded-full"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="size-5" />
           <span className="sr-only">Go back</span>
         </Button>
       </div>
@@ -136,7 +136,9 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           <p className="text-sm text-muted-foreground uppercase tracking-wide">
             Album
           </p>
-          <h1 className="text-xl sm:text-2xl font-bold mt-1">{albumName}</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold mt-1 text-balance">
+            {albumName}
+          </h1>
           <p className="text-muted-foreground mt-2">{artistName}</p>
           {album.ProductionYear && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -149,7 +151,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
       {/* Tracks List */}
       {tracks.length === 0 ? (
         <EmptyState
-          icon={<Music className="h-8 w-8" aria-hidden="true" />}
+          icon={<Music className="size-8" aria-hidden="true" />}
           message="No tracks found for this album"
           className="py-8"
         />

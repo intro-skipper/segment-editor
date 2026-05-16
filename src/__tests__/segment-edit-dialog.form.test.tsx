@@ -70,7 +70,7 @@ function getInput(label: string): HTMLInputElement {
 
 function SegmentEditDialogHarness() {
   const [open, setOpen] = React.useState(true)
-  const [segment, setSegment] = React.useState(
+  const [segment, setSegment] = React.useState(() =>
     createSegment({ EndTicks: 25, StartTicks: 10 }),
   )
   const onSave = vi.fn()

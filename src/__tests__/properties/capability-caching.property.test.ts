@@ -33,9 +33,11 @@ describe('Feature: direct-play-fallback, Property 6: Capability Caching Idempote
         async (codec) => {
           clearCache()
 
-          const result1 = await isCodecSupported(codec, 'video')
-          const result2 = await isCodecSupported(codec, 'video')
-          const result3 = await isCodecSupported(codec, 'video')
+          const [result1, result2, result3] = await Promise.all([
+            isCodecSupported(codec, 'video'),
+            isCodecSupported(codec, 'video'),
+            isCodecSupported(codec, 'video'),
+          ])
 
           return result1 === result2 && result2 === result3
         },
@@ -56,9 +58,11 @@ describe('Feature: direct-play-fallback, Property 6: Capability Caching Idempote
         async (codec) => {
           clearCache()
 
-          const result1 = await isCodecSupported(codec, 'audio')
-          const result2 = await isCodecSupported(codec, 'audio')
-          const result3 = await isCodecSupported(codec, 'audio')
+          const [result1, result2, result3] = await Promise.all([
+            isCodecSupported(codec, 'audio'),
+            isCodecSupported(codec, 'audio'),
+            isCodecSupported(codec, 'audio'),
+          ])
 
           return result1 === result2 && result2 === result3
         },

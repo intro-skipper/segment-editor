@@ -146,7 +146,6 @@ export function ItemImage({
   // Reset state when image source changes using key pattern
   const imageKey = imageUrl || rawImageUrl || item.Id
   const isLoaded = imageUrl !== null && loadedSource === imageUrl
-  const hasError = imageUrl !== null && failedSource === imageUrl
 
   const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const src = event.currentTarget.currentSrc || imageUrl
@@ -170,12 +169,17 @@ export function ItemImage({
 
   const displayAlt = alt || item.Name || 'Media item'
 
+  const hasFinalImageError = imageUrl !== null && failedSource === imageUrl
+  const shouldShowFallback =
+    (!imageUrl && !blurhashDataUrl) || hasFinalImageError
+
   // No image available and no placeholder to show
-  if ((!imageUrl && !blurhashDataUrl) || hasError) {
+  if (shouldShowFallback) {
     if (!showFallback) return null
 
     return (
       <div
+        key={failedSource ?? 'no-image'}
         className={cn(
           'bg-muted flex items-center justify-center rounded-lg overflow-hidden',
           aspectRatio,
@@ -203,6 +207,8 @@ export function ItemImage({
         <img
           src={blurhashDataUrl}
           alt=""
+          width={1}
+          height={1}
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -220,6 +226,8 @@ export function ItemImage({
           }}
           src={imageUrl}
           alt={displayAlt}
+          width={1}
+          height={1}
           loading="lazy"
           decoding="async"
           onLoad={handleLoad}

@@ -77,8 +77,10 @@ export function EntryStep({
               <Input
                 ref={inputRef}
                 id="server-address"
+                name="server-address"
                 type="text"
                 inputMode="url"
+                autoComplete="url"
                 placeholder="jellyfin.example.com…"
                 value={address}
                 onChange={(e) => {

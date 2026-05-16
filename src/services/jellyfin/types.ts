@@ -52,12 +52,12 @@ export interface TypedApis {
 // Authentication Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface ApiKeyCredentials {
+interface ApiKeyCredentials {
   method: 'apiKey'
   apiKey: string
 }
 
-export interface UserPassCredentials {
+interface UserPassCredentials {
   method: 'userPass'
   username: string
   password: string

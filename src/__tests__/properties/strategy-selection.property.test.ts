@@ -200,6 +200,39 @@ describe('Feature: direct-play-fallback, Property 3: Strategy Selection Correctn
     )
   })
 
+  it('can force HLS for compatible items during fallback', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        uuidArb,
+        fc.constantFrom(...DIRECT_PLAY_CONTAINERS),
+        fc.constantFrom(...DIRECT_PLAY_VIDEO_CODECS),
+        fc.constantFrom(...DIRECT_PLAY_AUDIO_CODECS),
+        async (itemId, container, videoCodec, audioCodec) => {
+          clearCache()
+          const item = createItemWithMediaSource(
+            itemId,
+            container,
+            videoCodec,
+            audioCodec,
+          )
+
+          const config = await getPlaybackConfig(
+            item,
+            undefined,
+            undefined,
+            true,
+          )
+
+          expect(config.strategy).toBe('hls')
+          expect(config.url).toContain('master.m3u8')
+          expect(config.url).not.toContain('/stream?')
+          return true
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
   /**
    * Property: Direct play URL contains /stream endpoint
    * For compatible items, the URL should use the direct stream endpoint

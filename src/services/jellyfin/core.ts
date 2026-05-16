@@ -126,7 +126,7 @@ export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
  *
  * Exported for reuse and testing.
  */
-export const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
+const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
 
 /** Returns true when running inside a Jellyfin desktop client (Desktop or Media Player). */
 export function isJellyfinDesktopClient(): boolean {
@@ -135,7 +135,7 @@ export function isJellyfinDesktopClient(): boolean {
 }
 
 /** Returns the server address from the plugin API client, or empty string if unavailable. */
-export function getPluginServerAddress(): string {
+function getPluginServerAddress(): string {
   const client = getPluginApiClient()
   if (!client) return ''
   return readServerAddress(client)

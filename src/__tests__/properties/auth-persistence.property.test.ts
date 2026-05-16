@@ -39,8 +39,7 @@ const userIdArb = fc.uuid()
 // Generate valid usernames (non-empty, trimmed)
 const usernameArb = fc
   .string({ minLength: 1, maxLength: 50 })
-  .filter((s) => s.trim().length > 0)
-  .map((s) => s.trim())
+  .map((s) => s.trim() || 'user')
 
 // Generate server versions (semver-like)
 const serverVersionArb = fc

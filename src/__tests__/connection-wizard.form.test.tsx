@@ -121,7 +121,7 @@ describe('ConnectionWizard TanStack Form migration', () => {
 
     await screen.findByRole('heading', { name: 'Select Server' })
 
-    const betaButton = screen.getByRole('button', {
+    const betaButton = screen.getByRole('option', {
       name: /https:\/\/beta\.local/i,
     })
     fireEvent.click(betaButton)
@@ -135,7 +135,7 @@ describe('ConnectionWizard TanStack Form migration', () => {
     await screen.findByRole('heading', { name: 'Select Server' })
     expect(
       screen
-        .getByRole('button', { name: /https:\/\/beta\.local/i })
+        .getByRole('option', { name: /https:\/\/beta\.local/i })
         .getAttribute('aria-selected'),
     ).toBe('true')
 
