@@ -19,8 +19,8 @@ export function SegmentSkipModeSection() {
         label: t('settings.segmentSkipMode.button'),
       },
       {
-        value: 'auto',
-        label: t('settings.segmentSkipMode.auto'),
+        value: 'skip',
+        label: t('settings.segmentSkipMode.skip'),
       },
       {
         value: 'disabled',
