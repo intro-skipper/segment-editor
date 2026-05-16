@@ -142,7 +142,7 @@ const buildColors = (
   if (!base) return null
 
   const background = adjustLightness(base, isDark ? -0.12 : 0.08)
-  const text = getContrastText(background, isDark ? 0.5 : 0.5)
+  const text = getContrastText(background)
 
   // Primary/accent fallback chains
   const primary = isDark
@@ -230,7 +230,7 @@ async function getPalette(url: string): Promise<Palette | null> {
   const vibrantWorkerModule = await loadVibrantWorkerModule()
 
   const cached = paletteCache.get(url)
-  if (cached) return Promise.resolve(cached)
+  if (cached) return cached
 
   let promise = pending.get(url)
   if (!promise) {
@@ -290,16 +290,9 @@ export function useVibrantColor(
   )
 
   useEffect(() => {
-    if (!imageUrl || !enabled) {
-      setColors(null)
-      return
-    }
-
-    const cached = cache.get(imageUrl)
-    if (cached) {
-      setColors(cached)
-      return
-    }
+    const cached = imageUrl && enabled ? (cache.get(imageUrl) ?? null) : null
+    setColors(cached)
+    if (!imageUrl || !enabled || cached) return
 
     let cancelled = false
     void getColors(imageUrl, resolvedTheme).then((result) => {

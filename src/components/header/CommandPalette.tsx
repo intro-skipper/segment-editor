@@ -62,7 +62,7 @@ const SearchResultItem = memo(function SearchResultItemComponent({
   onIntent: (item: BaseItemDto) => void
 }) {
   const Icon = (item.Type && ITEM_ICONS[item.Type]) ?? Film
-  const handleClick = useCallback(() => {
+  const selectResult = useCallback(() => {
     onSelect(item)
   }, [onSelect, item])
 
@@ -72,7 +72,7 @@ const SearchResultItem = memo(function SearchResultItemComponent({
       data-result-index={itemIndex}
       data-interactive-transition="true"
       type="button"
-      onClick={handleClick}
+      onClick={selectResult}
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
         'transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -153,7 +153,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
   )
 
   const deferredSearch = useDeferredValue(search)
-  const trimmedSearch = useMemo(() => deferredSearch.trim(), [deferredSearch])
+  const trimmedSearch = deferredSearch.trim()
   const canSearch = debouncedSearch.length >= MIN_SEARCH_LENGTH
   const excludedItemTypes = useMemo<Array<BaseItemKind> | undefined>(
     () =>
@@ -190,9 +190,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
 
     return items.filter(
       (item) =>
-        item.Type === null ||
-        item.Type === undefined ||
-        !excludedItemTypes.includes(item.Type),
+        item.Type === undefined || !excludedItemTypes.includes(item.Type),
     )
   }, [itemsData, excludedItemTypes])
 
@@ -245,11 +243,8 @@ export const CommandPalette = memo(function CommandPaletteComponent({
     [resultItems, visibleStartIndex, visibleEndIndex],
   )
 
-  const getResultItemKey = useCallback(
-    (item: BaseItemDto, index: number) =>
-      item.Id ?? `${item.Type ?? 'item'}-${index}`,
-    [],
-  )
+  const getResultItemKey = (item: BaseItemDto, index: number) =>
+    item.Id ?? `${item.Type ?? 'item'}-${index}`
 
   const setSelectedIndexWithScroll = useCallback(
     (nextIndex: number) => {
@@ -382,14 +377,15 @@ export const CommandPalette = memo(function CommandPaletteComponent({
             autoComplete="off"
             spellCheck={false}
             className={cn(
-              'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none placeholder:text-muted-foreground',
+              'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md placeholder:text-muted-foreground',
               search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
             )}
-            role="combobox"
             aria-expanded={resultItems.length > 0}
             aria-haspopup="listbox"
             aria-label={t('search.placeholder', 'Search media…')}
-            aria-controls="search-results"
+            aria-controls={
+              resultItems.length > 0 ? 'search-results' : undefined
+            }
             aria-activedescendant={activeDescendantId}
             aria-autocomplete="list"
           />
@@ -484,7 +480,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
             </div>
           ) : (
             <div
-              id="search-results"
+              id="search-empty-status"
               className="flex flex-col items-center justify-center py-12 text-muted-foreground"
               role="status"
               aria-live="polite"

@@ -43,7 +43,7 @@ export function getBestTrickplayInfo(
 
     const widths = Object.keys(widthMap)
       .map(Number)
-      .filter((w) => !Number.isNaN(w))
+      .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b)
 
     if (widths.length === 0) {
@@ -51,8 +51,13 @@ export function getBestTrickplayInfo(
     }
 
     // Prefer width around 320px for good quality/size balance
-    const preferredWidth =
-      widths.find((w) => w >= 320) ?? widths[widths.length - 1]
+    let preferredWidth = widths[widths.length - 1]
+    for (const width of widths) {
+      if (width >= 320) {
+        preferredWidth = width
+        break
+      }
+    }
     const info = widthMap[String(preferredWidth)]
 
     return { mediaSourceId, info }

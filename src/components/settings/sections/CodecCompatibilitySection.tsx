@@ -198,30 +198,8 @@ export function CodecCompatibilitySection() {
 
   useEffect(() => {
     if (!state.isExpanded || state.hasLoaded) return
-
-    let cancelled = false
-
-    const run = async () => {
-      dispatch({ type: 'PROBE_STARTED' })
-
-      try {
-        const { videoResults, audioResults } = await getCodecSupportResults()
-        if (!cancelled) {
-          dispatch({ type: 'PROBE_SUCCEEDED', videoResults, audioResults })
-        }
-      } catch {
-        if (!cancelled) {
-          dispatch({ type: 'PROBE_FAILED' })
-        }
-      }
-    }
-
-    void run()
-
-    return () => {
-      cancelled = true
-    }
-  }, [state.isExpanded, state.hasLoaded])
+    void runCodecProbe(false)
+  }, [state.isExpanded, state.hasLoaded, runCodecProbe])
 
   return (
     <SettingsSection icon={Monitor} title="Direct Play Compatibility">
@@ -280,7 +258,7 @@ export function CodecCompatibilitySection() {
                     <div className="animate-spin" aria-hidden>
                       <Loader2 className="size-4 mr-2" />
                     </div>
-                    Checking...
+                    Checking…
                   </>
                 ) : (
                   'Refresh Compatibility'

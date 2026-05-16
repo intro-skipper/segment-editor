@@ -72,7 +72,7 @@ type TrackSwitchErrorType =
 /**
  * Error information for track switching failures.
  */
-export interface TrackSwitchError {
+interface TrackSwitchError {
   type: TrackSwitchErrorType
   message: string
   trackIndex: number
@@ -105,7 +105,7 @@ interface TrackSwitchOptions {
 /**
  * JASSUB action type for ASS/SSA subtitle handling.
  */
-export type JassubAction = 'initialize' | 'dispose'
+type JassubAction = 'initialize' | 'dispose'
 
 /**
  * Result of a track switching operation.
@@ -566,21 +566,13 @@ async function switchDirectPlaySubtitleTrack(
   let relativeIndex: number
   if (subtitleTracks && subtitleTracks.length > 0) {
     relativeIndex = mapToRelativeIndex(trackIndex, subtitleTracks)
-    if (relativeIndex === -1) {
-      // Track not found in our list - may need to fetch external subtitle
-      // Fall through to external subtitle handling
-    }
   } else {
     // Fallback: assume trackIndex is already a relative index (legacy behavior)
     relativeIndex = trackIndex
   }
 
   // Check if track exists in TextTracks using relativeIndex
-  if (
-    relativeIndex !== -1 &&
-    relativeIndex >= 0 &&
-    relativeIndex < textTracks.length
-  ) {
+  if (relativeIndex >= 0 && relativeIndex < textTracks.length) {
     // Hide all tracks first
     Array.from(textTracks).forEach((track) => {
       track.mode = 'hidden'
@@ -670,10 +662,7 @@ async function switchDirectPlaySubtitleTrack(
     })
 
     // Find and show the newly added track
-    const newTrackIndex = textTracks.length - 1
-    if (newTrackIndex >= 0) {
-      textTracks[newTrackIndex].mode = 'showing'
-    }
+    textTracks[textTracks.length - 1].mode = 'showing'
 
     return { success: true }
   } catch (err) {

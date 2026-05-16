@@ -33,7 +33,7 @@ const HOVER_POSITION_EPSILON_PX = 1
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
-      className="rounded overflow-hidden shadow-lg mb-1 bg-black"
+      className="rounded overflow-hidden shadow-lg mb-1 bg-neutral-950"
       style={{
         width: position.thumbnailWidth,
         height: position.thumbnailHeight,
@@ -142,10 +142,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     const rect = scrubber.getBoundingClientRect()
     scrubberRectRef.current = rect
     return rect
-  }, [])
-
-  const invalidateScrubberRect = React.useCallback(() => {
-    scrubberRectRef.current = null
   }, [])
 
   const getPositionFromClientX = React.useCallback(
@@ -276,19 +272,21 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     const scrubber = scrubberRef.current
     if (!scrubber) return
 
+    const handler = () => {
+      scrubberRectRef.current = null
+    }
+
     const resizeObserver =
-      typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(invalidateScrubberRect)
-        : null
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(handler) : null
 
     resizeObserver?.observe(scrubber)
-    window.addEventListener('scroll', invalidateScrubberRect, { passive: true })
+    window.addEventListener('scroll', handler, { passive: true })
 
     return () => {
       resizeObserver?.disconnect()
-      window.removeEventListener('scroll', invalidateScrubberRect)
+      window.removeEventListener('scroll', handler)
     }
-  }, [invalidateScrubberRect])
+  }, [])
 
   React.useEffect(() => {
     return () => {
@@ -366,17 +364,19 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   const chapterMarkers = React.useMemo(() => {
     if (!chapters || chapters.length === 0 || duration <= 0) return []
 
-    return chapters
-      .map((chapter) => {
-        const positionSeconds = ticksToSeconds(chapter.StartPositionTicks)
-        const percentage = (positionSeconds / duration) * 100
-        return {
+    const markers: Array<{ name: string; position: number; time: number }> = []
+    for (const chapter of chapters) {
+      const positionSeconds = ticksToSeconds(chapter.StartPositionTicks)
+      const percentage = (positionSeconds / duration) * 100
+      if (percentage >= 0 && percentage <= 100) {
+        markers.push({
           name: chapter.Name || '',
           position: percentage,
           time: positionSeconds,
-        }
-      })
-      .filter((marker) => marker.position >= 0 && marker.position <= 100)
+        })
+      }
+    }
+    return markers
   }, [chapters, duration])
 
   // Memoize segment regions with position and width percentages
@@ -385,33 +385,36 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   const segmentRegions = React.useMemo(() => {
     if (!segments || segments.length === 0 || duration <= 0) return []
 
-    return segments
-      .filter((segment) => {
-        const startSeconds = segment.StartTicks ?? 0
-        const startPercent = (startSeconds / duration) * 100
-        return startPercent < 100 // Filter out segments starting beyond 100%
+    const regions: Array<{
+      id: MediaSegmentDto['Id']
+      type: MediaSegmentDto['Type']
+      start: number
+      width: number
+      color: string
+    }> = []
+    for (const segment of segments) {
+      const startSeconds = segment.StartTicks ?? 0
+      const startPercent = (startSeconds / duration) * 100
+      if (startPercent >= 100) continue // Skip segments starting beyond 100%
+      // StartTicks/EndTicks are already in seconds for editing segments
+      const endSeconds = segment.EndTicks ?? 0
+      const endPercent = (endSeconds / duration) * 100
+      const clampedStart = Math.max(0, startPercent)
+      const clampedEnd = Math.min(100, endPercent)
+      const width = Math.max(0, clampedEnd - clampedStart)
+      if (width <= 0.1) continue // Only show segments wider than 0.1%
+      const colorConfig = segment.Type
+        ? SEGMENT_COLORS[segment.Type]
+        : DEFAULT_SEGMENT_COLOR
+      regions.push({
+        id: segment.Id,
+        type: segment.Type,
+        start: clampedStart,
+        width,
+        color: colorConfig.css,
       })
-      .map((segment) => {
-        // StartTicks/EndTicks are already in seconds for editing segments
-        const startSeconds = segment.StartTicks ?? 0
-        const endSeconds = segment.EndTicks ?? 0
-        const startPercent = (startSeconds / duration) * 100
-        const endPercent = (endSeconds / duration) * 100
-        const clampedStart = Math.max(0, startPercent)
-        const clampedEnd = Math.min(100, endPercent)
-        const width = Math.max(0, clampedEnd - clampedStart)
-        const colorConfig = segment.Type
-          ? SEGMENT_COLORS[segment.Type]
-          : DEFAULT_SEGMENT_COLOR
-        return {
-          id: segment.Id,
-          type: segment.Type,
-          start: clampedStart,
-          width,
-          color: colorConfig.css,
-        }
-      })
-      .filter((region) => region.width > 0.1) // Only show segments wider than 0.1%
+    }
+    return regions
   }, [segments, duration])
 
   return (

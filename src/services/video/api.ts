@@ -201,10 +201,8 @@ function setImageUrlCache(cacheKey: string, value: string | null): void {
   if (imageUrlCache.has(cacheKey)) {
     imageUrlCache.delete(cacheKey)
   } else if (imageUrlCache.size >= IMAGE_URL_CACHE_MAX_SIZE) {
-    const firstKey = imageUrlCache.keys().next().value
-    if (firstKey) {
-      imageUrlCache.delete(firstKey)
-    }
+    const firstKey = imageUrlCache.keys().next().value!
+    imageUrlCache.delete(firstKey)
   }
 
   imageUrlCache.set(cacheKey, value)
@@ -289,14 +287,8 @@ export function getBestImageUrl(
 
 export function getImageBlurhash(item: BaseItemDto): string | undefined {
   const hashes = item.ImageBlurHashes?.Primary
-  if (!hashes) {
-    return undefined
-  }
-
-  const values: Array<string | null> = Object.values(hashes)
-  const [firstHash] = values
-
-  return firstHash ?? undefined
+  if (!hashes) return undefined
+  return Object.values(hashes)[0]
 }
 
 // ============================================================================
@@ -311,7 +303,7 @@ export function extractMediaSourceInfo(
   item: BaseItemDto,
 ): MediaSourceInfo | null {
   const mediaSources = item.MediaSources
-  if (!mediaSources || mediaSources.length === 0) {
+  if (!mediaSources?.length) {
     return null
   }
 
@@ -350,21 +342,25 @@ export function extractMediaSourceInfo(
  * @param item - The Jellyfin item to get playback config for
  * @param startTimeTicks - Optional start time in ticks
  * @param audioStreamIndex - Optional audio stream index for track selection
+ * @param forceHls - Forces HLS even when direct play is compatible
  * @returns PlaybackConfig with strategy and appropriate URL
  */
 export async function getPlaybackConfig(
   item: BaseItemDto,
   startTimeTicks?: number,
   audioStreamIndex?: number,
+  forceHls = false,
 ): Promise<PlaybackConfig> {
+  const startTime = startTimeTicks
+    ? startTimeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
+    : undefined
+
   if (!item.Id) {
     // No item ID, fall back to HLS (though this shouldn't happen)
     return {
       strategy: 'hls',
       url: '',
-      startTime: startTimeTicks
-        ? startTimeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
-        : undefined,
+      startTime,
     }
   }
 
@@ -383,7 +379,7 @@ export async function getPlaybackConfig(
     audioStreamIndex !== undefined &&
     isNonFirstAudioTrack(item, audioStreamIndex)
 
-  if (compatibility.canDirectPlay && !needsNonDefaultAudio) {
+  if (compatibility.canDirectPlay && !needsNonDefaultAudio && !forceHls) {
     // Use direct play (only when using first/default audio track)
     const url = getDirectPlayUrl({
       itemId: item.Id,
@@ -394,9 +390,7 @@ export async function getPlaybackConfig(
     return {
       strategy: 'direct',
       url,
-      startTime: startTimeTicks
-        ? startTimeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
-        : undefined,
+      startTime,
     }
   }
 
@@ -412,9 +406,7 @@ export async function getPlaybackConfig(
   return {
     strategy: 'hls',
     url,
-    startTime: startTimeTicks
-      ? startTimeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
-      : undefined,
+    startTime,
   }
 }
 
@@ -427,7 +419,7 @@ function isNonFirstAudioTrack(
   audioStreamIndex: number,
 ): boolean {
   const mediaSources = item.MediaSources
-  if (!mediaSources || mediaSources.length === 0) {
+  if (!mediaSources?.length) {
     return false
   }
 

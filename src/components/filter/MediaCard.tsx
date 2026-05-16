@@ -134,7 +134,7 @@ export const MediaCard = memo(function MediaCardComponent({
     preloadMediaRoute(router.preloadRoute, item)
   }, [item, router])
 
-  const handleFocus = useCallback(
+  const handleFocusPrefetch = useCallback(
     (event: React.FocusEvent<HTMLElement>) => {
       prefetchRoute()
       onFocus?.(event)
@@ -142,22 +142,9 @@ export const MediaCard = memo(function MediaCardComponent({
     [onFocus, prefetchRoute],
   )
 
-  const handleClick = useCallback(() => {
+  const handleNavigateToItem = useCallback(() => {
     navigateToMediaItem(navigate, item)
   }, [item, navigate])
-
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-      handleClick()
-    },
-    [handleClick],
-  )
 
   // Compute accessible label using translation
   const accessibleLabel = useMemo(() => {
@@ -211,9 +198,8 @@ export const MediaCard = memo(function MediaCardComponent({
         tabIndex={tabIndex}
         data-grid-index={dataGridIndex}
         aria-label={accessibleLabel}
-        onClick={handleClick}
-        onFocus={handleFocus}
-        onKeyDown={handleKeyDown}
+        onClick={handleNavigateToItem}
+        onFocus={handleFocusPrefetch}
         onPointerEnter={prefetchRoute}
         onTouchStart={prefetchRoute}
         className={cn(

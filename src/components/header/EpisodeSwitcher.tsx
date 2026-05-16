@@ -76,7 +76,7 @@ const EpisodeItem = memo(function EpisodeItemComponent({
     : null
   const episodeName = episode.Name || `Episode ${episodeNum}`
 
-  const handleClick = useCallback(() => {
+  const selectEpisode = useCallback(() => {
     if (episode.Id) onSelect(episode.Id)
   }, [episode.Id, onSelect])
 
@@ -98,7 +98,7 @@ const EpisodeItem = memo(function EpisodeItemComponent({
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={selectEpisode}
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
         'transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -172,7 +172,7 @@ const SeasonButton = memo(function SeasonButtonComponent({
   onSeasonSelect,
   vibrantColors,
 }: SeasonButtonProps) {
-  const handleClick = useCallback(() => {
+  const selectSeason = useCallback(() => {
     if (season.Id) onSeasonSelect(season.Id)
   }, [season.Id, onSeasonSelect])
 
@@ -187,7 +187,7 @@ const SeasonButton = memo(function SeasonButtonComponent({
     <button
       key={season.Id}
       type="button"
-      onClick={handleClick}
+      onClick={selectSeason}
       className={cn(
         'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-[background-color,color,box-shadow] duration-150 ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -441,12 +441,7 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
     [router],
   )
 
-  const setEpisodeListContainerRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setEpisodeListElement(node)
-    },
-    [],
-  )
+  const setEpisodeListContainerRef = setEpisodeListElement
 
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
 
@@ -465,12 +460,12 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
         )}
         aria-label={t('player.selectEpisode', 'Select episode')}
       >
-        <h1
-          className="text-2xl sm:text-3xl font-bold tracking-tight truncate"
+        <span
+          className="text-2xl sm:text-3xl font-semibold tracking-tight truncate"
           style={vibrantColors ? { color: vibrantColors.text } : undefined}
         >
           {displayTitle}
-        </h1>
+        </span>
         <ChevronDown
           className="size-5 flex-shrink-0 text-muted-foreground"
           aria-hidden

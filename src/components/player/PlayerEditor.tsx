@@ -144,7 +144,7 @@ function replaceSegmentSorted(
   updatedSegment: MediaSegmentDto,
 ): { nextSegments: Array<MediaSegmentDto>; insertedIndex: number } {
   if (!updatedSegment.Id) {
-    const nextSegments = [...segments].sort(sortSegmentsByStart)
+    const nextSegments = segments.toSorted(sortSegmentsByStart)
     return { nextSegments, insertedIndex: 0 }
   }
 
@@ -253,10 +253,7 @@ function useRenderPlayerEditor({
     [],
   )
 
-  const runtimeSeconds = React.useMemo(
-    () => ticksToSeconds(item.RunTimeTicks) || 0,
-    [item.RunTimeTicks],
-  )
+  const runtimeSeconds = ticksToSeconds(item.RunTimeTicks) || 0
 
   const frameStepSeconds = resolveFrameStepSeconds(item)
 
@@ -435,7 +432,7 @@ function useRenderPlayerEditor({
 
         // No existing segments, replace directly
         updateEditingSegments(() => {
-          const updated = [...result.segments].sort(sortSegmentsByStart)
+          const updated = result.segments.toSorted(sortSegmentsByStart)
           setActiveIndex(0)
           return updated
         })
@@ -538,7 +535,7 @@ function useRenderPlayerEditor({
     if (!pending) return
 
     updateEditingSegments(() => {
-      const updated = [...pending.segments].sort(sortSegmentsByStart)
+      const updated = pending.segments.toSorted(sortSegmentsByStart)
       setActiveIndex(0)
       return updated
     })

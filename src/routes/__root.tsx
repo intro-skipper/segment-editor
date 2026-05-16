@@ -46,10 +46,6 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
-const loadSettingsDialog = () => import('../components/settings')
-const loadConnectionWizard = () =>
-  import('../components/connection/ConnectionWizard')
-
 const DevTools = import.meta.env.DEV
   ? lazy(() =>
       import('../components/DevTools').then((module) => ({
@@ -59,13 +55,13 @@ const DevTools = import.meta.env.DEV
   : null
 
 const SettingsDialog = lazy(() =>
-  loadSettingsDialog().then((module) => ({
+  import('../components/settings').then((module) => ({
     default: module.SettingsDialog,
   })),
 )
 
 const ConnectionWizard = lazy(() =>
-  loadConnectionWizard().then((module) => ({
+  import('../components/connection/ConnectionWizard').then((module) => ({
     default: module.ConnectionWizard,
   })),
 )
@@ -88,10 +84,7 @@ function HeaderFallback() {
   }, [router])
 
   return (
-    <header
-      className="sticky top-0 z-40 backdrop-blur-xl bg-background/80"
-      role="banner"
-    >
+    <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80">
       <nav className="px-4 py-4 sm:px-6">
         <div className="flex items-center justify-between gap-4">
           <Link to="/" className="text-xl font-bold">
@@ -240,7 +233,6 @@ function RootComponent() {
           </ErrorBoundary>
           <main
             id="main-content"
-            role="main"
             aria-label={t('accessibility.mainContent', 'Main content')}
             tabIndex={-1}
             className="pb-safe outline-none"

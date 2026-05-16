@@ -62,7 +62,32 @@ interface SegmentEditDialogProps {
   onDelete: (segment: MediaSegmentDto) => void
 }
 
-export function SegmentEditDialog({
+export function SegmentEditDialog(props: SegmentEditDialogProps) {
+  const [openSession, setOpenSession] = React.useState(0)
+  const wasOpenRef = React.useRef(false)
+
+  React.useLayoutEffect(() => {
+    if (props.open && !wasOpenRef.current) {
+      setOpenSession((session) => session + 1)
+    }
+    wasOpenRef.current = props.open
+  }, [props.open])
+
+  const segmentKey = props.segment.Id
+    ? props.segment.Id
+    : [
+        props.segment.ItemId,
+        props.segment.Type,
+        props.segment.StartTicks,
+        props.segment.EndTicks,
+      ].join(':')
+
+  return (
+    <SegmentEditDialogContent key={`${segmentKey}:${openSession}`} {...props} />
+  )
+}
+
+function SegmentEditDialogContent({
   open,
   segment,
   runtimeSeconds,
@@ -73,7 +98,6 @@ export function SegmentEditDialog({
   const { t } = useTranslation()
   const startInputRef = React.useRef<HTMLInputElement>(null)
   const triggerRef = React.useRef<HTMLElement | null>(null)
-  const wasOpenRef = React.useRef(open)
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
 
   const form = useForm({
@@ -90,7 +114,6 @@ export function SegmentEditDialog({
   })
 
   const values = useStore(form.store, (state) => state.values)
-  const isDirty = useStore(form.store, (state) => state.isDirty)
   const { draftRange, validation } = React.useMemo(
     () =>
       getSegmentDraftState(
@@ -104,8 +127,7 @@ export function SegmentEditDialog({
     [segment.EndTicks, segment.StartTicks, values, runtimeSeconds],
   )
   const segmentColor = getSegmentColor(values.type)
-  const rawDuration = draftRange.endSeconds - draftRange.startSeconds
-  const duration = Math.max(0, rawDuration)
+  const duration = Math.max(0, draftRange.endSeconds - draftRange.startSeconds)
 
   const handleClose = React.useCallback(() => {
     onClose()
@@ -114,24 +136,11 @@ export function SegmentEditDialog({
     })
   }, [onClose])
 
-  React.useEffect(() => {
-    if (open) {
-      triggerRef.current = document.activeElement as HTMLElement
-    }
+  React.useLayoutEffect(() => {
+    triggerRef.current = open
+      ? (document.activeElement as HTMLElement)
+      : triggerRef.current
   }, [open])
-
-  React.useEffect(() => {
-    const justOpened = open && !wasOpenRef.current
-    wasOpenRef.current = open
-
-    if (!open) return
-    if (justOpened) {
-      form.reset(getSegmentFormDefaults(segment))
-      return
-    }
-    if (isDirty) return
-    form.reset(getSegmentFormDefaults(segment))
-  }, [form, isDirty, open, segment])
 
   const handleSave = React.useCallback(() => {
     void form.handleSubmit()
@@ -244,9 +253,17 @@ export function SegmentEditDialog({
                   <div className="sm:col-span-3 flex items-center gap-2">
                     <Input
                       id="segment-start"
+                      name="segment-start"
                       ref={startInputRef}
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
+                      aria-invalid={!validation.valid}
+                      aria-describedby={
+                        !validation.valid
+                          ? 'segment-validation-error'
+                          : undefined
+                      }
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={() => handleTimeFieldBlur(field)}
@@ -269,8 +286,16 @@ export function SegmentEditDialog({
                   <div className="sm:col-span-3 flex items-center gap-2">
                     <Input
                       id="segment-end"
+                      name="segment-end"
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
+                      aria-invalid={!validation.valid}
+                      aria-describedby={
+                        !validation.valid
+                          ? 'segment-validation-error'
+                          : undefined
+                      }
                       value={String(field.state.value)}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={() => handleTimeFieldBlur(field)}

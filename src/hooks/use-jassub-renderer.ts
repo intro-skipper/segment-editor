@@ -10,6 +10,7 @@ import type { SubtitleTrackInfo } from '@/services/video/tracks'
 import type { JassubRendererResult } from '@/services/video/subtitle'
 import {
   createJassubRenderer,
+  preloadJassubRenderer,
   requiresJassubRenderer,
 } from '@/services/video/subtitle'
 import { PLAYER_CONFIG } from '@/lib/constants'
@@ -47,7 +48,10 @@ const VIDEO_METADATA_HARD_TIMEOUT_MS = 60_000
 // Helpers
 // ============================================================================
 
-function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
+function waitForVideoMetadata(
+  video: HTMLVideoElement,
+  signal?: AbortSignal,
+): Promise<void> {
   if (video.readyState >= 1 && video.videoWidth > 0) {
     return Promise.resolve()
   }
@@ -60,6 +64,7 @@ function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
       video.removeEventListener('loadeddata', onLoad)
       video.removeEventListener('canplay', onLoad)
       video.removeEventListener('error', onError)
+      signal?.removeEventListener('abort', onAbort)
     }
 
     const onLoad = () => {
@@ -74,8 +79,13 @@ function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
       reject(new Error('Video error'))
     }
 
+    const onAbort = () => {
+      cleanup()
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+
     const softTimeout = setTimeout(() => {
-      if (video.readyState < 1) {
+      if (video.readyState < 1 && !signal?.aborted) {
         video.load()
       }
     }, VIDEO_METADATA_SOFT_TIMEOUT_MS)
@@ -85,6 +95,12 @@ function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
       reject(new Error('Timeout waiting for video metadata'))
     }, VIDEO_METADATA_HARD_TIMEOUT_MS)
 
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true })
     video.addEventListener('loadedmetadata', onLoad)
     video.addEventListener('loadeddata', onLoad)
     video.addEventListener('canplay', onLoad)
@@ -114,9 +130,12 @@ export function useJassubRenderer({
   userOffset,
   t,
 }: UseJassubRendererOptions): UseJassubRendererReturn {
-  const [isActive, setIsActive] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [rendererState, setRendererState] = useState({
+    isActive: false,
+    isLoading: false,
+    error: null as string | null,
+  })
+  const { isActive, isLoading, error } = rendererState
 
   const rendererRef = useRef<JassubRendererResult | null>(null)
   const userOffsetRef = useRef(userOffset)
@@ -126,6 +145,7 @@ export function useJassubRenderer({
   const prevActiveTrackRef = useRef(activeTrack)
   const prevItemIdRef = useRef(item?.Id)
   const prevVideoRef = useRef<HTMLVideoElement | null>(null)
+  const initTokenRef = useRef<symbol | null>(null)
 
   userOffsetRef.current = userOffset
   transcodingRef.current = transcodingOffsetTicks
@@ -148,7 +168,7 @@ export function useJassubRenderer({
 
   const destroyRenderer = useCallback(() => {
     teardownRenderer()
-    setIsActive(false)
+    setRendererState((s) => ({ ...s, isActive: false }))
   }, [teardownRenderer])
 
   // Debounced resize — guards against calling JASSUB resize() when the video
@@ -194,7 +214,7 @@ export function useJassubRenderer({
 
   const reportInitError = useEffectEvent((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err)
-    setError(msg)
+    setRendererState((s) => ({ ...s, isLoading: false, error: msg }))
     showError(getErrorMessage(err, t), msg)
     console.error('[JASSUB] Init error:', err)
   })
@@ -227,18 +247,22 @@ export function useJassubRenderer({
     prevItemIdRef.current = itemId
     prevVideoRef.current = video
 
-    let cancelled = false
+    const initToken = Symbol('jassub-init')
+    initTokenRef.current = initToken
+    const initAbortController = new AbortController()
 
     const init = async () => {
       // Destroy previous renderer first
       destroyRenderer()
 
-      setIsLoading(true)
-      setError(null)
+      setRendererState((s) => ({ ...s, isLoading: true, error: null }))
 
       try {
-        await waitForVideoMetadata(video)
-        if (cancelled) return
+        await Promise.all([
+          waitForVideoMetadata(video, initAbortController.signal),
+          preloadJassubRenderer(),
+        ])
+        if (initTokenRef.current !== initToken) return
 
         // Read latest item and transcodingOffsetTicks from refs at init time,
         // not at effect setup time — avoids stale closure without adding them
@@ -252,22 +276,29 @@ export function useJassubRenderer({
           item: currentItem!,
           transcodingOffsetTicks: currentOffset,
           userOffset: userOffsetRef.current,
+          signal: initAbortController.signal,
         })
 
+        if (initTokenRef.current !== initToken) {
+          result.destroy()
+          return
+        }
+
         rendererRef.current = result
-        setIsActive(true)
+        setRendererState({ isActive: true, isLoading: false, error: null })
       } catch (err) {
-        if (cancelled) return
+        if (initTokenRef.current !== initToken) return
         reportInitError(err)
-      } finally {
-        if (!cancelled) setIsLoading(false)
       }
     }
 
     void init()
 
     return () => {
-      cancelled = true
+      initAbortController.abort()
+      if (initTokenRef.current === initToken) {
+        initTokenRef.current = null
+      }
     }
   }, [activeTrack, itemId, videoRef, destroyRenderer, teardownRenderer])
 
@@ -296,7 +327,6 @@ export function useJassubRenderer({
   useEffect(() => {
     return () => {
       destroyRenderer()
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
     }
   }, [destroyRenderer])
 

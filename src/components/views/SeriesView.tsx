@@ -142,13 +142,13 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
   const ariaLabel = runtime
     ? `${episodeLabel}: ${episodeName}, ${runtime} minutes`
     : `${episodeLabel}: ${episodeName}`
-  const handleClick = React.useCallback(() => {
+  const selectEpisode = React.useCallback(() => {
     onEpisodeClick(episodeId)
   }, [onEpisodeClick, episodeId])
 
   return (
     <InteractiveCard
-      onClick={handleClick}
+      onClick={selectEpisode}
       animate
       animationDelay={animationDelay}
       className={cn(
@@ -302,7 +302,7 @@ export function SeriesView({
   }, [seasons])
 
   const [selectedSeasonId, setSelectedSeasonId] = React.useState<string | null>(
-    () => findDefaultSeasonId(),
+    findDefaultSeasonId,
   )
 
   const resolvedSelectedSeasonId = React.useMemo(() => {

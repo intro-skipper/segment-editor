@@ -17,10 +17,31 @@ const { SUPPORTED_FONT_TYPES, JASSUB_READY_TIMEOUT_MS } = SUBTITLE_CONFIG
 // Types
 // ============================================================================
 
-export type JassubInstance = JASSUB
+let jassubImportPromise: Promise<typeof JASSUB> | null = null
+
+async function loadJassubRenderer(): Promise<typeof JASSUB> {
+  jassubImportPromise ??= import('jassub')
+    .then((module) => module.default)
+    .catch((err: unknown) => {
+      jassubImportPromise = null
+      throw err
+    })
+
+  return jassubImportPromise
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
+}
+
+export async function preloadJassubRenderer(): Promise<void> {
+  await loadJassubRenderer()
+}
 
 export interface JassubRendererResult {
-  instance: JassubInstance
+  instance: JASSUB
   destroy: () => void
   setTimeOffset: (transcodingTicks: number, userOffset: number) => void
   setTrack: (url: string) => Promise<void>
@@ -32,6 +53,7 @@ interface CreateRendererOptions {
   item: BaseItemDto
   transcodingOffsetTicks?: number
   userOffset?: number
+  signal?: AbortSignal
 }
 
 // ============================================================================
@@ -69,18 +91,20 @@ function getEmbeddedFonts(item: BaseItemDto): Array<string> {
   const mediaSourceId = mediaSource.Id ?? itemId.replace(/-/g, '')
   const cleanServer = serverAddress.replace(/\/+$/, '')
 
-  return mediaSource.MediaAttachments.filter((att) => {
+  return mediaSource.MediaAttachments.reduce<Array<string>>((urls, att) => {
     const mime = att.MimeType?.toLowerCase()
-    return mime && SUPPORTED_FONT_TYPES.some((t) => t.toLowerCase() === mime)
-  }).flatMap((att) => {
-    if (att.DeliveryUrl) return [`${cleanServer}${att.DeliveryUrl}`]
-    if (att.Index != null) {
-      return [
-        `${cleanServer}/Videos/${itemId}/${mediaSourceId}/Attachments/${att.Index}`,
-      ]
+    if (!mime || !SUPPORTED_FONT_TYPES.some((t) => t.toLowerCase() === mime)) {
+      return urls
     }
-    return []
-  })
+    if (att.DeliveryUrl) {
+      urls.push(`${cleanServer}${att.DeliveryUrl}`)
+    } else if (att.Index != null) {
+      urls.push(
+        `${cleanServer}/Videos/${itemId}/${mediaSourceId}/Attachments/${att.Index}`,
+      )
+    }
+    return urls
+  }, [])
 }
 
 /** Calculates time offset combining transcoding and user offset. */
@@ -104,6 +128,7 @@ export async function createJassubRenderer(
     item,
     transcodingOffsetTicks = 0,
     userOffset = 0,
+    signal,
   } = options
 
   const itemId = item.Id ?? ''
@@ -111,8 +136,13 @@ export async function createJassubRenderer(
   const fonts = getEmbeddedFonts(item)
   const timeOffset = calcTimeOffset(transcodingOffsetTicks, userOffset)
 
-  // Dynamic import JASSUB
-  const JASSUB = (await import('jassub')).default
+  // Reuse the preloaded dynamic import when available. First ASS subtitle
+  // loads often spend time fetching/evaluating the JASSUB chunk before the
+  // worker/WASM is ready; starting this earlier keeps that cost out of the
+  // renderer critical path.
+  throwIfAborted(signal)
+  const JASSUB = await loadJassubRenderer()
+  throwIfAborted(signal)
 
   // JASSUB assets are served from node_modules via Vite's dev server
   // In dev: /node_modules/.vite/deps/... or direct node_modules path
@@ -126,19 +156,39 @@ export async function createJassubRenderer(
     debug: import.meta.env.DEV,
   })
 
-  // Wait for ready with timeout
+  // Wait for ready with timeout. If the selected track/item/video changes
+  // during first-load worker/WASM/font setup, abort promptly instead of
+  // leaving an obsolete renderer attached until ready or timeout.
+  let readyTimeout: ReturnType<typeof setTimeout> | null = null
+  let abortCleanup: (() => void) | null = null
+
   await Promise.race([
     instance.ready,
-    new Promise<never>((_, reject) =>
-      setTimeout(
+    new Promise<never>((_, reject) => {
+      readyTimeout = setTimeout(
         () => reject(new Error('JASSUB ready timeout')),
         JASSUB_READY_TIMEOUT_MS,
-      ),
-    ),
-  ]).catch((err) => {
-    void instance.destroy()
-    throw err
-  })
+      )
+    }),
+    new Promise<never>((_, reject) => {
+      if (!signal) return
+      const abort = () => reject(new DOMException('Aborted', 'AbortError'))
+      if (signal.aborted) {
+        abort()
+        return
+      }
+      signal.addEventListener('abort', abort, { once: true })
+      abortCleanup = () => signal.removeEventListener('abort', abort)
+    }),
+  ])
+    .catch((err) => {
+      void instance.destroy()
+      throw err
+    })
+    .finally(() => {
+      if (readyTimeout) clearTimeout(readyTimeout)
+      abortCleanup?.()
+    })
 
   let destroyed = false
 

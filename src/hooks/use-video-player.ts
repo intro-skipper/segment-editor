@@ -26,6 +26,7 @@ import {
   stopPlaybackSessionKeepalive,
 } from '@/services/video/playback-session'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
+import type { HlsPlayerError } from '@/hooks/use-hls-player'
 
 // ============================================================================
 // Types
@@ -246,28 +247,29 @@ export function useVideoPlayer({
     hlsCanPlayListenerRef.current = null
   }, [])
 
+  const handleHlsError = (hlsError: HlsPlayerError | null) => {
+    if (hlsError && isActiveRef.current) {
+      const videoError: VideoPlayerError = {
+        type: hlsError.type === 'network' ? 'network_error' : 'media_error',
+        message: hlsError.message,
+        recoverable: hlsError.recoverable,
+      }
+      setError(videoError)
+      onError?.(videoError)
+    } else {
+      setError(null)
+    }
+  }
+
+  const handleHlsRecoveryStart = () => onRecoveryStart?.()
+  const handleHlsRecoveryEnd = () => onRecoveryEnd?.()
+
   // HLS player hook for fallback
   const hlsPlayer = useHlsPlayer({
     videoUrl: strategy === 'hls' ? videoUrl : '',
-    onError: (hlsError) => {
-      if (hlsError && isActiveRef.current) {
-        const videoError: VideoPlayerError = {
-          type: hlsError.type === 'network' ? 'network_error' : 'media_error',
-          message: hlsError.message,
-          recoverable: hlsError.recoverable,
-        }
-        setError(videoError)
-        onError?.(videoError)
-      } else {
-        setError(null)
-      }
-    },
-    onRecoveryStart: () => {
-      onRecoveryStart?.()
-    },
-    onRecoveryEnd: () => {
-      onRecoveryEnd?.()
-    },
+    onError: handleHlsError,
+    onRecoveryStart: handleHlsRecoveryStart,
+    onRecoveryEnd: handleHlsRecoveryEnd,
     t,
   })
 
@@ -289,6 +291,22 @@ export function useVideoPlayer({
     },
     [],
   )
+
+  const restorePendingHlsState = useEffectEvent((video: HTMLVideoElement) => {
+    if (!pendingHlsStateRestoreRef.current) {
+      return
+    }
+
+    const savedState = getPreservedState(itemId)
+    if (!savedState) {
+      pendingHlsStateRestoreRef.current = false
+      return
+    }
+
+    restoreStateAndMaybeResume(video, savedState)
+    clearPreservedState()
+    pendingHlsStateRestoreRef.current = false
+  })
 
   /**
    * Marks playback state for restoration when the HLS video element is ready.
@@ -344,10 +362,14 @@ export function useVideoPlayer({
    */
   const switchToHls = useCallback(
     async (requestId = playbackRequestIdRef.current) => {
-      const isCurrentRequest =
-        isActiveRef.current && playbackRequestIdRef.current === requestId
+      const isCurrentHlsRequest = () =>
+        isActiveRef.current &&
+        playbackRequestIdRef.current === requestId &&
+        itemRef.current?.Id === itemId
 
-      if (!itemId || !isCurrentRequest) return
+      if (!itemId || !isCurrentHlsRequest()) return
+
+      const currentItem = itemRef.current!
 
       // Preserve current state before switching
       if (videoRef.current) {
@@ -356,29 +378,28 @@ export function useVideoPlayer({
 
       // Start playback session for HLS to enable server-side cleanup
       await startPlaybackSession(itemId)
-      if (!isActiveRef.current || playbackRequestIdRef.current !== requestId) {
+      if (!isCurrentHlsRequest()) {
         return
       }
 
-      const currentItem = itemRef.current
-      if (!currentItem || currentItem.Id !== itemId) {
-        return
-      }
+      // Force HLS config: direct-play fallback must not reuse a direct stream URL.
+      const config = await getPlaybackConfig(
+        currentItem,
+        undefined,
+        undefined,
+        true,
+      )
+      if (isCurrentHlsRequest()) {
+        const hlsUrl = config.strategy === 'hls' ? config.url : ''
 
-      // Get HLS config
-      const config = await getPlaybackConfig(currentItem)
-      if (playbackRequestIdRef.current !== requestId) {
-        return
+        // Update strategy after async operation — clear the error that triggered
+        // this fallback so the overlay disappears once HLS playback begins.
+        setError(null)
+        updateStrategy('hls')
+        setVideoUrl(hlsUrl || config.url)
+        scheduleHlsStateRestore()
+        onStrategyChange?.('hls')
       }
-      const hlsUrl = config.strategy === 'hls' ? config.url : ''
-
-      // Update strategy after async operation — clear the error that triggered
-      // this fallback so the overlay disappears once HLS playback begins.
-      setError(null)
-      updateStrategy('hls')
-      setVideoUrl(hlsUrl || config.url)
-      scheduleHlsStateRestore()
-      onStrategyChange?.('hls')
     },
     [
       itemId,
@@ -474,22 +495,6 @@ export function useVideoPlayer({
       onError?.(videoError)
     },
   )
-
-  const restorePendingHlsState = useEffectEvent((video: HTMLVideoElement) => {
-    if (!pendingHlsStateRestoreRef.current) {
-      return
-    }
-
-    const savedState = getPreservedState(itemId)
-    if (!savedState) {
-      pendingHlsStateRestoreRef.current = false
-      return
-    }
-
-    restoreStateAndMaybeResume(video, savedState)
-    clearPreservedState()
-    pendingHlsStateRestoreRef.current = false
-  })
 
   const handlePageHide = useEffectEvent(() => {
     stopPlaybackSessionKeepalive()
@@ -651,7 +656,7 @@ export function useVideoPlayer({
     } else if (videoRef.current) {
       videoRef.current.load()
     }
-  }, [strategy, hlsPlayer])
+  }, [strategy, hlsPlayer.retry])
 
   /**
    * Reload HLS stream with a new URL.

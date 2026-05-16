@@ -32,11 +32,9 @@ interface SegmentDraftState {
 
 type SegmentTimeField = 'startText' | 'endText'
 
-interface SegmentTimeParseResult {
-  ok: boolean
-  message?: string
-  value?: number
-}
+type SegmentTimeParseResult =
+  | { ok: true; value: number }
+  | { ok: false; message: string }
 
 export function formatSegmentInputSeconds(value: number): string {
   if (!Number.isFinite(value)) return String(value)
@@ -109,7 +107,6 @@ function parseUncheckedTimeText(value: string): number {
     const parsed = Number(part)
     if (!Number.isFinite(parsed)) return Number.NaN
     const multiplier = TIME_MULTIPLIERS[index]
-    if (multiplier === undefined) return Number.NaN
     return sum + parsed * multiplier
   }, 0)
 }
@@ -155,12 +152,8 @@ function getSegmentDraftRange(
   const end = parseSegmentTimeText('endText', values.endText)
 
   return {
-    startSeconds: start.ok
-      ? (start.value ?? fallback.startSeconds)
-      : fallback.startSeconds,
-    endSeconds: end.ok
-      ? (end.value ?? fallback.endSeconds)
-      : fallback.endSeconds,
+    startSeconds: start.ok ? start.value : fallback.startSeconds,
+    endSeconds: end.ok ? end.value : fallback.endSeconds,
   }
 }
 
@@ -195,7 +188,7 @@ export function createSegmentFormSchema(maxDuration?: number | null) {
         ctx.addIssue({
           code: 'custom',
           path: ['startText'],
-          message: start.message ?? getNumericFieldMessage('startText'),
+          message: start.message,
         })
       }
 
@@ -203,15 +196,15 @@ export function createSegmentFormSchema(maxDuration?: number | null) {
         ctx.addIssue({
           code: 'custom',
           path: ['endText'],
-          message: end.message ?? getNumericFieldMessage('endText'),
+          message: end.message,
         })
       }
 
       if (!start.ok || !end.ok) return
 
       const boundaryError = getSegmentBoundaryError(
-        start.value ?? 0,
-        end.value ?? 0,
+        start.value,
+        end.value,
         maxDuration,
       )
 

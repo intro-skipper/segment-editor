@@ -64,7 +64,7 @@ export async function discoverServers(
 export function sortServersByScore(
   servers: Array<RecommendedServerInfo>,
 ): Array<RecommendedServerInfo> {
-  return [...servers].sort((a, b) => {
+  return servers.toSorted((a, b) => {
     const scoreDiff = b.score - a.score
     if (scoreDiff !== 0) return scoreDiff
 
@@ -77,7 +77,7 @@ export function sortServersByScore(
 export function findBestServer(
   servers: Array<RecommendedServerInfo>,
 ): RecommendedServerInfo | null {
-  return servers.length === 0 ? null : (sortServersByScore(servers)[0] ?? null)
+  return servers.length === 0 ? null : sortServersByScore(servers)[0]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

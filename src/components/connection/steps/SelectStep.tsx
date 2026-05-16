@@ -7,7 +7,7 @@
  * @module components/connection/steps/SelectStep
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -79,14 +79,18 @@ interface ServerItemProps {
   isSelected: boolean
   onSelect: () => void
   index: number
+  buttonRef?: (element: HTMLButtonElement | null) => void
 }
 
-function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
-  const scoreDisplay = useMemo(
-    () => getScoreDisplay(server.score),
-    [server.score],
-  )
-  const scoreIcon = useMemo(() => renderScoreIcon(server.score), [server.score])
+function ServerItem({
+  server,
+  isSelected,
+  onSelect,
+  index,
+  buttonRef,
+}: ServerItemProps) {
+  const scoreDisplay = getScoreDisplay(server.score)
+  const scoreIcon = renderScoreIcon(server.score)
 
   const serverName = server.systemInfo?.ServerName ?? 'Jellyfin Server'
   const serverVersion = server.systemInfo?.Version ?? 'Unknown version'
@@ -94,7 +98,9 @@ function ServerItem({ server, isSelected, onSelect, index }: ServerItemProps) {
 
   return (
     <button
+      ref={buttonRef}
       type="button"
+      role="option"
       onClick={onSelect}
       aria-selected={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
@@ -181,12 +187,24 @@ function ServerList({
   error,
 }: ServerListProps) {
   const listRef = useRef<HTMLDivElement>(null)
+  const focusedGenerationRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (servers.length > 0 && !isLoading) {
-      listRef.current?.querySelector('button')?.focus()
-    }
-  }, [servers.length, isLoading])
+  const discoveryGeneration = useMemo(
+    () =>
+      isLoading ? null : servers.map((server) => server.address).join('\u001f'),
+    [isLoading, servers],
+  )
+
+  const focusFirstServerButton = useCallback(
+    (element: HTMLButtonElement | null) => {
+      if (!element || !discoveryGeneration) return
+      if (focusedGenerationRef.current === discoveryGeneration) return
+
+      focusedGenerationRef.current = discoveryGeneration
+      element.focus()
+    },
+    [discoveryGeneration],
+  )
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!listRef.current) return
@@ -268,6 +286,7 @@ function ServerList({
           isSelected={selectedServer?.address === server.address}
           onSelect={() => onSelect(server)}
           index={index}
+          buttonRef={index === 0 ? focusFirstServerButton : undefined}
         />
       ))}
     </div>

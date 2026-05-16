@@ -16,20 +16,33 @@ export interface ChapterMarker {
   endPositionSeconds?: number
 }
 
-const CHAPTER_NAME_MAP: Record<string, MediaSegmentType> = {
-  intro: MediaSegmentType.Intro,
-  opening: MediaSegmentType.Intro,
-  outro: MediaSegmentType.Outro,
-  ending: MediaSegmentType.Outro,
-  credits: MediaSegmentType.Outro,
-  preview: MediaSegmentType.Preview,
-  'next episode': MediaSegmentType.Preview,
-  recap: MediaSegmentType.Recap,
-  'previously on': MediaSegmentType.Recap,
-  commercial: MediaSegmentType.Commercial,
-  advertisement: MediaSegmentType.Commercial,
-  ad: MediaSegmentType.Commercial,
-}
+const CHAPTER_NAME_KEYWORDS: Array<
+  readonly [keyword: string, type: MediaSegmentType]
+> = [
+  ['intro', MediaSegmentType.Intro],
+  ['opening', MediaSegmentType.Intro],
+  ['outro', MediaSegmentType.Outro],
+  ['ending', MediaSegmentType.Outro],
+  ['credits', MediaSegmentType.Outro],
+  ['preview', MediaSegmentType.Preview],
+  ['next episode', MediaSegmentType.Preview],
+  ['recap', MediaSegmentType.Recap],
+  ['previously on', MediaSegmentType.Recap],
+  ['commercial', MediaSegmentType.Commercial],
+  ['advertisement', MediaSegmentType.Commercial],
+  ['ad', MediaSegmentType.Commercial],
+]
+
+const CHAPTER_NAME_PATTERNS: Array<
+  readonly [pattern: RegExp, type: MediaSegmentType]
+> = CHAPTER_NAME_KEYWORDS.map(([keyword, type]) => [
+  new RegExp(`\\b${keyword}\\b`),
+  type,
+])
+
+const CHAPTER_NAME_MAP = new Map<string, MediaSegmentType>(
+  CHAPTER_NAME_KEYWORDS,
+)
 
 const SEGMENT_TYPE_NAMES: Record<MediaSegmentType, string> = {
   [MediaSegmentType.Intro]: 'Intro',
@@ -42,10 +55,10 @@ const SEGMENT_TYPE_NAMES: Record<MediaSegmentType, string> = {
 
 export function getSegmentTypeFromChapterName(name: string): MediaSegmentType {
   const normalized = name.toLowerCase().trim()
-  const direct = CHAPTER_NAME_MAP[normalized] as MediaSegmentType | undefined
+  const direct = CHAPTER_NAME_MAP.get(normalized)
   if (direct) return direct
-  for (const [key, type] of Object.entries(CHAPTER_NAME_MAP)) {
-    if (normalized.includes(key)) return type
+  for (const [pattern, type] of CHAPTER_NAME_PATTERNS) {
+    if (pattern.test(normalized)) return type
   }
   return MediaSegmentType.Intro
 }

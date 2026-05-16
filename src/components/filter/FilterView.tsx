@@ -83,21 +83,23 @@ const selectSetSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
 ) => state.setSettingsOpen
 
-/** O(1) icon lookup by collection keyword */
-const COLLECTION_ICON_MAP = new Map<string, typeof Library>([
-  ['movie', Film],
-  ['film', Film],
-  ['series', Tv],
-  ['tv', Tv],
-  ['show', Tv],
-  ['music', Mic2],
-  ['artist', Mic2],
-])
+/** Ordered substring classifiers; matching is intentionally partial, not exact membership. */
+const COLLECTION_ICON_PATTERNS: Array<
+  readonly [pattern: RegExp, icon: typeof Library]
+> = [
+  [/movie/, Film],
+  [/film/, Film],
+  [/series/, Tv],
+  [/tv/, Tv],
+  [/show/, Tv],
+  [/music/, Mic2],
+  [/artist/, Mic2],
+]
 
 const getCollectionIcon = (name: string) => {
   const lower = name.toLowerCase()
-  for (const [key, icon] of COLLECTION_ICON_MAP) {
-    if (lower.includes(key)) return icon
+  for (const [pattern, icon] of COLLECTION_ICON_PATTERNS) {
+    if (pattern.test(lower)) return icon
   }
   return Library
 }
@@ -289,9 +291,7 @@ function subscribeToResize(callback: () => void) {
 
 /** Get current column count snapshot */
 function getColumnsSnapshot() {
-  return typeof window !== 'undefined'
-    ? getGridColumns(window.innerWidth)
-    : COLUMN_BREAKPOINTS.default
+  return getGridColumns(window.innerWidth)
 }
 
 /** Server snapshot for SSR */

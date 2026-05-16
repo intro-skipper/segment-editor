@@ -66,11 +66,6 @@ function CollectionSelector({
   const { t } = useTranslation()
   const currentName = collections.find((c) => c.ItemId === selectedId)?.Name
 
-  // Handle collection selection
-  const handleSelect = (id: string | null) => {
-    onSelect(id)
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -89,7 +84,7 @@ function CollectionSelector({
         {collections.map((c, index) => (
           <DropdownMenuItem
             key={c.ItemId ?? c.Name ?? `collection-${index}`}
-            onClick={() => handleSelect(c.ItemId ?? null)}
+            onClick={() => onSelect(c.ItemId ?? null)}
             className={cn(
               'cursor-pointer',
               selectedId === c.ItemId && 'bg-primary/10 text-primary',
@@ -230,7 +225,6 @@ export default function Header() {
     <>
       <header
         className="sticky top-0 z-40 backdrop-blur-xl"
-        role="banner"
         style={headerStyle}
       >
         <nav
@@ -258,19 +252,22 @@ export default function Header() {
                   </Button>
                   {/* Episode switcher replaces title for episodes on player page */}
                   {isPlayerPage && isEpisode && currentItem ? (
-                    <Suspense
-                      fallback={
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
-                          {pageTitle}
-                        </h1>
-                      }
-                    >
-                      <EpisodeSwitcher
-                        currentEpisode={currentItem}
-                        vibrantColors={vibrantColors}
-                        className="flex-1 min-w-0"
-                      />
-                    </Suspense>
+                    <>
+                      <h1 className="sr-only">{pageTitle}</h1>
+                      <Suspense
+                        fallback={
+                          <span className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+                            {pageTitle}
+                          </span>
+                        }
+                      >
+                        <EpisodeSwitcher
+                          currentEpisode={currentItem}
+                          vibrantColors={vibrantColors}
+                          className="flex-1 min-w-0"
+                        />
+                      </Suspense>
+                    </>
                   ) : (
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
                       {pageTitle}

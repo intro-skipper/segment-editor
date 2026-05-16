@@ -99,8 +99,7 @@ const getEventTimingMs = (
 
     if (
       normalizedType === 'END_CREDITS' &&
-      typeof maxDurationSeconds === 'number' &&
-      Number.isFinite(maxDurationSeconds) &&
+      isNumber(maxDurationSeconds) &&
       maxDurationSeconds > 0
     ) {
       return { startMs: startMsRaw, endMs: maxDurationSeconds * 1000 }
@@ -290,7 +289,7 @@ export function introSkipperClipboardTextToSegments(
   }
 
   const segments: Array<MediaSegmentDto> = []
-  const unknownTypes: Array<string> = []
+  const unknownTypesSet = new Set<string>()
   let skipped = 0
 
   for (const event of events) {
@@ -304,10 +303,7 @@ export function introSkipperClipboardTextToSegments(
       skipped += 1
       // Track unknown event types for user feedback
       if (typeof event.eventType === 'string' && event.eventType.trim()) {
-        const normalizedType = event.eventType.trim()
-        if (!unknownTypes.includes(normalizedType)) {
-          unknownTypes.push(normalizedType)
-        }
+        unknownTypesSet.add(event.eventType.trim())
       }
       continue
     }
@@ -336,7 +332,7 @@ export function introSkipperClipboardTextToSegments(
   return {
     segments: segments.sort(sortSegmentsByStart),
     skipped,
-    unknownTypes,
+    unknownTypes: [...unknownTypesSet],
     error: segments.length === 0 ? 'No importable events found' : undefined,
   }
 }
@@ -362,9 +358,9 @@ function isValidImportedSegment(
 ): boolean {
   return validateSegmentFormValues(
     getSegmentFormDefaults({
-      Type: segment.Type ?? 'Unknown',
-      StartTicks: segment.StartTicks ?? 0,
-      EndTicks: segment.EndTicks ?? 0,
+      Type: segment.Type,
+      StartTicks: segment.StartTicks,
+      EndTicks: segment.EndTicks,
     }),
     maxDurationSeconds,
   ).valid
@@ -382,27 +378,22 @@ function isValidImportedSegment(
 export function segmentsToIntroSkipperPayload(
   segments: Array<MediaSegmentDto>,
 ): IntroSkipperExportResult {
-  const sorted = [...segments].sort(sortSegmentsByStart)
+  const sorted = segments.toSorted(sortSegmentsByStart)
   const events: Array<IntroSkipperExportEvent> = []
-  const excludedTypes: Array<MediaSegmentType> = []
+  const excludedTypesSet = new Set<MediaSegmentType>()
   let excludedCount = 0
 
   for (const segment of sorted) {
     const eventType = toExportEventTypeForSegment(segment.Type)
     if (!eventType) {
       excludedCount += 1
-      if (segment.Type && !excludedTypes.includes(segment.Type)) {
-        excludedTypes.push(segment.Type)
+      if (segment.Type) {
+        excludedTypesSet.add(segment.Type)
       }
       continue
     }
 
-    const startSeconds =
-      typeof segment.StartTicks === 'number' ? segment.StartTicks : 0
-    const endSeconds =
-      typeof segment.EndTicks === 'number' ? segment.EndTicks : 0
-
-    const startTimeMs = secondsToMs(startSeconds)
+    const startTimeMs = secondsToMs(segment.StartTicks ?? 0)
 
     if (eventType === 'Outro') {
       events.push({
@@ -412,7 +403,7 @@ export function segmentsToIntroSkipperPayload(
       continue
     }
 
-    const endTimeMs = secondsToMs(endSeconds)
+    const endTimeMs = secondsToMs(segment.EndTicks ?? 0)
     events.push({
       startTimeMs,
       endTimeMs,
@@ -422,7 +413,7 @@ export function segmentsToIntroSkipperPayload(
 
   return {
     payload: events,
-    excludedTypes,
+    excludedTypes: [...excludedTypesSet],
     excludedCount,
   }
 }

@@ -67,18 +67,14 @@ const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
 // Validation (Single Responsibility)
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface SegmentValidation {
-  valid: boolean
-}
-
 /** Validates segment creation prerequisites */
-const validateForCreate = (segment: MediaSegmentDto): SegmentValidation => {
+const validateForCreate = (segment: MediaSegmentDto): boolean => {
   if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
     console.error('[Segments] Invalid or missing Item ID')
-    return { valid: false }
+    return false
   }
 
-  return { valid: true }
+  return true
 }
 
 /** Validates segment deletion prerequisites */
@@ -135,8 +131,7 @@ async function createSegment(
   segment: MediaSegmentDto,
   options?: SegmentApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  const validation = validateForCreate(segment)
-  if (!validation.valid) return false
+  if (!validateForCreate(segment)) return false
 
   const result = await withApi(async (apis) => {
     const url = buildSegmentUrl(
@@ -158,7 +153,7 @@ async function createSegment(
     }, options)
   }, options)
 
-  if (result === null || result === false) {
+  if (!result) {
     console.error('[Segments] Failed to create segment')
     return false
   }
@@ -195,7 +190,7 @@ export async function deleteSegment(
     }, options)
   }, options)
 
-  if (result === null || result === false) {
+  if (!result) {
     console.error('[Segments] Failed to delete segment')
     return false
   }
@@ -231,11 +226,10 @@ export async function batchSaveSegments(
     ),
   )
 
-  return createResults
-    .filter(
-      (r): r is PromiseFulfilledResult<MediaSegmentDto | false> =>
-        r.status === 'fulfilled',
-    )
-    .map((r) => r.value)
-    .filter((v): v is MediaSegmentDto => v !== false)
+  return createResults.reduce<Array<MediaSegmentDto>>((acc, r) => {
+    if (r.status === 'fulfilled' && r.value !== false) {
+      acc.push(r.value)
+    }
+    return acc
+  }, [])
 }
