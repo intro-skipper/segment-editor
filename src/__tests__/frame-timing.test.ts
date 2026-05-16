@@ -62,6 +62,31 @@ describe('player timing utilities', () => {
     expect(getFrameStepTargetTime(119.99, 1, frameStep, 120)).toBe(120)
   })
 
+  it('computes finite seek targets when media duration is unavailable', () => {
+    const frameStep = 1001 / 24000
+    const frameAlignedTime = frameStep * 240
+    const forwardTarget = frameAlignedTime + frameStep
+
+    const targetWithNanDuration = getFrameStepTargetTime(
+      frameAlignedTime,
+      1,
+      frameStep,
+      Number.NaN,
+    )
+
+    expect(Number.isFinite(targetWithNanDuration)).toBe(true)
+    expect(targetWithNanDuration).toBeCloseTo(forwardTarget, 9)
+    expect(
+      getFrameStepTargetTime(
+        frameAlignedTime,
+        1,
+        frameStep,
+        Number.POSITIVE_INFINITY,
+      ),
+    ).toBeCloseTo(forwardTarget, 9)
+    expect(getFrameStepTargetTime(frameAlignedTime, 1, frameStep, -1)).toBe(0)
+  })
+
   it('snaps one-frame seek targets back to frame boundaries', () => {
     const frameStep = 1001 / 24000
     const offFrameTime = frameStep * 1.2
@@ -100,7 +125,7 @@ describe('player timing utilities', () => {
     )
   })
 
-  it('reserves comma and period for frame stepping shortcuts', () => {
+  it('keeps frame stepping and speed shortcuts in sync with the cheatsheet', () => {
     expect(PLAYER_HOTKEYS.stepFrameBackward).toBe(',')
     expect(PLAYER_HOTKEYS.stepFrameForward).toBe('.')
     expect(PLAYER_HOTKEYS.decreaseSpeed).toBe('Alt+,')

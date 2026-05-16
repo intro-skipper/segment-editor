@@ -36,7 +36,19 @@ export const PLAYER_SHORTCUT_CHEATSHEET = Object.freeze([
   { labelKey: 'shortcuts.saveAll', hotkeys: ['Mod+S'] },
   { labelKey: 'shortcuts.prevSegment', hotkeys: ['['] },
   { labelKey: 'shortcuts.nextSegment', hotkeys: [']'] },
-  { labelKey: 'shortcuts.stepFrameBackForward', hotkeys: [',', '.'] },
-  { labelKey: 'shortcuts.increaseSpeed', hotkeys: ['Alt+.'] },
-  { labelKey: 'shortcuts.decreaseSpeed', hotkeys: ['Alt+,'] },
+  {
+    labelKey: 'shortcuts.stepFrameBackForward',
+    hotkeys: [
+      PLAYER_HOTKEYS.stepFrameBackward,
+      PLAYER_HOTKEYS.stepFrameForward,
+    ],
+  },
+  {
+    labelKey: 'shortcuts.increaseSpeed',
+    hotkeys: [PLAYER_HOTKEYS.increaseSpeed],
+  },
+  {
+    labelKey: 'shortcuts.decreaseSpeed',
+    hotkeys: [PLAYER_HOTKEYS.decreaseSpeed],
+  },
 ] as const)

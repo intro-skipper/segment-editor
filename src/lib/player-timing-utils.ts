@@ -48,5 +48,7 @@ export function getFrameStepTargetTime(
     currentTime + direction * frameStepSeconds,
     frameStepSeconds,
   )
-  return Math.min(Math.max(nextTime, 0), duration)
+  const maxTime = Number.isFinite(duration) ? Math.max(duration, 0) : Infinity
+
+  return Math.min(Math.max(nextTime, 0), maxTime)
 }
