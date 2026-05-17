@@ -1,4 +1,5 @@
 import { PLAYER_CONFIG } from './constants'
+import { snapToFrame } from './time-utils'
 
 /** Sentinel value in PLAYER_CONFIG.SKIP_TIMES representing "1 frame". */
 const FRAME_SKIP_SENTINEL = 0
@@ -35,4 +36,19 @@ export function getSkipStepSeconds(
 
 export function formatSkipDurationLabel(skipSeconds: number): string {
   return isFrameSkipSeconds(skipSeconds) ? '1f' : `${skipSeconds}s`
+}
+
+export function getFrameStepTargetTime(
+  currentTime: number,
+  direction: -1 | 1,
+  frameStepSeconds: number,
+  duration: number,
+): number {
+  const nextTime = snapToFrame(
+    currentTime + direction * frameStepSeconds,
+    frameStepSeconds,
+  )
+  const maxTime = Number.isFinite(duration) ? Math.max(duration, 0) : Infinity
+
+  return Math.min(Math.max(nextTime, 0), maxTime)
 }

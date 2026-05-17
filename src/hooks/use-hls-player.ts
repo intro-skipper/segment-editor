@@ -109,7 +109,15 @@ export function useHlsPlayer({
   useEffect(() => {
     const video = videoRef.current
 
-    if (!video || !videoUrl) return
+    if (!video || !videoUrl) {
+      isActiveRef.current = false
+      return () => {
+        if (recoveryTimerRef.current) {
+          clearTimeout(recoveryTimerRef.current)
+          recoveryTimerRef.current = null
+        }
+      }
+    }
 
     isActiveRef.current = true
 
@@ -175,7 +183,10 @@ export function useHlsPlayer({
 
     return () => {
       isActiveRef.current = false
-      clearRecoveryTimer()
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current)
+        recoveryTimerRef.current = null
+      }
       destroyHls()
     }
   }, [videoUrl, destroyHls, clearRecoveryTimer])

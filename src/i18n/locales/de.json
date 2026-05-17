@@ -302,7 +302,8 @@
     "prevSegment": "Vorheriges Segment",
     "nextSegment": "Nächstes Segment",
     "increaseSpeed": "Schneller",
-    "decreaseSpeed": "Langsamer"
+    "decreaseSpeed": "Langsamer",
+    "stepFrameBackForward": "Einzelbild zurück / vorwärts"
   },
   "series": {
     "unknownSeries": "Unbekannte Serie",

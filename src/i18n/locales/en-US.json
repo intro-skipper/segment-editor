@@ -302,7 +302,8 @@
     "prevSegment": "Previous segment",
     "nextSegment": "Next segment",
     "increaseSpeed": "Increase speed",
-    "decreaseSpeed": "Decrease speed"
+    "decreaseSpeed": "Decrease speed",
+    "stepFrameBackForward": "Step frame back / forward"
   },
   "series": {
     "unknownSeries": "Unknown Series",

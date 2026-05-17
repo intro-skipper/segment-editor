@@ -4,7 +4,12 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { DEFAULT_FRAME_STEP, PLAYER_CONFIG } from '@/lib/constants'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import {
+  PLAYER_HOTKEYS,
+  PLAYER_SHORTCUT_CHEATSHEET,
+} from '@/lib/player-shortcuts'
+import {
   formatSkipDurationLabel,
+  getFrameStepTargetTime,
   getSkipStepSeconds,
   isFrameSkipSeconds,
 } from '@/lib/player-timing-utils'
@@ -43,6 +48,56 @@ describe('player timing utilities', () => {
     expect(getSkipStepSeconds(999, frameStep)).toBe(defaultSkip)
   })
 
+  it('computes one-frame seek targets with media bounds', () => {
+    const frameStep = 1001 / 24000
+    const frameAlignedTime = frameStep * 240
+
+    expect(
+      getFrameStepTargetTime(frameAlignedTime, -1, frameStep, 120),
+    ).toBeCloseTo(frameAlignedTime - frameStep, 9)
+    expect(
+      getFrameStepTargetTime(frameAlignedTime, 1, frameStep, 120),
+    ).toBeCloseTo(frameAlignedTime + frameStep, 9)
+    expect(getFrameStepTargetTime(0.01, -1, frameStep, 120)).toBe(0)
+    expect(getFrameStepTargetTime(119.99, 1, frameStep, 120)).toBe(120)
+  })
+
+  it('computes finite seek targets when media duration is unavailable', () => {
+    const frameStep = 1001 / 24000
+    const frameAlignedTime = frameStep * 240
+    const forwardTarget = frameAlignedTime + frameStep
+
+    const targetWithNanDuration = getFrameStepTargetTime(
+      frameAlignedTime,
+      1,
+      frameStep,
+      Number.NaN,
+    )
+
+    expect(Number.isFinite(targetWithNanDuration)).toBe(true)
+    expect(targetWithNanDuration).toBeCloseTo(forwardTarget, 9)
+    expect(
+      getFrameStepTargetTime(
+        frameAlignedTime,
+        1,
+        frameStep,
+        Number.POSITIVE_INFINITY,
+      ),
+    ).toBeCloseTo(forwardTarget, 9)
+    expect(getFrameStepTargetTime(frameAlignedTime, 1, frameStep, -1)).toBe(0)
+  })
+
+  it('snaps one-frame seek targets back to frame boundaries', () => {
+    const frameStep = 1001 / 24000
+    const offFrameTime = frameStep * 1.2
+
+    expect(getFrameStepTargetTime(offFrameTime, -1, frameStep, 120)).toBe(0)
+    expect(getFrameStepTargetTime(offFrameTime, 1, frameStep, 120)).toBeCloseTo(
+      frameStep * 2,
+      9,
+    )
+  })
+
   it('formats skip labels consistently', () => {
     expect(isFrameSkipSeconds(0)).toBe(true)
     expect(isFrameSkipSeconds(0.5)).toBe(false)
@@ -68,5 +123,24 @@ describe('player timing utilities', () => {
       DEFAULT_FRAME_STEP,
       9,
     )
+  })
+
+  it('cheatsheet step frame and speed hotkeys match PLAYER_HOTKEYS', () => {
+    const stepFrameHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.stepFrameBackForward',
+    )?.hotkeys
+    const decreaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.decreaseSpeed',
+    )?.hotkeys
+    const increaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+      (entry) => entry.labelKey === 'shortcuts.increaseSpeed',
+    )?.hotkeys
+
+    expect(stepFrameHotkeys).toEqual([
+      PLAYER_HOTKEYS.stepFrameBackward,
+      PLAYER_HOTKEYS.stepFrameForward,
+    ])
+    expect(decreaseSpeedHotkeys).toEqual([PLAYER_HOTKEYS.decreaseSpeed])
+    expect(increaseSpeedHotkeys).toEqual([PLAYER_HOTKEYS.increaseSpeed])
   })
 })

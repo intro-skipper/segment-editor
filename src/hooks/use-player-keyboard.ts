@@ -12,6 +12,8 @@ interface KeyboardHandlers {
   cycleSkipTimeDown: () => void
   skipBackward: () => void
   skipForward: () => void
+  stepFrameBackward: () => void
+  stepFrameForward: () => void
   pushStartTimestamp: () => void
   pushEndTimestamp: () => void
   toggleMute: () => void
@@ -23,8 +25,8 @@ interface KeyboardHandlers {
 
 /**
  * Key mappings:
- * Space=Play, W/S=Skip time, A/D=Skip, E/F=Timestamps,
- * M=Mute, F11=Fullscreen, C=Subtitles, .=Faster, ,=Slower
+ * Space=Play, W/S=Skip time, A/D=Skip, ,/.=Frame step, E/F=Timestamps,
+ * M=Mute, F11=Fullscreen, C=Subtitles, Alt+.=Faster, Alt+,=Slower
  */
 export function usePlayerKeyboard(handlers: KeyboardHandlers): void {
   // Single-key shortcuts: ignoreInputs defaults to true (smart default),
@@ -34,6 +36,8 @@ export function usePlayerKeyboard(handlers: KeyboardHandlers): void {
   useHotkey(PLAYER_HOTKEYS.cycleSkipTimeDown, handlers.cycleSkipTimeDown)
   useHotkey(PLAYER_HOTKEYS.skipBackward, handlers.skipBackward)
   useHotkey(PLAYER_HOTKEYS.skipForward, handlers.skipForward)
+  useHotkey(PLAYER_HOTKEYS.stepFrameBackward, handlers.stepFrameBackward)
+  useHotkey(PLAYER_HOTKEYS.stepFrameForward, handlers.stepFrameForward)
   useHotkey(PLAYER_HOTKEYS.pushStartTimestamp, handlers.pushStartTimestamp)
   useHotkey(PLAYER_HOTKEYS.pushEndTimestamp, handlers.pushEndTimestamp)
   useHotkey(PLAYER_HOTKEYS.toggleMute, handlers.toggleMute)

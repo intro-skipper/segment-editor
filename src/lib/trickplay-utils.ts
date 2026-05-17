@@ -41,10 +41,12 @@ export function getBestTrickplayInfo(
       continue
     }
 
-    const widths = Object.keys(widthMap)
-      .map(Number)
-      .filter((n) => !Number.isNaN(n))
-      .sort((a, b) => a - b)
+    const widths: Array<number> = []
+    for (const key of Object.keys(widthMap)) {
+      const n = Number(key)
+      if (Number.isFinite(n)) widths.push(n)
+    }
+    widths.sort((a, b) => a - b)
 
     if (widths.length === 0) {
       continue
