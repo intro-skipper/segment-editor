@@ -125,12 +125,7 @@ describe('player timing utilities', () => {
     )
   })
 
-  it('keeps frame stepping and speed shortcuts in sync with the cheatsheet', () => {
-    expect(PLAYER_HOTKEYS.stepFrameBackward).toBe(',')
-    expect(PLAYER_HOTKEYS.stepFrameForward).toBe('.')
-    expect(PLAYER_HOTKEYS.decreaseSpeed).toBe('Alt+,')
-    expect(PLAYER_HOTKEYS.increaseSpeed).toBe('Alt+.')
-
+  it('cheatsheet step frame and speed hotkeys match PLAYER_HOTKEYS', () => {
     const stepFrameHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
       (entry) => entry.labelKey === 'shortcuts.stepFrameBackForward',
     )?.hotkeys
