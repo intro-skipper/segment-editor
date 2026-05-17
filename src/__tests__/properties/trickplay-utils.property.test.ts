@@ -81,6 +81,17 @@ describe('trickplay-utils', () => {
       const result = getBestTrickplayInfo(trickplay)
       expect(result?.info.Width).toBe(240)
     })
+
+    it('ignores non-finite width keys when picking a fallback width', () => {
+      const trickplay: TrickplayData = {
+        'source-1': {
+          '240': { Width: 240, ThumbnailCount: 100, Interval: 10000 },
+          Infinity: { Width: 999, ThumbnailCount: 100, Interval: 10000 },
+        },
+      }
+      const result = getBestTrickplayInfo(trickplay)
+      expect(result?.info.Width).toBe(240)
+    })
   })
 
   describe('getTrickplayPosition', () => {
