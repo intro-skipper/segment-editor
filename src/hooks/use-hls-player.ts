@@ -111,7 +111,12 @@ export function useHlsPlayer({
 
     if (!video || !videoUrl) {
       isActiveRef.current = false
-      return
+      return () => {
+        if (recoveryTimerRef.current) {
+          clearTimeout(recoveryTimerRef.current)
+          recoveryTimerRef.current = null
+        }
+      }
     }
 
     isActiveRef.current = true
@@ -178,6 +183,10 @@ export function useHlsPlayer({
 
     return () => {
       isActiveRef.current = false
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current)
+        recoveryTimerRef.current = null
+      }
       destroyHls()
     }
   }, [videoUrl, destroyHls, clearRecoveryTimer])
