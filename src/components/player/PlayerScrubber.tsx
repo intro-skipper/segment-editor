@@ -8,9 +8,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { ChapterInfo } from '@jellyfin/sdk/lib/generated-client/models'
-
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { ChapterInfo, MediaSegmentDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import { cn } from '@/lib/utils'

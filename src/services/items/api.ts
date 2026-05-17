@@ -10,9 +10,12 @@
  * against Zod schemas to ensure data integrity.
  */
 
-import { ItemFields, SortOrder } from '@jellyfin/sdk/lib/generated-client'
-import type { BaseItemKind } from '@jellyfin/sdk/lib/generated-client'
-import type { BaseItemDto, VirtualFolderInfo } from '@/types/jellyfin'
+import { ItemFields, SortOrder } from '@/types/jellyfin'
+import type {
+  BaseItemDto,
+  BaseItemKind,
+  VirtualFolderInfo,
+} from '@/types/jellyfin'
 import type { ApiOptions } from '@/services/jellyfin'
 import { getRequestConfig, withApi } from '@/services/jellyfin'
 import { AppError, logValidationWarning } from '@/lib/unified-error'

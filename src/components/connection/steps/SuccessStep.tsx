@@ -7,9 +7,9 @@
  */
 
 import { CheckCircle } from 'lucide-react'
-import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 
 import { Button } from '@/components/ui/button'
+import type { RecommendedServerInfo } from '@/types/jellyfin'
 
 interface SuccessStepProps {
   selectedServer: RecommendedServerInfo | null

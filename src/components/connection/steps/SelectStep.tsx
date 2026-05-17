@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   ShieldOff,
 } from 'lucide-react'
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -25,7 +24,8 @@ import {
   WizardBackAction,
   WizardContinueAction,
 } from '../WizardActions'
-import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
+import { RecommendedServerInfoScore } from '@/types/jellyfin'
+import type { RecommendedServerInfo } from '@/types/jellyfin'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { getScoreDisplay } from '@/services/jellyfin'

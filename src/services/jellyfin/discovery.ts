@@ -4,11 +4,11 @@
  * @module services/jellyfin/discovery
  */
 
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { getJellyfinClient, isAborted } from './core'
 import { normalizeServerAddress } from './security'
-import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
+import { RecommendedServerInfoScore } from '@/types/jellyfin'
 import type { ApiOptions } from './types'
+import type { RecommendedServerInfo } from '@/types/jellyfin'
 import { AppError, isAbortError } from '@/lib/unified-error'
 
 // ─────────────────────────────────────────────────────────────────────────────

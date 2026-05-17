@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
 import { canGoBack, getPreviousStep } from './connection-wizard-flow'
 import type { WizardStep } from './connection-wizard-flow'
-import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 
 import type { ConnectionWizardFormValues } from '@/lib/forms/connection-form'
+import type { RecommendedServerInfo } from '@/types/jellyfin'
 import {
   CONNECTION_WIZARD_DEFAULT_VALUES,
   ConnectionAuthSchema,
