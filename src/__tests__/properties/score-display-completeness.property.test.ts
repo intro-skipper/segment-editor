@@ -10,8 +10,8 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { getScoreDisplay } from '@/services/jellyfin'
+import { RecommendedServerInfoScore } from '@/types/jellyfin'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants

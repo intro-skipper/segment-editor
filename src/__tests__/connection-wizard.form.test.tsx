@@ -11,9 +11,9 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
 
 import { ConnectionWizard } from '@/components/connection/ConnectionWizard'
+import { RecommendedServerInfoScore } from '@/types/jellyfin'
 import '@/i18n/config'
 
 const discoverServersMock = vi.hoisted(() => vi.fn())

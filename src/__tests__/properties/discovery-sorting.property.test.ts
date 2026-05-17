@@ -9,9 +9,9 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { RecommendedServerInfoScore } from '@jellyfin/sdk/lib/models/recommended-server-info'
-import type { RecommendedServerInfo } from '@jellyfin/sdk/lib/models/recommended-server-info'
 import { sortServersByScore } from '@/services/jellyfin'
+import { RecommendedServerInfoScore } from '@/types/jellyfin'
+import type { RecommendedServerInfo } from '@/types/jellyfin'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Generators
