@@ -607,16 +607,6 @@ function useRenderPlayer({
     const segmentRanges = segmentTimeRangesRef.current
     const mode = segmentSkipModeRef.current
 
-    if (mode !== 'button' && mode !== 'skip' && mode !== 'disabled') {
-      // Unknown/unexpected persisted value — treat as disabled to avoid unintended behaviour.
-      if (prevActiveSegmentIdRef.current !== null) {
-        prevActiveSegmentIdRef.current = null
-        lastAutoSkippedSegmentIdRef.current = null
-        setActiveSkipSegment(null)
-      }
-      return
-    }
-
     if (mode === 'disabled' || segmentRanges.length === 0) {
       if (prevActiveSegmentIdRef.current !== null) {
         prevActiveSegmentIdRef.current = null
