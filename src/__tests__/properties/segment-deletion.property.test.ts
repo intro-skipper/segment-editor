@@ -12,7 +12,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { useDeleteSegment } from '@/services/segments/mutations'
+import {
+  DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
+  useDeleteSegment,
+} from '@/services/segments/mutations'
 import { segmentsKeys } from '@/services/segments/query-keys'
 
 // Track DELETE requests for verification
@@ -154,6 +157,17 @@ function setupMockFetch(success: boolean = true): void {
   )
 }
 
+const createSegmentDto = (
+  overrides: Partial<MediaSegmentDto> = {},
+): MediaSegmentDto => ({
+  Id: '00000000-0000-4000-8000-000000000001',
+  ItemId: '00000000-0000-4000-8000-000000000002',
+  Type: 'Intro',
+  StartTicks: 100,
+  EndTicks: 200,
+  ...overrides,
+})
+
 describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
     jellyfinFetchEmptyMock.mockClear()
@@ -276,19 +290,12 @@ describe('Segment Deletion State Synchronization', () => {
   })
 
   it('restores previous cache and invalidates when optimistic delete changes cache length', async () => {
-    const segment: MediaSegmentDto = {
-      Id: '00000000-0000-4000-8000-000000000001',
-      ItemId: '00000000-0000-4000-8000-000000000002',
-      Type: 'Intro',
-      StartTicks: 100,
-      EndTicks: 200,
-    }
-    const otherSegment: MediaSegmentDto = {
-      ...segment,
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
       Id: '00000000-0000-4000-8000-000000000003',
       StartTicks: 300,
       EndTicks: 400,
-    }
+    })
 
     setupMockFetch(false)
 
@@ -304,7 +311,7 @@ describe('Segment Deletion State Synchronization', () => {
     const { result } = renderHook(() => useDeleteSegment(), { wrapper })
 
     await expect(result.current.mutateAsync(segment)).rejects.toThrow(
-      'The server did not confirm the delete. Please try again.',
+      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
     )
 
     expect(
@@ -319,25 +326,17 @@ describe('Segment Deletion State Synchronization', () => {
   })
 
   it('restores previous cache without invalidation when optimistic delete does not change cache length', async () => {
-    const segment: MediaSegmentDto = {
-      Id: '00000000-0000-4000-8000-000000000001',
-      ItemId: '00000000-0000-4000-8000-000000000002',
-      Type: 'Intro',
-      StartTicks: 100,
-      EndTicks: 200,
-    }
-    const otherSegment: MediaSegmentDto = {
-      ...segment,
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
       Id: '00000000-0000-4000-8000-000000000003',
       StartTicks: 300,
       EndTicks: 400,
-    }
-    const anotherSegment: MediaSegmentDto = {
-      ...segment,
+    })
+    const anotherSegment = createSegmentDto({
       Id: '00000000-0000-4000-8000-000000000004',
       StartTicks: 500,
       EndTicks: 600,
-    }
+    })
 
     setupMockFetch(false)
 
@@ -355,7 +354,7 @@ describe('Segment Deletion State Synchronization', () => {
     const { result } = renderHook(() => useDeleteSegment(), { wrapper })
 
     await expect(result.current.mutateAsync(segment)).rejects.toThrow(
-      'The server did not confirm the delete. Please try again.',
+      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
     )
 
     const restored = queryClient.getQueryData<Array<MediaSegmentDto>>(

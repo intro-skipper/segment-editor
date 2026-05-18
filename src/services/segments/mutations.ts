@@ -27,6 +27,9 @@ interface OptimisticContext {
   rolledBack?: boolean
 }
 
+export const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
+  'The server did not confirm the delete. Please try again.'
+
 // Shared utilities
 const handleMutationError = (operation: string) => (error: unknown) => {
   if (isAbortError(error)) return
@@ -91,10 +94,7 @@ export const useDeleteSegment = () => {
   return useMutation<boolean, QueryError, MediaSegmentDto, OptimisticContext>({
     mutationFn: wrapMutationFn(async (segment, signal) => {
       const deleted = await deleteSegment(segment, { signal })
-      if (!deleted)
-        throw new Error(
-          'The server did not confirm the delete. Please try again.',
-        )
+      if (!deleted) throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
       return deleted
     }, getController),
     onMutate: async (segment) => {
