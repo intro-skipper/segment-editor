@@ -14,7 +14,8 @@ import {
   handleQueryError,
 } from '@/hooks/queries/query-error-handling'
 import { showError, showSuccess } from '@/lib/notifications'
-import { isAbortError } from '@/lib/unified-error'
+import { ErrorCodes } from '@/lib/unified-error'
+import { isValidItemId } from '@/lib/schemas'
 
 interface BatchSaveInput {
   itemId: string
@@ -27,10 +28,15 @@ interface OptimisticContext {
   rolledBack?: boolean
 }
 
+const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
+  'The server did not confirm the delete. Please try again.'
+
+const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
+
 // Shared utilities
 const handleMutationError = (operation: string) => (error: unknown) => {
-  if (isAbortError(error)) return
   const e = QueryError.from(error)
+  if (e.code === ErrorCodes.CANCELLED) return
   handleQueryError(e, { operation })
   showError(
     `${operation} failed`,
@@ -69,18 +75,25 @@ const rollbackSegments = (
   ctx: OptimisticContext,
 ) => {
   if (!previous) return
-  qc.setQueryData(segmentsKeys.list(itemId), previous)
   const current = qc.getQueryData<Array<MediaSegmentDto>>(
     segmentsKeys.list(itemId),
   )
-  if (
-    !current ||
-    current.length !== previous.length ||
-    !previous.every((s) => current.some((c) => c.Id === s.Id))
-  ) {
+  qc.setQueryData(segmentsKeys.list(itemId), previous)
+  if (!current || current.length !== previous.length) {
     void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+  } else {
+    const currentIds = new Set(current.map((segment) => segment.Id))
+    if (!previous.every((segment) => currentIds.has(segment.Id))) {
+      void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+    }
   }
   ctx.rolledBack = true
+}
+
+const validateDeleteInput = (segment: MediaSegmentDto) => {
+  if (!isValidItemId(segment.Id)) {
+    throw QueryError.validation(DELETE_SEGMENT_INVALID_MESSAGE)
+  }
 }
 
 export const useDeleteSegment = () => {
@@ -88,10 +101,15 @@ export const useDeleteSegment = () => {
   const getController = useAbortController()
 
   return useMutation<boolean, QueryError, MediaSegmentDto, OptimisticContext>({
-    mutationFn: wrapMutationFn(
-      (segment, signal) => deleteSegment(segment, { signal }),
-      getController,
-    ),
+    mutationFn: wrapMutationFn(async (segment, signal) => {
+      validateDeleteInput(segment)
+      const deleted = await deleteSegment(segment, { signal })
+      if (!deleted) {
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+        throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
+      }
+      return deleted
+    }, getController),
     onMutate: async (segment) => {
       if (!segment.ItemId) return { rolledBack: false }
       await qc.cancelQueries({ queryKey: segmentsKeys.list(segment.ItemId) })

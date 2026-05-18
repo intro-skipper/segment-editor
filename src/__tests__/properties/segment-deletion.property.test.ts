@@ -14,6 +14,7 @@ import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { useDeleteSegment } from '@/services/segments/mutations'
 import { segmentsKeys } from '@/services/segments/query-keys'
+import { ErrorCodes } from '@/lib/unified-error'
 
 // Track DELETE requests for verification
 interface DeleteRequest {
@@ -26,6 +27,7 @@ interface DeleteRequest {
 const deleteRequests: Array<DeleteRequest> = []
 
 const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
+const showErrorMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
@@ -66,6 +68,11 @@ vi.mock('@/services/jellyfin', () => ({
 vi.mock('@/services/jellyfin/http', () => ({
   jellyfinFetchEmpty: jellyfinFetchEmptyMock,
   jellyfinFetchJson: vi.fn(),
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  showError: showErrorMock,
+  showSuccess: vi.fn(),
 }))
 
 // Custom arbitrary for hex strings
@@ -154,9 +161,43 @@ function setupMockFetch(success: boolean = true): void {
   )
 }
 
+function setupAbortThenSuccessFetch(): void {
+  let callCount = 0
+  jellyfinFetchEmptyMock.mockImplementation(
+    ({ signal }: { signal?: AbortSignal }) => {
+      callCount += 1
+      if (callCount > 1) return Promise.resolve()
+
+      return new Promise<void>((_, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'))
+          return
+        }
+        signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        )
+      })
+    },
+  )
+}
+
+const createSegmentDto = (
+  overrides: Partial<MediaSegmentDto> = {},
+): MediaSegmentDto => ({
+  Id: '00000000-0000-4000-8000-000000000001',
+  ItemId: '00000000-0000-4000-8000-000000000002',
+  Type: 'Intro',
+  StartTicks: 100,
+  EndTicks: 200,
+  ...overrides,
+})
+
 describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
     jellyfinFetchEmptyMock.mockClear()
+    showErrorMock.mockClear()
     deleteRequests.length = 0
   })
 
@@ -272,6 +313,140 @@ describe('Segment Deletion State Synchronization', () => {
         return true
       }),
       { numRuns: 100 },
+    )
+  })
+
+  it('restores previous cache and invalidates when optimistic delete changes cache length', async () => {
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    })
+
+    setupMockFetch(false)
+
+    const { queryClient, wrapper } = createWrapper()
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const previousSegments = [segment, otherSegment]
+
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      previousSegments,
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toThrow(
+      'The server did not confirm the delete. Please try again.',
+    )
+
+    expect(
+      queryClient.getQueryData<Array<MediaSegmentDto>>(
+        segmentsKeys.list(segment.ItemId!),
+      ),
+    ).toEqual(previousSegments)
+    expect(invalidateQueriesSpy).toHaveBeenCalledTimes(1)
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: segmentsKeys.list(segment.ItemId!),
+    })
+  })
+
+  it('restores previous cache without invalidation when optimistic delete does not change cache length', async () => {
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    })
+    const anotherSegment = createSegmentDto({
+      Id: '00000000-0000-4000-8000-000000000004',
+      StartTicks: 500,
+      EndTicks: 600,
+    })
+
+    setupMockFetch(false)
+
+    const { queryClient, wrapper } = createWrapper()
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    // The deleted segment is not in the cache, so the optimistic filter leaves
+    // the cache length and IDs unchanged before rollback.
+    const previousSegments = [otherSegment, anotherSegment]
+
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      previousSegments,
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toThrow(
+      'The server did not confirm the delete. Please try again.',
+    )
+
+    const restored = queryClient.getQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+    )
+    expect(restored).toEqual(previousSegments)
+    expect(restored?.map((s) => s.Id)).toEqual(
+      previousSegments.map((s) => s.Id),
+    )
+    expect(invalidateQueriesSpy).not.toHaveBeenCalled()
+  })
+
+  it('suppresses error notification when delete is cancelled by a newer mutation', async () => {
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    })
+
+    setupAbortThenSuccessFetch()
+
+    const { queryClient, wrapper } = createWrapper()
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      [segment, otherSegment],
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    const cancelledDelete = result.current.mutateAsync(segment)
+    await waitFor(() => expect(jellyfinFetchEmptyMock).toHaveBeenCalledTimes(1))
+
+    const confirmedDelete = result.current.mutateAsync(otherSegment)
+
+    await expect(cancelledDelete).rejects.toMatchObject({
+      code: ErrorCodes.CANCELLED,
+    })
+    await expect(confirmedDelete).resolves.toBe(true)
+    expect(showErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('reports invalid segment IDs without using server confirmation message', async () => {
+    const segment = createSegmentDto({ Id: 'not-a-valid-id' })
+
+    const { queryClient, wrapper } = createWrapper()
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      [segment],
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_INPUT,
+      message: 'Invalid or missing segment ID',
+    })
+    expect(jellyfinFetchEmptyMock).not.toHaveBeenCalled()
+    expect(showErrorMock).toHaveBeenCalledWith(
+      'Delete segment failed',
+      'Invalid or missing segment ID',
+    )
+    expect(showErrorMock).not.toHaveBeenCalledWith(
+      'Delete segment failed',
+      'The server did not confirm the delete. Please try again.',
     )
   })
 
