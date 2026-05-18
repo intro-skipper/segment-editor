@@ -109,7 +109,7 @@ export function normalizeServerAddress(address: string): string {
 }
 
 /** Validates an endpoint path for traversal attacks. */
-function isValidEndpoint(endpoint: string): boolean {
+export function isValidEndpoint(endpoint: string): boolean {
   return !PATH_TRAVERSAL.test(endpoint) && !ENCODED_TRAVERSAL.test(endpoint)
 }
 

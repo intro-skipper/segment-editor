@@ -1,4 +1,5 @@
 import { AppError, ErrorCodes, isAbortError } from '@/lib/unified-error'
+import { isValidEndpoint } from './security'
 
 export interface JellyfinFetchOptions {
   baseUrl: string
@@ -83,6 +84,11 @@ async function readJson<T>(response: Response): Promise<T> {
 
 async function jellyfinRequest<T>(options: RequestOptions): Promise<T> {
   const { accessToken, body, expectJson, method, signal, timeout } = options
+
+  if (!isValidEndpoint(options.endpoint)) {
+    throw new AppError('Invalid endpoint', ErrorCodes.INVALID_INPUT, false)
+  }
+
   const requestSignal = createRequestSignal(signal, timeout)
 
   try {

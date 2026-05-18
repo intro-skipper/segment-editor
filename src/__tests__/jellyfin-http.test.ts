@@ -79,6 +79,29 @@ describe('jellyfin http helper', () => {
     ).rejects.toMatchObject({ name: 'AbortError' })
   })
 
+  it('rejects invalid endpoints before attaching abort or timeout cleanup work', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const addListener = vi.spyOn(controller.signal, 'addEventListener')
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener')
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+
+    await expect(
+      jellyfinFetchEmpty({
+        ...baseOptions,
+        endpoint: '../Users',
+        method: 'DELETE',
+        signal: controller.signal,
+        timeout: 100,
+      }),
+    ).rejects.toMatchObject({ code: ErrorCodes.INVALID_INPUT })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(addListener).not.toHaveBeenCalled()
+    expect(removeListener).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('maps helper-created timeout distinctly from caller abort', async () => {
     vi.useFakeTimers()
     vi.spyOn(globalThis, 'fetch').mockImplementation(
