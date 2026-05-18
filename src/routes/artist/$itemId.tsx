@@ -7,17 +7,15 @@ import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
 import {
-  artistKeys,
-  itemsKeys,
+  artistQueryOptions,
+  itemsQueryOptions,
   useAlbums,
   useItem,
-} from '@/hooks/queries/use-items'
+} from '@/services/items/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
-import { getAlbums, getItemById } from '@/services/items/api'
 
 const ArtistView = lazy(() =>
   import('@/components/views/ArtistView').then((module) => ({
@@ -93,16 +91,8 @@ export const Route = createFileRoute('/artist/$itemId')({
 
     // Prefetch artist and albums data in parallel
     await Promise.all([
-      queryClient.ensureQueryData({
-        queryKey: itemsKeys.detail(itemId),
-        queryFn: () => getItemById(itemId),
-        staleTime: QUERY_STALE_TIMES.LONG,
-      }),
-      queryClient.ensureQueryData({
-        queryKey: artistKeys.albums(itemId),
-        queryFn: () => getAlbums(itemId),
-        staleTime: QUERY_STALE_TIMES.LONG,
-      }),
+      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
+      queryClient.ensureQueryData(artistQueryOptions.albums(itemId)),
     ])
   },
   onError: () => {

@@ -9,7 +9,7 @@ import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
-import { useEpisodes, useSeasons } from '@/hooks/queries/use-items'
+import { useEpisodes, useSeasons } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
 import {

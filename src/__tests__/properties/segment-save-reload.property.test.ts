@@ -12,8 +12,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
-import { segmentsKeys } from '@/hooks/queries/use-segments'
+import { useBatchSaveSegments } from '@/services/segments/mutations'
+import { segmentsKeys } from '@/services/segments/query-keys'
 
 const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
 const jellyfinFetchJsonMock = vi.hoisted(() => vi.fn())

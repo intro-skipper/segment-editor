@@ -4,20 +4,11 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { createQueryKey } from './query-error-handling'
-import { createStandardQueryOptions } from './create-query-hook'
+import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { getSegmentsById } from '@/services/segments/api'
 import { selectValidAuth, useApiStore } from '@/stores'
-
-/**
- * Type-safe query key factory for segments.
- */
-export const segmentsKeys = {
-  all: createQueryKey('segments'),
-  lists: () => createQueryKey('segments', 'list'),
-  list: (itemId: string) => createQueryKey('segments', 'list', itemId),
-} as const
+import { segmentsKeys } from './query-keys'
 
 /**
  * Options for the useSegments hook.
@@ -26,6 +17,16 @@ interface UseSegmentsOptions {
   /** Whether the query is enabled */
   enabled?: boolean
 }
+
+export const segmentsQueryOptions = {
+  list: (itemId: string) =>
+    createStandardQueryOptions<Array<MediaSegmentDto>>({
+      queryKey: segmentsKeys.list(itemId),
+      queryFn: ({ signal }) => getSegmentsById(itemId, { signal }),
+      cacheDuration: 'SHORT',
+      operation: 'Fetch segments',
+    }),
+} as const
 
 /**
  * Hook to fetch all segments for a media item.
@@ -39,13 +40,8 @@ export function useSegments(itemId: string, options?: UseSegmentsOptions) {
   const validAuth = useApiStore(selectValidAuth)
   const enabled = options?.enabled ?? true
 
-  return useQuery(
-    createStandardQueryOptions<Array<MediaSegmentDto>>({
-      queryKey: segmentsKeys.list(itemId),
-      queryFn: ({ signal }) => getSegmentsById(itemId, { signal }),
-      enabled: validAuth && enabled && !!itemId,
-      cacheDuration: 'SHORT',
-      operation: 'Fetch segments',
-    }),
-  )
+  return useQuery({
+    ...segmentsQueryOptions.list(itemId),
+    enabled: validAuth && enabled && !!itemId,
+  })
 }

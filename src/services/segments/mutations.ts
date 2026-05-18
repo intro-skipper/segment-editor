@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { batchSaveSegments, deleteSegment } from '@/services/segments/api'
-import { segmentsKeys } from '@/hooks/queries/use-segments'
+import { segmentsKeys } from './query-keys'
 import {
   QueryError,
   handleQueryError,

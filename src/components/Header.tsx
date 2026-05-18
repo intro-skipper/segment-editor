@@ -23,8 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useSessionStore } from '@/stores/session-store'
-import { useCollections } from '@/hooks/queries/use-collections'
-import { useItem } from '@/hooks/queries/use-items'
+import { useCollections, useItem } from '@/services/items/queries'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { cn } from '@/lib/utils'
