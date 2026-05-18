@@ -15,7 +15,6 @@ export const itemsKeys = {
     },
   ) => createQueryKey('items', 'list', parentId, options),
   detail: (itemId: string) => createQueryKey('items', 'detail', itemId),
-  episodes: (seriesId: string) => createQueryKey('items', 'episodes', seriesId),
 } as const
 
 export const seriesKeys = {

@@ -21,6 +21,7 @@ import {
   itemsKeys,
   seriesKeys,
 } from './query-keys'
+
 interface UseEntityOptions {
   enabled?: boolean
 }
@@ -121,6 +122,7 @@ export const artistQueryOptions = {
     }),
 } as const
 
+// Internal until a route/root loader needs collection prefetching.
 const collectionsQueryOptions = {
   list: () =>
     createStandardQueryOptions<Array<VirtualFolderInfo>>({
@@ -131,15 +133,11 @@ const collectionsQueryOptions = {
     }),
 } as const
 
-const areEntityOptionsEnabled = (
-  ids: string | Array<string>,
+const isEntityQueryEnabled = (
+  id: string,
   validAuth: boolean,
   options?: UseEntityOptions,
-) => {
-  const idsValid = Array.isArray(ids) ? ids.every(Boolean) : !!ids
-
-  return validAuth && idsValid && (options?.enabled ?? true)
-}
+) => validAuth && !!id && (options?.enabled ?? true)
 
 export function useItems({
   parentId,
@@ -170,7 +168,7 @@ export const useItem = (itemId: string, opts?: UseEntityOptions) => {
 
   return useQuery({
     ...itemsQueryOptions.detail(itemId),
-    enabled: areEntityOptionsEnabled(itemId, validAuth, opts),
+    enabled: isEntityQueryEnabled(itemId, validAuth, opts),
   })
 }
 
@@ -179,7 +177,7 @@ export const useSeasons = (seriesId: string, opts?: UseEntityOptions) => {
 
   return useQuery({
     ...seriesQueryOptions.seasons(seriesId),
-    enabled: areEntityOptionsEnabled(seriesId, validAuth, opts),
+    enabled: isEntityQueryEnabled(seriesId, validAuth, opts),
   })
 }
 
@@ -188,7 +186,7 @@ export const useTracks = (albumId: string, opts?: UseEntityOptions) => {
 
   return useQuery({
     ...albumQueryOptions.tracks(albumId),
-    enabled: areEntityOptionsEnabled(albumId, validAuth, opts),
+    enabled: isEntityQueryEnabled(albumId, validAuth, opts),
   })
 }
 
@@ -197,7 +195,7 @@ export const useAlbums = (artistId: string, opts?: UseEntityOptions) => {
 
   return useQuery({
     ...artistQueryOptions.albums(artistId),
-    enabled: areEntityOptionsEnabled(artistId, validAuth, opts),
+    enabled: isEntityQueryEnabled(artistId, validAuth, opts),
   })
 }
 
@@ -210,7 +208,7 @@ export const useEpisodes = (
 
   return useQuery({
     ...seriesQueryOptions.episodes(seriesId, seasonId),
-    enabled: areEntityOptionsEnabled([seriesId, seasonId], validAuth, opts),
+    enabled: validAuth && !!seriesId && !!seasonId && (opts?.enabled ?? true),
   })
 }
 

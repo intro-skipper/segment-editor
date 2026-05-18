@@ -5,6 +5,5 @@ import { createQueryKey } from '@/hooks/queries/query-error-handling'
  */
 export const segmentsKeys = {
   all: createQueryKey('segments'),
-  lists: () => createQueryKey('segments', 'list'),
   list: (itemId: string) => createQueryKey('segments', 'list', itemId),
 } as const
