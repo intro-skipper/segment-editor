@@ -174,10 +174,10 @@ describe('Wizard Schema Validation', () => {
 })
 
 describe('Error Code Mapping', () => {
-  it('maps 401 status to UNAUTHORIZED code', () => {
+  it('maps 401 status to non-recoverable UNAUTHORIZED code', () => {
     const error = AppError.fromStatus(401)
     expect(error.code).toBe(ErrorCodes.UNAUTHORIZED)
-    expect(error.recoverable).toBe(true)
+    expect(error.recoverable).toBe(false)
   })
 
   it('maps 403 status to FORBIDDEN code', () => {

@@ -15,13 +15,8 @@ import type { MediaSegmentDto } from '@/types/jellyfin'
 import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
 import { segmentsKeys } from '@/hooks/queries/use-segments'
 
-// Mock axios instance used by SDK
-const mockAxiosInstance = {
-  delete: vi.fn(),
-  get: vi.fn(),
-  post: vi.fn(),
-  defaults: { headers: { common: {} } },
-}
+const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
+const jellyfinFetchJsonMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
@@ -34,8 +29,8 @@ const mockApis = {
   mediaSegmentsApi: {},
   systemApi: {},
   api: {
+    accessToken: 'test-token',
     basePath: 'http://localhost:8096',
-    axiosInstance: mockAxiosInstance,
   },
 }
 
@@ -53,23 +48,15 @@ vi.mock('@/services/jellyfin', () => ({
       timeout: options?.timeout ?? defaultTimeout,
     }),
   ),
-  getAuthenticatedRequestConfig: vi.fn(
-    (
-      accessToken: string | undefined,
-      options?: { signal?: AbortSignal; timeout?: number },
-      defaultTimeout = 30000,
-    ) => ({
-      signal: options?.signal,
-      timeout: options?.timeout ?? defaultTimeout,
-      headers: accessToken
-        ? { Authorization: `MediaBrowser Token="${accessToken}"` }
-        : undefined,
-    }),
-  ),
   isAborted: vi.fn((signal?: AbortSignal) => signal?.aborted === true),
   clearApiCache: vi.fn(),
   getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
   getAccessToken: vi.fn(() => 'test-token'),
+}))
+
+vi.mock('@/services/jellyfin/http', () => ({
+  jellyfinFetchEmpty: jellyfinFetchEmptyMock,
+  jellyfinFetchJson: jellyfinFetchJsonMock,
 }))
 
 // Custom arbitrary for hex strings
@@ -137,30 +124,20 @@ function createWrapper() {
   }
 }
 
-// Setup mock axios to handle batch save (POST for creates, DELETE for deletes)
-function setupMockAxiosForSave(savedSegments: Array<MediaSegmentDto>): void {
+function setupMockFetchForSave(savedSegments: Array<MediaSegmentDto>): void {
   let callIndex = 0
-  mockAxiosInstance.post.mockImplementation(() => {
+  jellyfinFetchJsonMock.mockImplementation(() => {
     const segment = savedSegments[callIndex % savedSegments.length]
     callIndex++
-    return Promise.resolve({
-      data: segment,
-      status: 200,
-      statusText: 'OK',
-    })
+    return Promise.resolve(segment)
   })
-  mockAxiosInstance.delete.mockResolvedValue({
-    data: {},
-    status: 204,
-    statusText: 'No Content',
-  })
+  jellyfinFetchEmptyMock.mockResolvedValue(undefined)
 }
 
 describe('Segment Save Reload', () => {
   beforeEach(() => {
-    mockAxiosInstance.delete.mockClear()
-    mockAxiosInstance.get.mockClear()
-    mockAxiosInstance.post.mockClear()
+    jellyfinFetchEmptyMock.mockClear()
+    jellyfinFetchJsonMock.mockClear()
   })
 
   afterEach(() => {
@@ -186,11 +163,11 @@ describe('Segment Save Reload', () => {
             return fc.constant(withSameItemId)
           }),
         async (segments) => {
-          mockAxiosInstance.post.mockClear()
-          mockAxiosInstance.delete.mockClear()
+          jellyfinFetchJsonMock.mockClear()
+          jellyfinFetchEmptyMock.mockClear()
 
           const itemId = segments[0].ItemId
-          setupMockAxiosForSave(segments)
+          setupMockFetchForSave(segments)
 
           const { queryClient, wrapper } = createWrapper()
 

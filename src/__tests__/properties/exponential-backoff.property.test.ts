@@ -6,9 +6,10 @@
  * (±25% variation).
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
-import { calculateBackoffDelay } from '@/lib/retry-utils'
+import { calculateBackoffDelay, withRetry } from '@/lib/retry-utils'
+import { AppError, ErrorCodes } from '@/lib/unified-error'
 
 describe('Exponential Backoff Calculation', () => {
   /**
@@ -238,5 +239,59 @@ describe('Exponential Backoff Calculation', () => {
         expect(delay).toBeLessThanOrEqual(maxExpected)
       }
     }
+  })
+
+  it('retries recoverable AppError statuses from fetch helpers', async () => {
+    const recoverableStatuses = [500, 429]
+
+    await Promise.all(
+      recoverableStatuses.map(async (status) => {
+        const fn = vi
+          .fn<() => Promise<string>>()
+          .mockRejectedValueOnce(AppError.fromStatus(status))
+          .mockResolvedValueOnce('ok')
+
+        await expect(
+          withRetry(fn, { baseDelay: 0, maxDelay: 0, maxRetries: 1 }),
+        ).resolves.toBe('ok')
+        expect(fn).toHaveBeenCalledTimes(2)
+      }),
+    )
+  })
+
+  it('does not retry non-recoverable AppError statuses from fetch helpers', async () => {
+    const nonRecoverableStatuses = [400, 401, 403]
+
+    await Promise.all(
+      nonRecoverableStatuses.map(async (status) => {
+        const error = AppError.fromStatus(status)
+        const fn = vi.fn<() => Promise<string>>().mockRejectedValue(error)
+
+        await expect(
+          withRetry(fn, { baseDelay: 0, maxDelay: 0, maxRetries: 1 }),
+        ).rejects.toBe(error)
+        expect(fn).toHaveBeenCalledTimes(1)
+      }),
+    )
+  })
+
+  it('retries recoverable timeout and network AppErrors from fetch helpers', async () => {
+    const recoverableCodes = [ErrorCodes.TIMEOUT, ErrorCodes.NETWORK_ERROR]
+
+    await Promise.all(
+      recoverableCodes.map(async (code) => {
+        const fn = vi
+          .fn<() => Promise<string>>()
+          .mockRejectedValueOnce(
+            new AppError('Recoverable failure', code, true),
+          )
+          .mockResolvedValueOnce('ok')
+
+        await expect(
+          withRetry(fn, { baseDelay: 0, maxDelay: 0, maxRetries: 1 }),
+        ).resolves.toBe('ok')
+        expect(fn).toHaveBeenCalledTimes(2)
+      }),
+    )
   })
 })

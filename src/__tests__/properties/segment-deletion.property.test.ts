@@ -11,8 +11,6 @@ import * as fc from 'fast-check'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import { AxiosError } from 'axios'
-import type { AxiosRequestConfig } from 'axios'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { useDeleteSegment } from '@/hooks/mutations/use-segment-mutations'
 import { segmentsKeys } from '@/hooks/queries/use-segments'
@@ -27,13 +25,7 @@ interface DeleteRequest {
 
 const deleteRequests: Array<DeleteRequest> = []
 
-// Mock axios instance used by SDK
-const mockAxiosInstance = {
-  delete: vi.fn(),
-  get: vi.fn(),
-  post: vi.fn(),
-  defaults: { headers: { common: {} } },
-}
+const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
@@ -46,8 +38,8 @@ const mockApis = {
   mediaSegmentsApi: {},
   systemApi: {},
   api: {
+    accessToken: 'test-token',
     basePath: 'http://localhost:8096',
-    axiosInstance: mockAxiosInstance,
   },
 }
 
@@ -65,23 +57,15 @@ vi.mock('@/services/jellyfin', () => ({
       timeout: options?.timeout ?? defaultTimeout,
     }),
   ),
-  getAuthenticatedRequestConfig: vi.fn(
-    (
-      accessToken: string | undefined,
-      options?: { signal?: AbortSignal; timeout?: number },
-      defaultTimeout = 30000,
-    ) => ({
-      signal: options?.signal,
-      timeout: options?.timeout ?? defaultTimeout,
-      headers: accessToken
-        ? { Authorization: `MediaBrowser Token="${accessToken}"` }
-        : undefined,
-    }),
-  ),
   isAborted: vi.fn((signal?: AbortSignal) => signal?.aborted === true),
   clearApiCache: vi.fn(),
   getServerBaseUrl: vi.fn(() => 'http://localhost:8096'),
   getAccessToken: vi.fn(() => 'test-token'),
+}))
+
+vi.mock('@/services/jellyfin/http', () => ({
+  jellyfinFetchEmpty: jellyfinFetchEmptyMock,
+  jellyfinFetchJson: vi.fn(),
 }))
 
 // Custom arbitrary for hex strings
@@ -149,55 +133,30 @@ function createWrapper() {
   }
 }
 
-// Setup mock axios to track DELETE requests
-function setupMockAxios(success: boolean = true): void {
-  mockAxiosInstance.delete.mockImplementation(
-    (url: string, _config?: AxiosRequestConfig) => {
-      // Parse URL to extract segment ID and query params
-      const urlObj = new URL(url, 'http://localhost:8096')
-      const pathParts = urlObj.pathname.split('/')
-      // Segment ID is after 'MediaSegmentsApi' in the path
-      const segmentIdPart = pathParts[pathParts.length - 1]
-      // Remove query string from segment ID if present
-      const segmentId = segmentIdPart.split('?')[0]
-
-      // Get query params from URL (segments API puts them in URL)
-      const itemId = urlObj.searchParams.get('itemId') ?? undefined
-      const type = urlObj.searchParams.get('type') ?? undefined
+function setupMockFetch(success: boolean = true): void {
+  jellyfinFetchEmptyMock.mockImplementation(
+    ({ endpoint, query }: { endpoint: string; query?: URLSearchParams }) => {
+      const segmentId = endpoint.split('/').at(-1) ?? ''
+      const itemId = query?.get('itemId') ?? undefined
+      const type = query?.get('type') ?? undefined
 
       deleteRequests.push({
-        url,
+        url: `${endpoint}${query?.toString() ? `?${query.toString()}` : ''}`,
         segmentId,
         itemId,
         type,
       })
 
-      if (success) {
-        return Promise.resolve({
-          data: {},
-          status: 204,
-          statusText: 'No Content',
-        })
-      } else {
-        const error = new AxiosError('Server Error')
-        error.response = {
-          status: 500,
-          data: { message: 'Server Error' },
-          statusText: 'Internal Server Error',
-          headers: {},
-          config: {} as never,
-        }
-        return Promise.reject(error)
-      }
+      return success
+        ? Promise.resolve()
+        : Promise.reject(new Error('Server Error'))
     },
   )
 }
 
 describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
-    mockAxiosInstance.delete.mockClear()
-    mockAxiosInstance.get.mockClear()
-    mockAxiosInstance.post.mockClear()
+    jellyfinFetchEmptyMock.mockClear()
     deleteRequests.length = 0
   })
 
@@ -215,10 +174,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous requests
         deleteRequests.length = 0
-        mockAxiosInstance.delete.mockClear()
+        jellyfinFetchEmptyMock.mockClear()
 
         // Setup successful delete response
-        setupMockAxios(true)
+        setupMockFetch(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -265,10 +224,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous state
         deleteRequests.length = 0
-        mockAxiosInstance.delete.mockClear()
+        jellyfinFetchEmptyMock.mockClear()
 
         // Setup successful delete response
-        setupMockAxios(true)
+        setupMockFetch(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -326,10 +285,10 @@ describe('Segment Deletion State Synchronization', () => {
       fc.asyncProperty(segmentArb, async (segment) => {
         // Clear previous state
         deleteRequests.length = 0
-        mockAxiosInstance.delete.mockClear()
+        jellyfinFetchEmptyMock.mockClear()
 
         // Setup successful delete response
-        setupMockAxios(true)
+        setupMockFetch(true)
 
         const { queryClient, wrapper } = createWrapper()
 
@@ -399,10 +358,10 @@ describe('Segment Deletion State Synchronization', () => {
 
           // Clear previous state
           deleteRequests.length = 0
-          mockAxiosInstance.delete.mockClear()
+          jellyfinFetchEmptyMock.mockClear()
 
           // Setup successful delete response
-          setupMockAxios(true)
+          setupMockFetch(true)
 
           const { queryClient, wrapper } = createWrapper()
 

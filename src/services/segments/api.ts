@@ -13,12 +13,8 @@
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { RetryOptions } from '@/lib/retry-utils'
 import type { ApiOptions } from '@/services/jellyfin'
-import {
-  getAuthenticatedRequestConfig,
-  getRequestConfig,
-  getServerBaseUrl,
-  withApi,
-} from '@/services/jellyfin'
+import { getRequestConfig, withApi } from '@/services/jellyfin'
+import { jellyfinFetchEmpty, jellyfinFetchJson } from '@/services/jellyfin/http'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
 import { API_CONFIG } from '@/lib/constants'
@@ -90,12 +86,9 @@ const validateForDelete = (segment: MediaSegmentDto): boolean => {
 // API Operations (Using withApi Pattern Consistently)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Builds segment API URL with proper encoding */
-const buildSegmentUrl = (path: string, params?: URLSearchParams): string => {
-  const base = getServerBaseUrl()
-  const qs = params?.toString()
-  return `${base}/MediaSegmentsApi/${path}${qs ? `?${qs}` : ''}`
-}
+/** Builds segment API endpoint path with proper encoding */
+const buildSegmentEndpoint = (path: string): string =>
+  `MediaSegmentsApi/${path}`
 
 /** Executes segment mutation with retry logic */
 const withSegmentRetry = <T>(
@@ -134,21 +127,22 @@ async function createSegment(
   if (!validateForCreate(segment)) return false
 
   const result = await withApi(async (apis) => {
-    const url = buildSegmentUrl(
-      encodeUrlParam(segment.ItemId!),
-      new URLSearchParams({ providerId: DEFAULT_SEGMENT_PROVIDER_ID }),
-    )
+    const endpoint = buildSegmentEndpoint(encodeUrlParam(segment.ItemId!))
+    const query = new URLSearchParams({
+      providerId: DEFAULT_SEGMENT_PROVIDER_ID,
+    })
 
     return withSegmentRetry(async () => {
-      const { data } = await apis.api.axiosInstance.post<MediaSegmentDto>(
-        url,
-        toServerSegment(segment),
-        getAuthenticatedRequestConfig(
-          apis.api.accessToken,
-          options,
-          API_CONFIG.SEGMENT_TIMEOUT_MS,
-        ),
-      )
+      const data = await jellyfinFetchJson<MediaSegmentDto>({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        body: toServerSegment(segment),
+        endpoint,
+        method: 'POST',
+        query,
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
       return toUiSegment(data)
     }, options)
   }, options)
@@ -175,17 +169,18 @@ export async function deleteSegment(
       params.set('type', String(segment.Type))
     }
 
-    const url = buildSegmentUrl(encodeUrlParam(segment.Id!), params)
+    const endpoint = buildSegmentEndpoint(encodeUrlParam(segment.Id!))
 
     return withSegmentRetry(async () => {
-      await apis.api.axiosInstance.delete(
-        url,
-        getAuthenticatedRequestConfig(
-          apis.api.accessToken,
-          options,
-          API_CONFIG.SEGMENT_TIMEOUT_MS,
-        ),
-      )
+      await jellyfinFetchEmpty({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        endpoint,
+        method: 'DELETE',
+        query: params,
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
       return true
     }, options)
   }, options)

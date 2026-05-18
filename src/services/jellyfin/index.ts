@@ -46,7 +46,6 @@ export type { ApiOptions, AuthCredentials, AuthResult } from './types'
 export {
   withApi,
   getRequestConfig,
-  getAuthenticatedRequestConfig,
   isPluginMode,
   getPluginCredentials,
   getDeviceId,
