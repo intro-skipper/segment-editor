@@ -65,7 +65,8 @@ const getProp = <T>(e: unknown, key: string): T | undefined =>
 
 const getCode = (e: unknown) => getProp<string>(e, 'code')
 const getStatus = (e: unknown) =>
-  getProp<{ status?: number }>(e, 'response')?.status
+  getProp<{ status?: number }>(e, 'response')?.status ??
+  getProp<number>(e, 'status')
 
 export const isAbortError = (e: unknown): boolean =>
   (e instanceof DOMException && e.name === 'AbortError') ||
@@ -80,9 +81,18 @@ const isNetworkError = (e: unknown): boolean => {
 
 export const isRecoverableError = (e: unknown): boolean => {
   if (isAbortError(e)) return false
-  if (isTimeoutError(e) || isNetworkError(e)) return true
+
   const status = getStatus(e)
-  return status !== undefined && (status >= 500 || status === 429)
+  if (status !== undefined) return status >= 500 || status === 429
+
+  const code = getCode(e)
+  if (code === ErrorCodes.TIMEOUT || code === ErrorCodes.NETWORK_ERROR) {
+    return true
+  }
+
+  if (isTimeoutError(e) || isNetworkError(e)) return true
+
+  return e instanceof AppError && e.recoverable === true
 }
 
 // HTTP status mapping
@@ -93,7 +103,7 @@ const STATUS_MAP: Record<
   401: {
     code: ErrorCodes.UNAUTHORIZED,
     message: 'Authentication required',
-    recoverable: true,
+    recoverable: false,
   },
   403: {
     code: ErrorCodes.FORBIDDEN,
