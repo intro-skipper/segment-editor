@@ -28,10 +28,10 @@ interface OptimisticContext {
   rolledBack?: boolean
 }
 
-export const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
+const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
   'The server did not confirm the delete. Please try again.'
 
-export const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
+const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
 
 // Shared utilities
 const handleMutationError = (operation: string) => (error: unknown) => {
@@ -90,10 +90,6 @@ const rollbackSegments = (
   ctx.rolledBack = true
 }
 
-const throwCancelledMutation = () => {
-  throw new DOMException('Aborted', 'AbortError')
-}
-
 const validateDeleteInput = (segment: MediaSegmentDto) => {
   if (!isValidItemId(segment.Id)) {
     throw QueryError.validation(DELETE_SEGMENT_INVALID_MESSAGE)
@@ -109,7 +105,7 @@ export const useDeleteSegment = () => {
       validateDeleteInput(segment)
       const deleted = await deleteSegment(segment, { signal })
       if (!deleted) {
-        if (signal.aborted) throwCancelledMutation()
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
         throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
       }
       return deleted

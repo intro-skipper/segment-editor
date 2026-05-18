@@ -12,11 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import {
-  DELETE_SEGMENT_INVALID_MESSAGE,
-  DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
-  useDeleteSegment,
-} from '@/services/segments/mutations'
+import { useDeleteSegment } from '@/services/segments/mutations'
 import { segmentsKeys } from '@/services/segments/query-keys'
 import { ErrorCodes } from '@/lib/unified-error'
 
@@ -32,7 +28,6 @@ const deleteRequests: Array<DeleteRequest> = []
 
 const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
-const showSuccessMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
@@ -77,7 +72,7 @@ vi.mock('@/services/jellyfin/http', () => ({
 
 vi.mock('@/lib/notifications', () => ({
   showError: showErrorMock,
-  showSuccess: showSuccessMock,
+  showSuccess: vi.fn(),
 }))
 
 // Custom arbitrary for hex strings
@@ -203,7 +198,6 @@ describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
     jellyfinFetchEmptyMock.mockClear()
     showErrorMock.mockClear()
-    showSuccessMock.mockClear()
     deleteRequests.length = 0
   })
 
@@ -344,7 +338,7 @@ describe('Segment Deletion State Synchronization', () => {
     const { result } = renderHook(() => useDeleteSegment(), { wrapper })
 
     await expect(result.current.mutateAsync(segment)).rejects.toThrow(
-      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
+      'The server did not confirm the delete. Please try again.',
     )
 
     expect(
@@ -387,7 +381,7 @@ describe('Segment Deletion State Synchronization', () => {
     const { result } = renderHook(() => useDeleteSegment(), { wrapper })
 
     await expect(result.current.mutateAsync(segment)).rejects.toThrow(
-      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
+      'The server did not confirm the delete. Please try again.',
     )
 
     const restored = queryClient.getQueryData<Array<MediaSegmentDto>>(
@@ -443,16 +437,16 @@ describe('Segment Deletion State Synchronization', () => {
 
     await expect(result.current.mutateAsync(segment)).rejects.toMatchObject({
       code: ErrorCodes.INVALID_INPUT,
-      message: DELETE_SEGMENT_INVALID_MESSAGE,
+      message: 'Invalid or missing segment ID',
     })
     expect(jellyfinFetchEmptyMock).not.toHaveBeenCalled()
     expect(showErrorMock).toHaveBeenCalledWith(
       'Delete segment failed',
-      DELETE_SEGMENT_INVALID_MESSAGE,
+      'Invalid or missing segment ID',
     )
     expect(showErrorMock).not.toHaveBeenCalledWith(
       'Delete segment failed',
-      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
+      'The server did not confirm the delete. Please try again.',
     )
   })
 
