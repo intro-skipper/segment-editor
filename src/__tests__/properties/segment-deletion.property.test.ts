@@ -318,6 +318,56 @@ describe('Segment Deletion State Synchronization', () => {
     })
   })
 
+  it('restores previous cache without invalidation when optimistic delete does not change cache length', async () => {
+    const segment: MediaSegmentDto = {
+      Id: '00000000-0000-4000-8000-000000000001',
+      ItemId: '00000000-0000-4000-8000-000000000002',
+      Type: 'Intro',
+      StartTicks: 100,
+      EndTicks: 200,
+    }
+    const otherSegment: MediaSegmentDto = {
+      ...segment,
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    }
+    const anotherSegment: MediaSegmentDto = {
+      ...segment,
+      Id: '00000000-0000-4000-8000-000000000004',
+      StartTicks: 500,
+      EndTicks: 600,
+    }
+
+    setupMockFetch(false)
+
+    const { queryClient, wrapper } = createWrapper()
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    // The deleted segment is not in the cache, so the optimistic filter leaves
+    // the cache length and IDs unchanged before rollback.
+    const previousSegments = [otherSegment, anotherSegment]
+
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      previousSegments,
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toThrow(
+      'The server did not confirm the delete. Please try again.',
+    )
+
+    const restored = queryClient.getQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+    )
+    expect(restored).toEqual(previousSegments)
+    expect(restored?.map((s) => s.Id)).toEqual(
+      previousSegments.map((s) => s.Id),
+    )
+    expect(invalidateQueriesSpy).not.toHaveBeenCalled()
+  })
+
   /**
    * Property: DELETE request includes correct query parameters
    * For any valid segment, the DELETE request SHALL include
