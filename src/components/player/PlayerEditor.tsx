@@ -20,8 +20,8 @@ import type {
   TimestampUpdate,
 } from '@/types/segment'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
-import { useSegments } from '@/hooks/queries/use-segments'
-import { useBatchSaveSegments } from '@/hooks/mutations/use-segment-mutations'
+import { useSegments } from '@/services/segments/queries'
+import { useBatchSaveSegments } from '@/services/segments/mutations'
 import { useAppStore } from '@/stores/app-store'
 import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'

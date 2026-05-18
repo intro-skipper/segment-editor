@@ -7,14 +7,11 @@ import { Suspense, lazy } from 'react'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { QUERY_STALE_TIMES } from '@/hooks/queries/query-constants'
-import { itemsKeys, useItem } from '@/hooks/queries/use-items'
-import { segmentsKeys } from '@/hooks/queries/use-segments'
+import { useItem, itemsQueryOptions } from '@/services/items/queries'
+import { segmentsQueryOptions } from '@/services/segments/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
-import { getItemById } from '@/services/items/api'
-import { getSegmentsById } from '@/services/segments/api'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 
@@ -100,20 +97,12 @@ export const Route = createFileRoute('/player/$itemId')({
     const { queryClient } = context
 
     const prefetches: Array<Promise<unknown>> = [
-      queryClient.ensureQueryData({
-        queryKey: itemsKeys.detail(itemId),
-        queryFn: () => getItemById(itemId),
-        staleTime: QUERY_STALE_TIMES.LONG,
-      }),
+      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
     ]
 
     if (deps.fetchSegments) {
       prefetches.push(
-        queryClient.ensureQueryData({
-          queryKey: segmentsKeys.list(itemId),
-          queryFn: () => getSegmentsById(itemId),
-          staleTime: QUERY_STALE_TIMES.SHORT,
-        }),
+        queryClient.ensureQueryData(segmentsQueryOptions.list(itemId)),
       )
     }
 

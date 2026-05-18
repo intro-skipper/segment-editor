@@ -10,7 +10,7 @@ import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
-import { useEpisodes } from '@/hooks/queries/use-items'
+import { useEpisodes } from '@/services/items/queries'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'

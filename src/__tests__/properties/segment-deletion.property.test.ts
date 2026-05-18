@@ -12,8 +12,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { useDeleteSegment } from '@/hooks/mutations/use-segment-mutations'
-import { segmentsKeys } from '@/hooks/queries/use-segments'
+import { useDeleteSegment } from '@/services/segments/mutations'
+import { segmentsKeys } from '@/services/segments/query-keys'
 
 // Track DELETE requests for verification
 interface DeleteRequest {

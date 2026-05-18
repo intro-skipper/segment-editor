@@ -52,8 +52,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
-import { useCollections } from '@/hooks/queries/use-collections'
-import { useItems } from '@/hooks/queries/use-items'
+import { useCollections, useItems } from '@/services/items/queries'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
