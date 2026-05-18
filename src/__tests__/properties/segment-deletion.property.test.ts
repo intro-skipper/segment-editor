@@ -13,10 +13,12 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import {
+  DELETE_SEGMENT_INVALID_MESSAGE,
   DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
   useDeleteSegment,
 } from '@/services/segments/mutations'
 import { segmentsKeys } from '@/services/segments/query-keys'
+import { ErrorCodes } from '@/lib/unified-error'
 
 // Track DELETE requests for verification
 interface DeleteRequest {
@@ -29,6 +31,8 @@ interface DeleteRequest {
 const deleteRequests: Array<DeleteRequest> = []
 
 const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
+const showErrorMock = vi.hoisted(() => vi.fn())
+const showSuccessMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
@@ -69,6 +73,11 @@ vi.mock('@/services/jellyfin', () => ({
 vi.mock('@/services/jellyfin/http', () => ({
   jellyfinFetchEmpty: jellyfinFetchEmptyMock,
   jellyfinFetchJson: vi.fn(),
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  showError: showErrorMock,
+  showSuccess: showSuccessMock,
 }))
 
 // Custom arbitrary for hex strings
@@ -157,6 +166,28 @@ function setupMockFetch(success: boolean = true): void {
   )
 }
 
+function setupAbortThenSuccessFetch(): void {
+  let callCount = 0
+  jellyfinFetchEmptyMock.mockImplementation(
+    ({ signal }: { signal?: AbortSignal }) => {
+      callCount += 1
+      if (callCount > 1) return Promise.resolve()
+
+      return new Promise<void>((_, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'))
+          return
+        }
+        signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        )
+      })
+    },
+  )
+}
+
 const createSegmentDto = (
   overrides: Partial<MediaSegmentDto> = {},
 ): MediaSegmentDto => ({
@@ -171,6 +202,8 @@ const createSegmentDto = (
 describe('Segment Deletion State Synchronization', () => {
   beforeEach(() => {
     jellyfinFetchEmptyMock.mockClear()
+    showErrorMock.mockClear()
+    showSuccessMock.mockClear()
     deleteRequests.length = 0
   })
 
@@ -365,6 +398,62 @@ describe('Segment Deletion State Synchronization', () => {
       previousSegments.map((s) => s.Id),
     )
     expect(invalidateQueriesSpy).not.toHaveBeenCalled()
+  })
+
+  it('suppresses error notification when delete is cancelled by a newer mutation', async () => {
+    const segment = createSegmentDto()
+    const otherSegment = createSegmentDto({
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    })
+
+    setupAbortThenSuccessFetch()
+
+    const { queryClient, wrapper } = createWrapper()
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      [segment, otherSegment],
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    const cancelledDelete = result.current.mutateAsync(segment)
+    await waitFor(() => expect(jellyfinFetchEmptyMock).toHaveBeenCalledTimes(1))
+
+    const confirmedDelete = result.current.mutateAsync(otherSegment)
+
+    await expect(cancelledDelete).rejects.toMatchObject({
+      code: ErrorCodes.CANCELLED,
+    })
+    await expect(confirmedDelete).resolves.toBe(true)
+    expect(showErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('reports invalid segment IDs without using server confirmation message', async () => {
+    const segment = createSegmentDto({ Id: 'not-a-valid-id' })
+
+    const { queryClient, wrapper } = createWrapper()
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      [segment],
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toMatchObject({
+      code: ErrorCodes.INVALID_INPUT,
+      message: DELETE_SEGMENT_INVALID_MESSAGE,
+    })
+    expect(jellyfinFetchEmptyMock).not.toHaveBeenCalled()
+    expect(showErrorMock).toHaveBeenCalledWith(
+      'Delete segment failed',
+      DELETE_SEGMENT_INVALID_MESSAGE,
+    )
+    expect(showErrorMock).not.toHaveBeenCalledWith(
+      'Delete segment failed',
+      DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE,
+    )
   })
 
   /**

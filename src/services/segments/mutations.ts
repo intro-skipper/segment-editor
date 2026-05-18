@@ -14,7 +14,8 @@ import {
   handleQueryError,
 } from '@/hooks/queries/query-error-handling'
 import { showError, showSuccess } from '@/lib/notifications'
-import { isAbortError } from '@/lib/unified-error'
+import { ErrorCodes } from '@/lib/unified-error'
+import { isValidItemId } from '@/lib/schemas'
 
 interface BatchSaveInput {
   itemId: string
@@ -30,10 +31,12 @@ interface OptimisticContext {
 export const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
   'The server did not confirm the delete. Please try again.'
 
+export const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
+
 // Shared utilities
 const handleMutationError = (operation: string) => (error: unknown) => {
-  if (isAbortError(error)) return
   const e = QueryError.from(error)
+  if (e.code === ErrorCodes.CANCELLED) return
   handleQueryError(e, { operation })
   showError(
     `${operation} failed`,
@@ -87,14 +90,28 @@ const rollbackSegments = (
   ctx.rolledBack = true
 }
 
+const throwCancelledMutation = () => {
+  throw new DOMException('Aborted', 'AbortError')
+}
+
+const validateDeleteInput = (segment: MediaSegmentDto) => {
+  if (!isValidItemId(segment.Id)) {
+    throw QueryError.validation(DELETE_SEGMENT_INVALID_MESSAGE)
+  }
+}
+
 export const useDeleteSegment = () => {
   const qc = useQueryClient()
   const getController = useAbortController()
 
   return useMutation<boolean, QueryError, MediaSegmentDto, OptimisticContext>({
     mutationFn: wrapMutationFn(async (segment, signal) => {
+      validateDeleteInput(segment)
       const deleted = await deleteSegment(segment, { signal })
-      if (!deleted) throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
+      if (!deleted) {
+        if (signal.aborted) throwCancelledMutation()
+        throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
+      }
       return deleted
     }, getController),
     onMutate: async (segment) => {
