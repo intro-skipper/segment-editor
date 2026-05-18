@@ -275,6 +275,49 @@ describe('Segment Deletion State Synchronization', () => {
     )
   })
 
+  it('restores previous cache and invalidates when optimistic delete changes cache length', async () => {
+    const segment: MediaSegmentDto = {
+      Id: '00000000-0000-4000-8000-000000000001',
+      ItemId: '00000000-0000-4000-8000-000000000002',
+      Type: 'Intro',
+      StartTicks: 100,
+      EndTicks: 200,
+    }
+    const otherSegment: MediaSegmentDto = {
+      ...segment,
+      Id: '00000000-0000-4000-8000-000000000003',
+      StartTicks: 300,
+      EndTicks: 400,
+    }
+
+    setupMockFetch(false)
+
+    const { queryClient, wrapper } = createWrapper()
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const previousSegments = [segment, otherSegment]
+
+    queryClient.setQueryData<Array<MediaSegmentDto>>(
+      segmentsKeys.list(segment.ItemId!),
+      previousSegments,
+    )
+
+    const { result } = renderHook(() => useDeleteSegment(), { wrapper })
+
+    await expect(result.current.mutateAsync(segment)).rejects.toThrow(
+      'The server did not confirm the delete. Please try again.',
+    )
+
+    expect(
+      queryClient.getQueryData<Array<MediaSegmentDto>>(
+        segmentsKeys.list(segment.ItemId!),
+      ),
+    ).toEqual(previousSegments)
+    expect(invalidateQueriesSpy).toHaveBeenCalledTimes(1)
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: segmentsKeys.list(segment.ItemId!),
+    })
+  })
+
   /**
    * Property: DELETE request includes correct query parameters
    * For any valid segment, the DELETE request SHALL include

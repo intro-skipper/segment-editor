@@ -69,16 +69,17 @@ const rollbackSegments = (
   ctx: OptimisticContext,
 ) => {
   if (!previous) return
-  qc.setQueryData(segmentsKeys.list(itemId), previous)
   const current = qc.getQueryData<Array<MediaSegmentDto>>(
     segmentsKeys.list(itemId),
   )
-  if (
-    !current ||
-    current.length !== previous.length ||
-    !previous.every((s) => current.some((c) => c.Id === s.Id))
-  ) {
+  qc.setQueryData(segmentsKeys.list(itemId), previous)
+  if (!current || current.length !== previous.length) {
     void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+  } else {
+    const currentIds = new Set(current.map((segment) => segment.Id))
+    if (!previous.every((segment) => currentIds.has(segment.Id))) {
+      void qc.invalidateQueries({ queryKey: segmentsKeys.list(itemId) })
+    }
   }
   ctx.rolledBack = true
 }
@@ -88,10 +89,14 @@ export const useDeleteSegment = () => {
   const getController = useAbortController()
 
   return useMutation<boolean, QueryError, MediaSegmentDto, OptimisticContext>({
-    mutationFn: wrapMutationFn(
-      (segment, signal) => deleteSegment(segment, { signal }),
-      getController,
-    ),
+    mutationFn: wrapMutationFn(async (segment, signal) => {
+      const deleted = await deleteSegment(segment, { signal })
+      if (!deleted)
+        throw new Error(
+          'The server did not confirm the delete. Please try again.',
+        )
+      return deleted
+    }, getController),
     onMutate: async (segment) => {
       if (!segment.ItemId) return { rolledBack: false }
       await qc.cancelQueries({ queryKey: segmentsKeys.list(segment.ItemId) })
