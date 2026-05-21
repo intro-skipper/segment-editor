@@ -31,7 +31,6 @@ import type { ComponentProps, ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
-import { LightRays } from '@/components/ui/light-rays'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
 import { Freeze } from '@/components/ui/freeze'
@@ -570,14 +569,6 @@ function useRenderFilterView() {
 
   return (
     <div className="relative px-4 pb-8 sm:px-6">
-      <LightRays
-        className="fixed inset-0 z-0"
-        count={5}
-        color="rgba(120, 180, 255, 0.15)"
-        blur={48}
-        speed={18}
-        length="60vh"
-      />
       <div className="max-w-7xl mx-auto">
         {/* Not Connected State - standalone mode without credentials */}
         {showNotConnected && (
