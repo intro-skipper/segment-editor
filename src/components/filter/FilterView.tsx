@@ -531,9 +531,12 @@ function useRenderFilterView() {
     startTransition(() => {
       setCurrentPage(newPage)
     })
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches
+    if (typeof window === 'undefined') return
+
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
     window.scrollTo({
       top: 0,
       behavior: prefersReducedMotion ? 'auto' : 'smooth',

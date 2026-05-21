@@ -55,9 +55,8 @@
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-fast: 150ms;
   --duration-normal: 200ms;
-  --duration-slow: 300ms;
-  --duration-entrance: 400ms;
   --duration-toast: 250ms;
+  --duration-player-enter: 250ms;
   --duration-player-exit: 180ms;
   /* Spacing tokens for consistent sizing */
   --spacing-button-min: 10rem;
@@ -410,7 +409,7 @@ body {
 
   &::view-transition-new(root) {
     animation-name: vt-expand-in;
-    animation-duration: var(--duration-toast);
+    animation-duration: var(--duration-player-enter);
   }
 }
 
