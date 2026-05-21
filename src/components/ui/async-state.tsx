@@ -13,6 +13,7 @@ import { AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 import { Button } from './button'
 import { Skeleton } from './skeleton'
 import { cn } from '@/lib/utils'
+import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
 // Re-export SimpleEmptyState as EmptyState for backward compatibility
 export { SimpleEmptyState as EmptyState } from './empty-state'
@@ -90,7 +91,7 @@ export function SegmentLoadingState({
             'p-4 rounded-2xl border border-border/50 bg-card/30',
             'animate-in fade-in duration-300',
           )}
-          style={{ animationDelay: `${i * 50}ms` }}
+          style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
         >
           {/* Header row with type badge and actions */}
           <div className="flex items-center justify-between mb-3">

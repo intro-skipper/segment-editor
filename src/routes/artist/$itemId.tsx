@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
+import { staggerDelay } from '@/lib/animation-utils'
 
 const ArtistView = lazy(() =>
   import('@/components/views/ArtistView').then((module) => ({
@@ -68,7 +69,7 @@ function ArtistSkeleton() {
             <div
               key={i}
               className="space-y-2 animate-in fade-in duration-300"
-              style={{ animationDelay: `${i * 40}ms` }}
+              style={{ animationDelay: staggerDelay(i) }}
             >
               <Skeleton className="aspect-square w-full rounded-lg" />
               <Skeleton className="h-4 w-3/4" />

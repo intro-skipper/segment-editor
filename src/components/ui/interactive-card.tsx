@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 interface InteractiveCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Click handler for the card */
   onClick?: () => void
-  /** Animation delay in ms for staggered entrance */
-  animationDelay?: number
+  /** Animation delay as CSS value for staggered entrance (e.g. "120ms") */
+  animationDelay?: string
   /** Whether to animate entrance */
   animate?: boolean
   /** Accessible label for the card */
@@ -23,7 +23,7 @@ interface InteractiveCardProps extends React.ButtonHTMLAttributes<HTMLButtonElem
  */
 export const InteractiveCard = React.memo(function InteractiveCardComponent({
   onClick,
-  animationDelay = 0,
+  animationDelay,
   animate = false,
   className,
   style,
@@ -44,9 +44,7 @@ export const InteractiveCard = React.memo(function InteractiveCardComponent({
         className,
       )}
       style={{
-        ...(animate && animationDelay > 0
-          ? { animationDelay: `${animationDelay}ms` }
-          : {}),
+        ...(animate && animationDelay ? { animationDelay } : {}),
         ...style,
       }}
       {...props}

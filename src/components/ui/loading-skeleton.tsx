@@ -10,6 +10,7 @@
  */
 
 import { cn } from '@/lib/utils'
+import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
 interface LoadingSkeletonProps {
   /** Width of the skeleton */
@@ -88,7 +89,7 @@ export function MediaGridSkeleton({
         <div
           key={i}
           className="animate-in fade-in duration-300"
-          style={{ animationDelay: `${i * 30}ms` }}
+          style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
         >
           <MediaCardSkeleton />
         </div>

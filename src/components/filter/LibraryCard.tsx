@@ -11,6 +11,7 @@ import type { VirtualFolderInfo } from '@/types/jellyfin'
 import { getServerBaseUrl } from '@/services/jellyfin'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { cn } from '@/lib/utils'
+import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
 interface LibraryCardProps {
   /** The library/collection item */
@@ -24,10 +25,6 @@ interface LibraryCardProps {
   /** Index for animation stagger */
   index?: number
 }
-
-/** Max animation delay to prevent long waits */
-const MAX_ANIMATION_DELAY = 300
-const ANIMATION_STAGGER = 30
 
 export const LibraryCard = memo(function LibraryCardComponent({
   collection,
@@ -60,10 +57,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
   })
 
   // Derived values
-  const animationDelay = Math.min(
-    index * ANIMATION_STAGGER,
-    MAX_ANIMATION_DELAY,
-  )
+  const animationDelay = staggerDelay(index, STAGGER_FAST)
 
   return (
     <button
@@ -80,7 +74,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
         'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
         className,
       )}
-      style={{ animationDelay: `${animationDelay}ms` }}
+      style={{ animationDelay }}
     >
       {/* Library Image - 16:9 aspect ratio */}
       <div className="relative aspect-video bg-muted overflow-hidden">

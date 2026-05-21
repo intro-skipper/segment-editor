@@ -52,6 +52,13 @@
   --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
   --tracking-normal: 0rem;
   --spacing: 0.25rem;
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-entrance: 400ms;
+  --duration-toast: 250ms;
+  --duration-player-exit: 180ms;
   /* Spacing tokens for consistent sizing */
   --spacing-button-min: 10rem;
   --spacing-dropdown-min: 12.5rem;
@@ -270,8 +277,8 @@ body {
 /* Default crossfade transition */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 200ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: var(--duration-normal);
+  animation-timing-function: var(--ease-out-expo);
 }
 
 ::view-transition-old(root) {
@@ -326,12 +333,12 @@ body {
 :root:active-view-transition-type(forward) {
   &::view-transition-old(root) {
     animation-name: vt-zoom-out;
-    animation-duration: 150ms;
+    animation-duration: var(--duration-fast);
   }
 
   &::view-transition-new(root) {
     animation-name: vt-zoom-in;
-    animation-duration: 200ms;
+    animation-duration: var(--duration-normal);
   }
 }
 
@@ -361,12 +368,12 @@ body {
 :root:active-view-transition-type(back) {
   &::view-transition-old(root) {
     animation-name: vt-shrink-out;
-    animation-duration: 150ms;
+    animation-duration: var(--duration-fast);
   }
 
   &::view-transition-new(root) {
     animation-name: vt-shrink-in;
-    animation-duration: 200ms;
+    animation-duration: var(--duration-normal);
   }
 }
 
@@ -398,12 +405,12 @@ body {
 :root:active-view-transition-type(to-player) {
   &::view-transition-old(root) {
     animation-name: vt-expand-out;
-    animation-duration: 180ms;
+    animation-duration: var(--duration-player-exit);
   }
 
   &::view-transition-new(root) {
     animation-name: vt-expand-in;
-    animation-duration: 250ms;
+    animation-duration: var(--duration-toast);
   }
 }
 
@@ -428,10 +435,10 @@ body {
 /* Opt-in transitions for interactive elements */
 [data-interactive-transition='true'] {
   transition:
-    transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease;
+    transform var(--duration-fast) var(--ease-out-expo),
+    background-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    opacity var(--duration-fast) ease;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -457,7 +464,7 @@ body {
 /* Skip link for keyboard navigation */
 .skip-link {
   @apply sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-primary text-primary-foreground px-4 py-2 z-50 rounded-b-lg font-medium;
-  transition: top 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: top var(--duration-normal) var(--ease-out-expo);
 }
 
 /* Touch target sizing for mobile (WCAG 2.5.5 compliance)
@@ -504,8 +511,10 @@ body {
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
   ::view-transition-old(root),
@@ -532,9 +541,9 @@ body {
 .segment-handle {
   touch-action: none;
   transition:
-    filter 150ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    filter var(--duration-fast) var(--ease-out-expo),
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
   border-radius: 2px;
   will-change: transform, filter;
 }
@@ -587,7 +596,7 @@ body {
 ::-webkit-scrollbar-thumb {
   background: oklch(from var(--muted-foreground) l c h / 30%);
   border-radius: 4px;
-  transition: background 200ms ease;
+  transition: background var(--duration-normal) ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -599,8 +608,8 @@ input:not([type='checkbox']):not([type='radio']),
 textarea,
 select {
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 
 input:not([type='checkbox']):not([type='radio']):focus,
@@ -641,7 +650,7 @@ select:focus {
     transparent 70%
   );
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--duration-normal) ease;
 }
 
 .player-control:hover::before {
@@ -718,8 +727,8 @@ kbd {
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity 150ms ease,
-    transform 150ms ease;
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
   box-shadow: var(--shadow-md);
 }
 
@@ -754,8 +763,8 @@ kbd {
   opacity: 0.6;
   filter: grayscale(20%);
   transition:
-    opacity 200ms ease,
-    filter 200ms ease;
+    opacity var(--duration-normal) ease,
+    filter var(--duration-normal) ease;
 }
 
 .empty-state-illustration:hover {
@@ -779,7 +788,7 @@ kbd {
   border-radius: 50%;
   background: var(--primary);
   opacity: 0;
-  transition: opacity 150ms ease;
+  transition: opacity var(--duration-fast) ease;
 }
 
 .timeline-marker:hover::after,
@@ -803,7 +812,7 @@ kbd {
 .drag-handle {
   cursor: grab;
   opacity: 0.5;
-  transition: opacity 150ms ease;
+  transition: opacity var(--duration-fast) ease;
 }
 
 .drag-handle:hover {
@@ -827,7 +836,7 @@ kbd {
 }
 
 [data-sonner-toast] {
-  animation: toast-enter 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: toast-enter var(--duration-toast) var(--ease-out-expo);
 }
 
 /* Subtle gradient overlay for media cards */

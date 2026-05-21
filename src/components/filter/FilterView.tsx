@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  startTransition,
   useState,
   useSyncExternalStore,
 } from 'react'
@@ -26,14 +27,12 @@ import {
   Unplug,
 } from 'lucide-react'
 
-import { AnimatePresence, m, useIsPresent } from 'motion/react'
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps } from 'react'
 import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
-import { Freeze } from '@/components/ui/freeze'
 import {
   Pagination,
   PaginationContent,
@@ -69,6 +68,7 @@ import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
+import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
 // Stable selectors to prevent re-renders - defined outside component
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
@@ -112,8 +112,6 @@ const VIRTUALIZED_GRID_THRESHOLD = 180
 const GRID_ROW_ESTIMATE_PX = 360
 const GRID_OVERSCAN_ROWS = 3
 const LIST_CLASS = 'flex flex-col gap-3'
-const MAX_ANIMATION_DELAY = 300
-const ANIMATION_STAGGER = 30
 
 const MEDIA_LABEL_KEY_MAP: Record<string, string> = {
   [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
@@ -130,16 +128,6 @@ function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
     MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
 
   return t(labelKey, { name: `${name}${year}` })
-}
-
-interface FreezeOnExitProps {
-  children: ReactNode
-}
-
-function FreezeOnExit({ children }: FreezeOnExitProps) {
-  const isPresent = useIsPresent()
-
-  return <Freeze frozen={!isPresent}>{children}</Freeze>
 }
 
 function MediaListSkeleton({
@@ -161,7 +149,7 @@ function MediaListSkeleton({
         <div
           key={i}
           className="flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl bg-card/60 backdrop-blur-sm animate-in fade-in duration-300"
-          style={{ animationDelay: `${i * ANIMATION_STAGGER}ms` }}
+          style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
           aria-hidden="true"
         >
           <div className="w-16 md:w-20 aspect-[2/3] rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
@@ -203,10 +191,7 @@ function MediaListRow({
     ],
   )
   const vibrantColors = useVibrantColor(imageUrl)
-  const animationDelay = Math.min(
-    index * ANIMATION_STAGGER,
-    MAX_ANIMATION_DELAY,
-  )
+  const animationDelay = staggerDelay(index, STAGGER_FAST)
   const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
   const cardStyle = useMemo(
     () =>
@@ -528,21 +513,31 @@ function useRenderFilterView() {
 
   const handleCollectionChange = (value: string | null) => {
     setFocusedIndex(-1)
-    void navigate({
-      to: '/',
-      search: {
-        collection: value ?? undefined,
-        page: undefined,
-        search: undefined,
-      },
-      replace: true,
+    startTransition(() => {
+      void navigate({
+        to: '/',
+        search: {
+          collection: value ?? undefined,
+          page: undefined,
+          search: undefined,
+        },
+        replace: true,
+      })
     })
   }
 
   const handlePageChange = (newPage: number) => {
     setFocusedIndex(-1)
-    setCurrentPage(newPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    startTransition(() => {
+      setCurrentPage(newPage)
+    })
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
   }
 
   const handleRetry = () => {
@@ -683,33 +678,23 @@ function useRenderFilterView() {
           )}
 
         {/* Loading State */}
-        <AnimatePresence mode="wait">
-          {showLoading && (
-            <m.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <FreezeOnExit>
-                {viewMode === 'list' ? (
-                  <MediaListSkeleton
-                    count={Math.min(effectivePageSize, 12)}
-                    loadingLabel={t('items.loadingMediaItems', {
-                      defaultValue: 'Loading media items',
-                    })}
-                  />
-                ) : (
-                  <MediaGridSkeleton
-                    count={Math.min(effectivePageSize, 24)}
-                    gridClassName={GRID_CLASS}
-                  />
-                )}
-              </FreezeOnExit>
-            </m.div>
-          )}
-        </AnimatePresence>
+        {showLoading && (
+          <div className="animate-in fade-in duration-200">
+            {viewMode === 'list' ? (
+              <MediaListSkeleton
+                count={Math.min(effectivePageSize, 12)}
+                loadingLabel={t('items.loadingMediaItems', {
+                  defaultValue: 'Loading media items',
+                })}
+              />
+            ) : (
+              <MediaGridSkeleton
+                count={Math.min(effectivePageSize, 24)}
+                gridClassName={GRID_CLASS}
+              />
+            )}
+          </div>
+        )}
 
         {/* Error State */}
         {showError && (

@@ -14,6 +14,7 @@ import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
+import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
 interface MediaCardProps {
   item: BaseItemDto
@@ -92,10 +93,6 @@ const LABEL_KEY_MAP: Record<string, string> = {
   [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
 }
 
-/** Max animation delay to prevent long waits on large grids */
-const MAX_ANIMATION_DELAY = 300
-const ANIMATION_STAGGER = 30
-
 export const MediaCard = memo(function MediaCardComponent({
   item,
   className,
@@ -156,10 +153,7 @@ export const MediaCard = memo(function MediaCardComponent({
   }, [item, t])
 
   // Derived values - no useMemo needed for simple computations
-  const animationDelay = Math.min(
-    index * ANIMATION_STAGGER,
-    MAX_ANIMATION_DELAY,
-  )
+  const animationDelay = staggerDelay(index, STAGGER_FAST)
 
   // Memoize style objects to prevent re-renders
   const textBoxStyle = useMemo(
@@ -175,7 +169,7 @@ export const MediaCard = memo(function MediaCardComponent({
 
   const cardStyle = useMemo(
     () => ({
-      animationDelay: `${animationDelay}ms`,
+      animationDelay,
       backgroundColor: vibrantColors?.primary ?? 'var(--card)',
     }),
     [animationDelay, vibrantColors?.primary],

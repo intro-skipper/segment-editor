@@ -103,7 +103,7 @@ export default defineConfig({
             },
             {
               name: 'ui-vendor',
-              test: /[\\/]node_modules[\\/](@base-ui[\\/]react|lucide-react|sonner|class-variance-authority|clsx|tailwind-merge|motion)[\\/]/,
+              test: /[\\/]node_modules[\\/](@base-ui[\\/]react|lucide-react|sonner|class-variance-authority|clsx|tailwind-merge)[\\/]/,
             },
             {
               name: 'media-vendor',

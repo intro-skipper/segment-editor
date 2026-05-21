@@ -20,6 +20,7 @@ import {
   LoadingState,
 } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
+import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
 interface SeriesViewProps {
   /** The series item */
@@ -125,7 +126,7 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
   const runtime = episode.RunTimeTicks
     ? Math.round(episode.RunTimeTicks / 600_000_000)
     : null
-  const animationDelay = Math.min(index * 40, 400)
+  const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
 
   // Memoize style objects to prevent re-renders
   const cardStyle = React.useMemo(

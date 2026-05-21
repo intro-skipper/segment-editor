@@ -29,6 +29,7 @@ import type { RecommendedServerInfo } from '@/types/jellyfin'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { getScoreDisplay } from '@/services/jellyfin'
+import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -111,7 +112,7 @@ function ServerItem({
         isSelected && 'border-primary bg-primary/5',
         'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
       )}
-      style={{ animationDelay: `${index * 50}ms` }}
+      style={{ animationDelay: staggerDelay(index, STAGGER_SLOW) }}
     >
       <div className="flex items-start gap-3">
         <div

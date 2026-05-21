@@ -18,6 +18,7 @@ import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
 const SeriesView = lazy(() =>
   import('@/components/views/SeriesView').then((module) => ({
@@ -66,7 +67,7 @@ function SeriesSkeleton() {
             <Skeleton
               key={i}
               className="h-14 w-full rounded-lg animate-in fade-in duration-300"
-              style={{ animationDelay: `${i * 50}ms` }}
+              style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
             />
           ))}
         </div>
