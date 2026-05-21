@@ -262,30 +262,30 @@ export function useJassubRenderer({
           waitForVideoMetadata(video, initAbortController.signal),
           preloadJassubRenderer(),
         ])
-        if (initTokenRef.current !== initToken) return
 
-        // Read latest item and transcodingOffsetTicks from refs at init time,
-        // not at effect setup time — avoids stale closure without adding them
-        // as deps that would cause unnecessary renderer teardown/recreation.
-        const currentItem = itemRef.current
-        const currentOffset = transcodingRef.current
+        if (initTokenRef.current === initToken) {
+          // Read latest item and transcodingOffsetTicks from refs at init time,
+          // not at effect setup time, avoids stale closure without adding them
+          // as deps that would cause unnecessary renderer teardown/recreation.
+          const currentItem = itemRef.current
+          const currentOffset = transcodingRef.current
 
-        const result = await createJassubRenderer({
-          video,
-          track: activeTrack,
-          item: currentItem!,
-          transcodingOffsetTicks: currentOffset,
-          userOffset: userOffsetRef.current,
-          signal: initAbortController.signal,
-        })
+          const result = await createJassubRenderer({
+            video,
+            track: activeTrack,
+            item: currentItem!,
+            transcodingOffsetTicks: currentOffset,
+            userOffset: userOffsetRef.current,
+            signal: initAbortController.signal,
+          })
 
-        if (initTokenRef.current !== initToken) {
-          result.destroy()
-          return
+          if (initTokenRef.current === initToken) {
+            rendererRef.current = result
+            setRendererState({ isActive: true, isLoading: false, error: null })
+          } else {
+            result.destroy()
+          }
         }
-
-        rendererRef.current = result
-        setRendererState({ isActive: true, isLoading: false, error: null })
       } catch (err) {
         if (initTokenRef.current !== initToken) return
         reportInitError(err)

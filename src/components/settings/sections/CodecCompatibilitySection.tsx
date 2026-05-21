@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
 
-import { SettingsSection } from '../primitives'
+import { SettingsSection } from '../primitives/SettingsSection'
 import {
   DIRECT_PLAY_AUDIO_CODECS,
   DIRECT_PLAY_VIDEO_CODECS,

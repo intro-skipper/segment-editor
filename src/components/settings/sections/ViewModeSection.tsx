@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { LayoutList } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { SelectSettingsSection } from '../primitives'
-import type { SelectOption } from '../primitives'
+import { SelectSettingsSection } from '../primitives/SelectSettingsSection'
+import type { SelectOption } from '../primitives/SettingsSelect'
 import type { ViewMode } from '@/stores/session-store'
 import { VIEW_MODE_OPTIONS, useSessionStore } from '@/stores/session-store'
 

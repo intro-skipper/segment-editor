@@ -71,7 +71,7 @@ function CollectionSelector({
         className="flex items-center gap-3 hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
         aria-label={t('items.filter.selectCollection', 'Select collection')}
       >
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
           {currentName ?? t('items.filter.collection', 'All Libraries')}
         </h1>
         <ChevronDown className="size-5 text-muted-foreground" aria-hidden />
@@ -268,7 +268,7 @@ export default function Header() {
                       </Suspense>
                     </>
                   ) : (
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
                       {pageTitle}
                     </h1>
                   )}

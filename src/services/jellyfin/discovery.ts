@@ -49,10 +49,9 @@ export async function discoverServers(
         options?.minimumScore ?? RecommendedServerInfoScore.BAD,
       )
 
-    if (isAborted(options?.signal))
-      return { servers: [], error: 'Discovery cancelled' }
-
-    return { servers: sortServersByScore(servers) }
+    return isAborted(options?.signal)
+      ? { servers: [], error: 'Discovery cancelled' }
+      : { servers: sortServersByScore(servers) }
   } catch (error) {
     if (isAbortError(error) || isAborted(options?.signal)) {
       return { servers: [], error: 'Discovery cancelled' }

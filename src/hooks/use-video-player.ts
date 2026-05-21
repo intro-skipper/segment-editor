@@ -378,27 +378,26 @@ export function useVideoPlayer({
 
       // Start playback session for HLS to enable server-side cleanup
       await startPlaybackSession(itemId)
-      if (!isCurrentHlsRequest()) {
-        return
-      }
 
-      // Force HLS config: direct-play fallback must not reuse a direct stream URL.
-      const config = await getPlaybackConfig(
-        currentItem,
-        undefined,
-        undefined,
-        true,
-      )
       if (isCurrentHlsRequest()) {
-        const hlsUrl = config.strategy === 'hls' ? config.url : ''
+        // Force HLS config: direct-play fallback must not reuse a direct stream URL.
+        const config = await getPlaybackConfig(
+          currentItem,
+          undefined,
+          undefined,
+          true,
+        )
+        if (isCurrentHlsRequest()) {
+          const hlsUrl = config.strategy === 'hls' ? config.url : ''
 
-        // Update strategy after async operation — clear the error that triggered
-        // this fallback so the overlay disappears once HLS playback begins.
-        setError(null)
-        updateStrategy('hls')
-        setVideoUrl(hlsUrl || config.url)
-        scheduleHlsStateRestore()
-        onStrategyChange?.('hls')
+          // Update strategy after async operation, clear the error that triggered
+          // this fallback so the overlay disappears once HLS playback begins.
+          setError(null)
+          updateStrategy('hls')
+          setVideoUrl(hlsUrl || config.url)
+          scheduleHlsStateRestore()
+          onStrategyChange?.('hls')
+        }
       }
     },
     [
@@ -538,19 +537,16 @@ export function useVideoPlayer({
           preferredAudioStreamIndex,
         )
 
-        if (playbackRequestIdRef.current !== requestId) {
-          return
-        }
+        if (playbackRequestIdRef.current === requestId) {
+          // Start playback session for HLS to enable server-side cleanup
+          if (config.strategy === 'hls') {
+            await startPlaybackSession(itemId)
+          }
 
-        // Start playback session for HLS to enable server-side cleanup
-        if (config.strategy === 'hls') {
-          await startPlaybackSession(itemId)
-          if (playbackRequestIdRef.current !== requestId) {
-            return
+          if (playbackRequestIdRef.current === requestId) {
+            handleInitPlaybackSuccess(config, itemId)
           }
         }
-
-        handleInitPlaybackSuccess(config, itemId)
       } catch (err) {
         if (playbackRequestIdRef.current !== requestId) {
           return

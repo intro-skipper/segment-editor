@@ -10,8 +10,8 @@ import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe } from 'lucide-react'
 
-import { SelectSettingsSection } from '../primitives'
-import type { SelectOption } from '../primitives'
+import { SelectSettingsSection } from '../primitives/SelectSettingsSection'
+import type { SelectOption } from '../primitives/SettingsSelect'
 import type { Locale } from '@/stores/app-store'
 import { getEffectiveLocale, useAppStore } from '@/stores/app-store'
 

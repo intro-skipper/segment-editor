@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle, LogOut, Server, XCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { SettingsSection } from '../primitives'
+import { SettingsSection } from '../primitives/SettingsSection'
 import { useApiStore } from '@/stores/api-store'
 import { showNotification } from '@/lib/notifications'
 import { ConnectionWizard } from '@/components/connection/ConnectionWizard'

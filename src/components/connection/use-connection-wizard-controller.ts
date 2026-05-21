@@ -82,38 +82,38 @@ export function useConnectionWizardController(): ConnectionWizardController {
             signal: controller.signal,
           })
 
-          if (controller.signal.aborted) return
+          if (!controller.signal.aborted) {
+            if (result.error) {
+              setIsRequestPending(false)
+              setRequestError(result.error)
+              return
+            }
 
-          if (result.error) {
-            setIsRequestPending(false)
-            setRequestError(result.error)
-            return
-          }
+            if (result.servers.length === 0) {
+              setIsRequestPending(false)
+              setRequestError(
+                'No servers found at this address. Check the address and try again.',
+              )
+              return
+            }
 
-          if (result.servers.length === 0) {
+            const nextSelectedServer =
+              result.servers.find(
+                (server) => server.address === value.selectedServerAddress,
+              ) ?? findBestServer(result.servers)
+
+            setServers(result.servers)
+            setRequestError(null)
             setIsRequestPending(false)
-            setRequestError(
-              'No servers found at this address. Check the address and try again.',
+            setStep('select')
+            formRef.current?.setFieldValue(
+              'selectedServerAddress',
+              nextSelectedServer?.address ?? '',
+              {
+                dontValidate: true,
+              },
             )
-            return
           }
-
-          const nextSelectedServer =
-            result.servers.find(
-              (server) => server.address === value.selectedServerAddress,
-            ) ?? findBestServer(result.servers)
-
-          setServers(result.servers)
-          setRequestError(null)
-          setIsRequestPending(false)
-          setStep('select')
-          formRef.current?.setFieldValue(
-            'selectedServerAddress',
-            nextSelectedServer?.address ?? '',
-            {
-              dontValidate: true,
-            },
-          )
         } catch (error) {
           if (controller.signal.aborted) return
           setIsRequestPending(false)
@@ -146,18 +146,18 @@ export function useConnectionWizardController(): ConnectionWizardController {
           signal: controller.signal,
         })
 
-        if (controller.signal.aborted) return
+        if (!controller.signal.aborted) {
+          if (!result.success) {
+            setIsRequestPending(false)
+            setRequestError(result.error ?? 'Authentication failed')
+            return
+          }
 
-        if (!result.success) {
+          storeAuthResult(selectedServer.address, result, credentials.method)
           setIsRequestPending(false)
-          setRequestError(result.error ?? 'Authentication failed')
-          return
+          setRequestError(null)
+          setStep('success')
         }
-
-        storeAuthResult(selectedServer.address, result, credentials.method)
-        setIsRequestPending(false)
-        setRequestError(null)
-        setStep('success')
       } catch (error) {
         if (controller.signal.aborted) return
         setIsRequestPending(false)
