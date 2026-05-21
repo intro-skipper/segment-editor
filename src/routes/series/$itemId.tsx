@@ -14,7 +14,6 @@ import {
   useSeasons,
 } from '@/services/items/queries'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LightRays } from '@/components/ui/light-rays'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getBestImageUrl } from '@/services/video/api'
@@ -152,20 +151,10 @@ function SeriesPage() {
     <>
       {/* Full-screen background that extends behind header */}
       {vibrantColors && (
-        <>
-          <div
-            className="fixed inset-0 z-0 transition-colors duration-700"
-            style={{ backgroundColor: vibrantColors.background }}
-          />
-          <LightRays
-            className="fixed inset-0 z-0"
-            count={5}
-            color={vibrantColors.primary}
-            blur={48}
-            speed={18}
-            length="60vh"
-          />
-        </>
+        <div
+          className="fixed inset-0 z-0 transition-colors duration-700"
+          style={{ backgroundColor: vibrantColors.background }}
+        />
       )}
       <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
         <FeatureErrorBoundary
