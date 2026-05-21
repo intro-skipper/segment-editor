@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SkipForward } from 'lucide-react'
 
-import { SelectSettingsSection } from '../primitives'
-import type { SelectOption } from '../primitives'
+import { SelectSettingsSection } from '../primitives/SelectSettingsSection'
+import type { SelectOption } from '../primitives/SettingsSelect'
 import type { SegmentSkipMode } from '@/stores/app-store'
 import { useAppStore } from '@/stores/app-store'
 

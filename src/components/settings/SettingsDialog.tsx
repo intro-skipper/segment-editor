@@ -2,15 +2,13 @@ import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings2 } from 'lucide-react'
 
-import {
-  AppearanceSection,
-  CodecCompatibilitySection,
-  LanguageSection,
-  PageSizeSection,
-  SegmentSkipModeSection,
-  ServerConnectionSection,
-  ViewModeSection,
-} from './sections'
+import { AppearanceSection } from './sections/AppearanceSection'
+import { CodecCompatibilitySection } from './sections/CodecCompatibilitySection'
+import { LanguageSection } from './sections/LanguageSection'
+import { PageSizeSection } from './sections/PageSizeSection'
+import { SegmentSkipModeSection } from './sections/SegmentSkipModeSection'
+import { ServerConnectionSection } from './sections/ServerConnectionSection'
+import { ViewModeSection } from './sections/ViewModeSection'
 import { useSessionStore } from '@/stores/session-store'
 import { isPluginMode } from '@/services/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'

@@ -114,17 +114,17 @@ export function useConnectionInit(): ConnectionState {
           signal: controller.signal,
         })
 
-        if (controller.signal.aborted) return
-
-        const store = useApiStore.getState()
-        if (result.valid && result.authenticated) {
-          useApiStore.setState({
-            serverVersion: result.serverVersion,
-            validConnection: true,
-            validAuth: true,
-          })
-        } else {
-          store.setConnectionStatus(false, false)
+        if (!controller.signal.aborted) {
+          const store = useApiStore.getState()
+          if (result.valid && result.authenticated) {
+            useApiStore.setState({
+              serverVersion: result.serverVersion,
+              validConnection: true,
+              validAuth: true,
+            })
+          } else {
+            store.setConnectionStatus(false, false)
+          }
         }
       } catch {
         if (controller.signal.aborted) return

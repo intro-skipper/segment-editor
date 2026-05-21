@@ -9,8 +9,8 @@
 import { useCallback, useMemo } from 'react'
 import { Settings2 } from 'lucide-react'
 
-import { SelectSettingsSection } from '../primitives'
-import type { SelectOption } from '../primitives'
+import { SelectSettingsSection } from '../primitives/SelectSettingsSection'
+import type { SelectOption } from '../primitives/SettingsSelect'
 import type { PageSize } from '@/stores/session-store'
 import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
 
