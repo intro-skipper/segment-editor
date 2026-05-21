@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
+import { staggerDelay } from '@/lib/animation-utils'
 
 interface EpisodeSwitcherProps {
   currentEpisode: BaseItemDto
@@ -41,7 +42,7 @@ const EpisodeItemSkeleton = memo(function EpisodeItemSkeletonComponent({
   return (
     <div
       className="flex items-center gap-3 px-3 py-2.5 animate-in fade-in duration-300"
-      style={{ animationDelay: `${index * 40}ms` }}
+      style={{ animationDelay: staggerDelay(index) }}
       aria-hidden="true"
     >
       <Skeleton className="size-8 rounded-lg flex-shrink-0" />

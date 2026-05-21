@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
+import { staggerDelay } from '@/lib/animation-utils'
 
 const AlbumView = lazy(() =>
   import('@/components/views/AlbumView').then((module) => ({
@@ -76,7 +77,7 @@ function AlbumSkeleton() {
             <Skeleton
               key={i}
               className="h-12 w-full rounded-lg animate-in fade-in duration-300"
-              style={{ animationDelay: `${i * 40}ms` }}
+              style={{ animationDelay: staggerDelay(i) }}
             />
           ))}
         </div>

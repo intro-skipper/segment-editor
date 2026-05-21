@@ -14,6 +14,7 @@ import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
 const PlayerEditor = lazy(() =>
   import('@/components/player/PlayerEditor').then((module) => ({
@@ -73,11 +74,11 @@ function PlayerSkeleton() {
         <div className="space-y-4">
           <Skeleton
             className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
-            style={{ animationDelay: '50ms' }}
+            style={{ animationDelay: staggerDelay(1, STAGGER_SLOW) }}
           />
           <Skeleton
             className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
-            style={{ animationDelay: '100ms' }}
+            style={{ animationDelay: staggerDelay(2, STAGGER_SLOW) }}
           />
         </div>
       </div>
@@ -157,11 +158,13 @@ function PlayerPage() {
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
         >
           <Suspense fallback={<PlayerSkeleton />}>
-            <PlayerEditor
-              item={item}
-              fetchSegments={fetchSegments}
-              vibrantColors={vibrantColors}
-            />
+            <div className="animate-in fade-in duration-300">
+              <PlayerEditor
+                item={item}
+                fetchSegments={fetchSegments}
+                vibrantColors={vibrantColors}
+              />
+            </div>
           </Suspense>
         </FeatureErrorBoundary>
       </main>
