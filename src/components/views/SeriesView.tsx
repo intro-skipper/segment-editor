@@ -1,8 +1,3 @@
-/**
- * SeriesView - Displays series seasons and episodes.
- * Features pill tabs for seasons and clean card list for episodes.
- */
-
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -14,26 +9,17 @@ import { useEpisodes } from '@/services/items/queries'
 import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
-import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-} from '@/components/ui/async-state'
+import { LoadingState } from '@/components/ui/async-state'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
 import { cn } from '@/lib/utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
 interface SeriesViewProps {
-  /** The series item */
   series: BaseItemDto
-  /** Array of seasons for the series */
   seasons: Array<BaseItemDto>
-  /** Extracted vibrant colors from series poster */
   vibrantColors?: VibrantColors | null
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SeasonTabs - Pill-style season selector with ARIA support
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface SeasonTabsProps {
   seasons: Array<BaseItemDto>
@@ -42,7 +28,6 @@ interface SeasonTabsProps {
   vibrantColors?: VibrantColors | null
 }
 
-/** Check if a season is a "Specials" season */
 const isSpecialSeason = (s: BaseItemDto) =>
   s.IndexNumber === 0 || (s.Name || '').toLowerCase().includes('special')
 
@@ -54,7 +39,6 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
 }: SeasonTabsProps) {
   const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
 
-  // Memoize sorted seasons - specials always last, single pass
   const orderedSeasons = React.useMemo(() => {
     const normal: typeof seasons = []
     const specials: typeof seasons = []
@@ -77,6 +61,7 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
 
         return (
           <button
+            type="button"
             key={season.Id}
             role="tab"
             aria-selected={isSelected}
@@ -101,10 +86,6 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
   )
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EpisodeCard - Memoized episode display with animation
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface EpisodeCardProps {
   episode: BaseItemDto
   episodeId: string
@@ -128,7 +109,6 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
     : null
   const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
 
-  // Memoize style objects to prevent re-renders
   const cardStyle = React.useMemo(
     () =>
       vibrantColors ? { backgroundColor: vibrantColors.primary } : undefined,
@@ -160,7 +140,6 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
       style={cardStyle}
       aria-label={ariaLabel}
     >
-      {/* Thumbnail */}
       <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
         <ItemImage
           item={episode}
@@ -179,7 +158,6 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
         </div>
       </div>
 
-      {/* Info */}
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
         <p
           className="font-semibold truncate leading-tight text-base md:text-lg"
@@ -198,10 +176,6 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
     </InteractiveCard>
   )
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SeasonEpisodes - Episode list with TanStack Query
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface SeasonEpisodesProps {
   seriesId: string
@@ -285,10 +259,6 @@ function SeasonEpisodes({
     </div>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SeriesView - Main component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function SeriesView({
   series,

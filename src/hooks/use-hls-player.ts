@@ -1,12 +1,3 @@
-/**
- * useHlsPlayer - HLS.js video player hook with error recovery.
- *
- * Features:
- * - Automatic error recovery for network and media errors
- * - Proper cleanup to prevent memory leaks
- * - Safari native HLS fallback
- */
-
 import { useCallback, useEffect, useEffectEvent, useRef } from 'react'
 import Hls from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
@@ -43,9 +34,6 @@ const HLS_CONFIG = {
   abrEwmaDefaultEstimate: 500000,
 } as const
 
-/**
- * Creates an HLS error object with localized message.
- */
 const createError = (
   type: HlsPlayerError['type'],
   msgKey: string,
@@ -89,7 +77,6 @@ export function useHlsPlayer({
     ): HlsPlayerError => createError(type, msgKey, t, recoverable),
   )
 
-  // Cleanup recovery timer - extracted for reuse
   const clearRecoveryTimer = useCallback(() => {
     if (recoveryTimerRef.current) {
       clearTimeout(recoveryTimerRef.current)
@@ -97,7 +84,6 @@ export function useHlsPlayer({
     }
   }, [])
 
-  // Cleanup HLS instance
   const destroyHls = useCallback(() => {
     clearRecoveryTimer()
     if (hlsRef.current) {
@@ -108,20 +94,20 @@ export function useHlsPlayer({
 
   useEffect(() => {
     const video = videoRef.current
+    const recoveryTimer = recoveryTimerRef
 
     if (!video || !videoUrl) {
       isActiveRef.current = false
       return () => {
-        if (recoveryTimerRef.current) {
-          clearTimeout(recoveryTimerRef.current)
-          recoveryTimerRef.current = null
+        if (recoveryTimer.current) {
+          clearTimeout(recoveryTimer.current)
+          recoveryTimer.current = null
         }
       }
     }
 
     isActiveRef.current = true
 
-    // Clear previous state
     reportError(null)
     destroyHls()
 
@@ -177,15 +163,14 @@ export function useHlsPlayer({
       hls.loadSource(videoUrl)
       hlsRef.current = hls
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS support
       video.src = videoUrl
     }
 
     return () => {
       isActiveRef.current = false
-      if (recoveryTimerRef.current) {
-        clearTimeout(recoveryTimerRef.current)
-        recoveryTimerRef.current = null
+      if (recoveryTimer.current) {
+        clearTimeout(recoveryTimer.current)
+        recoveryTimer.current = null
       }
       destroyHls()
     }

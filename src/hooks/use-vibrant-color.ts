@@ -31,7 +31,6 @@ interface Palette {
 
 type ResolvedTheme = 'light' | 'dark'
 
-// Lazy worker initialization
 type VibrantWorkerModule = typeof VibrantWorkerRuntime
 
 let workerInitialized = false
@@ -79,7 +78,6 @@ darkModeQuery?.addEventListener('change', (e) => {
 const resolveTheme = (theme: Theme): ResolvedTheme =>
   theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
 
-// Caches
 const colorCacheLight = new LRUCache<string, VibrantColors>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
 )
@@ -94,7 +92,6 @@ const pending = new Map<string, Promise<Palette | null>>()
 const getCache = (theme: ResolvedTheme) =>
   theme === 'dark' ? colorCacheDark : colorCacheLight
 
-// Shared canvas for image processing
 let sharedCanvas: {
   canvas: HTMLCanvasElement
   ctx: CanvasRenderingContext2D
@@ -109,7 +106,6 @@ const getCanvas = () => {
   return sharedCanvas
 }
 
-// Color utilities
 const adjustLightness = (hex: string, adjust: number): string => {
   const color = parse(hex)
   if (!color) return hex
@@ -127,14 +123,12 @@ const getLightness = (hex: string): number => {
 const getContrastText = (hex: string, threshold = 0.5): string =>
   getLightness(hex) < threshold ? '#f5f5f5' : '#1a1a1a'
 
-/** Builds VibrantColors from palette based on theme */
 const buildColors = (
   palette: Palette,
   theme: ResolvedTheme,
 ): VibrantColors | null => {
   const isDark = theme === 'dark'
 
-  // Dark: Muted swatches, Light: Vibrant swatches
   const base = isDark
     ? (palette.DarkMuted?.hex ?? palette.Muted?.hex)
     : (palette.LightVibrant?.hex ?? palette.Vibrant?.hex)
@@ -144,7 +138,6 @@ const buildColors = (
   const background = adjustLightness(base, isDark ? -0.12 : 0.08)
   const text = getContrastText(background)
 
-  // Primary/accent fallback chains
   const primary = isDark
     ? (palette.Muted?.hex ?? palette.DarkMuted?.hex ?? base)
     : (palette.Vibrant?.hex ?? palette.DarkVibrant?.hex ?? base)
@@ -162,7 +155,6 @@ const buildColors = (
   }
 }
 
-// Extraction pipeline
 const EXTRACTION_TIMEOUT_MS = 5000
 
 async function extractPalette(
@@ -259,7 +251,6 @@ async function getColors(
   return colors
 }
 
-/** Eagerly preloads vibrant colors for a list of image URLs into the cache. */
 export const preloadVibrantColors = (
   urls: ReadonlyArray<string>,
   theme: Theme = 'auto',
@@ -271,7 +262,6 @@ export const preloadVibrantColors = (
   }
 }
 
-// Main hook
 interface UseVibrantColorOptions {
   enabled?: boolean
 }

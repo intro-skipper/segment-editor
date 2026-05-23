@@ -16,10 +16,6 @@ import {
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { showError } from '@/lib/notifications'
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface UseJassubRendererOptions {
   videoRef: React.RefObject<HTMLVideoElement | null>
   activeTrack: SubtitleTrackInfo | null
@@ -37,16 +33,8 @@ interface UseJassubRendererReturn {
   resize: () => void
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const VIDEO_METADATA_SOFT_TIMEOUT_MS = 15_000
 const VIDEO_METADATA_HARD_TIMEOUT_MS = 60_000
-
-// ============================================================================
-// Helpers
-// ============================================================================
 
 function waitForVideoMetadata(
   video: HTMLVideoElement,
@@ -118,10 +106,6 @@ function getErrorMessage(error: unknown, t: (key: string) => string): string {
   return t('player.subtitle.error.jassubInit')
 }
 
-// ============================================================================
-// Hook
-// ============================================================================
-
 export function useJassubRenderer({
   videoRef,
   activeTrack,
@@ -151,12 +135,8 @@ export function useJassubRenderer({
   transcodingRef.current = transcodingOffsetTicks
   itemRef.current = item
 
-  // Narrow primitive dep for the init effect — only re-run when the item
-  // identity changes, not when unrelated fields on the BaseItemDto mutate.
   const itemId = item?.Id
 
-  // Cleanup helper — also cancels any pending debounced resize to prevent
-  // the timer from firing after the renderer has been destroyed.
   const teardownRenderer = useCallback(() => {
     if (resizeTimerRef.current) {
       clearTimeout(resizeTimerRef.current)
@@ -171,42 +151,34 @@ export function useJassubRenderer({
     setRendererState((s) => ({ ...s, isActive: false }))
   }, [teardownRenderer])
 
-  // Debounced resize — guards against calling JASSUB resize() when the video
-  // element has invalid layout dimensions (e.g. during strategy switches when
-  // the element is detached/hidden). JASSUB's worker would try to set
-  // OffscreenCanvas.width to NaN, throwing a TypeError.
   const resize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
     resizeTimerRef.current = setTimeout(() => {
       const renderer = rendererRef.current
       if (!renderer) return
 
-      // Validate that the video element JASSUB is bound to has real dimensions.
-      // During strategy transitions the element may be detached with 0×0 layout.
+      // During strategy transitions the video element may be detached with 0×0
+      // layout. JASSUB's worker would set OffscreenCanvas.width to NaN, throwing.
       const video = videoRef.current
       if (!video || video.clientWidth <= 0 || video.clientHeight <= 0) return
 
-      // Skip resize if the active video element no longer matches the one
-      // JASSUB was created against. During strategy switches (direct <-> HLS)
-      // videoRef resolves to a different HTMLVideoElement while the old
-      // renderer is still alive. Calling resize() would make the worker read
-      // dimensions from the stale/detached element, causing
-      // "Failed to set 'width' on OffscreenCanvas" in the worker.
+      // During strategy switches (direct <-> HLS) videoRef resolves to a
+      // different HTMLVideoElement while the old renderer is still alive.
+      // Calling resize() would make the worker read dimensions from the
+      // stale/detached element, causing OffscreenCanvas errors in the worker.
       if (video !== prevVideoRef.current) return
 
       try {
-        // resize() posts to the JASSUB web worker and returns a Promise.
-        // The worker may still reject asynchronously if it reads stale
-        // dimensions, so swallow the rejection — the next resize after
-        // JASSUB is re-created for the new element will recover.
+        // resize() posts to the JASSUB web worker — the worker may still reject
+        // asynchronously if it reads stale dimensions, so swallow the rejection.
+        // The next resize after JASSUB is re-created will recover.
         void Promise.resolve(renderer.instance.resize()).catch(() => {})
-      } catch {
-        // Synchronous errors (e.g. renderer already destroyed)
+      } catch (resizeError) {
+        void resizeError
       }
     }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
   }, [videoRef])
 
-  // User offset update
   const setUserOffset = useCallback((offset: number) => {
     userOffsetRef.current = offset
     rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
@@ -219,18 +191,15 @@ export function useJassubRenderer({
     console.error('[JASSUB] Init error:', err)
   })
 
-  // Main effect: create/destroy renderer based on track
   useEffect(() => {
     const video = videoRef.current
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
 
-    // Cleanup if no longer needed
     if (!needsJassub || !video || !itemId) {
       teardownRenderer()
       return
     }
 
-    // Skip if track, item, and video element haven't changed.
     // The video element identity check is critical: during strategy switches
     // (direct <-> HLS) the videoRef may resolve to a different HTMLVideoElement,
     // and JASSUB must be re-created against the new element.
@@ -252,7 +221,6 @@ export function useJassubRenderer({
     const initAbortController = new AbortController()
 
     const init = async () => {
-      // Destroy previous renderer first
       destroyRenderer()
 
       setRendererState((s) => ({ ...s, isLoading: true, error: null }))
@@ -264,9 +232,6 @@ export function useJassubRenderer({
         ])
 
         if (initTokenRef.current === initToken) {
-          // Read latest item and transcodingOffsetTicks from refs at init time,
-          // not at effect setup time, avoids stale closure without adding them
-          // as deps that would cause unnecessary renderer teardown/recreation.
           const currentItem = itemRef.current
           const currentOffset = transcodingRef.current
 
@@ -305,7 +270,6 @@ export function useJassubRenderer({
   const needsJassubNow =
     !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id
 
-  // Resize observer
   useEffect(() => {
     const video = videoRef.current
     if (!video || !isActive || !needsJassubNow) return
@@ -323,7 +287,6 @@ export function useJassubRenderer({
     }
   }, [videoRef, isActive, resize, needsJassubNow])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       destroyRenderer()

@@ -1,9 +1,3 @@
-/**
- * PlayerSettingsMenu - Settings dropdown for skip duration, playback speed,
- * subtitle offset, and keyboard shortcut cheatsheet.
- * Extracted from PlayerControls to keep component sizes manageable.
- */
-
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MoreVertical } from 'lucide-react'
@@ -27,7 +21,6 @@ import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { SKIP_TIMES, PLAYBACK_SPEEDS } = PLAYER_CONFIG
 
-/** Pre-computed display strings for shortcut keys (platform-aware, e.g. ⌘ on Mac) */
 const CHEATSHEET_DISPLAY = PLAYER_SHORTCUT_CHEATSHEET.map((entry) => ({
   labelKey: entry.labelKey,
   displayKeys: entry.hotkeys.map(formatForDisplay),
@@ -39,17 +32,11 @@ interface PlayerSettingsMenuProps {
   iconColor: string | undefined
   applyButtonStyle: (active?: boolean) => React.CSSProperties | undefined
   onSkipTimeChange: (index: number) => void
-  /** Current subtitle offset in seconds (positive = delay, negative = advance) */
   subtitleOffset: number
-  /** Callback when subtitle offset changes */
   onSubtitleOffsetChange?: (offset: number) => void
-  /** Whether subtitles are currently active */
   hasActiveSubtitle: boolean
-  /** Current playback speed index into PLAYBACK_SPEEDS */
   playbackSpeedIndex?: number
-  /** Callback when playback speed changes */
   onSpeedChange?: (speedIndex: number) => void
-  /** Container element for dropdown portals (needed for fullscreen) */
   portalContainer?: React.RefObject<HTMLElement | null>
 }
 
@@ -119,7 +106,6 @@ export function PlayerSettingsMenu({
         className="p-4 min-w-[280px]"
         container={portalContainer}
       >
-        {/* Skip Duration */}
         <div className="mb-4 pb-4 border-b border-border">
           <p
             className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
@@ -139,6 +125,7 @@ export function PlayerSettingsMenu({
                 : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
               return (
                 <button
+                  type="button"
                   key={time}
                   onClick={() => onSkipTimeChange(idx)}
                   className={cn(
@@ -158,7 +145,6 @@ export function PlayerSettingsMenu({
           </div>
         </div>
 
-        {/* Playback Speed */}
         {onSpeedChange && playbackSpeedIndex !== undefined && (
           <div className="mb-4 pb-4 border-b border-border">
             <p
@@ -174,6 +160,7 @@ export function PlayerSettingsMenu({
             >
               {PLAYBACK_SPEEDS.map((speed, idx) => (
                 <button
+                  type="button"
                   key={speed}
                   onClick={() => onSpeedChange(idx)}
                   className={cn(
@@ -195,7 +182,6 @@ export function PlayerSettingsMenu({
           </div>
         )}
 
-        {/* Subtitle Offset - only shown when subtitles are active */}
         {hasActiveSubtitle && onSubtitleOffsetChange && (
           <div className="mb-4 pb-4 border-b border-border">
             <p
@@ -246,7 +232,6 @@ export function PlayerSettingsMenu({
           </div>
         )}
 
-        {/* Keyboard Shortcuts */}
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
             {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}

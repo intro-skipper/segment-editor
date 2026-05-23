@@ -1,7 +1,3 @@
-/**
- * ArtistView - Displays artist albums in a responsive grid.
- */
-
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
@@ -10,18 +6,12 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { Button } from '@/components/ui/button'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
-import { EmptyState } from '@/components/ui/async-state'
+import { EmptyState } from '@/components/ui/empty-state'
 
 interface ArtistViewProps {
-  /** The artist item */
   artist: BaseItemDto
-  /** Array of albums for the artist */
   albums: Array<BaseItemDto>
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AlbumCard - Memoized album grid card
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface AlbumCardProps {
   album: BaseItemDto
@@ -48,7 +38,6 @@ const AlbumCard = React.memo(function AlbumCardComponent({
       className="group w-full rounded-lg overflow-hidden hover:scale-[1.02] hover:shadow-lg focus-visible:ring-offset-2"
       aria-label={ariaLabel}
     >
-      {/* Album Artwork */}
       <div className="aspect-square bg-muted rounded-lg overflow-hidden">
         <ItemImage
           item={album}
@@ -58,7 +47,6 @@ const AlbumCard = React.memo(function AlbumCardComponent({
         />
       </div>
 
-      {/* Album Name */}
       <div className="mt-2">
         <p
           className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary transition-colors text-center"
@@ -75,10 +63,6 @@ const AlbumCard = React.memo(function AlbumCardComponent({
     </InteractiveCard>
   )
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ArtistView - Main component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function ArtistView({ artist, albums }: ArtistViewProps) {
   const navigate = useNavigate()
@@ -99,7 +83,6 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -113,20 +96,18 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
         <h1 className="text-xl font-semibold text-balance">{artistName}</h1>
       </div>
 
-      {/* Albums Grid */}
       {albums.length === 0 ? (
         <EmptyState
           message="No albums found for this artist"
           className="py-8"
         />
       ) : (
-        <div
+        <ul
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
-          role="list"
           aria-label={`${albums.length} albums by ${artistName}`}
         >
           {albums.map((album) => (
-            <div
+            <li
               key={album.Id}
               style={{
                 contentVisibility: 'auto',
@@ -138,9 +119,9 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
                 albumId={album.Id || ''}
                 onAlbumSelect={handleAlbumClick}
               />
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   )

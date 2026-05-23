@@ -1,16 +1,3 @@
-/**
- * TrackSelector - Dropdown component for selecting audio and subtitle tracks.
- *
- * Features:
- * - Audio track selection with language, codec, and channel info
- * - Subtitle track selection with "Off" option
- * - Playback strategy indicator (Direct/HLS)
- * - Keyboard navigation support
- * - Visual indication of active tracks
- *
- * @module components/player/TrackSelector
- */
-
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
@@ -30,47 +17,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
-
-/**
- * Props for the TrackSelector component.
- */
 interface TrackSelectorProps {
-  /** Current state of available and active tracks */
   trackState: TrackState
-  /** Callback when an audio track is selected */
   onSelectAudio: (index: number) => void
-  /** Callback when a subtitle track is selected (null for off) */
   onSelectSubtitle: (index: number | null) => void
-  /** Current playback strategy (direct or hls) */
   strategy?: PlaybackStrategy
-  /** Whether the selector is disabled */
   disabled?: boolean
-  /** Button styling function from vibrant colors */
   getButtonStyle?: (active?: boolean) => React.CSSProperties | undefined
-  /** Icon color from vibrant colors */
   iconColor?: string
-  /** Whether vibrant colors are available */
   hasColors?: boolean
-  /** Custom class name for the trigger button */
   className?: string
-  /** Container element for dropdown portals (needed for fullscreen) */
   portalContainer?: React.RefObject<HTMLElement | null>
 }
 
-// ============================================================================
-// Component
-// ============================================================================
-
-/**
- * TrackSelector component for selecting audio and subtitle tracks.
- *
- * Displays a dropdown menu with two sections:
- * - Audio tracks with language, codec, and channel information
- * - Subtitle tracks with "Off" option and format information
- */
 export const TrackSelector = memo(function TrackSelectorComponent({
   trackState,
   onSelectAudio,
@@ -88,18 +47,12 @@ export const TrackSelector = memo(function TrackSelectorComponent({
   const { audioTracks, subtitleTracks, activeAudioIndex, activeSubtitleIndex } =
     trackState
 
-  // Check if there are any tracks to display
   const hasAudioTracks = audioTracks.length > 0
   const hasSubtitleTracks = subtitleTracks.length > 0
   const hasTracks = hasAudioTracks || hasSubtitleTracks
 
-  // Strategy indicator info
   const isDirect = strategy === 'direct'
   const StrategyIcon = isDirect ? Zap : Monitor
-
-  // ============================================================================
-  // Render
-  // ============================================================================
 
   return (
     <DropdownMenu>
@@ -130,18 +83,16 @@ export const TrackSelector = memo(function TrackSelectorComponent({
         className="min-w-[240px] max-h-[400px] overflow-y-auto"
         container={portalContainer}
       >
-        {/* Playback Strategy Indicator */}
         {strategy && (
           <>
             <div className="px-3 py-2">
-              <div
+              <output
                 className={cn(
                   'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium',
                   isDirect
                     ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                     : 'bg-blue-500/10 text-blue-600 border border-blue-500/20',
                 )}
-                role="status"
                 aria-label={
                   isDirect
                     ? t(
@@ -160,13 +111,12 @@ export const TrackSelector = memo(function TrackSelectorComponent({
                     ? t('player.strategy.directLabel', 'Direct Play')
                     : t('player.strategy.hlsLabel', 'HLS Transcode')}
                 </span>
-              </div>
+              </output>
             </div>
             {hasTracks && <DropdownMenuSeparator />}
           </>
         )}
 
-        {/* Audio Tracks Section */}
         {hasAudioTracks && (
           <DropdownMenuGroup>
             <DropdownMenuLabel className="flex items-center gap-2">
@@ -200,10 +150,8 @@ export const TrackSelector = memo(function TrackSelectorComponent({
           </DropdownMenuGroup>
         )}
 
-        {/* Separator between sections */}
         {hasAudioTracks && hasSubtitleTracks && <DropdownMenuSeparator />}
 
-        {/* Subtitle Tracks Section */}
         {hasSubtitleTracks && (
           <DropdownMenuGroup>
             <DropdownMenuLabel className="flex items-center gap-2">
@@ -211,7 +159,6 @@ export const TrackSelector = memo(function TrackSelectorComponent({
               {t('player.tracks.subtitle', 'Subtitles')}
             </DropdownMenuLabel>
 
-            {/* Off option */}
             <DropdownMenuItem
               onClick={() => onSelectSubtitle(null)}
               className={cn(
@@ -229,7 +176,6 @@ export const TrackSelector = memo(function TrackSelectorComponent({
               )}
             </DropdownMenuItem>
 
-            {/* Subtitle tracks */}
             {subtitleTracks.map((track) => {
               const isActive = track.index === activeSubtitleIndex
 
@@ -256,7 +202,6 @@ export const TrackSelector = memo(function TrackSelectorComponent({
           </DropdownMenuGroup>
         )}
 
-        {/* Empty state */}
         {!hasTracks && (
           <div className="px-3 py-2 text-sm text-muted-foreground">
             {t('player.tracks.noTracks', 'No tracks available')}

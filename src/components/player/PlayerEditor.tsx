@@ -1,8 +1,3 @@
-/**
- * PlayerEditor component.
- * Integrates Player with segment editing functionality.
- */
-
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
@@ -46,22 +41,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
-import { SegmentLoadingState } from '@/components/ui/async-state'
+import { SegmentLoadingState } from '@/components/ui/segment-loading-state'
 
-/** Shared style for content-visibility virtualization on segment cards. */
 const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',
   containIntrinsicSize: '0 280px',
 }
 
 interface PlayerEditorProps {
-  /** Media item to edit segments for */
   item: BaseItemDto
-  /** Whether to fetch segments on mount */
   fetchSegments?: boolean
-  /** Vibrant theme colors derived from the current item artwork */
   vibrantColors: VibrantColors | null
-  /** Additional class names */
   className?: string
 }
 
@@ -163,10 +153,6 @@ function replaceSegmentSorted(
   return { nextSegments, insertedIndex }
 }
 
-/**
- * PlayerEditor component.
- * Manages segment editing state and integrates with the Player component.
- */
 export function PlayerEditor({
   item,
   fetchSegments = true,
@@ -195,7 +181,6 @@ function useRenderPlayerEditor({
     useVibrantButtonStyle(vibrantColors)
   const batchSaveMutation = useBatchSaveSegments()
 
-  // Fetch segments from server
   const { data: serverSegments = [], isLoading: isLoadingSegments } =
     useSegments(item.Id ?? '', {
       enabled: fetchSegments && !!item.Id,
@@ -206,7 +191,6 @@ function useRenderPlayerEditor({
     [serverSegments],
   )
 
-  // Local editing state
   const [localEditingSegments, setLocalEditingSegments] =
     React.useState<Array<MediaSegmentDto> | null>(null)
   const editingSegments = localEditingSegments ?? sortedServerSegments
@@ -217,17 +201,13 @@ function useRenderPlayerEditor({
     number | null
   >(null)
 
-  // Ref to get current player time
   const getCurrentTimeRef = React.useRef<(() => number) | null>(null)
 
-  // Import confirmation dialog state
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
   const pendingImportRef = React.useRef<ParsedImportResult | null>(null)
 
-  // Track if save is in progress to prevent concurrent operations
   const isSaving = batchSaveMutation.isPending
 
-  // AbortController ref for cancelling in-flight save operations
   const saveAbortRef = React.useRef<AbortController | null>(null)
 
   const updateEditingSegments = React.useCallback(
@@ -237,14 +217,12 @@ function useRenderPlayerEditor({
     [sortedServerSegments],
   )
 
-  // Keep a ref to the latest editing segments for async operations
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
     editingSegmentsRef.current = editingSegments
   }, [editingSegments])
   const timestampTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
 
-  // Cleanup timeout and abort controller on unmount
   React.useEffect(
     () => () => {
       if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
@@ -257,7 +235,6 @@ function useRenderPlayerEditor({
 
   const frameStepSeconds = resolveFrameStepSeconds(item)
 
-  // Handle segment creation from player
   const handleCreateSegment = React.useCallback(
     (data: CreateSegmentData) => {
       const newSegment: MediaSegmentDto = {
@@ -280,13 +257,11 @@ function useRenderPlayerEditor({
     [item.Id, updateEditingSegments],
   )
 
-  // Handle timestamp update from player
   const handleUpdateSegmentTimestamp = React.useCallback(
     (data: TimestampUpdate) => {
       updateEditingSegments((prev) => {
         if (prev.length === 0) return prev
 
-        // Use provided index or fall back to activeIndex
         const targetIndex = data.index ?? activeIndex
         const segment = prev[targetIndex] as MediaSegmentDto | undefined
         if (segment === undefined) return prev
@@ -315,7 +290,6 @@ function useRenderPlayerEditor({
     return snapToFrame(raw, frameStepSeconds)
   }, [frameStepSeconds])
 
-  // Handle segment update from slider
   const handleUpdateSegment = React.useCallback(
     (data: SegmentUpdate) => {
       updateEditingSegments((prev) => {
@@ -354,7 +328,6 @@ function useRenderPlayerEditor({
     [updateEditingSegments],
   )
 
-  // Handle player timestamp request (seek video to segment time)
   const handlePlayerTimestamp = React.useCallback((timestamp: number) => {
     if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
     setPlayerTimestamp(timestamp)
@@ -364,19 +337,16 @@ function useRenderPlayerEditor({
     )
   }, [])
 
-  // Open edit dialog for a segment
   const handleOpenEditDialog = React.useCallback((index: number) => {
     setEditingSegmentIndex(index)
     setEditDialogOpen(true)
   }, [])
 
-  // Close edit dialog
   const handleCloseEditDialog = React.useCallback(() => {
     setEditDialogOpen(false)
     setEditingSegmentIndex(null)
   }, [])
 
-  // Save segment from edit dialog
   const handleSaveSegmentFromDialog = React.useCallback(
     (updatedSegment: MediaSegmentDto) => {
       updateEditingSegments((prev) => {
@@ -391,7 +361,6 @@ function useRenderPlayerEditor({
     [updateEditingSegments],
   )
 
-  // Delete segment from edit dialog
   const handleDeleteSegmentFromDialog = React.useCallback(
     (segment: MediaSegmentDto) => {
       updateEditingSegments((prev) =>
@@ -402,7 +371,6 @@ function useRenderPlayerEditor({
     [updateEditingSegments],
   )
 
-  // Paste from clipboard with validation
   const handlePasteFromClipboard = React.useCallback(() => {
     if (!item.Id) return
     const itemId = item.Id
@@ -423,21 +391,18 @@ function useRenderPlayerEditor({
           return
         }
 
-        // If there are existing segments, show confirmation dialog
         if (editingSegmentsRef.current.length > 0) {
           pendingImportRef.current = result
           setImportDialogOpen(true)
           return
         }
 
-        // No existing segments, replace directly
         updateEditingSegments(() => {
           const updated = result.segments.toSorted(sortSegmentsByStart)
           setActiveIndex(0)
           return updated
         })
 
-        // Build informative notification message
         const infoSuffix = buildImportInfoSuffix(result)
         showNotification({
           type: 'positive',
@@ -452,16 +417,13 @@ function useRenderPlayerEditor({
       })
   }, [item.Id, runtimeSeconds, t, updateEditingSegments])
 
-  // Save all segments with race condition prevention
   const handleSaveAll = React.useCallback(async () => {
     if (!item.Id || isSaving) return
 
-    // Cancel any previous in-flight save
     saveAbortRef.current?.abort()
     const controller = new AbortController()
     saveAbortRef.current = controller
 
-    // Use ref to get latest segments at the moment of save
     const currentSegments = editingSegmentsRef.current
 
     try {
@@ -471,7 +433,6 @@ function useRenderPlayerEditor({
         newSegments: currentSegments,
       })
 
-      // Only show notification if not aborted
       if (!controller.signal.aborted) {
         setLocalEditingSegments(null)
         showNotification({
@@ -479,13 +440,9 @@ function useRenderPlayerEditor({
           message: t('editor.saveSegment'),
         })
       }
-    } catch {
-      // Error notification is handled by the mutation's onError handler
-      // No additional notification needed here to avoid duplicate toasts
-    }
+    } catch {}
   }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
 
-  // Copy all segments to system clipboard as JSON
   const handleCopyAllAsJson = React.useCallback(async () => {
     const segmentsToCopy = editingSegmentsRef.current
     if (segmentsToCopy.length === 0) {
@@ -500,7 +457,6 @@ function useRenderPlayerEditor({
       const result = segmentsToIntroSkipperClipboardText(segmentsToCopy)
       await navigator.clipboard.writeText(result.text)
 
-      // Build informative notification message
       if (result.excludedCount > 0) {
         const excludedInfo = result.excludedTypes.join(', ')
         showNotification({
@@ -529,7 +485,6 @@ function useRenderPlayerEditor({
     setImportDialogOpen(false)
   }, [])
 
-  // Handle import confirmation: replace all segments
   const handleImportReplace = React.useCallback(() => {
     const pending = pendingImportRef.current
     if (!pending) return
@@ -549,7 +504,6 @@ function useRenderPlayerEditor({
     dismissImportDialog()
   }, [dismissImportDialog, updateEditingSegments])
 
-  // Handle import confirmation: merge with existing segments
   const handleImportMerge = React.useCallback(() => {
     const pending = pendingImportRef.current
     if (!pending) return
@@ -568,15 +522,12 @@ function useRenderPlayerEditor({
     dismissImportDialog()
   }, [dismissImportDialog, updateEditingSegments])
 
-  // Handle import dialog cancel
   const handleImportCancel = dismissImportDialog
 
-  // Keyboard shortcut: Mod+S to save all segments
   useHotkey('Mod+S', () => {
     void handleSaveAll()
   })
 
-  // Keyboard shortcut: [ to navigate to previous segment
   useHotkey('[', () => {
     setActiveIndex((prev) =>
       editingSegments.length === 0
@@ -585,7 +536,6 @@ function useRenderPlayerEditor({
     )
   })
 
-  // Keyboard shortcut: ] to navigate to next segment
   useHotkey(']', () => {
     setActiveIndex((prev) =>
       editingSegments.length === 0 ? 0 : (prev + 1) % editingSegments.length,
@@ -594,7 +544,6 @@ function useRenderPlayerEditor({
 
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
-      {/* Player */}
       {showVideoPlayer && (
         <Player
           item={item}
@@ -608,7 +557,6 @@ function useRenderPlayerEditor({
         />
       )}
 
-      {/* Restore player + segment creation button when player is hidden */}
       {!showVideoPlayer && (
         <div className="flex justify-center gap-3">
           <Button
@@ -633,7 +581,6 @@ function useRenderPlayerEditor({
         </div>
       )}
 
-      {/* Segments list */}
       <div className="space-y-4">
         {isLoadingSegments ? (
           <SegmentLoadingState count={2} />
@@ -669,7 +616,6 @@ function useRenderPlayerEditor({
         )}
       </div>
 
-      {/* Segment Edit Dialog */}
       {editingSegmentIndex !== null && editingSegments[editingSegmentIndex] && (
         <SegmentEditDialog
           key={editingSegments[editingSegmentIndex].Id ?? editingSegmentIndex}
@@ -682,7 +628,6 @@ function useRenderPlayerEditor({
         />
       )}
 
-      {/* Import Confirmation Dialog */}
       <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -710,12 +655,12 @@ function useRenderPlayerEditor({
         </AlertDialogContent>
       </AlertDialog>
 
-      <div
-        className="flex flex-row justify-center gap-4"
-        role="group"
+      <fieldset
+        className="flex flex-row justify-center gap-4 border-0 p-0 m-0"
         aria-label={t('editor.actions', 'Segment actions')}
       >
         <button
+          type="button"
           data-interactive-transition="true"
           onClick={handlePasteFromClipboard}
           aria-label={t('editor.paste', 'Paste segment from clipboard')}
@@ -737,6 +682,7 @@ function useRenderPlayerEditor({
           {t('editor.paste', 'Paste')}
         </button>
         <button
+          type="button"
           data-interactive-transition="true"
           onClick={() => void handleSaveAll()}
           disabled={isSaving}
@@ -764,7 +710,7 @@ function useRenderPlayerEditor({
           {isSaving && <span className="sr-only">Saving segments</span>}
           {t('editor.saveSegment')}
         </button>
-      </div>
+      </fieldset>
     </div>
   )
 }

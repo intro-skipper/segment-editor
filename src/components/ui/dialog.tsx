@@ -4,7 +4,7 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { withFreezeOnExit } from '@/components/ui/freeze'
+import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />

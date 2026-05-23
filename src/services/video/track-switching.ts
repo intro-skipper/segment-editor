@@ -129,7 +129,7 @@ export interface TrackSwitchResult {
  * @param format - The desired subtitle format (default: 'vtt')
  * @returns The subtitle delivery URL
  */
-function getSubtitleDeliveryUrl(
+export function getSubtitleDeliveryUrl(
   itemId: string,
   trackIndex: number,
   format: string = 'vtt',
