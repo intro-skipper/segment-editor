@@ -3,7 +3,7 @@ import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { withFreezeOnExit } from '@/components/ui/freeze'
+import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
@@ -125,11 +125,7 @@ function AlertDialogAction({
   ...props
 }: React.ComponentProps<typeof Button>) {
   return (
-    <Button
-      data-slot="alert-dialog-action"
-      className={cn(className)}
-      {...props}
-    />
+    <Button data-slot="alert-dialog-action" className={className} {...props} />
   )
 }
 
@@ -143,7 +139,7 @@ function AlertDialogCancel({
   return (
     <AlertDialogPrimitive.Close
       data-slot="alert-dialog-cancel"
-      className={cn(className)}
+      className={className}
       render={<Button variant={variant} size={size} />}
       {...props}
     />

@@ -1,8 +1,3 @@
-/**
- * FilterView - Main media browsing interface.
- * Displays library picker, search, and paginated media grid.
- */
-
 import {
   useCallback,
   useEffect,
@@ -70,7 +65,6 @@ import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
-// Stable selectors to prevent re-renders - defined outside component
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
   state.pageSize
 
@@ -81,7 +75,6 @@ const selectSetSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
 ) => state.setSettingsOpen
 
-/** Ordered substring classifiers; matching is intentionally partial, not exact membership. */
 const COLLECTION_ICON_PATTERNS: Array<
   readonly [pattern: RegExp, icon: typeof Library]
 > = [
@@ -102,7 +95,6 @@ const getCollectionIcon = (name: string) => {
   return Library
 }
 
-// Stable empty array to avoid re-creating a new reference every render
 const EMPTY_ITEMS: Array<BaseItemDto> = []
 
 const GRID_CLASS =
@@ -138,12 +130,7 @@ function MediaListSkeleton({
   loadingLabel: string
 }) {
   return (
-    <div
-      className={LIST_CLASS}
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
+    <output className={LIST_CLASS} aria-live="polite" aria-busy="true">
       <span className="sr-only">{loadingLabel}</span>
       {Array.from({ length: count }).map((_, i) => (
         <div
@@ -159,7 +146,7 @@ function MediaListSkeleton({
           </div>
         </div>
       ))}
-    </div>
+    </output>
   )
 }
 
@@ -180,15 +167,7 @@ function MediaListRow({
 }: MediaListRowProps) {
   const imageUrl = useMemo(
     () => getBestImageUrl(item, 160, 240) ?? null,
-    [
-      item.Id,
-      item.ImageTags?.Primary,
-      item.ImageTags?.Thumb,
-      item.BackdropImageTags?.[0],
-      item.ParentThumbItemId,
-      item.SeriesId,
-      item.SeriesPrimaryImageTag,
-    ],
+    [item],
   )
   const vibrantColors = useVibrantColor(imageUrl)
   const animationDelay = staggerDelay(index, STAGGER_FAST)
@@ -253,7 +232,6 @@ function MediaListRow({
   )
 }
 
-/** Subscribe to window resize events */
 function subscribeToResize(callback: () => void) {
   let frameId: number | null = null
   const onResize = () => {
@@ -272,17 +250,14 @@ function subscribeToResize(callback: () => void) {
   }
 }
 
-/** Get current column count snapshot */
 function getColumnsSnapshot() {
   return getGridColumns(window.innerWidth)
 }
 
-/** Server snapshot for SSR */
 function getServerColumnsSnapshot() {
   return COLUMN_BREAKPOINTS.default
 }
 
-/** Hook to get current column count based on viewport width using useSyncExternalStore */
 function useGridColumns(): number {
   return useSyncExternalStore(
     subscribeToResize,
@@ -291,7 +266,6 @@ function useGridColumns(): number {
   )
 }
 
-/** Builds the middle section of page numbers with ellipsis */
 function buildMiddlePages(
   current: number,
   total: number,
@@ -311,10 +285,8 @@ function getPageNumbers(
   current: number,
   total: number,
 ): Array<number | 'ellipsis'> {
-  // For small page counts, show all pages
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
 
-  // For larger counts, show first, middle section with ellipsis, and last
   const pages: Array<number | 'ellipsis'> = [1]
   pages.push(...buildMiddlePages(current, total))
   if (total > 1) pages.push(total)
@@ -324,11 +296,6 @@ function getPageNumbers(
 
 const routeApi = getRouteApi('/')
 
-/**
- * FilterView provides the main browsing interface for media collections.
- * Users can select a collection, filter by name, and view items in a paginated grid.
- * State is stored in URL search params for shareability.
- */
 export function FilterView() {
   return useRenderFilterView()
 }
@@ -337,7 +304,6 @@ function useRenderFilterView() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  // Get URL search params for shareable state
   const {
     collection: selectedCollection,
     page,
@@ -345,8 +311,6 @@ function useRenderFilterView() {
   } = routeApi.useSearch()
   const currentPage = page ?? 1
 
-  // Page size is kept in session store as it's a user preference
-  // Use individual selector to avoid object creation
   const pageSize = useSessionStore(selectPageSize)
   const viewMode = useSessionStore(selectViewMode)
   const effectivePageSize =
@@ -371,11 +335,9 @@ function useRenderFilterView() {
   const columns = useGridColumns()
   const navigationColumns = viewMode === 'list' ? 1 : columns
 
-  // Plugin mode and connection state
   const { isPlugin, hasCredentials, isConnected } = usePluginMode()
   const setSettingsOpen = useSessionStore(selectSetSettingsOpen)
 
-  // Fetch collections and items
   const {
     data: collections,
     isLoading: collectionsLoading,
@@ -396,7 +358,6 @@ function useRenderFilterView() {
     enabled: !!selectedCollection,
   })
 
-  // Calculate pagination with bounds checking
   const totalItems = itemsData?.totalCount ?? 0
   const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize))
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
@@ -422,15 +383,12 @@ function useRenderFilterView() {
     }
   }, [currentPage, validCurrentPage, setCurrentPage])
 
-  // Grid keyboard navigation using the shared hook
   const handleItemActivate = (index: number) => {
     const item = paginatedItems.at(index)
     if (item === undefined) return
     navigateToMediaItem(navigate, item)
   }
 
-  // Scroll a virtualized grid item into view by programmatically scrolling
-  // the container. The hook will retry focus after the element renders.
   const handleScrollToIndex = (index: number) => {
     const container = virtualizedGridElement
     if (!container) return
@@ -448,22 +406,17 @@ function useRenderFilterView() {
       onScrollToIndex: shouldVirtualizeGrid ? handleScrollToIndex : undefined,
     })
 
-  // Merged ref callback: sets both the virtualizer scroll element and the
-  // grid keyboard navigation ref so both systems work on the same DOM node.
   const setVirtualizedGridRef = (node: HTMLDivElement | null) => {
     setVirtualizedGridElement(node)
     gridRef.current = node
   }
 
-  // Track URLs already requested for preloading
   const preloadedUrlsRef = useRef(new Set<string>())
 
-  // Clear preload cache when collection changes
   useEffect(() => {
     preloadedUrlsRef.current.clear()
   }, [selectedCollection])
 
-  // Preload vibrant colors for above-the-fold items only
   useEffect(() => {
     if (paginatedItems.length === 0) return
 
@@ -550,7 +503,6 @@ function useRenderFilterView() {
 
   const pageNumbers = getPageNumbers(validCurrentPage, totalPages)
 
-  // Derived state
   const showLoading =
     collectionsLoading ||
     (selectedCollection && !itemsError && itemsLoading && !itemsData)
@@ -558,17 +510,13 @@ function useRenderFilterView() {
   const showEmpty =
     selectedCollection && !itemsLoading && !itemsError && totalItems === 0
 
-  // Not connected state (standalone mode only)
   const showNotConnected = !isPlugin && !hasCredentials && !isConnected
 
-  // Connecting state - only in plugin mode before credentials are processed
-  // With immediate trust of plugin credentials, this should rarely show
   const showConnecting = isPlugin && !isConnected
 
   return (
     <div className="relative px-4 pb-8 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        {/* Not Connected State - standalone mode without credentials */}
         {showNotConnected && (
           <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
             <Empty className="border-none bg-transparent">
@@ -604,7 +552,6 @@ function useRenderFilterView() {
           </div>
         )}
 
-        {/* Connecting State - plugin mode waiting for credentials */}
         {showConnecting && (
           <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
             <Empty className="border-none bg-transparent">
@@ -629,7 +576,6 @@ function useRenderFilterView() {
           </div>
         )}
 
-        {/* Library Picker - shown when no collection selected */}
         {!showNotConnected &&
           !showConnecting &&
           !selectedCollection &&
@@ -656,9 +602,8 @@ function useRenderFilterView() {
                     })}
                   </p>
                 </div>
-                <div
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6"
-                  role="group"
+                <fieldset
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 border-0 p-0 m-0"
                   aria-label={t('items.selectLibrary', {
                     defaultValue: 'Select a Library',
                   })}
@@ -675,12 +620,11 @@ function useRenderFilterView() {
                       />
                     )
                   })}
-                </div>
+                </fieldset>
               </div>
             </div>
           )}
 
-        {/* Loading State */}
         {showLoading && (
           <div className="animate-in fade-in duration-200">
             {viewMode === 'list' ? (
@@ -693,13 +637,12 @@ function useRenderFilterView() {
             ) : (
               <MediaGridSkeleton
                 count={Math.min(effectivePageSize, 24)}
-                gridClassName={GRID_CLASS}
+                className={GRID_CLASS}
               />
             )}
           </div>
         )}
 
-        {/* Error State */}
         {showError && (
           <div
             className="flex flex-col items-center justify-center py-16 gap-4"
@@ -727,11 +670,9 @@ function useRenderFilterView() {
           </div>
         )}
 
-        {/* Empty State */}
         {showEmpty && (
-          <div
+          <output
             className="flex flex-col items-center justify-center py-16 text-center"
-            role="status"
             aria-live="polite"
           >
             <div className="size-20 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -743,13 +684,11 @@ function useRenderFilterView() {
             <p className="text-muted-foreground text-lg">
               {t('items.noItems', { defaultValue: 'No items found' })}
             </p>
-          </div>
+          </output>
         )}
 
-        {/* Media Grid */}
         {paginatedItems.length > 0 && (
           <>
-            {/* Item count with aria-live for screen readers */}
             <div className="flex justify-between items-center mb-6">
               <p
                 className="text-sm text-muted-foreground"
@@ -816,7 +755,6 @@ function useRenderFilterView() {
                     return (
                       <div
                         key={`grid-row-${rowIndex}`}
-                        role="row"
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -871,7 +809,6 @@ function useRenderFilterView() {
               </div>
             )}
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="mt-10">
                 <Pagination>

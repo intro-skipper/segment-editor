@@ -1,7 +1,3 @@
-/**
- * AlbumView - Displays album tracks with navigation to player.
- */
-
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, Music, Play } from 'lucide-react'
@@ -10,20 +6,14 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { Button } from '@/components/ui/button'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
-import { EmptyState } from '@/components/ui/async-state'
+import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { formatReadableTime, ticksToSeconds } from '@/lib/time-utils'
 
 interface AlbumViewProps {
-  /** The album item */
   album: BaseItemDto
-  /** Array of tracks for the album */
   tracks: Array<BaseItemDto>
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TrackRow - Memoized track display
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface TrackRowProps {
   track: BaseItemDto
@@ -56,20 +46,17 @@ const TrackRow = React.memo(function TrackRowComponent({
       )}
       aria-label={`Play track ${trackNumber}: ${track.Name || `Track ${trackNumber}`}, duration ${duration}`}
     >
-      {/* Track Number / Play Icon */}
       <div className="w-8 text-center text-muted-foreground" aria-hidden="true">
         <span className="group-hover:hidden">{trackNumber}</span>
         <Play className="size-4 hidden group-hover:inline" />
       </div>
 
-      {/* Track Name */}
       <div className="flex-grow min-w-0">
         <p className="text-sm font-medium truncate">
           {track.Name || `Track ${trackNumber}`}
         </p>
       </div>
 
-      {/* Duration */}
       <div
         className="text-sm text-muted-foreground"
         aria-label={`Duration: ${duration}`}
@@ -79,10 +66,6 @@ const TrackRow = React.memo(function TrackRowComponent({
     </InteractiveCard>
   )
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AlbumView - Main component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function AlbumView({ album, tracks }: AlbumViewProps) {
   const navigate = useNavigate()
@@ -108,7 +91,6 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -121,7 +103,6 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
         </Button>
       </div>
 
-      {/* Album Info */}
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         <div className="flex-shrink-0 w-[var(--spacing-thumbnail-sm)] h-[var(--spacing-thumbnail-sm)] sm:w-[var(--spacing-thumbnail-md)] sm:h-[var(--spacing-thumbnail-md)] bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
           <ItemImage
@@ -148,7 +129,6 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
         </div>
       </div>
 
-      {/* Tracks List */}
       {tracks.length === 0 ? (
         <EmptyState
           icon={<Music className="size-8" aria-hidden="true" />}
@@ -156,13 +136,12 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           className="py-8"
         />
       ) : (
-        <div
+        <ul
           className="space-y-1"
-          role="list"
           aria-label={`${tracks.length} tracks in ${albumName}`}
         >
           {tracks.map((track, index) => (
-            <div
+            <li
               key={track.Id}
               style={{
                 contentVisibility: 'auto',
@@ -175,9 +154,9 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
                 index={index + 1}
                 onTrackSelect={handleTrackClick}
               />
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   )

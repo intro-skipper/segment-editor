@@ -31,10 +31,6 @@ import { Badge } from '@/components/ui/badge'
 import { getScoreDisplay } from '@/services/jellyfin'
 import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface SelectStepProps {
   servers: Array<RecommendedServerInfo>
   selectedServer: RecommendedServerInfo | null
@@ -44,10 +40,6 @@ interface SelectStepProps {
   onBack: () => void
   onContinue: () => void
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 function renderScoreIcon(score: RecommendedServerInfoScore) {
   switch (score) {
@@ -64,16 +56,10 @@ function renderScoreIcon(score: RecommendedServerInfoScore) {
 function getBadgeVariant(
   variant: 'success' | 'warning' | 'error',
 ): 'default' | 'secondary' | 'destructive' {
-  return variant === 'success'
-    ? 'default'
-    : variant === 'warning'
-      ? 'secondary'
-      : 'destructive'
+  if (variant === 'success') return 'default'
+  if (variant === 'warning') return 'secondary'
+  return 'destructive'
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Server Item
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ServerItemProps {
   server: RecommendedServerInfo
@@ -81,6 +67,7 @@ interface ServerItemProps {
   onSelect: () => void
   index: number
   buttonRef?: (element: HTMLButtonElement | null) => void
+  onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void
 }
 
 function ServerItem({
@@ -89,6 +76,7 @@ function ServerItem({
   onSelect,
   index,
   buttonRef,
+  onKeyDown,
 }: ServerItemProps) {
   const scoreDisplay = getScoreDisplay(server.score)
   const scoreIcon = renderScoreIcon(server.score)
@@ -103,6 +91,7 @@ function ServerItem({
       type="button"
       role="option"
       onClick={onSelect}
+      onKeyDown={onKeyDown}
       aria-selected={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
@@ -168,10 +157,6 @@ function ServerItem({
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Server List
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface ServerListProps {
   servers: Array<RecommendedServerInfo>
   selectedServer: RecommendedServerInfo | null
@@ -207,37 +192,40 @@ function ServerList({
     [discoveryGeneration],
   )
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!listRef.current) return
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (!listRef.current) return
 
-    const buttons = Array.from(listRef.current.querySelectorAll('button'))
-    const currentIndex = buttons.findIndex(
-      (btn) => btn === document.activeElement,
-    )
+      const buttons = Array.from(listRef.current.querySelectorAll('button'))
+      const currentIndex = buttons.findIndex(
+        (btn) => btn === document.activeElement,
+      )
 
-    let nextIndex = currentIndex
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        nextIndex = Math.min(currentIndex + 1, buttons.length - 1)
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        nextIndex = Math.max(currentIndex - 1, 0)
-        break
-      case 'Home':
-        e.preventDefault()
-        nextIndex = 0
-        break
-      case 'End':
-        e.preventDefault()
-        nextIndex = buttons.length - 1
-        break
-      default:
-        return
-    }
-    buttons[nextIndex]?.focus()
-  }, [])
+      let nextIndex = currentIndex
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          nextIndex = Math.min(currentIndex + 1, buttons.length - 1)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          nextIndex = Math.max(currentIndex - 1, 0)
+          break
+        case 'Home':
+          e.preventDefault()
+          nextIndex = 0
+          break
+        case 'End':
+          e.preventDefault()
+          nextIndex = buttons.length - 1
+          break
+        default:
+          return
+      }
+      buttons[nextIndex]?.focus()
+    },
+    [],
+  )
 
   if (isLoading) {
     return (
@@ -273,13 +261,7 @@ function ServerList({
   }
 
   return (
-    <div
-      ref={listRef}
-      role="listbox"
-      aria-label="Discovered servers"
-      onKeyDown={handleKeyDown}
-      className="space-y-2"
-    >
+    <div ref={listRef} aria-label="Discovered servers" className="space-y-2">
       {servers.map((server, index) => (
         <ServerItem
           key={server.address}
@@ -288,15 +270,12 @@ function ServerList({
           onSelect={() => onSelect(server)}
           index={index}
           buttonRef={index === 0 ? focusFirstServerButton : undefined}
+          onKeyDown={handleKeyDown}
         />
       ))}
     </div>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function SelectStep({
   servers,
@@ -311,8 +290,6 @@ export function SelectStep({
   const serverCountText =
     servers.length === 1 ? 'Found 1 server' : `Found ${servers.length} servers`
 
-  // Check if the app is served over HTTPS and selected server uses HTTP (Mixed Content)
-  // This causes issues in Firefox, so we show a warning
   const isMixedContent =
     typeof window !== 'undefined' &&
     window.location.protocol === 'https:' &&
@@ -321,7 +298,6 @@ export function SelectStep({
 
   return (
     <div className="space-y-6">
-      {/* Inline header */}
       <div className="text-center">
         <h2 className="text-lg font-semibold mb-1">Select Server</h2>
         <p className="text-sm text-muted-foreground">{serverCountText}</p>
@@ -335,7 +311,6 @@ export function SelectStep({
         error={error}
       />
 
-      {/* HTTP Warning for Firefox users - only when app is served over HTTPS */}
       {isMixedContent && (
         <div
           className="flex items-start gap-3 p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10"

@@ -1,6 +1,6 @@
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 import { cn } from '@/lib/utils'
-import { withFreezeOnExit } from '@/components/ui/freeze'
+import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
   return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />

@@ -114,8 +114,7 @@ const EpisodeItem = memo(function EpisodeItemComponent({
       onFocus={() => {
         if (episode.Id) onIntent(episode.Id)
       }}
-      role="option"
-      aria-selected={isActive}
+      aria-current={isActive ? 'true' : undefined}
       aria-label={`Episode ${episodeNum}: ${episodeName}${runtime ? `, ${runtime} minutes` : ''}${isActive ? ', currently playing' : ''}`}
     >
       <span
@@ -186,7 +185,6 @@ const SeasonButton = memo(function SeasonButtonComponent({
 
   return (
     <button
-      key={season.Id}
       type="button"
       onClick={selectSeason}
       className={cn(
@@ -250,7 +248,6 @@ const SeasonSelector = memo(function SeasonSelectorComponent({
   )
 })
 
-// Episode list content renderer - reduces cyclomatic complexity
 const EpisodeListContent = memo(function EpisodeListContentComponent({
   episodes,
   currentEpisodeId,
@@ -286,19 +283,14 @@ const EpisodeListContent = memo(function EpisodeListContentComponent({
 
   if (isLoading) {
     return (
-      <div
-        className="space-y-0.5"
-        role="status"
-        aria-live="polite"
-        aria-busy="true"
-      >
+      <output className="space-y-0.5" aria-live="polite" aria-busy="true">
         <span className="sr-only">Loading episodes</span>
         {['skeleton-1', 'skeleton-2', 'skeleton-3', 'skeleton-4'].map(
           (skeletonId, index) => (
             <EpisodeItemSkeleton key={skeletonId} index={index} />
           ),
         )}
-      </div>
+      </output>
     )
   }
 
@@ -330,7 +322,6 @@ const EpisodeListContent = memo(function EpisodeListContentComponent({
   if (shouldVirtualize) {
     return (
       <div
-        role="listbox"
         aria-label="Episodes"
         style={{
           height: totalVirtualHeight,
@@ -369,7 +360,7 @@ const EpisodeListContent = memo(function EpisodeListContentComponent({
   }
 
   return (
-    <div className="space-y-0.5" role="listbox" aria-label="Episodes">
+    <div className="space-y-0.5" aria-label="Episodes">
       {episodes.map((episode, index) => (
         <EpisodeItem
           key={episode.Id}
@@ -442,8 +433,6 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
     [router],
   )
 
-  const setEpisodeListContainerRef = setEpisodeListElement
-
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
 
   const episodeLabel = `S${currentEpisode.ParentIndexNumber ?? '?'}E${currentEpisode.IndexNumber ?? '?'}`
@@ -502,7 +491,7 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
         </DropdownMenuGroup>
 
         <div
-          ref={setEpisodeListContainerRef}
+          ref={setEpisodeListElement}
           className="overflow-y-auto max-h-[min(320px,50vh)] px-1.5 pb-1.5"
           role="tabpanel"
         >

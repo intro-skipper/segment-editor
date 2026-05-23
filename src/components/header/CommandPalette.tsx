@@ -82,8 +82,7 @@ const SearchResultItem = memo(function SearchResultItemComponent({
       )}
       onPointerEnter={() => onIntent(item)}
       onFocus={() => onIntent(item)}
-      role="option"
-      aria-selected={isSelected}
+      aria-current={isSelected ? 'true' : undefined}
     >
       <div
         className={cn(
@@ -353,7 +352,6 @@ export const CommandPalette = memo(function CommandPaletteComponent({
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >
-        {/* Search Input Section */}
         <div className="relative border-b border-border/50 p-4 overflow-hidden">
           {showLoading ? (
             <div
@@ -380,7 +378,6 @@ export const CommandPalette = memo(function CommandPaletteComponent({
               'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md placeholder:text-muted-foreground',
               search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
             )}
-            aria-expanded={resultItems.length > 0}
             aria-haspopup="listbox"
             aria-label={t('search.placeholder', 'Search media…')}
             aria-controls={
@@ -419,7 +416,6 @@ export const CommandPalette = memo(function CommandPaletteComponent({
           )}
         </div>
 
-        {/* Results Section */}
         <div className="px-2 pb-2">
           {resultItems.length > 0 && (
             <div className="px-3 py-2">
@@ -438,7 +434,6 @@ export const CommandPalette = memo(function CommandPaletteComponent({
               ref={handleScrollContainerRef}
               className="overflow-y-auto"
               style={{ height: listHeight }}
-              role="listbox"
               aria-label={t('search.results', 'Search results')}
             >
               <div
@@ -479,10 +474,9 @@ export const CommandPalette = memo(function CommandPaletteComponent({
               </div>
             </div>
           ) : (
-            <div
+            <output
               id="search-empty-status"
               className="flex flex-col items-center justify-center py-12 text-muted-foreground"
-              role="status"
               aria-live="polite"
             >
               <Search
@@ -495,7 +489,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
                   ? t('search.no_results', 'No results found')
                   : t('search.start_typing', 'Start typing to search…')}
               </p>
-            </div>
+            </output>
           )}
         </div>
       </DialogContent>

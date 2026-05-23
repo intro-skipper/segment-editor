@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
+import { QueryClient } from '@tanstack/react-query'
 import {
   RouterProvider,
   createBrowserHistory,
@@ -8,8 +9,15 @@ import {
 } from '@tanstack/react-router'
 
 import * as TanStackQueryProvider from './integrations/tanstack-query/root-provider.tsx'
+import {
+  QUERY_GC_TIMES,
+  QUERY_STALE_TIMES,
+} from './hooks/queries/query-constants'
+import {
+  getRetryDelay,
+  shouldRetryQuery,
+} from './hooks/queries/query-error-handling'
 
-// Import the generated route tree
 import { routeTree } from './routeTree.gen'
 import {
   APP_BASE_ROUTE,
@@ -22,12 +30,26 @@ import { DesktopFallback } from './components/DesktopFallback'
 
 import './styles.css'
 
-// Create a new router instance
-const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: shouldRetryQuery,
+      retryDelay: getRetryDelay,
+      staleTime: QUERY_STALE_TIMES.MEDIUM,
+      gcTime: QUERY_GC_TIMES.MEDIUM,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+      retryDelay: getRetryDelay,
+    },
+  },
+})
+const routerContext = { queryClient }
 const pluginMode = isPluginMode()
 const pluginBuild = import.meta.env.BASE_URL.startsWith(`/${APP_BASE_ROUTE}/`)
 
-// Use memory history in plugin mode, browser history otherwise
 const history = pluginMode
   ? createMemoryHistory({ initialEntries: [PLUGIN_ROUTER_ENTRY] })
   : createBrowserHistory()
@@ -40,14 +62,11 @@ const router = createRouter({
   routeTree,
   basepath: basePath,
   history: history,
-  context: {
-    ...TanStackQueryProviderContext,
-  },
+  context: routerContext,
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 30_000,
-  // Enable view transitions with typed navigation
   defaultViewTransition: {
     types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {
       // Skip transition for hash-only changes (e.g., anchor links)
@@ -78,14 +97,12 @@ const router = createRouter({
   },
 })
 
-// Register the router instance for type safety
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
   }
 }
 
-// Render the app
 const rootElement = document.getElementById('segment-editor-root')
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement)
@@ -93,7 +110,7 @@ if (rootElement) {
   if (pluginMode && isJellyfinDesktopClient()) {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+        <TanStackQueryProvider.Provider queryClient={queryClient}>
           <DesktopFallback />
         </TanStackQueryProvider.Provider>
       </StrictMode>,
@@ -101,7 +118,7 @@ if (rootElement) {
   } else {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+        <TanStackQueryProvider.Provider queryClient={queryClient}>
           <RouterProvider router={router} />
         </TanStackQueryProvider.Provider>
       </StrictMode>,

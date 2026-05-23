@@ -1,10 +1,3 @@
-/**
- * PlayerScrubber component.
- * Timeline scrubber for video playback with seek functionality.
- * Supports mouse, touch, and keyboard interactions.
- * Includes trickplay preview thumbnails on hover.
- */
-
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -21,13 +14,11 @@ import {
 } from '@/lib/trickplay-utils'
 import { useApiStore } from '@/stores/api-store'
 
-/** Step sizes for scrubber keyboard navigation */
 const SCRUBBER_STEP_FINE = 5
 const SCRUBBER_STEP_COARSE = 10
 const HOVER_TIME_EPSILON_SECONDS = 0.05
 const HOVER_POSITION_EPSILON_PX = 1
 
-/** Trickplay thumbnail preview component */
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
@@ -65,7 +56,6 @@ interface PlayerScrubberProps {
   trickplay?: TrickplayData | null
 }
 
-// Stable selectors for API store
 const selectServerAddress = (s: { serverAddress: string }) => s.serverAddress
 const selectApiKey = (s: { apiKey: string | undefined }) => s.apiKey
 
@@ -103,7 +93,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   const lastHoverTimeRef = React.useRef<number | null>(null)
   const lastHoverPositionRef = React.useRef<number | null>(null)
 
-  // Get best trickplay info
   const trickplayInfo = React.useMemo(
     () => getBestTrickplayInfo(trickplay),
     [trickplay],
@@ -114,7 +103,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     [hoverTime],
   )
 
-  // Calculate trickplay position for hover time
   const trickplayPosition = React.useMemo(() => {
     if (!trickplayInfo || !itemId || previewTime === null) return null
     return getTrickplayPosition(
@@ -287,12 +275,14 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   }, [])
 
   React.useEffect(() => {
+    const seekFrame = seekFrameRef
+    const hoverFrame = hoverFrameRef
     return () => {
-      if (seekFrameRef.current !== null) {
-        cancelAnimationFrame(seekFrameRef.current)
+      if (seekFrame.current !== null) {
+        cancelAnimationFrame(seekFrame.current)
       }
-      if (hoverFrameRef.current !== null) {
-        cancelAnimationFrame(hoverFrameRef.current)
+      if (hoverFrame.current !== null) {
+        cancelAnimationFrame(hoverFrame.current)
       }
     }
   }, [])
@@ -317,7 +307,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     [currentTime, duration, onSeek],
   )
 
-  // Memoize dynamic styles to prevent object recreation
   const trackStyle = React.useMemo(
     () =>
       vibrantColors
@@ -346,19 +335,16 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     [progress, vibrantColors],
   )
 
-  // Memoize buffered progress style
   const bufferedStyle = React.useMemo(
     () => ({ width: `${bufferedProgress}%` }),
     [bufferedProgress],
   )
 
-  // Memoize hover indicator style
   const hoverIndicatorStyle = React.useMemo(
     () => ({ left: hoverPosition, transform: 'translateX(-50%)' }),
     [hoverPosition],
   )
 
-  // Memoize chapter markers with position percentages
   const chapterMarkers = React.useMemo(() => {
     if (!chapters || chapters.length === 0 || duration <= 0) return []
 
@@ -377,7 +363,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     return markers
   }, [chapters, duration])
 
-  // Memoize segment regions with position and width percentages
   // Note: editingSegments store StartTicks/EndTicks in SECONDS (not Jellyfin ticks)
   // because the SegmentSlider works with seconds for the UI
   const segmentRegions = React.useMemo(() => {
@@ -400,7 +385,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
       const clampedStart = Math.max(0, startPercent)
       const clampedEnd = Math.min(100, endPercent)
       const width = Math.max(0, clampedEnd - clampedStart)
-      if (width <= 0.1) continue // Only show segments wider than 0.1%
+      if (width <= 0.1) continue
       const colorConfig = segment.Type
         ? SEGMENT_COLORS[segment.Type]
         : DEFAULT_SEGMENT_COLOR
@@ -425,21 +410,23 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
         ref={scrubberRef}
         className="relative flex-1 h-2 cursor-pointer group touch-none"
         style={{ contain: 'layout style', touchAction: 'none' }}
-        role="slider"
-        aria-label={t('accessibility.player.videoProgress', 'Video progress')}
-        aria-valuemin={0}
-        aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(currentTime)}
-        aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
-        aria-orientation="horizontal"
-        tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onPointerEnter={refreshScrubberRect}
-        onKeyDown={handleKeyDown}
       >
+        <input
+          type="range"
+          min={0}
+          max={Math.round(duration)}
+          value={Math.round(currentTime)}
+          onChange={(event) => onSeek(Number(event.currentTarget.value))}
+          onKeyDown={handleKeyDown}
+          className="sr-only"
+          aria-label={t('accessibility.player.videoProgress', 'Video progress')}
+          aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+        />
         <div
           className={cn(
             'absolute inset-0 rounded-full overflow-hidden',
@@ -452,7 +439,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
             style={bufferedStyle}
           />
 
-          {/* Segment regions */}
           {segmentRegions.map((region) => (
             <div
               key={region.id}
@@ -475,7 +461,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
           />
         </div>
 
-        {/* Chapter markers */}
         {chapterMarkers.map((marker, index) => (
           <button
             key={`chapter-${marker.time}-${marker.position}-${marker.name}`}
@@ -502,7 +487,6 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
           />
         ))}
 
-        {/* Chapter tooltip */}
         {hoveredChapter && (
           <div
             className="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-20"
@@ -536,11 +520,9 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
             className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none z-30"
             style={hoverIndicatorStyle}
           >
-            {/* Trickplay thumbnail preview */}
             {trickplayPosition && (
               <TrickplayPreview position={trickplayPosition} />
             )}
-            {/* Time label */}
             <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
               {formatTime(hoverTime)}
             </div>

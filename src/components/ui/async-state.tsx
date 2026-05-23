@@ -2,21 +2,11 @@
  * AsyncState - Reusable loading, error, and empty state components.
  * Consolidates duplicated patterns across views.
  *
- * Loading State Patterns:
- * - LoadingState: Centered spinner with optional message (for inline/small areas)
- * - SegmentLoadingState: Skeleton cards for segment lists
- *
- * All loading components include proper ARIA attributes for accessibility.
+ * LoadingState includes proper ARIA attributes for accessibility.
  */
 
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react'
-import { Button } from './button'
-import { Skeleton } from './skeleton'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
-
-// Re-export SimpleEmptyState as EmptyState for backward compatibility
-export { SimpleEmptyState as EmptyState } from './empty-state'
 
 interface LoadingStateProps {
   /** Loading message to display */
@@ -43,12 +33,11 @@ export function LoadingState({
   size = 'sm',
 }: LoadingStateProps) {
   return (
-    <div
+    <output
       className={cn(
         'py-6 flex items-center justify-center gap-2 text-muted-foreground',
         className,
       )}
-      role="status"
       aria-live="polite"
       aria-busy="true"
     >
@@ -57,101 +46,6 @@ export function LoadingState({
       </div>
       <span className="sr-only">Loading</span>
       {message && <span>{message}</span>}
-    </div>
-  )
-}
-
-interface SegmentLoadingStateProps {
-  /** Number of skeleton items to show */
-  count?: number
-  /** Additional classes */
-  className?: string
-}
-
-/**
- * Skeleton loading state for segment lists.
- * Displays animated skeleton cards matching segment slider layout.
- */
-export function SegmentLoadingState({
-  count = 3,
-  className,
-}: SegmentLoadingStateProps) {
-  return (
-    <div
-      className={cn('space-y-3', className)}
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <span className="sr-only">Loading segments</span>
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            'p-4 rounded-2xl border border-border/50 bg-card/30',
-            'animate-in fade-in duration-300',
-          )}
-          style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
-        >
-          {/* Header row with type badge and actions */}
-          <div className="flex items-center justify-between mb-3">
-            <Skeleton className="h-6 w-20 rounded-full" />
-            <div className="flex gap-2">
-              <Skeleton className="size-8 rounded-lg" />
-              <Skeleton className="size-8 rounded-lg" />
-            </div>
-          </div>
-          {/* Slider track */}
-          <Skeleton className="h-10 w-full rounded-lg mb-3" />
-          {/* Time inputs row */}
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-8 w-24 rounded-md" />
-            <Skeleton className="h-4 w-8" />
-            <Skeleton className="h-8 w-24 rounded-md" />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-interface ErrorStateProps {
-  /** Error message to display */
-  message: string
-  /** Callback when retry is clicked */
-  onRetry?: () => void
-  /** Retry button text */
-  retryText?: string
-  /** Additional classes */
-  className?: string
-}
-
-/**
- * Error display with optional retry button.
- */
-export function ErrorState({
-  message,
-  onRetry,
-  retryText = 'Retry',
-  className,
-}: ErrorStateProps) {
-  return (
-    <div
-      className={cn(
-        'py-6 flex flex-col items-center justify-center gap-3 text-muted-foreground',
-        className,
-      )}
-      role="alert"
-      aria-live="assertive"
-    >
-      <AlertCircle className="size-8 text-destructive" aria-hidden="true" />
-      <p className="text-sm">{message}</p>
-      {onRetry && (
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw className="size-4 mr-2" aria-hidden="true" />
-          {retryText}
-        </Button>
-      )}
-    </div>
+    </output>
   )
 }

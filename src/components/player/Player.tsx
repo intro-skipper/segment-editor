@@ -1,7 +1,3 @@
-/**
- * Player - Video player with direct play support and HLS fallback.
- */
-
 import {
   useCallback,
   useEffect,
@@ -174,10 +170,6 @@ const selectPlayerState = (
   setPlayerMuted: state.setPlayerMuted,
 })
 
-/**
- * Finds the preferred audio stream index based on language preference.
- * Returns undefined if no preference is set or no matching track is found.
- */
 function findPreferredAudioStreamIndex(
   item: BaseItemDto,
   preferredLanguage: string | null,
@@ -196,7 +188,6 @@ function findPreferredAudioStreamIndex(
   return matchingTrack?.index
 }
 
-/** Maps VideoPlayerErrorType to HlsPlayerError type */
 function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
   switch (type) {
     case 'media_error':
@@ -270,19 +261,13 @@ interface PlayerProps {
   vibrantColors: VibrantColors | null
   timestamp?: number
   segments?: Array<MediaSegmentDto>
-  /** Pre-resolved frame duration in seconds (avoids duplicate computation when parent already has it). */
   frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   className?: string
-  /** Ref callback to expose getCurrentTime function to parent */
   getCurrentTimeRef?: React.MutableRefObject<(() => number) | null>
 }
 
-/**
- * Video player component with direct play support and HLS fallback.
- * Provides playback controls, segment creation, and keyboard shortcuts.
- */
 export function Player({
   item,
   vibrantColors,
@@ -320,7 +305,6 @@ function useRenderPlayer({
 }: PlayerProps) {
   const { t } = useTranslation()
 
-  // Use extracted selector with useShallow to prevent unnecessary re-renders
   const { persistedVolume, persistedMuted, setPlayerVolume, setPlayerMuted } =
     useSessionStore(useShallow(selectPlayerState))
 
@@ -343,11 +327,9 @@ function useRenderPlayer({
     playbackSpeedIndex,
   } = state
 
-  // Refs for stable callback references in skip operations
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
 
-  // Segment skip mode from app settings
   const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
   const segmentSkipModeRef = useRef(segmentSkipMode)
   segmentSkipModeRef.current = segmentSkipMode
@@ -356,8 +338,6 @@ function useRenderPlayer({
     (s) => s.jellyfinPlaybackSyncEnabled,
   )
 
-  // Precompute segment time ranges once per segment list update, sorted by
-  // startSeconds so binary search can be used during playback hot-path.
   const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
     () =>
       (segments ?? [])
@@ -372,7 +352,6 @@ function useRenderPlayer({
         .sort((a, b) => a.startSeconds - b.startSeconds),
     [segments],
   )
-  // ID-keyed map for O(1) lookup by segment ID (used in handleSkipSegment).
   const segmentTimeRangeById = useMemo<Map<string, SegmentTimeRange>>(
     () =>
       segmentTimeRanges.reduce((map, r) => {
@@ -383,21 +362,16 @@ function useRenderPlayer({
       }, new Map<string, SegmentTimeRange>()),
     [segmentTimeRanges],
   )
-  // Stable refs for precomputed segment ranges in time-update handlers.
   const segmentTimeRangesRef = useRef(segmentTimeRanges)
   segmentTimeRangesRef.current = segmentTimeRanges
   const segmentTimeRangeByIdRef = useRef(segmentTimeRangeById)
   segmentTimeRangeByIdRef.current = segmentTimeRangeById
 
-  // Active segment overlapping the current playback position (for button mode)
   const [activeSkipSegment, setActiveSkipSegment] =
     useState<MediaSegmentDto | null>(null)
-  // Track the ID of the last active segment to avoid redundant state updates
   const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
-  // Track the segment ID we last auto-skipped to prevent repeated seeks
   const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
 
-  // Convenience: snap the current playback position to the nearest frame boundary.
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
 
@@ -464,8 +438,6 @@ function useRenderPlayer({
 
   const handleStrategyChange = useCallback(
     (strategy: PlaybackStrategy) => {
-      // Clear any stale error from the previous strategy — the switch succeeded,
-      // so the error overlay (e.g. "directPlayFailed") must not persist.
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
 
       if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
@@ -1237,7 +1209,9 @@ function useRenderPlayer({
             onProgress={handleProgress}
             onPlay={handlePlay}
             onPause={handlePause}
-          />
+          >
+            <track kind="captions" />
+          </video>
         </button>
 
         {/* Error overlay - strategy-aware */}

@@ -10,10 +10,6 @@ interface FreezeOnExitProps {
   children: React.ReactNode
 }
 
-interface TransitionStatusState {
-  transitionStatus?: string
-}
-
 const NEVER: Promise<never> = new Promise(() => {})
 
 function Suspend(): never {
@@ -36,19 +32,9 @@ export function Freeze({ frozen, children }: FreezeProps) {
   )
 }
 
-function FreezeOnExit({ transitionStatus, children }: FreezeOnExitProps) {
+export function FreezeOnExit({
+  transitionStatus,
+  children,
+}: FreezeOnExitProps) {
   return <Freeze frozen={transitionStatus === 'ending'}>{children}</Freeze>
-}
-
-export function withFreezeOnExit(children: React.ReactNode) {
-  return (
-    popupProps: React.ComponentPropsWithRef<'div'>,
-    state: TransitionStatusState,
-  ) => (
-    <div {...popupProps}>
-      <FreezeOnExit transitionStatus={state.transitionStatus}>
-        {children}
-      </FreezeOnExit>
-    </div>
-  )
 }
