@@ -4,6 +4,7 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { getPlaybackConfig, getVideoStreamUrl } from '@/services/video/api'
 import { getCredentials, getDeviceId } from '@/services/jellyfin'
 import { checkCompatibility } from '@/services/video/compatibility'
+import { createPlaySessionId } from '@/services/video/session'
 
 vi.mock('@/services/jellyfin', () => ({
   buildApiUrl: vi.fn(({ serverAddress, endpoint, query }) => {
@@ -16,6 +17,10 @@ vi.mock('@/services/jellyfin', () => ({
 
 vi.mock('@/services/video/compatibility', () => ({
   checkCompatibility: vi.fn(),
+}))
+
+vi.mock('@/services/video/session', () => ({
+  createPlaySessionId: vi.fn(),
 }))
 
 function createPlayableItem(): BaseItemDto {
@@ -38,12 +43,14 @@ function createPlayableItem(): BaseItemDto {
 
 describe('getVideoStreamUrl URL serialization', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(getDeviceId).mockReturnValue('test-device')
     vi.mocked(getCredentials).mockReturnValue({
       serverAddress: 'https://jellyfin.example',
       accessToken: 'token',
     })
     vi.mocked(checkCompatibility).mockResolvedValue({ canDirectPlay: true })
+    vi.mocked(createPlaySessionId).mockReturnValue('generated-session-id')
   })
 
   it('includes explicit PlaySessionId in the URL query', () => {
@@ -54,6 +61,16 @@ describe('getVideoStreamUrl URL serialization', () => {
 
     const params = new URLSearchParams(url.split('?')[1])
     expect(params.get('PlaySessionId')).toBe('session-xyz')
+  })
+
+  it('generates default PlaySessionId through the session helper', () => {
+    const url = getVideoStreamUrl({
+      itemId: 'item-abc',
+    })
+
+    const params = new URLSearchParams(url.split('?')[1])
+    expect(createPlaySessionId).toHaveBeenCalledTimes(1)
+    expect(params.get('PlaySessionId')).toBe('generated-session-id')
   })
 
   it('includes explicit MediaSourceId in the URL query', () => {
@@ -100,12 +117,14 @@ describe('getVideoStreamUrl URL serialization', () => {
 
 describe('getPlaybackConfig URL integration', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(getDeviceId).mockReturnValue('test-device')
     vi.mocked(getCredentials).mockReturnValue({
       serverAddress: 'https://jellyfin.example',
       accessToken: 'token',
     })
     vi.mocked(checkCompatibility).mockResolvedValue({ canDirectPlay: true })
+    vi.mocked(createPlaySessionId).mockReturnValue('generated-session-id')
   })
 
   it('uses MediaSources[0].Id for direct-play MediaSourceId', async () => {

@@ -8,7 +8,7 @@ import type { MediaSourceInfo } from '@/services/video/compatibility'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { checkCompatibility } from '@/services/video/compatibility'
-import { generateUUID } from '@/lib/segment-utils'
+import { createPlaySessionId } from '@/services/video/session'
 
 // ============================================================================
 // Types
@@ -147,7 +147,7 @@ export function getVideoStreamUrl(
     maxStreamingBitrate = 140000000,
     startTimeTicks = 0,
     mediaSourceId,
-    playSessionId = generateUUID(),
+    playSessionId = createPlaySessionId(),
   } = options
 
   const query = new URLSearchParams({

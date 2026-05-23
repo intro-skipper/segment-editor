@@ -36,14 +36,9 @@ import {
   stopPlaybackStatusKeepalive,
 } from '@/services/video/playback-session'
 import type { PlaybackStatusPlayMethod } from '@/services/video/playback-session'
-import { JELLYFIN_CONFIG } from '@/lib/constants'
+import { secondsToTicks } from '@/lib/time-utils'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
-
-function secondsToTicks(seconds: number): number | null {
-  if (!Number.isFinite(seconds) || seconds < 0) return null
-  return Math.floor(seconds * JELLYFIN_CONFIG.TICKS_PER_SECOND)
-}
 
 // ============================================================================
 // Types
@@ -335,7 +330,7 @@ export function useVideoPlayer({
     const video = getActiveVideoElement()
     const activeSession = activePlaybackStatusRef.current
     if (video !== null) {
-      const currentTicks = secondsToTicks(video.currentTime) ?? 0
+      const currentTicks = secondsToTicks(video.currentTime)
       if (activeSession) activeSession.latestPositionTicks = currentTicks
       return currentTicks
     }
@@ -352,7 +347,7 @@ export function useVideoPlayer({
 
       const video = getActiveVideoElement()
       const positionTicks =
-        positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0) ?? 0
+        positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0)
       const playMethod: PlaybackStatusPlayMethod =
         currentStrategyRef.current === 'hls' ? 'Transcode' : 'DirectPlay'
       const playSessionId =
@@ -571,8 +566,9 @@ export function useVideoPlayer({
       // Capture direct-play position before preserving state and stopping status.
       // After updateStrategy('hls') the active video element becomes the HLS element
       // (currentTime = 0), so we must snapshot the position now.
-      const directPositionTicks =
-        secondsToTicks(videoRef.current?.currentTime ?? 0) ?? 0
+      const directPositionTicks = secondsToTicks(
+        videoRef.current?.currentTime ?? 0,
+      )
 
       // Preserve current state before switching
       if (videoRef.current) {
@@ -851,7 +847,7 @@ export function useVideoPlayer({
       video.removeEventListener('pause', handlePause)
       video.removeEventListener('seeked', handleSeeked)
     }
-  }, [jellyfinPlaybackSyncEnabled, itemId, activeVideoRef])
+  }, [jellyfinPlaybackSyncEnabled, itemId, activeVideoRef, strategy])
 
   /**
    * Sets up direct play video element with error handling.
@@ -927,8 +923,7 @@ export function useVideoPlayer({
       // Capture position before preserving state and stopping status.
       // After strategy switches to HLS the active element changes, so snapshot now.
       const activeVideo = getActiveVideoElement()
-      const activePositionTicks =
-        secondsToTicks(activeVideo?.currentTime ?? 0) ?? 0
+      const activePositionTicks = secondsToTicks(activeVideo?.currentTime ?? 0)
       setPreservedState(activeVideo, itemId)
       await stopCurrentPlaybackStatus()
       const previousHlsPlaySessionId = hlsPlaySessionIdRef.current
