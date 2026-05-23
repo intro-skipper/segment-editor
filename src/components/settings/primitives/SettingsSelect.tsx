@@ -16,6 +16,7 @@ interface SettingsSelectProps<T extends string = string> {
   onValueChange: (value: T) => void
   options: Array<SelectOption<T>>
   'aria-label'?: string
+  'aria-describedby'?: string
 }
 
 export function SettingsSelect<T extends string = string>({
@@ -23,6 +24,7 @@ export function SettingsSelect<T extends string = string>({
   onValueChange,
   options,
   'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
 }: SettingsSelectProps<T>) {
   // Handle Base UI's onValueChange signature which includes null
   const handleValueChange = (newValue: T | null) => {
@@ -36,6 +38,7 @@ export function SettingsSelect<T extends string = string>({
       <SelectTrigger
         className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50"
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
       >
         <SelectValue />
       </SelectTrigger>

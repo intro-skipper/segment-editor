@@ -5,6 +5,7 @@ import { Settings2 } from 'lucide-react'
 import { AppearanceSection } from './sections/AppearanceSection'
 import { CodecCompatibilitySection } from './sections/CodecCompatibilitySection'
 import { LanguageSection } from './sections/LanguageSection'
+import { JellyfinPlaybackSyncSection } from './sections/JellyfinPlaybackSyncSection'
 import { PageSizeSection } from './sections/PageSizeSection'
 import { SegmentSkipModeSection } from './sections/SegmentSkipModeSection'
 import { ServerConnectionSection } from './sections/ServerConnectionSection'
@@ -12,9 +13,8 @@ import { ViewModeSection } from './sections/ViewModeSection'
 import { useSessionStore } from '@/stores/session-store'
 import { isPluginMode } from '@/services/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { withErrorBoundary } from '@/components/with-error-boundary'
 
-function SettingsDialogBase() {
+export function SettingsDialog() {
   const { t } = useTranslation()
   const triggerRef = useRef<HTMLElement | null>(null)
 
@@ -52,6 +52,7 @@ function SettingsDialogBase() {
           <ViewModeSection />
           <CodecCompatibilitySection />
           <SegmentSkipModeSection />
+          <JellyfinPlaybackSyncSection />
         </div>
         {!pluginMode && (
           <div className="px-5 py-3 border-t border-border/50 text-center">
@@ -85,6 +86,3 @@ function SettingsHeader({ title }: { title: string }) {
     </div>
   )
 }
-
-// Wrap with error boundary for reliability
-export const SettingsDialog = withErrorBoundary(SettingsDialogBase)

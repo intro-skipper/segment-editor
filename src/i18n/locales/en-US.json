@@ -332,6 +332,12 @@
       "button": "Display skip button",
       "skip": "Automatically skip",
       "disabled": "Default playback only"
+    },
+    "jellyfinPlaybackSync": {
+      "title": "Report playback to Jellyfin",
+      "enabled": "Enabled - sync position and watched status",
+      "disabled": "Disabled - keep playback private",
+      "description": "When enabled, Jellyfin can show Now Playing, save resume position, and mark media as played."
     }
   },
   "navigation": {

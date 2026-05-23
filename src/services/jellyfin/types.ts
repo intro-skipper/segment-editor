@@ -10,6 +10,7 @@ import type {
   getItemsApi,
   getLibraryApi,
   getLibraryStructureApi,
+  getHlsSegmentApi,
   getMediaSegmentsApi,
   getPlaystateApi,
   getPluginsApi,
@@ -18,10 +19,6 @@ import type {
   getTvShowsApi,
   getVideosApi,
 } from '@jellyfin/sdk/lib/utils/api'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Core Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface Credentials {
   serverAddress: string
@@ -39,6 +36,7 @@ export interface TypedApis {
   itemsApi: ReturnType<typeof getItemsApi>
   libraryApi: ReturnType<typeof getLibraryApi>
   libraryStructureApi: ReturnType<typeof getLibraryStructureApi>
+  hlsSegmentApi: ReturnType<typeof getHlsSegmentApi>
   imageApi: ReturnType<typeof getImageApi>
   videosApi: ReturnType<typeof getVideosApi>
   tvShowsApi: ReturnType<typeof getTvShowsApi>
@@ -47,10 +45,6 @@ export interface TypedApis {
   searchApi: ReturnType<typeof getSearchApi>
   playstateApi: ReturnType<typeof getPlaystateApi>
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Authentication Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ApiKeyCredentials {
   method: 'apiKey'
@@ -79,10 +73,6 @@ export interface ConnectionResult {
   authenticated: boolean
   serverVersion: string
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Plugin Integration Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface JellyfinApiClient {
   serverAddress?: () => string

@@ -352,6 +352,10 @@ function useRenderPlayer({
   const segmentSkipModeRef = useRef(segmentSkipMode)
   segmentSkipModeRef.current = segmentSkipMode
 
+  const jellyfinPlaybackSyncEnabled = useAppStore(
+    (s) => s.jellyfinPlaybackSyncEnabled,
+  )
+
   // Precompute segment time ranges once per segment list update, sorted by
   // startSeconds so binary search can be used during playback hot-path.
   const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
@@ -412,12 +416,9 @@ function useRenderPlayer({
     null,
   )
 
-  // Unified single/double click/tap detection (used for both mouse and touch)
   const lastInteractionTimeRef = useRef(0)
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Throttle mouse move handler (only reset timer every 500ms)
   const lastMouseMoveRef = useRef(0)
-  // Track rAF IDs for subtitle resize cleanup
   const resizeRafRef = useRef<number | null>(null)
   const playbackUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -434,7 +435,6 @@ function useRenderPlayer({
     })
   }, [item.Id, timelineStore])
 
-  // Expose getCurrentTime function to parent component
   useLayoutEffect(() => {
     if (getCurrentTimeRef) {
       getCurrentTimeRef.current = () => currentTimeRef.current
@@ -446,11 +446,9 @@ function useRenderPlayer({
     }
   }, [getCurrentTimeRef])
 
-  // Poster URL - use blob URL to bypass COEP restrictions
   const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  // Video player error handler
   const handleVideoError = useCallback((error: VideoPlayerError | null) => {
     if (error) {
       const hlsError: HlsPlayerError = {
@@ -464,14 +462,12 @@ function useRenderPlayer({
     }
   }, [])
 
-  // Strategy change handler - shows notification on fallback
   const handleStrategyChange = useCallback(
     (strategy: PlaybackStrategy) => {
       // Clear any stale error from the previous strategy — the switch succeeded,
       // so the error overlay (e.g. "directPlayFailed") must not persist.
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
 
-      // Show notification when falling back from direct play to HLS
       if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
         showNotification({
           type: 'info',
@@ -484,18 +480,15 @@ function useRenderPlayer({
     [t],
   )
 
-  // Get preferred audio language from app store for initial playback
   const preferredAudioLanguage = useAppStore(
     (s) => s.trackPreferences.preferredAudioLanguage,
   )
 
-  // Compute preferred audio stream index for initial URL generation
   const preferredAudioStreamIndex = findPreferredAudioStreamIndex(
     item,
     preferredAudioLanguage,
   )
 
-  // Initialize video player via custom hook with direct play support
   const {
     videoRef,
     hlsRef,
@@ -506,6 +499,7 @@ function useRenderPlayer({
   } = useVideoPlayer({
     item,
     preferredAudioStreamIndex,
+    jellyfinPlaybackSyncEnabled,
     onError: handleVideoError,
     onStrategyChange: handleStrategyChange,
     onRecoveryStart: () => {
@@ -517,7 +511,6 @@ function useRenderPlayer({
     t,
   })
 
-  // Track preference setters from app store (combined to avoid 3 separate subscriptions)
   const {
     setPreferredAudioLanguage,
     setPreferredSubtitleLanguage,
@@ -530,7 +523,6 @@ function useRenderPlayer({
     })),
   )
 
-  // Initialize track manager for audio/subtitle selection
   const {
     trackState,
     selectAudioTrack,
@@ -545,7 +537,6 @@ function useRenderPlayer({
     onReloadHls: reloadHlsWithUrl,
   })
 
-  // Get the active subtitle track for JASSUB renderer
   const activeSubtitleTrack =
     trackState.activeSubtitleIndex === null
       ? null
@@ -553,7 +544,6 @@ function useRenderPlayer({
           (track) => track.index === trackState.activeSubtitleIndex,
         ) ?? null)
 
-  // Initialize JASSUB renderer for ASS/SSA subtitles
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
     useJassubRenderer({
       videoRef,
@@ -564,20 +554,17 @@ function useRenderPlayer({
       t,
     })
 
-  // Handler for subtitle offset changes from UI controls
   const handleSubtitleOffsetChange = (offset: number) => {
     dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
     setJassubUserOffset(offset)
   }
 
-  // Handle external timestamp changes
   useLayoutEffect(() => {
     if (timestamp !== undefined && videoRef.current) {
       videoRef.current.currentTime = timestamp
     }
   }, [timestamp, videoRef])
 
-  // Sync video element with persisted volume on mount
   useLayoutEffect(() => {
     const video = videoRef.current
     if (video) {
@@ -586,7 +573,6 @@ function useRenderPlayer({
     }
   }, [videoRef, persistedVolume, persistedMuted])
 
-  // Video event handlers
   const clearPlaybackUpdateTimer = () => {
     if (playbackUpdateTimeoutRef.current !== null) {
       clearTimeout(playbackUpdateTimeoutRef.current)
@@ -722,7 +708,6 @@ function useRenderPlayer({
     dispatch({ type: 'PLAY_STATE', isPlaying: false })
   }
 
-  // Playback controls
   const togglePlay = () => {
     const video = videoRef.current
     if (!video) return
@@ -784,7 +769,6 @@ function useRenderPlayer({
     publishTimelineTime(time)
   }
 
-  // Skip controls using refs for stable timing
   const skipForward = () => {
     const step = getSkipStepSeconds(skipTimeIndex, frameStep)
     const newTime = Math.min(
@@ -833,7 +817,6 @@ function useRenderPlayer({
     dispatch({ type: 'CYCLE_SKIP', direction: -1 })
   }
 
-  // Playback speed controls
   const increaseSpeed = () => {
     dispatch({ type: 'CYCLE_SPEED', direction: 1 })
   }
@@ -846,14 +829,12 @@ function useRenderPlayer({
     dispatch({ type: 'SET_SPEED', speedIndex })
   }
 
-  // Sync video element playback rate when speed index changes
   useLayoutEffect(() => {
     const video = videoRef.current
     if (!video) return
     video.playbackRate = PLAYER_CONFIG.PLAYBACK_SPEEDS[playbackSpeedIndex]
   }, [playbackSpeedIndex, videoRef])
 
-  // Segment timestamp handlers — snap to nearest frame boundary
   const pushStartTimestamp = () => {
     onUpdateSegmentTimestamp({
       currentTime: snappedCurrentTime(),
@@ -868,7 +849,6 @@ function useRenderPlayer({
     })
   }
 
-  // Segment creation
   const handleCreateSegment = (type: MediaSegmentType) => {
     onCreateSegment({
       type,
@@ -876,7 +856,6 @@ function useRenderPlayer({
     })
   }
 
-  // Fullscreen toggle
   const toggleFullscreen = () => {
     const container = containerRef.current
     if (!container) return
@@ -894,7 +873,6 @@ function useRenderPlayer({
     }
   }
 
-  // Subtitle toggle — cycles between off and the last/first available subtitle track
   const toggleSubtitles = async () => {
     try {
       if (trackState.activeSubtitleIndex !== null) {
@@ -916,7 +894,6 @@ function useRenderPlayer({
     }
   }
 
-  // Keyboard shortcuts via custom hook
   usePlayerKeyboard({
     togglePlay,
     cycleSkipTimeUp,
@@ -934,7 +911,6 @@ function useRenderPlayer({
     decreaseSpeed,
   })
 
-  // Helper to clear the hide controls timer
   const clearHideControlsTimer = () => {
     if (hideControlsTimeoutRef.current) {
       clearTimeout(hideControlsTimeoutRef.current)
@@ -942,26 +918,35 @@ function useRenderPlayer({
     }
   }
 
+  const clearSingleTapTimer = () => {
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current)
+      singleTapTimerRef.current = null
+    }
+  }
+
+  const clearResizeFrame = () => {
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current)
+      resizeRafRef.current = null
+    }
+  }
+
   const handleFullscreenChange = useEffectEvent(() => {
     const isFs = !!document.fullscreenElement
 
-    // Show controls when entering fullscreen, reset fit mode and clear timer when exiting
     if (isFs) {
       dispatchFullscreenUi({ type: 'ENTER_FULLSCREEN' })
-      // Clear any existing timer before setting a new one
       clearHideControlsTimer()
-      // Start auto-hide timer when entering fullscreen
       hideControlsTimeoutRef.current = setTimeout(() => {
         dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
       }, CONTROLS_HIDE_DELAY_MS)
     } else {
       dispatchFullscreenUi({ type: 'EXIT_FULLSCREEN' })
-      // Clear the hide timer to avoid it firing when not in fullscreen
       clearHideControlsTimer()
     }
   })
 
-  // Listen for fullscreen changes
   useEffect(() => {
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
@@ -969,11 +954,9 @@ function useRenderPlayer({
     }
   }, [])
 
-  // Toggle video fit mode (contain <-> cover) and resize subtitles
   const toggleVideoFitMode = () => {
     dispatchFullscreenUi({ type: 'TOGGLE_FIT_MODE' })
 
-    // Cancel any pending resize to avoid stale callbacks
     if (resizeRafRef.current !== null) {
       cancelAnimationFrame(resizeRafRef.current)
       resizeRafRef.current = null
@@ -992,7 +975,6 @@ function useRenderPlayer({
     })
   }
 
-  // Auto-hide controls in fullscreen after inactivity
   const resetHideControlsTimer = () => {
     clearHideControlsTimer()
     dispatchFullscreenUi({ type: 'SHOW_CONTROLS' })
@@ -1030,10 +1012,7 @@ function useRenderPlayer({
     lastInteractionTimeRef.current = now
 
     // Clear any pending single-tap/click action
-    if (singleTapTimerRef.current) {
-      clearTimeout(singleTapTimerRef.current)
-      singleTapTimerRef.current = null
-    }
+    clearSingleTapTimer()
 
     if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
       // Double-tap/click detected
@@ -1063,7 +1042,7 @@ function useRenderPlayer({
   }
 
   const handleVideoContainerKeyDown = (
-    e: React.KeyboardEvent<HTMLDivElement>,
+    e: React.KeyboardEvent<HTMLButtonElement>,
   ) => {
     // Only handle Enter here — Space is handled globally by usePlayerKeyboard
     if (e.key === 'Enter') {
@@ -1072,13 +1051,10 @@ function useRenderPlayer({
     }
   }
 
-  // Handle mouse movement in fullscreen to show/hide controls
-  // Throttled to avoid excessive timer resets during rapid mouse movement
   const handleFullscreenMouseMove = () => {
     if (!isFullscreen) return
 
     const now = Date.now()
-    // Only reset timer if controls are hidden OR enough time has passed (throttle)
     if (
       !showFullscreenControls ||
       now - lastMouseMoveRef.current > MOUSE_MOVE_THROTTLE_MS
@@ -1088,35 +1064,27 @@ function useRenderPlayer({
     }
   }
 
-  // Handle mouse leave - don't immediately hide, let the timer handle it gracefully
   const handleContainerMouseLeave = () => {
     if (isFullscreen && showFullscreenControls) {
       resetHideControlsTimer()
     }
   }
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       clearHideControlsTimer()
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current)
-      }
-      if (resizeRafRef.current !== null) {
-        cancelAnimationFrame(resizeRafRef.current)
-      }
+      clearSingleTapTimer()
+      clearResizeFrame()
       clearPlaybackUpdateTimer()
     }
   }, [])
 
-  // Reset segment skip tracking when mode changes for predictable behavior.
   useEffect(() => {
     prevActiveSegmentIdRef.current = null
     lastAutoSkippedSegmentIdRef.current = null
     setActiveSkipSegment(null)
   }, [segmentSkipMode])
 
-  // Seek past the active segment end when the skip button is clicked
   const handleSkipSegment = (segment: MediaSegmentDto) => {
     const range =
       segment.Id !== undefined
@@ -1129,19 +1097,16 @@ function useRenderPlayer({
     lastAutoSkippedSegmentIdRef.current = null
   }
 
-  // Handler for skip time changes from controls
   const handleSkipTimeChange = (index: number) => {
     dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
   }
 
-  // Track selection handlers that also update preferences
   const handleAudioTrackSelect = async (index: number) => {
     try {
       await selectAudioTrack(index)
     } catch {
       return
     }
-    // Update preference with the selected track's language
     const selectedTrack = trackState.audioTracks.find(
       (track) => track.index === index,
     )
@@ -1156,12 +1121,9 @@ function useRenderPlayer({
     } catch {
       return
     }
-    // Update preferences based on selection
     if (index === null) {
-      // Subtitles turned off
       setSubtitlesEnabled(false)
     } else {
-      // Subtitles enabled - update language preference
       setSubtitlesEnabled(true)
       const selectedTrack = trackState.subtitleTracks.find(
         (track) => track.index === index,
@@ -1172,13 +1134,11 @@ function useRenderPlayer({
     }
   }
 
-  // Check if tracks are available
   const hasAnyTracks =
     trackState.audioTracks.length > 0 || trackState.subtitleTracks.length > 0
 
   const setShowVideoPlayer = useAppStore((s) => s.setShowVideoPlayer)
 
-  // Props for PlayerControls — used in both normal and fullscreen layouts
   const playerControlsProps = {
     playback: {
       state: isPlaying ? 'playing' : 'paused',
@@ -1229,9 +1189,8 @@ function useRenderPlayer({
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {/* Fullscreen container - wraps everything */}
-      <div
+      <section
         ref={containerRef}
-        role="region"
         aria-label={t('player.videoPlayer')}
         className={cn(
           'relative',
@@ -1239,14 +1198,13 @@ function useRenderPlayer({
         )}
         onMouseMove={handleFullscreenMouseMove}
         onMouseLeave={handleContainerMouseLeave}
-        tabIndex={isFullscreen ? 0 : -1}
       >
         {/* Video container */}
-        <div
-          role="button"
+        <button
+          type="button"
           tabIndex={0}
           className={cn(
-            'relative',
+            'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
             isFullscreen
               ? cn(
                   'w-full h-full',
@@ -1257,6 +1215,7 @@ function useRenderPlayer({
           onClick={handleVideoInteraction}
           onTouchEnd={handleVideoInteraction}
           onKeyDown={handleVideoContainerKeyDown}
+          aria-label={t('player.videoPlayer')}
         >
           <video
             ref={videoRef}
@@ -1279,81 +1238,79 @@ function useRenderPlayer({
             onPlay={handlePlay}
             onPause={handlePause}
           />
+        </button>
 
-          {/* Error overlay - strategy-aware */}
-          {playerError && !isRecovering ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
-              <AlertTriangle className="size-12 text-destructive mb-4" />
-              <p className="text-lg font-medium mb-2">{playerError.message}</p>
-              {strategy === 'direct' && playerError.type === 'media' ? (
-                <p className="text-sm text-muted-foreground mb-2">
-                  {t('player.error.directPlayFailed')}
-                </p>
-              ) : null}
-              {playerError.recoverable ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.stopPropagation()
-                    handleRetry()
-                  }}
-                  className="mt-2"
-                >
-                  <RefreshCw className="size-4 mr-2" />
-                  {t('player.retry')}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Loading/Recovery indicator */}
-          {isVideoLoading || isRecovering ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/60"
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-            >
-              <div className="animate-spin" aria-hidden="true">
-                <RefreshCw className="size-8 text-white" />
-              </div>
-              <span className="sr-only">
-                {isRecovering
-                  ? t('player.recovering', 'Recovering playback')
-                  : t('accessibility.loading')}
-              </span>
-            </div>
-          ) : null}
-
-          {/* Segment skip button overlay */}
-          {segmentSkipMode === 'button' &&
-          activeSkipSegment &&
-          !playerError &&
-          !isVideoLoading ? (
-            <div
-              className="absolute bottom-4 right-4 z-20"
-              data-player-controls-overlay="true"
-            >
+        {/* Error overlay - strategy-aware */}
+        {playerError && !isRecovering ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
+            <AlertTriangle className="size-12 text-destructive mb-4" />
+            <p className="text-lg font-medium mb-2">{playerError.message}</p>
+            {strategy === 'direct' && playerError.type === 'media' ? (
+              <p className="text-sm text-muted-foreground mb-2">
+                {t('player.error.directPlayFailed')}
+              </p>
+            ) : null}
+            {playerError.recoverable ? (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleSkipSegment(activeSkipSegment)}
-                className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
-                aria-label={t('player.skipSegment', {
-                  type: t(`segmentType.${activeSkipSegment.Type}`),
-                })}
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.stopPropagation()
+                  handleRetry()
+                }}
+                className="mt-2"
               >
-                <SkipForward className="size-4" aria-hidden="true" />
-                {t('player.skipSegment', {
-                  type: t(`segmentType.${activeSkipSegment.Type}`),
-                })}
+                <RefreshCw className="size-4 mr-2" />
+                {t('player.retry')}
               </Button>
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+          </div>
+        ) : null}
 
-        {/* Fullscreen OSD/Controls overlay */}
+        {/* Loading/Recovery indicator */}
+        {isVideoLoading || isRecovering ? (
+          <output
+            className="absolute inset-0 flex items-center justify-center bg-black/60"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div className="animate-spin" aria-hidden="true">
+              <RefreshCw className="size-8 text-white" />
+            </div>
+            <span className="sr-only">
+              {isRecovering
+                ? t('player.recovering', 'Recovering playback')
+                : t('accessibility.loading')}
+            </span>
+          </output>
+        ) : null}
+
+        {/* Segment skip button overlay */}
+        {segmentSkipMode === 'button' &&
+        activeSkipSegment &&
+        !playerError &&
+        !isVideoLoading ? (
+          <div
+            className="absolute bottom-4 right-4 z-20"
+            data-player-controls-overlay="true"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSkipSegment(activeSkipSegment)}
+              className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
+              aria-label={t('player.skipSegment', {
+                type: t(`segmentType.${activeSkipSegment.Type}`),
+              })}
+            >
+              <SkipForward className="size-4" aria-hidden="true" />
+              {t('player.skipSegment', {
+                type: t(`segmentType.${activeSkipSegment.Type}`),
+              })}
+            </Button>
+          </div>
+        ) : null}
+
         {isFullscreen ? (
           <div
             className={cn(
@@ -1363,14 +1320,12 @@ function useRenderPlayer({
                 : 'opacity-0 pointer-events-none',
             )}
             aria-hidden={!showFullscreenControls}
-            // Prevent keyboard focus on hidden controls - inert removes from tab order and accessibility tree
             inert={!showFullscreenControls || undefined}
           >
             <div
               className="max-w-[90%] mx-auto"
               data-player-controls-overlay="true"
             >
-              {/* Fit mode toggle hint */}
               <div className="flex justify-end mb-2">
                 <Button
                   variant="ghost"
@@ -1410,9 +1365,8 @@ function useRenderPlayer({
             </div>
           </div>
         ) : null}
-      </div>
+      </section>
 
-      {/* Normal mode controls (outside fullscreen container) */}
       {!isFullscreen ? (
         <>
           <TimelineScrubber

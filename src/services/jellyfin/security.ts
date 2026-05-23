@@ -4,10 +4,6 @@
  * @module services/jellyfin/security
  */
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Security Patterns (compiled once at module load)
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 const DANGEROUS_PROTOCOLS = [
   /^javascript:/i,
@@ -17,17 +13,18 @@ const DANGEROUS_PROTOCOLS = [
 ]
 const PATH_TRAVERSAL = /(?:^|[\\/])\.\.(?:[\\/]|$)/
 const ENCODED_TRAVERSAL = /%2e%2e|%252e%252e|%c0%ae|%c1%9c/i
-// oxlint-disable-next-line no-control-regex
-const DANGEROUS_CHARS = /[\x00-\x1f\x7f]/
-
-// ─────────────────────────────────────────────────────────────────────────────
-// URL Sanitization
-// ─────────────────────────────────────────────────────────────────────────────
+function hasDangerousChars(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
 
 /** Sanitizes a URL, returning null if invalid or dangerous. */
 export function sanitizeUrl(url: string | null | undefined): string | null {
   const trimmed = url?.trim()
-  if (!trimmed || DANGEROUS_CHARS.test(trimmed)) return null
+  if (!trimmed || hasDangerousChars(trimmed)) return null
 
   let decoded: string
   try {
@@ -70,7 +67,7 @@ export function sanitizeUrl(url: string | null | undefined): string | null {
 function sanitizeQueryParam(value: string | null | undefined): string {
   if (value == null) return ''
   const str = String(value)
-  if (DANGEROUS_CHARS.test(str)) return ''
+  if (hasDangerousChars(str)) return ''
 
   return str
     .replace(/<[^>]*>/g, '')
@@ -90,21 +87,17 @@ export function normalizeServerAddress(address: string): string {
   const trimmed = address.trim()
   if (!trimmed) return trimmed
 
-  // Check if it looks like a URL with a scheme
   const hasScheme = /^https?:\/\//i.test(trimmed)
 
   if (hasScheme) {
     try {
       const parsed = new URL(trimmed)
-      // Return only the origin (scheme + host + port)
       return parsed.origin
     } catch {
-      // If URL parsing fails, return the trimmed address as-is
       return trimmed
     }
   }
 
-  // No scheme - return as-is (discovery will handle adding scheme)
   return trimmed
 }
 
@@ -117,10 +110,6 @@ export function isValidEndpoint(endpoint: string): boolean {
 function sanitizeEndpoint(endpoint: string): string {
   return endpoint.replace(/^\/+|\.{2,}/g, '')
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// URL Building
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface UrlBuildOptions {
   serverAddress: string

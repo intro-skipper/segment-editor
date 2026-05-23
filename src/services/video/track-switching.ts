@@ -9,12 +9,9 @@ import type Hls from 'hls.js'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getVideoStreamUrl } from '@/services/video/api'
+import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
-
-// ============================================================================
-// HTML5 AudioTrack API Type Declarations
-// ============================================================================
 
 /**
  * HTML5 AudioTrack interface (not in standard TypeScript DOM types).
@@ -56,10 +53,6 @@ function removeManagedSubtitleTracks(videoElement: HTMLVideoElement): void {
   })
 }
 
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
-
 /**
  * Error types for track switching operations.
  */
@@ -97,9 +90,14 @@ interface TrackSwitchOptions {
   /** Media source ID for URL generation */
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
-  onReloadHls?: (newUrl: string) => Promise<void>
+  onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
   /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
   signal?: AbortSignal
+}
+
+export interface HlsReloadRequest {
+  url: string
+  playSessionId: string
 }
 
 /**
@@ -122,10 +120,6 @@ export interface TrackSwitchResult {
   /** The subtitle track info when jassubAction is 'initialize' */
   track?: SubtitleTrackInfo
 }
-
-// ============================================================================
-// URL Generation
-// ============================================================================
 
 /**
  * Generates a subtitle delivery URL for fetching external subtitles.
@@ -169,13 +163,17 @@ function getSubtitleDeliveryUrl(
 function getHlsUrlWithAudioTrack(
   itemId: string,
   audioStreamIndex: number,
-): string {
-  return getVideoStreamUrl({ itemId }, audioStreamIndex)
+  mediaSourceId?: string,
+): HlsReloadRequest {
+  const playSessionId = createPlaySessionId()
+  return {
+    url: getVideoStreamUrl(
+      { itemId, mediaSourceId, playSessionId },
+      audioStreamIndex,
+    ),
+    playSessionId,
+  }
 }
-
-// ============================================================================
-// Index Mapping Utilities
-// ============================================================================
 
 /**
  * Maps a Jellyfin MediaStream index to the HLS.js/HTML5 relative index.
@@ -201,10 +199,6 @@ function mapToRelativeIndex(
   const track = tracks.find((t) => t.index === mediaStreamIndex)
   return track?.relativeIndex ?? -1
 }
-
-// ============================================================================
-// HLS Audio Track Switching
-// ============================================================================
 
 /**
  * Switches audio track in HLS mode.
@@ -240,7 +234,6 @@ function switchHlsAudioTrack(
     }
   }
 
-  // Validate that the track exists in our list
   if (audioTracks && audioTracks.length > 0) {
     const targetTrack = audioTracks.find((t) => t.index === trackIndex)
     if (!targetTrack) {
@@ -255,10 +248,8 @@ function switchHlsAudioTrack(
     }
   }
 
-  // Check if HLS.js actually has multiple audio tracks in the manifest
   const hlsAudioTracks = hlsInstance.audioTracks
 
-  // If HLS.js has multiple audio tracks, we can try to switch directly
   if (hlsAudioTracks.length > 1) {
     let relativeIndex = -1
 
@@ -306,10 +297,6 @@ function switchHlsAudioTrack(
   }
 }
 
-// ============================================================================
-// Direct Play Audio Track Switching
-// ============================================================================
-
 /**
  * Switches audio track in direct play mode.
  *
@@ -325,13 +312,12 @@ async function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  const { videoElement, audioTracks, itemId, onReloadHls } = options
+  const { videoElement, audioTracks, itemId, mediaSourceId, onReloadHls } =
+    options
 
-  // Check if native AudioTrack API is available
   const videoWithTracks = videoElement as HTMLVideoElementWithAudioTracks
   const nativeAudioTracks = videoWithTracks.audioTracks
 
-  // Find the target track
   const targetTrack = audioTracks?.find((t) => t.index === trackIndex)
   if (!targetTrack) {
     return {
@@ -414,8 +400,8 @@ async function switchDirectPlayAudioTrack(
   }
 
   // Generate HLS URL with the selected audio track and trigger reload
-  const newUrl = getHlsUrlWithAudioTrack(itemId, trackIndex)
-  if (!newUrl) {
+  const reload = getHlsUrlWithAudioTrack(itemId, trackIndex, mediaSourceId)
+  if (!reload.url) {
     return {
       success: false,
       error: {
@@ -428,7 +414,7 @@ async function switchDirectPlayAudioTrack(
 
   // Trigger HLS reload - this will switch from direct play to HLS mode
   try {
-    await onReloadHls(newUrl)
+    await onReloadHls(reload)
   } catch (err) {
     return {
       success: false,
@@ -445,10 +431,6 @@ async function switchDirectPlayAudioTrack(
 
   return { success: true, reloadRequired: true }
 }
-
-// ============================================================================
-// HLS Subtitle Switching
-// ============================================================================
 
 /**
  * Switches subtitle track in HLS mode using HLS.js API.
@@ -533,10 +515,6 @@ function switchHlsSubtitleTrack(
     }
   }
 }
-
-// ============================================================================
-// Direct Play Subtitle Switching
-// ============================================================================
 
 /**
  * Switches subtitle track in direct play mode using the TextTrack API.
@@ -681,10 +659,6 @@ async function switchDirectPlaySubtitleTrack(
   }
 }
 
-// ============================================================================
-// Unified Track Switching Functions
-// ============================================================================
-
 /**
  * Switches audio track using the appropriate method based on playback strategy.
  *
@@ -735,9 +709,13 @@ export async function switchAudioTrack(
       // Generate new HLS URL with the selected audio track
       // Note: We don't pass currentTime here because the HLS player hook
       // will preserve and restore the playback position automatically
-      const newUrl = getHlsUrlWithAudioTrack(options.itemId, trackIndex)
+      const reload = getHlsUrlWithAudioTrack(
+        options.itemId,
+        trackIndex,
+        options.mediaSourceId,
+      )
 
-      if (!newUrl) {
+      if (!reload.url) {
         return {
           success: false,
           error: {
@@ -750,7 +728,7 @@ export async function switchAudioTrack(
 
       // Trigger the reload
       try {
-        await options.onReloadHls(newUrl)
+        await options.onReloadHls(reload)
       } catch (err) {
         return {
           success: false,

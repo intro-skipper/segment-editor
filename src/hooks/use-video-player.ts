@@ -15,16 +15,28 @@ import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackState } from '@/services/video/playback-state'
 import type { PlaybackStrategy } from '@/services/video/api'
-import { getPlaybackConfig } from '@/services/video/api'
+import {
+  getPlaybackConfig,
+  getPlaybackMediaSourceId,
+} from '@/services/video/api'
+import type { HlsReloadRequest } from '@/services/video/track-switching'
 import {
   capturePlaybackState,
   restorePlaybackStateSync,
 } from '@/services/video/playback-state'
+import { createPlaySessionId } from '@/services/video/session'
 import {
-  startPlaybackSession,
-  stopPlaybackSession,
-  stopPlaybackSessionKeepalive,
+  stopActiveEncoding,
+  stopActiveEncodingKeepalive,
+} from '@/services/video/transcode-session'
+import {
+  reportPlaybackProgress,
+  startPlaybackStatus,
+  stopPlaybackStatus,
+  stopPlaybackStatusKeepalive,
 } from '@/services/video/playback-session'
+import type { PlaybackStatusPlayMethod } from '@/services/video/playback-session'
+import { secondsToTicks } from '@/lib/time-utils'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
 
@@ -63,6 +75,8 @@ interface UseVideoPlayerOptions {
   item: BaseItemDto | null
   /** Preferred audio stream index for initial playback (Jellyfin MediaStream index) */
   preferredAudioStreamIndex?: number
+  /** Whether Jellyfin playback status sync is enabled */
+  jellyfinPlaybackSyncEnabled?: boolean
   /** Callback when an error occurs */
   onError?: (error: VideoPlayerError) => void
   /** Callback when playback strategy changes */
@@ -94,7 +108,15 @@ interface UseVideoPlayerReturn {
   /** Current video URL being played */
   videoUrl: string
   /** Reload HLS stream with a new URL (for audio track switching) */
-  reloadHlsWithUrl: (newUrl: string) => Promise<void>
+  reloadHlsWithUrl: (reload: HlsReloadRequest) => Promise<void>
+}
+
+interface ActivePlaybackStatusSession {
+  itemId: string
+  mediaSourceId: string
+  playSessionId: string
+  playMethod: PlaybackStatusPlayMethod
+  latestPositionTicks: number
 }
 
 // ============================================================================
@@ -158,6 +180,7 @@ function createErrorFromMediaError(
 export function useVideoPlayer({
   item,
   preferredAudioStreamIndex,
+  jellyfinPlaybackSyncEnabled = false,
   onError,
   onStrategyChange,
   onRecoveryStart,
@@ -170,7 +193,7 @@ export function useVideoPlayer({
   // Track which (item, audioStreamIndex) combination has finished loading
   const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined)
   const itemId = item?.Id ?? null
-  const mediaSourceId = item?.MediaSources?.[0]?.Id ?? null
+  const mediaSourceId = item ? (getPlaybackMediaSourceId(item) ?? null) : null
   const itemRef = useRef(item)
 
   itemRef.current = item
@@ -181,9 +204,15 @@ export function useVideoPlayer({
   const pendingHlsStateRestoreRef = useRef(false)
   const isActiveRef = useRef(true)
   const playbackRequestIdRef = useRef(0)
+  const playbackStatusStartIdRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const emptyHlsRef = useRef<Hls | null>(null)
   const currentStrategyRef = useRef<PlaybackStrategy>('hls')
+  const hlsPlaySessionIdRef = useRef<string | null>(null)
+  const playbackSyncEnabledRef = useRef(jellyfinPlaybackSyncEnabled)
+  const activePlaybackStatusRef = useRef<ActivePlaybackStatusSession | null>(
+    null,
+  )
   /** Guards against error handler firing during intentional strategy switches (e.g. audio track switch) */
   const intentionalSwitchRef = useRef(false)
   const hlsRestoreVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -196,10 +225,28 @@ export function useVideoPlayer({
     setStrategy(newStrategy)
   }, [])
 
+  playbackSyncEnabledRef.current = jellyfinPlaybackSyncEnabled
+
   const clearPreservedState = useCallback(() => {
     preservedStateRef.current = null
     preservedStateItemIdRef.current = null
   }, [])
+
+  const stopCurrentHlsEncoding = useCallback(async () => {
+    const playSessionId = hlsPlaySessionIdRef.current
+    hlsPlaySessionIdRef.current = null
+    try {
+      await stopActiveEncoding({ playSessionId })
+    } catch (err) {
+      console.debug('Failed to stop Jellyfin active encoding', err)
+    }
+  }, [])
+
+  const stopCurrentHlsEncodingKeepalive = useEffectEvent(() => {
+    const playSessionId = hlsPlaySessionIdRef.current
+    hlsPlaySessionIdRef.current = null
+    stopActiveEncodingKeepalive({ playSessionId })
+  })
 
   const setPreservedState = useCallback(
     (
@@ -278,6 +325,144 @@ export function useVideoPlayer({
       ? hlsPlayer.videoRef.current
       : videoRef.current
   }, [hlsPlayer.videoRef])
+
+  const getCurrentPositionTicks = useCallback((): number => {
+    const video = getActiveVideoElement()
+    const activeSession = activePlaybackStatusRef.current
+    if (video !== null) {
+      const currentTicks = secondsToTicks(video.currentTime)
+      if (activeSession) activeSession.latestPositionTicks = currentTicks
+      return currentTicks
+    }
+    return activeSession?.latestPositionTicks ?? 0
+  }, [getActiveVideoElement])
+
+  const startCurrentPlaybackStatus = useCallback(
+    async (positionTicksOverride?: number) => {
+      if (!playbackSyncEnabledRef.current || !itemId || !mediaSourceId) return
+      if (activePlaybackStatusRef.current) return
+
+      const startId = ++playbackStatusStartIdRef.current
+      const requestId = playbackRequestIdRef.current
+
+      const video = getActiveVideoElement()
+      const positionTicks =
+        positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0)
+      const playMethod: PlaybackStatusPlayMethod =
+        currentStrategyRef.current === 'hls' ? 'Transcode' : 'DirectPlay'
+      const playSessionId =
+        playMethod === 'Transcode'
+          ? hlsPlaySessionIdRef.current
+          : createPlaySessionId()
+
+      if (!playSessionId) return
+
+      const nextSession: ActivePlaybackStatusSession = {
+        itemId,
+        mediaSourceId,
+        playSessionId,
+        playMethod,
+        latestPositionTicks: positionTicks,
+      }
+
+      const isCurrentPlaybackStatusStart = () => {
+        const currentMediaSourceId = itemRef.current
+          ? (getPlaybackMediaSourceId(itemRef.current) ?? null)
+          : null
+
+        return (
+          isActiveRef.current &&
+          playbackSyncEnabledRef.current &&
+          playbackStatusStartIdRef.current === startId &&
+          playbackRequestIdRef.current === requestId &&
+          itemRef.current?.Id === itemId &&
+          currentMediaSourceId === mediaSourceId &&
+          !activePlaybackStatusRef.current &&
+          (playMethod !== 'Transcode' ||
+            hlsPlaySessionIdRef.current === playSessionId)
+        )
+      }
+
+      try {
+        await startPlaybackStatus({
+          itemId,
+          mediaSourceId,
+          playSessionId,
+          playMethod,
+          positionTicks,
+          isPaused: video?.paused ?? true,
+        })
+
+        if (!isCurrentPlaybackStatusStart()) {
+          void stopPlaybackStatus({
+            ...nextSession,
+            positionTicks: nextSession.latestPositionTicks,
+          }).catch((err) => {
+            console.debug('Failed to stop stale Jellyfin playback status', err)
+          })
+          return
+        }
+
+        activePlaybackStatusRef.current = nextSession
+      } catch (err) {
+        console.debug('Failed to start Jellyfin playback status reporting', err)
+      }
+    },
+    [getActiveVideoElement, itemId, mediaSourceId],
+  )
+
+  const reportCurrentPlaybackProgress = useEffectEvent(
+    async (isPaused: boolean) => {
+      const activeSession = activePlaybackStatusRef.current
+      if (!playbackSyncEnabledRef.current || !activeSession) return
+
+      try {
+        await reportPlaybackProgress({
+          ...activeSession,
+          positionTicks: getCurrentPositionTicks(),
+          isPaused,
+        })
+      } catch (err) {
+        console.debug('Failed to report Jellyfin playback progress', err)
+      }
+    },
+  )
+
+  const consumeActivePlaybackStatus = useCallback(() => {
+    const activeSession = activePlaybackStatusRef.current
+    // Capture position before clearing the ref so getCurrentPositionTicks can
+    // still update latestPositionTicks on the session object if the video element
+    // is available, or fall back to the last known value if it is not.
+    const finalPositionTicks = getCurrentPositionTicks()
+    activePlaybackStatusRef.current = null
+    playbackStatusStartIdRef.current++
+
+    return { activeSession, finalPositionTicks }
+  }, [getCurrentPositionTicks])
+
+  const stopCurrentPlaybackStatus = useCallback(async () => {
+    const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
+    if (!activeSession) return
+
+    try {
+      await stopPlaybackStatus({
+        ...activeSession,
+        positionTicks: finalPositionTicks,
+      })
+    } catch (err) {
+      console.debug('Failed to stop Jellyfin playback status reporting', err)
+    }
+  }, [consumeActivePlaybackStatus])
+
+  const stopCurrentPlaybackStatusKeepalive = useEffectEvent(() => {
+    const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
+    if (!activeSession) return
+
+    stopPlaybackStatusKeepalive({
+      ...activeSession,
+      positionTicks: finalPositionTicks,
+    })
+  })
 
   const restoreStateAndMaybeResume = useCallback(
     (video: HTMLVideoElement, state: PlaybackState) => {
@@ -371,13 +556,20 @@ export function useVideoPlayer({
 
       const currentItem = itemRef.current!
 
+      // Capture direct-play position before preserving state and stopping status.
+      // After updateStrategy('hls') the active video element becomes the HLS element
+      // (currentTime = 0), so we must snapshot the position now.
+      const directPositionTicks = secondsToTicks(
+        videoRef.current?.currentTime ?? 0,
+      )
+
       // Preserve current state before switching
       if (videoRef.current) {
         setPreservedState(videoRef.current, itemId)
       }
+      await stopCurrentPlaybackStatus()
 
-      // Start playback session for HLS to enable server-side cleanup
-      await startPlaybackSession(itemId)
+      const hlsPlaySessionId = createPlaySessionId()
 
       if (isCurrentHlsRequest()) {
         // Force HLS config: direct-play fallback must not reuse a direct stream URL.
@@ -386,9 +578,11 @@ export function useVideoPlayer({
           undefined,
           undefined,
           true,
+          hlsPlaySessionId,
         )
         if (isCurrentHlsRequest()) {
           const hlsUrl = config.strategy === 'hls' ? config.url : ''
+          hlsPlaySessionIdRef.current = hlsPlaySessionId
 
           // Update strategy after async operation, clear the error that triggered
           // this fallback so the overlay disappears once HLS playback begins.
@@ -397,6 +591,7 @@ export function useVideoPlayer({
           setVideoUrl(hlsUrl || config.url)
           scheduleHlsStateRestore()
           onStrategyChange?.('hls')
+          await startCurrentPlaybackStatus(directPositionTicks)
         }
       }
     },
@@ -405,6 +600,8 @@ export function useVideoPlayer({
       onStrategyChange,
       scheduleHlsStateRestore,
       setPreservedState,
+      startCurrentPlaybackStatus,
+      stopCurrentPlaybackStatus,
       updateStrategy,
     ],
   )
@@ -496,7 +693,8 @@ export function useVideoPlayer({
   )
 
   const handlePageHide = useEffectEvent(() => {
-    stopPlaybackSessionKeepalive()
+    stopCurrentPlaybackStatusKeepalive()
+    stopCurrentHlsEncodingKeepalive()
   })
 
   useEffect(() => {
@@ -506,6 +704,21 @@ export function useVideoPlayer({
       window.removeEventListener('pagehide', handlePageHide)
     }
   }, [])
+
+  const syncPlaybackStatusEnabled = useEffectEvent((enabled: boolean) => {
+    if (enabled) {
+      playbackSyncEnabledRef.current = true
+      void startCurrentPlaybackStatus()
+      return
+    }
+
+    void stopCurrentPlaybackStatus()
+    playbackSyncEnabledRef.current = false
+  })
+
+  useEffect(() => {
+    syncPlaybackStatusEnabled(jellyfinPlaybackSyncEnabled)
+  }, [jellyfinPlaybackSyncEnabled])
 
   /**
    * Initializes playback with the appropriate strategy.
@@ -530,22 +743,24 @@ export function useVideoPlayer({
           return
         }
 
-        // Pass preferred audio stream index for HLS URL generation
+        const hlsPlaySessionId = createPlaySessionId()
         const config = await getPlaybackConfig(
           currentItem,
           undefined,
           preferredAudioStreamIndex,
+          false,
+          hlsPlaySessionId,
         )
 
         if (playbackRequestIdRef.current === requestId) {
-          // Start playback session for HLS to enable server-side cleanup
           if (config.strategy === 'hls') {
-            await startPlaybackSession(itemId)
+            hlsPlaySessionIdRef.current = hlsPlaySessionId
+          } else {
+            hlsPlaySessionIdRef.current = null
           }
 
-          if (playbackRequestIdRef.current === requestId) {
-            handleInitPlaybackSuccess(config, itemId)
-          }
+          handleInitPlaybackSuccess(config, itemId)
+          await startCurrentPlaybackStatus()
         }
       } catch (err) {
         if (playbackRequestIdRef.current !== requestId) {
@@ -576,8 +791,8 @@ export function useVideoPlayer({
       intentionalSwitchRef.current = false
       pendingHlsStateRestoreRef.current = false
       clearHlsStateRestoreSubscription()
-      // Stop playback session on cleanup to trigger server-side transcoding cleanup
-      void stopPlaybackSession()
+      void stopCurrentPlaybackStatus()
+      void stopCurrentHlsEncoding()
     }
   }, [
     itemId,
@@ -588,7 +803,43 @@ export function useVideoPlayer({
     clearPreservedState,
     clearHlsStateRestoreSubscription,
     setPreservedState,
+    startCurrentPlaybackStatus,
+    stopCurrentPlaybackStatus,
+    stopCurrentHlsEncoding,
   ])
+
+  const activeVideoRef = strategy === 'hls' ? hlsPlayer.videoRef : videoRef
+
+  useEffect(() => {
+    if (!jellyfinPlaybackSyncEnabled || !itemId) return
+
+    const video = activeVideoRef.current
+    if (!video) return
+
+    const handlePlaying = () => {
+      void reportCurrentPlaybackProgress(false)
+    }
+    const handlePause = () => {
+      void reportCurrentPlaybackProgress(true)
+    }
+    const handleSeeked = () => {
+      void reportCurrentPlaybackProgress(video.paused)
+    }
+    const intervalId = window.setInterval(() => {
+      if (!video.paused) void reportCurrentPlaybackProgress(false)
+    }, 15_000)
+
+    video.addEventListener('playing', handlePlaying)
+    video.addEventListener('pause', handlePause)
+    video.addEventListener('seeked', handleSeeked)
+
+    return () => {
+      window.clearInterval(intervalId)
+      video.removeEventListener('playing', handlePlaying)
+      video.removeEventListener('pause', handlePause)
+      video.removeEventListener('seeked', handleSeeked)
+    }
+  }, [jellyfinPlaybackSyncEnabled, itemId, activeVideoRef, strategy])
 
   /**
    * Sets up direct play video element with error handling.
@@ -660,10 +911,25 @@ export function useVideoPlayer({
    * Also handles switching from direct play to HLS mode when needed.
    */
   const reloadHlsWithUrl = useCallback(
-    async (newUrl: string) => {
-      // Preserve current playback state from whichever video element is active
+    async ({ url, playSessionId: nextHlsPlaySessionId }: HlsReloadRequest) => {
+      // Capture position before preserving state and stopping status.
+      // After strategy switches to HLS the active element changes, so snapshot now.
       const activeVideo = getActiveVideoElement()
+      const activePositionTicks = secondsToTicks(activeVideo?.currentTime ?? 0)
       setPreservedState(activeVideo, itemId)
+      await stopCurrentPlaybackStatus()
+      const previousHlsPlaySessionId = hlsPlaySessionIdRef.current
+      if (
+        previousHlsPlaySessionId &&
+        previousHlsPlaySessionId !== nextHlsPlaySessionId
+      ) {
+        try {
+          await stopActiveEncoding({ playSessionId: previousHlsPlaySessionId })
+        } catch (err) {
+          console.debug('Failed to stop previous Jellyfin active encoding', err)
+        }
+      }
+      hlsPlaySessionIdRef.current = nextHlsPlaySessionId
 
       // Clear any stale error from a previous strategy — the user is intentionally
       // switching audio tracks, so a leftover "directPlayFailed" overlay should not persist.
@@ -685,11 +951,6 @@ export function useVideoPlayer({
             videoRef.current.load()
           }
 
-          // Start playback session for HLS (item.Id should be available)
-          if (itemId) {
-            await startPlaybackSession(itemId)
-          }
-
           // Switch strategy to HLS.
           updateStrategy('hls')
           onStrategyChange?.('hls')
@@ -699,8 +960,9 @@ export function useVideoPlayer({
       }
 
       // Update the URL state - this will trigger HLS.js to load the new URL
-      setVideoUrl(newUrl)
+      setVideoUrl(url)
       scheduleHlsStateRestore()
+      void startCurrentPlaybackStatus(activePositionTicks)
     },
     [
       itemId,
@@ -709,11 +971,12 @@ export function useVideoPlayer({
       setPreservedState,
       updateStrategy,
       scheduleHlsStateRestore,
+      startCurrentPlaybackStatus,
+      stopCurrentPlaybackStatus,
     ],
   )
 
-  // Use HLS player's video ref when in HLS mode
-  const activeVideoRef = strategy === 'hls' ? hlsPlayer.videoRef : videoRef
+  // Use HLS player's refs when in HLS mode
   const activeHlsRef = strategy === 'hls' ? hlsPlayer.hlsRef : emptyHlsRef
 
   // Derive loading/error/url from item and load tracking
