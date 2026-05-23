@@ -234,7 +234,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
   })
 
-  it('does not resurrect stale playback status after sync is disabled mid-start', async () => {
+  it('stops stale pending playback status after sync is disabled mid-start', async () => {
     const startDeferred = createDeferred()
     vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
 
@@ -260,7 +260,14 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
 
     expect(reportPlaybackProgress).not.toHaveBeenCalled()
-    expect(stopPlaybackStatus).not.toHaveBeenCalled()
+    expect(stopPlaybackStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'hls-session-1',
+        positionTicks: 120_000_000,
+      }),
+    )
   })
 
   it('starts playback status immediately when sync is toggled on after HLS loads', async () => {
@@ -387,7 +394,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
   })
 
-  it('does not send further writes after sync is disabled', async () => {
+  it('stops active playback status and does not send further writes after sync is disabled', async () => {
     const { rerender } = renderVideoPlayer({
       jellyfinPlaybackSyncEnabled: true,
     })
@@ -396,9 +403,29 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
     })
 
+    act(() => {
+      hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
+    })
+
+    await waitFor(() => {
+      expect(reportPlaybackProgress).toHaveBeenCalledTimes(1)
+    })
+
     vi.mocked(reportPlaybackProgress).mockClear()
+    vi.mocked(stopPlaybackStatus).mockClear()
 
     rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: false })
+
+    await waitFor(() => {
+      expect(stopPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          itemId: 'item-1',
+          mediaSourceId: 'item-1-media-source',
+          playSessionId: 'hls-session-1',
+          positionTicks: 120_000_000,
+        }),
+      )
+    })
 
     act(() => {
       hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))

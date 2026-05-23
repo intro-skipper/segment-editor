@@ -383,8 +383,6 @@ export function useVideoPlayer({
         )
       }
 
-      const canStopStalePlaybackStatus = () => playbackSyncEnabledRef.current
-
       try {
         await startPlaybackStatus({
           itemId,
@@ -396,17 +394,12 @@ export function useVideoPlayer({
         })
 
         if (!isCurrentPlaybackStatusStart()) {
-          if (canStopStalePlaybackStatus()) {
-            void stopPlaybackStatus({
-              ...nextSession,
-              positionTicks: nextSession.latestPositionTicks,
-            }).catch((err) => {
-              console.debug(
-                'Failed to stop stale Jellyfin playback status',
-                err,
-              )
-            })
-          }
+          void stopPlaybackStatus({
+            ...nextSession,
+            positionTicks: nextSession.latestPositionTicks,
+          }).catch((err) => {
+            console.debug('Failed to stop stale Jellyfin playback status', err)
+          })
           return
         }
 
@@ -449,7 +442,7 @@ export function useVideoPlayer({
 
   const stopCurrentPlaybackStatus = useCallback(async () => {
     const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
-    if (!playbackSyncEnabledRef.current || !activeSession) return
+    if (!activeSession) return
 
     try {
       await stopPlaybackStatus({
@@ -463,7 +456,7 @@ export function useVideoPlayer({
 
   const stopCurrentPlaybackStatusKeepalive = useEffectEvent(() => {
     const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
-    if (!playbackSyncEnabledRef.current || !activeSession) return
+    if (!activeSession) return
 
     stopPlaybackStatusKeepalive({
       ...activeSession,
@@ -713,15 +706,14 @@ export function useVideoPlayer({
   }, [])
 
   const syncPlaybackStatusEnabled = useEffectEvent((enabled: boolean) => {
-    playbackSyncEnabledRef.current = enabled
-
     if (enabled) {
+      playbackSyncEnabledRef.current = true
       void startCurrentPlaybackStatus()
       return
     }
 
-    activePlaybackStatusRef.current = null
-    playbackStatusStartIdRef.current++
+    void stopCurrentPlaybackStatus()
+    playbackSyncEnabledRef.current = false
   })
 
   useEffect(() => {
