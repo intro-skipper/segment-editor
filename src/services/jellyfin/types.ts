@@ -20,10 +20,6 @@ import type {
   getVideosApi,
 } from '@jellyfin/sdk/lib/utils/api'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface Credentials {
   serverAddress: string
   accessToken: string
@@ -49,10 +45,6 @@ export interface TypedApis {
   searchApi: ReturnType<typeof getSearchApi>
   playstateApi: ReturnType<typeof getPlaystateApi>
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Authentication Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ApiKeyCredentials {
   method: 'apiKey'
@@ -81,10 +73,6 @@ export interface ConnectionResult {
   authenticated: boolean
   serverVersion: string
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Plugin Integration Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface JellyfinApiClient {
   serverAddress?: () => string

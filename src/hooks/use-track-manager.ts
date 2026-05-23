@@ -38,10 +38,6 @@ import { showError } from '@/lib/notifications'
 import { languagesMatch } from '@/lib/language-utils'
 import { useAppStore } from '@/stores/app-store'
 
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
-
 /**
  * Options for the useTrackManager hook.
  */
@@ -83,10 +79,6 @@ interface UserTrackSelectionState {
   hasSubtitleSelection: boolean
   subtitleIndex: number | null
 }
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
 
 /**
  * Finds the best audio track index based on preferences.
@@ -133,10 +125,6 @@ function findPreferredSubtitleIndex(
   return null
 }
 
-// ============================================================================
-// Main Hook
-// ============================================================================
-
 /**
  * Hook for managing audio and subtitle track selection.
  *
@@ -157,7 +145,6 @@ export function useTrackManager({
   t,
   onReloadHls,
 }: UseTrackManagerOptions): UseTrackManagerReturn {
-  // Only store explicit user track picks; defaults are derived during render.
   const [userSelection, setUserSelection] = useState<UserTrackSelectionState>({
     key: '',
     hasAudioSelection: false,
@@ -168,7 +155,6 @@ export function useTrackManager({
   const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // AbortController for cancelling in-flight subtitle load operations on unmount
   const abortControllerRef = useRef<AbortController>(new AbortController())
   useEffect(() => {
     const controller = new AbortController()
@@ -178,7 +164,6 @@ export function useTrackManager({
     }
   }, [])
 
-  // Get track preferences from app store
   const {
     preferredAudioLanguage,
     preferredSubtitleLanguage,
@@ -192,13 +177,6 @@ export function useTrackManager({
     })),
   )
 
-  // ============================================================================
-  // Track Lists
-  // ============================================================================
-
-  /**
-   * Extract tracks from item - computed directly during render.
-   */
   const { audioTracks, subtitleTracks } = useMemo(() => {
     if (!item) {
       return { audioTracks: [], subtitleTracks: [] }
@@ -250,10 +228,6 @@ export function useTrackManager({
       ? userSelection.subtitleIndex
       : preferredSubtitleIndex
 
-  /**
-   * Combine track lists and active indices into trackState.
-   * This is computed directly during render, not stored in state.
-   */
   const trackState: TrackState = useMemo(
     () => ({
       audioTracks,
@@ -263,10 +237,6 @@ export function useTrackManager({
     }),
     [audioTracks, subtitleTracks, activeAudioIndex, activeSubtitleIndex],
   )
-
-  // ============================================================================
-  // Track Switching Options
-  // ============================================================================
 
   const mediaSourceId = item?.MediaSources?.[0]?.Id ?? undefined
 
@@ -303,16 +273,6 @@ export function useTrackManager({
     ],
   )
 
-  // ============================================================================
-  // Audio Track Selection
-  // ============================================================================
-
-  /**
-   * Selects an audio track by index.
-   * Calls the appropriate switching service based on playback strategy.
-   *
-   * @param index - The audio track index to select
-   */
   const selectAudioTrack = useCallback(
     async (index: number): Promise<void> => {
       const video = videoRef.current
@@ -321,7 +281,6 @@ export function useTrackManager({
         return
       }
 
-      // Validate track index
       const track = audioTrackMap.get(index)
       if (!track) {
         const errorMsg = t('player.tracks.error.trackNotFound')
@@ -330,7 +289,6 @@ export function useTrackManager({
         return
       }
 
-      // Skip if already active
       if (index === trackState.activeAudioIndex) {
         return
       }
@@ -382,16 +340,6 @@ export function useTrackManager({
     ],
   )
 
-  // ============================================================================
-  // Subtitle Track Selection
-  // ============================================================================
-
-  /**
-   * Selects a subtitle track by index, or turns off subtitles if null.
-   * Calls the appropriate switching service based on playback strategy.
-   *
-   * @param index - The subtitle track index to select, or null for off
-   */
   const selectSubtitleTrack = useCallback(
     async (index: number | null): Promise<void> => {
       const video = videoRef.current
@@ -400,7 +348,6 @@ export function useTrackManager({
         return
       }
 
-      // Validate track index if not turning off
       if (index !== null) {
         const track = subtitleTrackMap.get(index)
         if (!track) {
@@ -411,7 +358,6 @@ export function useTrackManager({
         }
       }
 
-      // Skip if already active
       if (index === trackState.activeSubtitleIndex) {
         return
       }
@@ -472,10 +418,6 @@ export function useTrackManager({
       trackResetKey,
     ],
   )
-
-  // ============================================================================
-  // Return Value
-  // ============================================================================
 
   return {
     trackState,

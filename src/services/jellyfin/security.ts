@@ -4,10 +4,6 @@
  * @module services/jellyfin/security
  */
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Security Patterns (compiled once at module load)
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 const DANGEROUS_PROTOCOLS = [
   /^javascript:/i,
@@ -24,10 +20,6 @@ function hasDangerousChars(value: string): boolean {
   }
   return false
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// URL Sanitization
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** Sanitizes a URL, returning null if invalid or dangerous. */
 export function sanitizeUrl(url: string | null | undefined): string | null {
@@ -95,21 +87,17 @@ export function normalizeServerAddress(address: string): string {
   const trimmed = address.trim()
   if (!trimmed) return trimmed
 
-  // Check if it looks like a URL with a scheme
   const hasScheme = /^https?:\/\//i.test(trimmed)
 
   if (hasScheme) {
     try {
       const parsed = new URL(trimmed)
-      // Return only the origin (scheme + host + port)
       return parsed.origin
     } catch {
-      // If URL parsing fails, return the trimmed address as-is
       return trimmed
     }
   }
 
-  // No scheme - return as-is (discovery will handle adding scheme)
   return trimmed
 }
 
@@ -122,10 +110,6 @@ export function isValidEndpoint(endpoint: string): boolean {
 function sanitizeEndpoint(endpoint: string): string {
   return endpoint.replace(/^\/+|\.{2,}/g, '')
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// URL Building
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface UrlBuildOptions {
   serverAddress: string

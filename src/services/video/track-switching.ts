@@ -13,10 +13,6 @@ import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
-// ============================================================================
-// HTML5 AudioTrack API Type Declarations
-// ============================================================================
-
 /**
  * HTML5 AudioTrack interface (not in standard TypeScript DOM types).
  * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioTrack
@@ -56,10 +52,6 @@ function removeManagedSubtitleTracks(videoElement: HTMLVideoElement): void {
     track.remove()
   })
 }
-
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
 
 /**
  * Error types for track switching operations.
@@ -129,10 +121,6 @@ export interface TrackSwitchResult {
   track?: SubtitleTrackInfo
 }
 
-// ============================================================================
-// URL Generation
-// ============================================================================
-
 /**
  * Generates a subtitle delivery URL for fetching external subtitles.
  *
@@ -187,10 +175,6 @@ function getHlsUrlWithAudioTrack(
   }
 }
 
-// ============================================================================
-// Index Mapping Utilities
-// ============================================================================
-
 /**
  * Maps a Jellyfin MediaStream index to the HLS.js/HTML5 relative index.
  * This is necessary because Jellyfin MediaStream indices include all stream types
@@ -215,10 +199,6 @@ function mapToRelativeIndex(
   const track = tracks.find((t) => t.index === mediaStreamIndex)
   return track?.relativeIndex ?? -1
 }
-
-// ============================================================================
-// HLS Audio Track Switching
-// ============================================================================
 
 /**
  * Switches audio track in HLS mode.
@@ -254,7 +234,6 @@ function switchHlsAudioTrack(
     }
   }
 
-  // Validate that the track exists in our list
   if (audioTracks && audioTracks.length > 0) {
     const targetTrack = audioTracks.find((t) => t.index === trackIndex)
     if (!targetTrack) {
@@ -269,10 +248,8 @@ function switchHlsAudioTrack(
     }
   }
 
-  // Check if HLS.js actually has multiple audio tracks in the manifest
   const hlsAudioTracks = hlsInstance.audioTracks
 
-  // If HLS.js has multiple audio tracks, we can try to switch directly
   if (hlsAudioTracks.length > 1) {
     let relativeIndex = -1
 
@@ -320,10 +297,6 @@ function switchHlsAudioTrack(
   }
 }
 
-// ============================================================================
-// Direct Play Audio Track Switching
-// ============================================================================
-
 /**
  * Switches audio track in direct play mode.
  *
@@ -342,11 +315,9 @@ async function switchDirectPlayAudioTrack(
   const { videoElement, audioTracks, itemId, mediaSourceId, onReloadHls } =
     options
 
-  // Check if native AudioTrack API is available
   const videoWithTracks = videoElement as HTMLVideoElementWithAudioTracks
   const nativeAudioTracks = videoWithTracks.audioTracks
 
-  // Find the target track
   const targetTrack = audioTracks?.find((t) => t.index === trackIndex)
   if (!targetTrack) {
     return {
@@ -461,10 +432,6 @@ async function switchDirectPlayAudioTrack(
   return { success: true, reloadRequired: true }
 }
 
-// ============================================================================
-// HLS Subtitle Switching
-// ============================================================================
-
 /**
  * Switches subtitle track in HLS mode using HLS.js API.
  * Maps the Jellyfin MediaStream index to the HLS.js relative index before switching.
@@ -548,10 +515,6 @@ function switchHlsSubtitleTrack(
     }
   }
 }
-
-// ============================================================================
-// Direct Play Subtitle Switching
-// ============================================================================
 
 /**
  * Switches subtitle track in direct play mode using the TextTrack API.
@@ -695,10 +658,6 @@ async function switchDirectPlaySubtitleTrack(
     }
   }
 }
-
-// ============================================================================
-// Unified Track Switching Functions
-// ============================================================================
 
 /**
  * Switches audio track using the appropriate method based on playback strategy.

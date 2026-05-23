@@ -80,15 +80,10 @@ function HeaderFallback() {
   )
 }
 
-/**
- * 404 Not Found component for the root route.
- * Displays a friendly error message when a route is not found.
- */
 export function NotFoundComponent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  // Safe back navigation that stays within the app
   const handleGoBack = useCallback(() => {
     void navigate({ to: '/' })
   }, [navigate])
@@ -142,7 +137,6 @@ export function RootComponent() {
 
   const updateToastId = 'pwa-update-available'
 
-  // the SW registration setup.
   const onNeedRefresh = useEffectEvent((applyUpdate: () => Promise<void>) => {
     toast.info(t('pwa.updateAvailableTitle', 'New version available'), {
       id: updateToastId,
@@ -176,21 +170,17 @@ export function RootComponent() {
     }
   }, [])
 
-  // Unified connection initialization for both plugin and standalone modes
   const { showWizard } = useConnectionInit()
   const settingsOpen = useSessionStore(selectSettingsOpen)
 
-  // Local override to allow manually closing the wizard
   const [wizardDismissed, setWizardDismissed] = useState(false)
 
-  // Show wizard if hook says so AND user hasn't dismissed it
   const wizardOpen = showWizard && !wizardDismissed
 
   const handleWizardOpenChange = useCallback((open: boolean) => {
     if (!open) setWizardDismissed(true)
   }, [])
 
-  // Handle wizard completion
   const handleWizardComplete = useCallback(() => {
     setWizardDismissed(true)
   }, [])
@@ -198,7 +188,6 @@ export function RootComponent() {
   return (
     <HotkeysProvider>
       <div className="min-h-screen">
-        {/* Skip link for keyboard navigation - visible only when focused */}
         {showSkipToMain ? (
           <a
             href="#main-content"
@@ -207,7 +196,6 @@ export function RootComponent() {
             {t('accessibility.skipToMain', 'Skip to main content')}
           </a>
         ) : null}
-        {/* Header wrapped in error boundary to prevent header crashes from breaking the app */}
         <ErrorBoundary componentName="Header" fallback={<HeaderFallback />}>
           <Header />
         </ErrorBoundary>

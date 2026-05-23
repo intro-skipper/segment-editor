@@ -31,10 +31,6 @@ import { generateUUID } from '@/lib/segment-utils'
 import { AppError, isAbortError } from '@/lib/unified-error'
 import { API_CONFIG } from '@/lib/constants'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants & State
-// ─────────────────────────────────────────────────────────────────────────────
-
 const CLIENT_INFO = { name: 'Segment Editor', version: '1.0.0' } as const
 const DEVICE_ID_KEY = 'segment-editor-device-id'
 const PLUGIN_CONFIGURATION_PATH = '/configurationpage'
@@ -50,20 +46,12 @@ let jellyfinInstance: Jellyfin | null = null
 let apiCache: { key: string; apis: TypedApis } | null = null
 let credentialResolver: (() => Credentials | null) | null = null
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
 /** Sets the credential resolver for automatic credential lookup. */
 export function setCredentialResolver(
   resolver: () => Credentials | null,
 ): void {
   credentialResolver = resolver
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Device & Plugin Detection
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY)
@@ -153,10 +141,6 @@ export function getStandaloneEditorUrl(): string {
     : `/${APP_BASE_ROUTE}`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Client Factory
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function getJellyfinClient(): Jellyfin {
   if (!jellyfinInstance) {
     const plugin = getPluginApiClient()
@@ -173,10 +157,6 @@ export function getJellyfinClient(): Jellyfin {
   }
   return jellyfinInstance
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// API Factory (DRY: single implementation)
-// ─────────────────────────────────────────────────────────────────────────────
 
 function createTypedApis(api: Api): TypedApis {
   return {
@@ -230,10 +210,6 @@ export function clearApiCache(): void {
   apiCache = null
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Request Utilities
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const isAborted = (signal?: AbortSignal): boolean =>
   signal?.aborted === true
 
@@ -246,10 +222,6 @@ export function getRequestConfig(
     timeout: options?.timeout ?? defaultTimeout,
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Unified API Wrapper
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Executes an API operation with automatic credential resolution and error handling.
