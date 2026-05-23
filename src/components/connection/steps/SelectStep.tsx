@@ -89,10 +89,9 @@ function ServerItem({
     <button
       ref={buttonRef}
       type="button"
-      role="option"
       onClick={onSelect}
       onKeyDown={onKeyDown}
-      aria-selected={isSelected}
+      aria-pressed={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
         'w-full text-left p-4 rounded-xl transition-[transform,box-shadow,background-color,border-color] duration-200',

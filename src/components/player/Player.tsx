@@ -45,6 +45,7 @@ import { languagesMatch } from '@/lib/language-utils'
 import { Button } from '@/components/ui/button'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
+import { getSubtitleDeliveryUrl } from '@/services/video/track-switching'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
@@ -515,6 +516,34 @@ function useRenderPlayer({
       : (trackState.subtitleTracks.find(
           (track) => track.index === trackState.activeSubtitleIndex,
         ) ?? null)
+
+  const nativeCaptionTracks = useMemo(() => {
+    const itemId = item.Id
+    if (strategy !== 'direct' || !itemId) return []
+
+    const tracks: Array<{
+      index: number
+      language: string | undefined
+      label: string
+      src: string
+    }> = []
+
+    for (const track of trackState.subtitleTracks) {
+      const src = getSubtitleDeliveryUrl(itemId, track.index, 'vtt')
+      if (src === '') continue
+
+      tracks.push({
+        index: track.index,
+        language: track.language ?? undefined,
+        label: track.displayTitle,
+        src,
+      })
+    }
+
+    return tracks
+  }, [item.Id, strategy, trackState.subtitleTracks])
+  const primaryCaptionTrack = nativeCaptionTracks.at(0)
+  const additionalCaptionTracks = nativeCaptionTracks.slice(1)
 
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
     useJassubRenderer({
@@ -1189,6 +1218,8 @@ function useRenderPlayer({
           onKeyDown={handleVideoContainerKeyDown}
           aria-label={t('player.videoPlayer')}
         >
+          {/* Captions are rendered from Jellyfin subtitle metadata when a real VTT source is available. */}
+          {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
           <video
             ref={videoRef}
             className={cn(
@@ -1210,7 +1241,24 @@ function useRenderPlayer({
             onPlay={handlePlay}
             onPause={handlePause}
           >
-            <track kind="captions" />
+            {primaryCaptionTrack ? (
+              <track
+                key={primaryCaptionTrack.index}
+                kind="captions"
+                src={primaryCaptionTrack.src}
+                srcLang={primaryCaptionTrack.language}
+                label={primaryCaptionTrack.label}
+              />
+            ) : null}
+            {additionalCaptionTracks.map((track) => (
+              <track
+                key={track.index}
+                kind="captions"
+                src={track.src}
+                srcLang={track.language}
+                label={track.label}
+              />
+            ))}
           </video>
         </button>
 
