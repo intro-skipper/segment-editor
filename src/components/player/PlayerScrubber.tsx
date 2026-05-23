@@ -19,6 +19,10 @@ const SCRUBBER_STEP_COARSE = 10
 const HOVER_TIME_EPSILON_SECONDS = 0.05
 const HOVER_POSITION_EPSILON_PX = 1
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
@@ -115,8 +119,19 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     )
   }, [trickplayInfo, itemId, previewTime, serverAddress, apiKey])
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
-  const bufferedProgress = duration > 0 ? (buffered / duration) * 100 : 0
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0
+  const safeCurrentTime = Number.isFinite(currentTime)
+    ? clamp(currentTime, 0, safeDuration)
+    : 0
+  const safeBuffered = Number.isFinite(buffered)
+    ? clamp(buffered, 0, safeDuration)
+    : 0
+  const rangeMax = Math.round(safeDuration)
+  const rangeValue = clamp(Math.round(safeCurrentTime), 0, rangeMax)
+
+  const progress = safeDuration > 0 ? (safeCurrentTime / safeDuration) * 100 : 0
+  const bufferedProgress =
+    safeDuration > 0 ? (safeBuffered / safeDuration) * 100 : 0
 
   const refreshScrubberRect = React.useCallback(() => {
     const scrubber = scrubberRef.current
@@ -132,7 +147,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
 
   const getPositionFromClientX = React.useCallback(
     (clientX: number): { time: number; position: number } => {
-      if (duration <= 0) {
+      if (safeDuration <= 0) {
         return { time: 0, position: 0 }
       }
 
@@ -142,10 +157,10 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
       }
 
       const x = Math.max(0, Math.min(clientX - rect.left, rect.width))
-      const time = (x / rect.width) * duration
+      const time = (x / rect.width) * safeDuration
       return { time, position: x }
     },
-    [duration, refreshScrubberRect],
+    [safeDuration, refreshScrubberRect],
   )
 
   const scheduleSeek = React.useCallback(
@@ -289,12 +304,12 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
-      if (duration <= 0) return
+      if (safeDuration <= 0) return
 
       const result = handleRangeKeyboard(e.key, e.shiftKey, {
         min: 0,
-        max: duration,
-        value: currentTime,
+        max: safeDuration,
+        value: safeCurrentTime,
         stepFine: SCRUBBER_STEP_FINE,
         stepCoarse: SCRUBBER_STEP_COARSE,
       })
@@ -304,7 +319,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
         onSeek(result.newValue)
       }
     },
-    [currentTime, duration, onSeek],
+    [safeCurrentTime, safeDuration, onSeek],
   )
 
   const trackStyle = React.useMemo(
@@ -346,12 +361,12 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
   )
 
   const chapterMarkers = React.useMemo(() => {
-    if (!chapters || chapters.length === 0 || duration <= 0) return []
+    if (!chapters || chapters.length === 0 || safeDuration <= 0) return []
 
     const markers: Array<{ name: string; position: number; time: number }> = []
     for (const chapter of chapters) {
       const positionSeconds = ticksToSeconds(chapter.StartPositionTicks)
-      const percentage = (positionSeconds / duration) * 100
+      const percentage = (positionSeconds / safeDuration) * 100
       if (percentage >= 0 && percentage <= 100) {
         markers.push({
           name: chapter.Name || '',
@@ -361,12 +376,12 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
       }
     }
     return markers
-  }, [chapters, duration])
+  }, [chapters, safeDuration])
 
   // Note: editingSegments store StartTicks/EndTicks in SECONDS (not Jellyfin ticks)
   // because the SegmentSlider works with seconds for the UI
   const segmentRegions = React.useMemo(() => {
-    if (!segments || segments.length === 0 || duration <= 0) return []
+    if (!segments || segments.length === 0 || safeDuration <= 0) return []
 
     const regions: Array<{
       id: MediaSegmentDto['Id']
@@ -377,11 +392,11 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
     }> = []
     for (const segment of segments) {
       const startSeconds = segment.StartTicks ?? 0
-      const startPercent = (startSeconds / duration) * 100
+      const startPercent = (startSeconds / safeDuration) * 100
       if (startPercent >= 100) continue // Skip segments starting beyond 100%
       // StartTicks/EndTicks are already in seconds for editing segments
       const endSeconds = segment.EndTicks ?? 0
-      const endPercent = (endSeconds / duration) * 100
+      const endPercent = (endSeconds / safeDuration) * 100
       const clampedStart = Math.max(0, startPercent)
       const clampedEnd = Math.min(100, endPercent)
       const width = Math.max(0, clampedEnd - clampedStart)
@@ -398,12 +413,12 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
       })
     }
     return regions
-  }, [segments, duration])
+  }, [segments, safeDuration])
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
       <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)]">
-        {formatTime(currentTime)}
+        {formatTime(safeCurrentTime)}
       </span>
 
       <div
@@ -419,13 +434,13 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
         <input
           type="range"
           min={0}
-          max={Math.round(duration)}
-          value={Math.round(currentTime)}
+          max={rangeMax}
+          value={rangeValue}
           onChange={(event) => onSeek(Number(event.currentTarget.value))}
           onKeyDown={handleKeyDown}
           className="sr-only"
           aria-label={t('accessibility.player.videoProgress', 'Video progress')}
-          aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+          aria-valuetext={`${formatTime(safeCurrentTime)} of ${formatTime(safeDuration)}`}
         />
         <div
           className={cn(
@@ -531,7 +546,7 @@ export const PlayerScrubber = React.memo(function PlayerScrubberComponent({
       </div>
 
       <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)] text-right">
-        {formatTime(duration)}
+        {formatTime(safeDuration)}
       </span>
     </div>
   )
