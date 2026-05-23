@@ -20,7 +20,7 @@ interface WizardStepContentProps {
   serverAddressInputRef: RefObject<HTMLInputElement | null>
 }
 
-function renderWizardStepContent({
+function WizardStepContent({
   controller,
   handleComplete,
   serverAddressInputRef,
@@ -111,11 +111,11 @@ export function ConnectionWizardContent({
 
         <StepIndicator currentStep={controller.step} />
 
-        {renderWizardStepContent({
-          controller,
-          handleComplete,
-          serverAddressInputRef,
-        })}
+        <WizardStepContent
+          controller={controller}
+          handleComplete={handleComplete}
+          serverAddressInputRef={serverAddressInputRef}
+        />
       </DialogContent>
     </Dialog>
   )
