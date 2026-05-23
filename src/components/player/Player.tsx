@@ -1289,9 +1289,7 @@ function useRenderPlayer({
             onProgress={handleProgress}
             onPlay={handlePlay}
             onPause={handlePause}
-          >
-            <track kind="captions" label={t('player.tracks.subtitle')} />
-          </video>
+          />
         </button>
 
         {/* Error overlay - strategy-aware */}

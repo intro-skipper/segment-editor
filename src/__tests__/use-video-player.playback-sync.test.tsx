@@ -192,7 +192,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       })
       return (
         <video ref={player.videoRef}>
-          <track kind="captions" label="Captions" />
+          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
         </video>
       )
     }

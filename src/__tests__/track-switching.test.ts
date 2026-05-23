@@ -1,11 +1,19 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type Hls from 'hls.js'
-import type { AudioTrackInfo } from '@/services/video/tracks'
-import { switchAudioTrack } from '@/services/video/track-switching'
+import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
+import {
+  switchAudioTrack,
+  switchSubtitleTrack,
+} from '@/services/video/track-switching'
 
 const getVideoStreamUrlMock = vi.hoisted(() => vi.fn())
 const createPlaySessionIdMock = vi.hoisted(() => vi.fn())
+const buildApiUrlMock = vi.hoisted(() => vi.fn())
+const getCredentialsMock = vi.hoisted(() => vi.fn())
+const getDeviceIdMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/video/api', () => ({
   getVideoStreamUrl: getVideoStreamUrlMock,
@@ -13,6 +21,12 @@ vi.mock('@/services/video/api', () => ({
 
 vi.mock('@/services/video/session', () => ({
   createPlaySessionId: createPlaySessionIdMock,
+}))
+
+vi.mock('@/services/jellyfin', () => ({
+  buildApiUrl: buildApiUrlMock,
+  getCredentials: getCredentialsMock,
+  getDeviceId: getDeviceIdMock,
 }))
 
 function createAudioTrack(
@@ -26,6 +40,21 @@ function createAudioTrack(
     displayTitle: `Track ${index}`,
     codec: 'aac',
     channels: 2,
+    isDefault: relativeIndex === 0,
+  }
+}
+
+function createSubtitleTrack(
+  index: number,
+  relativeIndex: number,
+): SubtitleTrackInfo {
+  return {
+    index,
+    relativeIndex,
+    language: 'eng',
+    displayTitle: `Subtitle ${index}`,
+    format: 'SRT',
+    isExternal: true,
     isDefault: relativeIndex === 0,
   }
 }
@@ -113,5 +142,55 @@ describe('switchAudioTrack async reload failures', () => {
         trackIndex: 7,
       },
     })
+  })
+})
+
+describe('switchSubtitleTrack direct play', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getDeviceIdMock.mockReturnValue('device-1')
+    getCredentialsMock.mockReturnValue({
+      serverAddress: 'https://jellyfin.example',
+      accessToken: 'token',
+    })
+    buildApiUrlMock.mockImplementation(({ serverAddress, endpoint, query }) => {
+      const params = query ? `?${query.toString()}` : ''
+      return `${serverAddress}/${endpoint}${params}`
+    })
+  })
+
+  it('loads a managed external subtitle track when no TextTrack exists', async () => {
+    const video = document.createElement('video')
+    const textTracks: Array<TextTrack> = []
+    Object.defineProperty(video, 'textTracks', {
+      configurable: true,
+      value: textTracks,
+    })
+
+    const appendChild = video.appendChild.bind(video)
+    vi.spyOn(video, 'appendChild').mockImplementation((node) => {
+      const result = appendChild(node)
+      textTracks.push({ mode: 'disabled' } as TextTrack)
+      window.setTimeout(() => {
+        node.dispatchEvent(new Event('load'))
+      }, 0)
+      return result
+    })
+
+    await expect(
+      switchSubtitleTrack(3, {
+        strategy: 'direct',
+        videoElement: video,
+        itemId: 'item-1',
+        subtitleTracks: [createSubtitleTrack(3, 0)],
+      }),
+    ).resolves.toEqual({ success: true })
+
+    const trackElement = video.querySelector('track')
+    expect(trackElement?.src).toContain(
+      '/Videos/item-1/item-1/Subtitles/3/0/Stream.vtt',
+    )
+    expect(trackElement?.getAttribute('data-segment-editor-track')).toBe('true')
+    expect(textTracks[0].mode).toBe('showing')
   })
 })
