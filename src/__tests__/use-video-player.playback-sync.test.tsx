@@ -190,7 +190,11 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         item: createItem(),
         t: (key) => key,
       })
-      return <video ref={player.videoRef} />
+      return (
+        <video ref={player.videoRef}>
+          <track kind="captions" label="Captions" />
+        </video>
+      )
     }
 
     const { container } = render(<Harness />)
