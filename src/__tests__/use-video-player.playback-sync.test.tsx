@@ -392,6 +392,35 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         isPaused: true,
       })
     })
+
+    vi.mocked(reportPlaybackProgress).mockClear()
+    directVideo.currentTime = 35
+
+    act(() => {
+      directVideo.dispatchEvent(new Event('playing'))
+      directVideo.dispatchEvent(new Event('pause'))
+      directVideo.dispatchEvent(new Event('seeked'))
+    })
+
+    await waitFor(() => {
+      expect(reportPlaybackProgress).toHaveBeenCalledTimes(3)
+    })
+    expect(reportPlaybackProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playSessionId: 'direct-session-1',
+        playMethod: 'DirectPlay',
+        positionTicks: 350_000_000,
+        isPaused: false,
+      }),
+    )
+    expect(reportPlaybackProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playSessionId: 'direct-session-1',
+        playMethod: 'DirectPlay',
+        positionTicks: 350_000_000,
+        isPaused: true,
+      }),
+    )
   })
 
   it('stops active playback status and does not send further writes after sync is disabled', async () => {
@@ -665,6 +694,58 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
 
     expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
       expect.objectContaining({ positionTicks: 550_000_000 }),
+    )
+  })
+
+  it('does not start Transcode status with provisional HLS ID when config resolves to direct', async () => {
+    const configDeferred = createDeferred()
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+    vi.mocked(getPlaybackConfig).mockReturnValue(
+      configDeferred.promise.then(() => ({
+        strategy: 'direct' as const,
+        url: 'https://jellyfin.example/Videos/item-1/stream',
+      })),
+    )
+
+    const { result } = renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        undefined,
+        false,
+        'unused-hls-init',
+      )
+    })
+
+    expect(startPlaybackStatus).not.toHaveBeenCalled()
+
+    act(() => {
+      configDeferred.resolve()
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 0
+    result.current.videoRef.current = directVideo
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'direct-session-1',
+          playMethod: 'DirectPlay',
+        }),
+      )
+    })
+
+    expect(startPlaybackStatus).not.toHaveBeenCalledWith(
+      expect.objectContaining({ playMethod: 'Transcode' }),
     )
   })
 })
