@@ -8,6 +8,7 @@ import { Jellyfin } from '@jellyfin/sdk'
 import {
   getImageApi,
   getItemsApi,
+  getHlsSegmentApi,
   getLibraryApi,
   getLibraryStructureApi,
   getMediaSegmentsApi,
@@ -182,6 +183,7 @@ function createTypedApis(api: Api): TypedApis {
     api,
     systemApi: getSystemApi(api),
     itemsApi: getItemsApi(api),
+    hlsSegmentApi: getHlsSegmentApi(api),
     libraryApi: getLibraryApi(api),
     libraryStructureApi: getLibraryStructureApi(api),
     imageApi: getImageApi(api),

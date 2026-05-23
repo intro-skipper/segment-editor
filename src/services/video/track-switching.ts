@@ -9,6 +9,7 @@ import type Hls from 'hls.js'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getVideoStreamUrl } from '@/services/video/api'
+import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
@@ -97,9 +98,14 @@ interface TrackSwitchOptions {
   /** Media source ID for URL generation */
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
-  onReloadHls?: (newUrl: string) => Promise<void>
+  onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
   /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
   signal?: AbortSignal
+}
+
+export interface HlsReloadRequest {
+  url: string
+  playSessionId: string
 }
 
 /**
@@ -169,8 +175,16 @@ function getSubtitleDeliveryUrl(
 function getHlsUrlWithAudioTrack(
   itemId: string,
   audioStreamIndex: number,
-): string {
-  return getVideoStreamUrl({ itemId }, audioStreamIndex)
+  mediaSourceId?: string,
+): HlsReloadRequest {
+  const playSessionId = createPlaySessionId()
+  return {
+    url: getVideoStreamUrl(
+      { itemId, mediaSourceId, playSessionId },
+      audioStreamIndex,
+    ),
+    playSessionId,
+  }
 }
 
 // ============================================================================
@@ -325,7 +339,8 @@ async function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  const { videoElement, audioTracks, itemId, onReloadHls } = options
+  const { videoElement, audioTracks, itemId, mediaSourceId, onReloadHls } =
+    options
 
   // Check if native AudioTrack API is available
   const videoWithTracks = videoElement as HTMLVideoElementWithAudioTracks
@@ -414,8 +429,8 @@ async function switchDirectPlayAudioTrack(
   }
 
   // Generate HLS URL with the selected audio track and trigger reload
-  const newUrl = getHlsUrlWithAudioTrack(itemId, trackIndex)
-  if (!newUrl) {
+  const reload = getHlsUrlWithAudioTrack(itemId, trackIndex, mediaSourceId)
+  if (!reload.url) {
     return {
       success: false,
       error: {
@@ -428,7 +443,7 @@ async function switchDirectPlayAudioTrack(
 
   // Trigger HLS reload - this will switch from direct play to HLS mode
   try {
-    await onReloadHls(newUrl)
+    await onReloadHls(reload)
   } catch (err) {
     return {
       success: false,
@@ -735,9 +750,13 @@ export async function switchAudioTrack(
       // Generate new HLS URL with the selected audio track
       // Note: We don't pass currentTime here because the HLS player hook
       // will preserve and restore the playback position automatically
-      const newUrl = getHlsUrlWithAudioTrack(options.itemId, trackIndex)
+      const reload = getHlsUrlWithAudioTrack(
+        options.itemId,
+        trackIndex,
+        options.mediaSourceId,
+      )
 
-      if (!newUrl) {
+      if (!reload.url) {
         return {
           success: false,
           error: {
@@ -750,7 +769,7 @@ export async function switchAudioTrack(
 
       // Trigger the reload
       try {
-        await options.onReloadHls(newUrl)
+        await options.onReloadHls(reload)
       } catch (err) {
         return {
           success: false,

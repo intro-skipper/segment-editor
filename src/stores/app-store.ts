@@ -30,6 +30,7 @@ interface AppState {
   trackPreferences: TrackPreferences
   /** How to handle segments during playback: show a button, auto-skip, or do nothing */
   segmentSkipMode: SegmentSkipMode
+  jellyfinPlaybackSyncEnabled: boolean
 }
 
 interface AppActions {
@@ -46,6 +47,7 @@ interface AppActions {
   setSubtitlesEnabled: (enabled: boolean) => void
   /** Set how segments are handled during playback */
   setSegmentSkipMode: (mode: SegmentSkipMode) => void
+  setJellyfinPlaybackSyncEnabled: (enabled: boolean) => void
 }
 
 type AppStore = AppState & AppActions
@@ -85,6 +87,7 @@ const initialState: AppState = {
     subtitlesEnabled: false,
   },
   segmentSkipMode: 'button',
+  jellyfinPlaybackSyncEnabled: false,
 }
 
 export const useAppStore = create<AppStore>()(
@@ -121,17 +124,22 @@ export const useAppStore = create<AppStore>()(
           },
         })),
       setSegmentSkipMode: (segmentSkipMode) => set({ segmentSkipMode }),
+      setJellyfinPlaybackSyncEnabled: (jellyfinPlaybackSyncEnabled) =>
+        set({ jellyfinPlaybackSyncEnabled }),
     }),
     {
       name: 'segment-editor-app',
-      version: 1,
+      version: 2,
       migrate: (persistedState: unknown, version: number) => {
         if (typeof persistedState !== 'object' || persistedState === null) {
           return persistedState
         }
-        const state = persistedState as Record<string, unknown>
+        let state = persistedState as Record<string, unknown>
         if (version < 1 && state.segmentSkipMode === 'auto') {
-          return { ...state, segmentSkipMode: 'skip' }
+          state = { ...state, segmentSkipMode: 'skip' }
+        }
+        if (version < 2 && !('jellyfinPlaybackSyncEnabled' in state)) {
+          state = { ...state, jellyfinPlaybackSyncEnabled: false }
         }
         return state
       },

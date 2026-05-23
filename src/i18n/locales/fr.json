@@ -252,6 +252,12 @@
       "button": "Afficher le bouton de saut",
       "skip": "Passer automatiquement",
       "disabled": "Lecture par défaut uniquement"
+    },
+    "jellyfinPlaybackSync": {
+      "title": "Signaler la lecture à Jellyfin",
+      "enabled": "Activé - synchroniser la position et l'état vu",
+      "disabled": "Désactivé - garder la lecture privée",
+      "description": "Lorsqu'il est activé, Jellyfin peut afficher la lecture en cours, enregistrer la position de reprise et marquer les médias comme lus."
     }
   },
   "segmentType": {

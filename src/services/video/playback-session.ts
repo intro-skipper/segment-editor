@@ -1,91 +1,97 @@
-/**
- * Playback session management for Jellyfin.
- * Reports playback start/stop to enable server-side cleanup of transcoding files.
- *
- * @module services/video/playback-session
- */
-
 import { buildApiUrl, getCredentials, withApi } from '@/services/jellyfin'
-import { generateUUID } from '@/lib/segment-utils'
 
-interface PlaybackSession {
-  playSessionId: string
+export type PlaybackStatusPlayMethod = 'DirectPlay' | 'Transcode'
+
+interface PlaybackStatusOptions {
   itemId: string
   mediaSourceId: string
+  playSessionId: string
+  playMethod: PlaybackStatusPlayMethod
+  positionTicks: number
+  isPaused: boolean
 }
 
-let activeSession: PlaybackSession | null = null
+interface StopPlaybackStatusOptions {
+  itemId: string
+  mediaSourceId: string
+  playSessionId: string
+  positionTicks: number
+  failed?: boolean
+}
 
-/**
- * Creates a new playback session and reports start to Jellyfin.
- * This enables the server to track the session for cleanup.
- */
-export async function startPlaybackSession(
-  itemId: string,
-  mediaSourceId?: string,
-): Promise<PlaybackSession> {
-  // End any existing session first
-  if (activeSession) {
-    await stopPlaybackSession()
-  }
-
-  const session: PlaybackSession = {
-    playSessionId: generateUUID(),
-    itemId,
-    mediaSourceId: mediaSourceId ?? itemId.replace(/-/g, ''),
-  }
-
-  // Report playback start to Jellyfin
+export async function startPlaybackStatus({
+  itemId,
+  mediaSourceId,
+  playSessionId,
+  playMethod,
+  positionTicks,
+  isPaused,
+}: PlaybackStatusOptions): Promise<void> {
   await withApi(async (apis) => {
     await apis.playstateApi.reportPlaybackStart({
       playbackStartInfo: {
         ItemId: itemId,
-        PlaySessionId: session.playSessionId,
-        MediaSourceId: session.mediaSourceId,
+        MediaSourceId: mediaSourceId,
+        PlaySessionId: playSessionId,
+        PlayMethod: playMethod,
+        PositionTicks: positionTicks,
+        IsPaused: isPaused,
         CanSeek: true,
-        PlayMethod: 'Transcode',
       },
     })
   })
-
-  activeSession = session
-  return session
 }
 
-/**
- * Reports playback stopped to Jellyfin, triggering cleanup of transcoding files.
- * PositionTicks is intentionally omitted to avoid updating the user's watch
- * position or auto-marking the item as played.
- */
-export async function stopPlaybackSession(): Promise<void> {
-  if (!activeSession) return
+export async function reportPlaybackProgress({
+  itemId,
+  mediaSourceId,
+  playSessionId,
+  playMethod,
+  positionTicks,
+  isPaused,
+}: PlaybackStatusOptions): Promise<void> {
+  await withApi(async (apis) => {
+    await apis.playstateApi.reportPlaybackProgress({
+      playbackProgressInfo: {
+        ItemId: itemId,
+        MediaSourceId: mediaSourceId,
+        PlaySessionId: playSessionId,
+        PlayMethod: playMethod,
+        PositionTicks: positionTicks,
+        IsPaused: isPaused,
+        CanSeek: true,
+      },
+    })
+  })
+}
 
-  const session = activeSession
-  activeSession = null
-
+export async function stopPlaybackStatus({
+  itemId,
+  mediaSourceId,
+  playSessionId,
+  positionTicks,
+  failed,
+}: StopPlaybackStatusOptions): Promise<void> {
   await withApi(async (apis) => {
     await apis.playstateApi.reportPlaybackStopped({
       playbackStopInfo: {
-        ItemId: session.itemId,
-        PlaySessionId: session.playSessionId,
-        MediaSourceId: session.mediaSourceId,
+        ItemId: itemId,
+        MediaSourceId: mediaSourceId,
+        PlaySessionId: playSessionId,
+        PositionTicks: positionTicks,
+        Failed: failed,
       },
     })
   })
 }
 
-/**
- * Reports playback stopped using a keepalive request.
- * Intended for pagehide/unload flows where async cleanup can be dropped.
- * PositionTicks is intentionally omitted to avoid updating the user's watch
- * position or auto-marking the item as played.
- */
-export function stopPlaybackSessionKeepalive(): void {
-  if (!activeSession) return
-
-  const session = activeSession
-  activeSession = null
-
+export function stopPlaybackStatusKeepalive({
+  itemId,
+  mediaSourceId,
+  playSessionId,
+  positionTicks,
+  failed,
+}: StopPlaybackStatusOptions): void {
   const { serverAddress, accessToken } = getCredentials()
   const url = buildApiUrl({
     serverAddress,
@@ -96,11 +102,11 @@ export function stopPlaybackSessionKeepalive(): void {
   if (!url) return
 
   const body = JSON.stringify({
-    playbackStopInfo: {
-      ItemId: session.itemId,
-      PlaySessionId: session.playSessionId,
-      MediaSourceId: session.mediaSourceId,
-    },
+    ItemId: itemId,
+    MediaSourceId: mediaSourceId,
+    PlaySessionId: playSessionId,
+    PositionTicks: positionTicks,
+    Failed: failed,
   })
 
   try {
@@ -112,15 +118,7 @@ export function stopPlaybackSessionKeepalive(): void {
       },
       body,
     })
-  } catch {
-    // Best effort during unload/pagehide
+  } catch (error) {
+    console.debug('Failed to queue Jellyfin playback status stop', error)
   }
-}
-
-/**
- * Gets the current active session's PlaySessionId.
- * Returns null if no session is active.
- */
-export function getActivePlaySessionId(): string | null {
-  return activeSession?.playSessionId ?? null
 }

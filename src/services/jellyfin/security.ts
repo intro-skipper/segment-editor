@@ -17,8 +17,13 @@ const DANGEROUS_PROTOCOLS = [
 ]
 const PATH_TRAVERSAL = /(?:^|[\\/])\.\.(?:[\\/]|$)/
 const ENCODED_TRAVERSAL = /%2e%2e|%252e%252e|%c0%ae|%c1%9c/i
-// oxlint-disable-next-line no-control-regex
-const DANGEROUS_CHARS = /[\x00-\x1f\x7f]/
+function hasDangerousChars(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // URL Sanitization
@@ -27,7 +32,7 @@ const DANGEROUS_CHARS = /[\x00-\x1f\x7f]/
 /** Sanitizes a URL, returning null if invalid or dangerous. */
 export function sanitizeUrl(url: string | null | undefined): string | null {
   const trimmed = url?.trim()
-  if (!trimmed || DANGEROUS_CHARS.test(trimmed)) return null
+  if (!trimmed || hasDangerousChars(trimmed)) return null
 
   let decoded: string
   try {
@@ -70,7 +75,7 @@ export function sanitizeUrl(url: string | null | undefined): string | null {
 function sanitizeQueryParam(value: string | null | undefined): string {
   if (value == null) return ''
   const str = String(value)
-  if (DANGEROUS_CHARS.test(str)) return ''
+  if (hasDangerousChars(str)) return ''
 
   return str
     .replace(/<[^>]*>/g, '')

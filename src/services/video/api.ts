@@ -8,7 +8,6 @@ import type { MediaSourceInfo } from '@/services/video/compatibility'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { checkCompatibility } from '@/services/video/compatibility'
-import { getActivePlaySessionId } from '@/services/video/playback-session'
 import { generateUUID } from '@/lib/segment-utils'
 
 // ============================================================================
@@ -21,6 +20,8 @@ interface VideoStreamOptions {
   audioCodec?: string
   maxStreamingBitrate?: number
   startTimeTicks?: number
+  mediaSourceId?: string
+  playSessionId?: string
 }
 
 /**
@@ -72,6 +73,19 @@ function buildUrl(endpoint: string, query: URLSearchParams): string {
   })
 }
 
+function getFallbackMediaSourceId(itemId: string): string {
+  return itemId.replace(/-/g, '')
+}
+
+export function getPlaybackMediaSourceId(
+  item: BaseItemDto,
+): string | undefined {
+  return (
+    item.MediaSources?.[0]?.Id ??
+    (item.Id ? getFallbackMediaSourceId(item.Id) : undefined)
+  )
+}
+
 // ============================================================================
 // Direct Play URL Generation
 // ============================================================================
@@ -95,7 +109,7 @@ export function getDirectPlayUrl(options: DirectPlayOptions): string {
   if (mediaSourceId) {
     query.set('MediaSourceId', mediaSourceId)
   } else {
-    query.set('MediaSourceId', itemId.replace(/-/g, ''))
+    query.set('MediaSourceId', getFallbackMediaSourceId(itemId))
   }
 
   // Add optional StartTimeTicks parameter
@@ -132,14 +146,13 @@ export function getVideoStreamUrl(
     audioCodec = 'aac',
     maxStreamingBitrate = 140000000,
     startTimeTicks = 0,
+    mediaSourceId,
+    playSessionId = generateUUID(),
   } = options
-
-  // Use active session's PlaySessionId if available, otherwise generate new one
-  const playSessionId = getActivePlaySessionId() ?? generateUUID()
 
   const query = new URLSearchParams({
     DeviceId: getDeviceId(),
-    MediaSourceId: itemId.replace(/-/g, ''),
+    MediaSourceId: mediaSourceId ?? getFallbackMediaSourceId(itemId),
     PlaySessionId: playSessionId,
     VideoCodec: 'av1,hevc,h264,vp9',
     AudioCodec: audioCodec,
@@ -350,6 +363,7 @@ export async function getPlaybackConfig(
   startTimeTicks?: number,
   audioStreamIndex?: number,
   forceHls = false,
+  hlsPlaySessionId?: string,
 ): Promise<PlaybackConfig> {
   const startTime = startTimeTicks
     ? startTimeTicks / JELLYFIN_CONFIG.TICKS_PER_SECOND
@@ -372,6 +386,7 @@ export async function getPlaybackConfig(
 
   // Get container from media source if available
   const container = mediaSourceInfo?.container
+  const mediaSourceId = getPlaybackMediaSourceId(item)
 
   // Check if a non-first audio track is requested
   // If so, we need HLS transcoding since browsers don't support audio track switching in direct play
@@ -383,6 +398,7 @@ export async function getPlaybackConfig(
     // Use direct play (only when using first/default audio track)
     const url = getDirectPlayUrl({
       itemId: item.Id,
+      mediaSourceId,
       startTimeTicks,
       container,
     })
@@ -398,6 +414,8 @@ export async function getPlaybackConfig(
   const url = getVideoStreamUrl(
     {
       itemId: item.Id,
+      mediaSourceId,
+      playSessionId: hlsPlaySessionId,
       startTimeTicks,
     },
     audioStreamIndex,

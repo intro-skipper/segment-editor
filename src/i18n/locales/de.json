@@ -332,6 +332,12 @@
       "button": "Überspringen-Schaltfläche anzeigen",
       "skip": "Automatisch überspringen",
       "disabled": "Nur Standard-Wiedergabe"
+    },
+    "jellyfinPlaybackSync": {
+      "title": "Wiedergabe an Jellyfin melden",
+      "enabled": "Aktiviert - Position und Gesehen-Status synchronisieren",
+      "disabled": "Deaktiviert - Wiedergabe privat halten",
+      "description": "Wenn aktiviert, kann Jellyfin \"Aktuelle Wiedergabe\" anzeigen, die Fortsetzungsposition speichern und Medien als gesehen markieren."
     }
   },
   "navigation": {

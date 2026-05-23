@@ -16,7 +16,10 @@ import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
-import type { TrackSwitchResult } from '@/services/video/track-switching'
+import type {
+  HlsReloadRequest,
+  TrackSwitchResult,
+} from '@/services/video/track-switching'
 import type {
   AudioTrackInfo,
   SubtitleTrackInfo,
@@ -54,7 +57,7 @@ interface UseTrackManagerOptions {
   /** Translation function for error messages */
   t: (key: string) => string
   /** Callback to reload HLS stream with new URL (for audio track switching) */
-  onReloadHls?: (newUrl: string) => Promise<void>
+  onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
 }
 
 /**

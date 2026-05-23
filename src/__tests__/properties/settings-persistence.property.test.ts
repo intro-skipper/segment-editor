@@ -10,6 +10,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
+import { useAppStore } from '@/stores/app-store'
 
 // Storage key constants matching the stores
 const APP_STORAGE_KEY = 'segment-editor-app'
@@ -25,6 +26,7 @@ interface AppSettings {
   showVideoPlayer: boolean
   enableEdl: boolean
   enableChapter: boolean
+  jellyfinPlaybackSyncEnabled: boolean
 }
 
 interface ApiSettings {
@@ -53,6 +55,7 @@ const appSettingsArb = fc.record<AppSettings>({
   showVideoPlayer: booleanArb,
   enableEdl: booleanArb,
   enableChapter: booleanArb,
+  jellyfinPlaybackSyncEnabled: booleanArb,
 })
 
 const apiSettingsArb = fc.record<ApiSettings>({
@@ -113,6 +116,9 @@ describe('Settings Persistence Round-Trip', () => {
         expect(restored.showVideoPlayer).toBe(settings.showVideoPlayer)
         expect(restored.enableEdl).toBe(settings.enableEdl)
         expect(restored.enableChapter).toBe(settings.enableChapter)
+        expect(restored.jellyfinPlaybackSyncEnabled).toBe(
+          settings.jellyfinPlaybackSyncEnabled,
+        )
 
         return true
       }),
@@ -170,6 +176,7 @@ describe('Settings Persistence Round-Trip', () => {
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
+            jellyfinPlaybackSyncEnabled: false,
           },
           version: 0,
         }
@@ -208,6 +215,7 @@ describe('Settings Persistence Round-Trip', () => {
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
+            jellyfinPlaybackSyncEnabled: false,
           },
           version: 0,
         }
@@ -264,12 +272,70 @@ describe('Settings Persistence Round-Trip', () => {
           expect(restored.showVideoPlayer).toBe(finalSettings.showVideoPlayer)
           expect(restored.enableEdl).toBe(finalSettings.enableEdl)
           expect(restored.enableChapter).toBe(finalSettings.enableChapter)
+          expect(restored.jellyfinPlaybackSyncEnabled).toBe(
+            finalSettings.jellyfinPlaybackSyncEnabled,
+          )
 
           return true
         },
       ),
       { numRuns: 100 },
     )
+  })
+
+  it('defaults playback sync to disabled during app settings migration', async () => {
+    const previousState = {
+      theme: 'auto' as Theme,
+      locale: 'en-US' as Locale,
+      showVideoPlayer: true,
+      enableEdl: false,
+      enableChapter: false,
+    }
+
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: previousState, version: 1 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().jellyfinPlaybackSyncEnabled).toBe(false)
+  })
+
+  it('preserves enabled playback sync during app settings migration', async () => {
+    const previousState = {
+      theme: 'auto' as Theme,
+      locale: 'en-US' as Locale,
+      showVideoPlayer: true,
+      enableEdl: false,
+      enableChapter: false,
+      jellyfinPlaybackSyncEnabled: true,
+    }
+
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: previousState, version: 1 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().jellyfinPlaybackSyncEnabled).toBe(true)
+  })
+
+  it('persists playback sync setter updates immediately', () => {
+    localStorage.removeItem(APP_STORAGE_KEY)
+
+    useAppStore.getState().setJellyfinPlaybackSyncEnabled(true)
+
+    let stored = localStorage.getItem(APP_STORAGE_KEY)
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).state.jellyfinPlaybackSyncEnabled).toBe(true)
+
+    useAppStore.getState().setJellyfinPlaybackSyncEnabled(false)
+
+    stored = localStorage.getItem(APP_STORAGE_KEY)
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).state.jellyfinPlaybackSyncEnabled).toBe(false)
   })
 
   /**

@@ -352,6 +352,10 @@ function useRenderPlayer({
   const segmentSkipModeRef = useRef(segmentSkipMode)
   segmentSkipModeRef.current = segmentSkipMode
 
+  const jellyfinPlaybackSyncEnabled = useAppStore(
+    (s) => s.jellyfinPlaybackSyncEnabled,
+  )
+
   // Precompute segment time ranges once per segment list update, sorted by
   // startSeconds so binary search can be used during playback hot-path.
   const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
@@ -506,6 +510,7 @@ function useRenderPlayer({
   } = useVideoPlayer({
     item,
     preferredAudioStreamIndex,
+    jellyfinPlaybackSyncEnabled,
     onError: handleVideoError,
     onStrategyChange: handleStrategyChange,
     onRecoveryStart: () => {
@@ -942,6 +947,20 @@ function useRenderPlayer({
     }
   }
 
+  const clearSingleTapTimer = () => {
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current)
+      singleTapTimerRef.current = null
+    }
+  }
+
+  const clearResizeFrame = () => {
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current)
+      resizeRafRef.current = null
+    }
+  }
+
   const handleFullscreenChange = useEffectEvent(() => {
     const isFs = !!document.fullscreenElement
 
@@ -1030,10 +1049,7 @@ function useRenderPlayer({
     lastInteractionTimeRef.current = now
 
     // Clear any pending single-tap/click action
-    if (singleTapTimerRef.current) {
-      clearTimeout(singleTapTimerRef.current)
-      singleTapTimerRef.current = null
-    }
+    clearSingleTapTimer()
 
     if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
       // Double-tap/click detected
@@ -1063,7 +1079,7 @@ function useRenderPlayer({
   }
 
   const handleVideoContainerKeyDown = (
-    e: React.KeyboardEvent<HTMLDivElement>,
+    e: React.KeyboardEvent<HTMLButtonElement>,
   ) => {
     // Only handle Enter here — Space is handled globally by usePlayerKeyboard
     if (e.key === 'Enter') {
@@ -1099,12 +1115,8 @@ function useRenderPlayer({
   useEffect(() => {
     return () => {
       clearHideControlsTimer()
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current)
-      }
-      if (resizeRafRef.current !== null) {
-        cancelAnimationFrame(resizeRafRef.current)
-      }
+      clearSingleTapTimer()
+      clearResizeFrame()
       clearPlaybackUpdateTimer()
     }
   }, [])
@@ -1229,9 +1241,8 @@ function useRenderPlayer({
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {/* Fullscreen container - wraps everything */}
-      <div
+      <section
         ref={containerRef}
-        role="region"
         aria-label={t('player.videoPlayer')}
         className={cn(
           'relative',
@@ -1239,14 +1250,13 @@ function useRenderPlayer({
         )}
         onMouseMove={handleFullscreenMouseMove}
         onMouseLeave={handleContainerMouseLeave}
-        tabIndex={isFullscreen ? 0 : -1}
       >
         {/* Video container */}
-        <div
-          role="button"
+        <button
+          type="button"
           tabIndex={0}
           className={cn(
-            'relative',
+            'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
             isFullscreen
               ? cn(
                   'w-full h-full',
@@ -1257,6 +1267,7 @@ function useRenderPlayer({
           onClick={handleVideoInteraction}
           onTouchEnd={handleVideoInteraction}
           onKeyDown={handleVideoContainerKeyDown}
+          aria-label={t('player.videoPlayer')}
         >
           <video
             ref={videoRef}
@@ -1278,80 +1289,81 @@ function useRenderPlayer({
             onProgress={handleProgress}
             onPlay={handlePlay}
             onPause={handlePause}
-          />
+          >
+            <track kind="captions" label={t('player.tracks.subtitle')} />
+          </video>
+        </button>
 
-          {/* Error overlay - strategy-aware */}
-          {playerError && !isRecovering ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
-              <AlertTriangle className="size-12 text-destructive mb-4" />
-              <p className="text-lg font-medium mb-2">{playerError.message}</p>
-              {strategy === 'direct' && playerError.type === 'media' ? (
-                <p className="text-sm text-muted-foreground mb-2">
-                  {t('player.error.directPlayFailed')}
-                </p>
-              ) : null}
-              {playerError.recoverable ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.stopPropagation()
-                    handleRetry()
-                  }}
-                  className="mt-2"
-                >
-                  <RefreshCw className="size-4 mr-2" />
-                  {t('player.retry')}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Loading/Recovery indicator */}
-          {isVideoLoading || isRecovering ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/60"
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-            >
-              <div className="animate-spin" aria-hidden="true">
-                <RefreshCw className="size-8 text-white" />
-              </div>
-              <span className="sr-only">
-                {isRecovering
-                  ? t('player.recovering', 'Recovering playback')
-                  : t('accessibility.loading')}
-              </span>
-            </div>
-          ) : null}
-
-          {/* Segment skip button overlay */}
-          {segmentSkipMode === 'button' &&
-          activeSkipSegment &&
-          !playerError &&
-          !isVideoLoading ? (
-            <div
-              className="absolute bottom-4 right-4 z-20"
-              data-player-controls-overlay="true"
-            >
+        {/* Error overlay - strategy-aware */}
+        {playerError && !isRecovering ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
+            <AlertTriangle className="size-12 text-destructive mb-4" />
+            <p className="text-lg font-medium mb-2">{playerError.message}</p>
+            {strategy === 'direct' && playerError.type === 'media' ? (
+              <p className="text-sm text-muted-foreground mb-2">
+                {t('player.error.directPlayFailed')}
+              </p>
+            ) : null}
+            {playerError.recoverable ? (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleSkipSegment(activeSkipSegment)}
-                className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
-                aria-label={t('player.skipSegment', {
-                  type: t(`segmentType.${activeSkipSegment.Type}`),
-                })}
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.stopPropagation()
+                  handleRetry()
+                }}
+                className="mt-2"
               >
-                <SkipForward className="size-4" aria-hidden="true" />
-                {t('player.skipSegment', {
-                  type: t(`segmentType.${activeSkipSegment.Type}`),
-                })}
+                <RefreshCw className="size-4 mr-2" />
+                {t('player.retry')}
               </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Loading/Recovery indicator */}
+        {isVideoLoading || isRecovering ? (
+          <output
+            className="absolute inset-0 flex items-center justify-center bg-black/60"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div className="animate-spin" aria-hidden="true">
+              <RefreshCw className="size-8 text-white" />
             </div>
-          ) : null}
-        </div>
+            <span className="sr-only">
+              {isRecovering
+                ? t('player.recovering', 'Recovering playback')
+                : t('accessibility.loading')}
+            </span>
+          </output>
+        ) : null}
+
+        {/* Segment skip button overlay */}
+        {segmentSkipMode === 'button' &&
+        activeSkipSegment &&
+        !playerError &&
+        !isVideoLoading ? (
+          <div
+            className="absolute bottom-4 right-4 z-20"
+            data-player-controls-overlay="true"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSkipSegment(activeSkipSegment)}
+              className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
+              aria-label={t('player.skipSegment', {
+                type: t(`segmentType.${activeSkipSegment.Type}`),
+              })}
+            >
+              <SkipForward className="size-4" aria-hidden="true" />
+              {t('player.skipSegment', {
+                type: t(`segmentType.${activeSkipSegment.Type}`),
+              })}
+            </Button>
+          </div>
+        ) : null}
 
         {/* Fullscreen OSD/Controls overlay */}
         {isFullscreen ? (
@@ -1410,7 +1422,7 @@ function useRenderPlayer({
             </div>
           </div>
         ) : null}
-      </div>
+      </section>
 
       {/* Normal mode controls (outside fullscreen container) */}
       {!isFullscreen ? (
