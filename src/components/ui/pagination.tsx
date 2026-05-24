@@ -5,8 +5,9 @@ import {
   ChevronRightIcon,
   MoreHorizontalIcon,
 } from 'lucide-react'
+import type { VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   return (
@@ -38,30 +39,95 @@ function PaginationItem({ ...props }: React.ComponentProps<'li'>) {
 
 type PaginationLinkProps = {
   isActive?: boolean
-} & Pick<React.ComponentProps<typeof Button>, 'size'> &
-  React.ComponentProps<'a'>
+} & Pick<VariantProps<typeof buttonVariants>, 'size'> &
+  (
+    | ({ href: string } & React.ComponentProps<'a'>)
+    | ({ href?: undefined } & React.ComponentProps<'button'>)
+  )
 
-function PaginationLink({
+function getPaginationLinkClassName({
   className,
   isActive,
   size = 'icon',
-  ...props
-}: PaginationLinkProps) {
+}: {
+  className?: string
+  isActive?: boolean
+  size?: VariantProps<typeof buttonVariants>['size']
+}) {
+  return cn(
+    'touch-manipulation min-h-11 min-w-11',
+    buttonVariants({ variant: isActive ? 'outline' : 'ghost', size }),
+    className,
+  )
+}
+
+function getPaginationLinkSharedProps({
+  ariaLabel,
+  className,
+  isActive,
+  size,
+}: {
+  ariaLabel?: string
+  className?: string
+  isActive?: boolean
+  size?: VariantProps<typeof buttonVariants>['size']
+}) {
+  return {
+    'aria-label': ariaLabel,
+    'aria-current': isActive ? 'page' : undefined,
+    'data-slot': 'pagination-link',
+    'data-active': isActive,
+    'data-interactive-transition': 'true',
+    className: getPaginationLinkClassName({ className, isActive, size }),
+  } as const
+}
+
+function PaginationLink(props: PaginationLinkProps) {
+  if (props.href !== undefined) {
+    const {
+      className,
+      isActive,
+      size = 'icon',
+      children,
+      'aria-label': ariaLabel,
+      ...anchorProps
+    } = props
+    return (
+      <a
+        {...getPaginationLinkSharedProps({
+          ariaLabel,
+          className,
+          isActive,
+          size,
+        })}
+        {...anchorProps}
+      >
+        {children}
+      </a>
+    )
+  }
+
+  const {
+    className,
+    isActive,
+    size = 'icon',
+    children,
+    'aria-label': ariaLabel,
+    ...buttonProps
+  } = props
   return (
-    <Button
-      variant={isActive ? 'outline' : 'ghost'}
-      size={size}
-      className={cn('min-h-11 min-w-11', className)}
-      nativeButton={false}
-      render={
-        <a
-          aria-current={isActive ? 'page' : undefined}
-          data-slot="pagination-link"
-          data-active={isActive}
-          {...props}
-        />
-      }
-    />
+    <button
+      type="button"
+      {...getPaginationLinkSharedProps({
+        ariaLabel,
+        className,
+        isActive,
+        size,
+      })}
+      {...buttonProps}
+    >
+      {children}
+    </button>
   )
 }
 

@@ -73,7 +73,10 @@ function createSegment(
   }
 }
 
-function renderSlider(segment: MediaSegmentDto = createSegment()) {
+function renderSlider(
+  segment: MediaSegmentDto = createSegment(),
+  props: Partial<React.ComponentProps<typeof SegmentSlider>> = {},
+) {
   const onUpdate = vi.fn()
 
   const result = render(
@@ -89,6 +92,7 @@ function renderSlider(segment: MediaSegmentDto = createSegment()) {
       onSetActive={vi.fn()}
       onUpdate={onUpdate}
       vibrantColors={null}
+      {...props}
     />,
   )
 
@@ -142,7 +146,12 @@ describe('SegmentSlider TanStack Form migration', () => {
     const { onUpdate } = renderSlider()
 
     const endHandle = screen.getAllByRole('slider', { name: /end handle/i })[0]
-    const sliderTrack = endHandle.parentElement?.parentElement as HTMLDivElement
+    const sliderTrack = screen.getByRole('group', {
+      name: /segment slider group/i,
+    }) as HTMLFieldSetElement
+    expect(sliderTrack.getAttribute('aria-describedby')).toBe(
+      'segment-segment-1-description',
+    )
 
     Object.defineProperty(sliderTrack, 'getBoundingClientRect', {
       configurable: true,
@@ -180,6 +189,31 @@ describe('SegmentSlider TanStack Form migration', () => {
       end: 35,
       id: 'segment-1',
       start: 10,
+    })
+  })
+
+  it('exposes frame step precision on range handles', () => {
+    renderSlider(createSegment(), { frameStepSeconds: 1001 / 24000 })
+
+    const startHandle = screen.getByRole('slider', { name: /start handle/i })
+    const endHandle = screen.getByRole('slider', { name: /end handle/i })
+
+    expect(startHandle.getAttribute('step')).toBe(String(1001 / 24000))
+    expect(endHandle.getAttribute('step')).toBe(String(1001 / 24000))
+  })
+
+  it('snaps keyboard handle changes to fractional frame steps', async () => {
+    const frameStepSeconds = 1001 / 24000
+    renderSlider(createSegment(), { frameStepSeconds })
+
+    const startHandle = screen.getByRole('slider', { name: /start handle/i })
+    fireEvent.keyDown(startHandle, { key: 'ArrowRight' })
+
+    const startInput = document.getElementById(
+      'segment-segment-1-start',
+    ) as HTMLInputElement
+    await waitFor(() => {
+      expect(startInput.value).toBe('10.093')
     })
   })
 

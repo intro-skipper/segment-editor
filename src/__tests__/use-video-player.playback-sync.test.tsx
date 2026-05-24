@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useVideoPlayer } from '@/hooks/use-video-player'
+import type { PlaybackStrategy } from '@/services/video/api'
 import { getPlaybackConfig } from '@/services/video/api'
 import {
   reportPlaybackProgress,
@@ -70,6 +71,17 @@ function createDeferred(): { promise: Promise<void>; resolve: () => void } {
   return { promise, resolve }
 }
 
+function createDeferredValue<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+} {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 function createItem(id = 'item-1'): BaseItemDto {
   return {
     Id: id,
@@ -82,18 +94,22 @@ function createItem(id = 'item-1'): BaseItemDto {
 function renderVideoPlayer(options?: {
   item?: BaseItemDto
   jellyfinPlaybackSyncEnabled?: boolean
+  onStrategyChange?: (strategy: PlaybackStrategy) => void
 }) {
   return renderHook(
     ({
       item,
       jellyfinPlaybackSyncEnabled,
+      onStrategyChange,
     }: {
       item: BaseItemDto
       jellyfinPlaybackSyncEnabled: boolean
+      onStrategyChange?: (strategy: PlaybackStrategy) => void
     }) =>
       useVideoPlayer({
         item,
         jellyfinPlaybackSyncEnabled,
+        onStrategyChange,
         t: (key) => key,
       }),
     {
@@ -101,6 +117,7 @@ function renderVideoPlayer(options?: {
         item: options?.item ?? createItem(),
         jellyfinPlaybackSyncEnabled:
           options?.jellyfinPlaybackSyncEnabled ?? false,
+        onStrategyChange: options?.onStrategyChange,
       },
     },
   )
@@ -281,6 +298,74 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
 
     await waitFor(() => {
       expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('waits for playback config before starting sync when sync is toggled on mid-load', async () => {
+    const configDeferred =
+      createDeferredValue<Awaited<ReturnType<typeof getPlaybackConfig>>>()
+    vi.mocked(getPlaybackConfig).mockReturnValue(configDeferred.promise)
+
+    const { rerender } = renderVideoPlayer()
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalled()
+    })
+
+    rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: true })
+    expect(startPlaybackStatus).not.toHaveBeenCalled()
+
+    await act(async () => {
+      configDeferred.resolve({
+        strategy: 'hls',
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=hls-session-1',
+      })
+      await configDeferred.promise
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('does not start stale direct-play sync when enabling during a new item load', async () => {
+    const configDeferred =
+      createDeferredValue<Awaited<ReturnType<typeof getPlaybackConfig>>>()
+    vi.mocked(getPlaybackConfig)
+      .mockResolvedValueOnce({
+        strategy: 'direct',
+        url: 'https://jellyfin.example/Videos/item-1/stream',
+      })
+      .mockReturnValueOnce(configDeferred.promise)
+
+    const { result, rerender } = renderVideoPlayer()
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 34
+    result.current.videoRef.current = directVideo
+
+    rerender({ item: createItem('item-2'), jellyfinPlaybackSyncEnabled: true })
+    expect(startPlaybackStatus).not.toHaveBeenCalled()
+
+    await act(async () => {
+      configDeferred.resolve({
+        strategy: 'hls',
+        url: 'https://jellyfin.example/Videos/item-2/master.m3u8?PlaySessionId=hls-session-2',
+      })
+      await configDeferred.promise
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          itemId: 'item-2',
+          playMethod: 'Transcode',
+        }),
+      )
     })
   })
 
@@ -602,6 +687,45 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
 
     expect(result.current.strategy).toBe('hls')
+  })
+
+  it('calls onStrategyChange with hls on direct-to-HLS switch via reloadHlsWithUrl', async () => {
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValueOnce('hls-fallback-session')
+
+    vi.mocked(getPlaybackConfig).mockResolvedValue({
+      strategy: 'direct',
+      url: 'https://jellyfin.example/Videos/item-1/stream',
+    })
+
+    const onStrategyChange = vi.fn<(strategy: PlaybackStrategy) => void>()
+    const { result } = renderVideoPlayer({
+      jellyfinPlaybackSyncEnabled: true,
+      onStrategyChange,
+    })
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 10
+    result.current.videoRef.current = directVideo
+
+    onStrategyChange.mockClear()
+
+    await act(async () => {
+      await result.current.reloadHlsWithUrl({
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=hls-fallback-session',
+        playSessionId: 'hls-fallback-session',
+      })
+    })
+
+    await waitFor(() => {
+      expect(onStrategyChange).toHaveBeenCalledWith('hls')
+    })
   })
 
   it('preserves direct-play position in HLS Transcode start on direct-to-HLS switch via reloadHlsWithUrl (position=42s)', async () => {

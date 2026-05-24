@@ -539,6 +539,15 @@ body {
 /* Segment slider - enhanced touch and visual feedback */
 .segment-handle {
   touch-action: none;
+}
+
+.segment-handle-hit-area {
+  width: 0.875rem;
+  height: 100%;
+  transform: translate(-50%, -50%);
+}
+
+.segment-handle-visual {
   transition:
     filter var(--duration-fast) var(--ease-out-expo),
     box-shadow var(--duration-fast) ease,
@@ -547,38 +556,30 @@ body {
   will-change: transform, filter;
 }
 
-.segment-handle:hover {
+.segment-handle:hover + .segment-handle-visual {
   filter: brightness(1.1);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-  transform: scaleY(1.1);
+  transform: translateX(-50%) scaleY(1.1);
 }
 
-.segment-handle:active {
+.segment-handle:active + .segment-handle-visual {
   filter: brightness(1.2);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
-  transform: scaleY(1.15);
+  transform: translateX(-50%) scaleY(1.15);
 }
 
 /* Touch devices: expanded touch target (44px minimum per WCAG) */
 @media (pointer: coarse) {
-  .segment-handle {
-    width: 20px !important;
+  .segment-handle-hit-area {
+    width: var(--spacing-touch-target-min);
+    height: var(--spacing-touch-target-min);
   }
-  .segment-handle:hover,
-  .segment-handle:active {
+
+  .segment-handle:hover + .segment-handle-visual,
+  .segment-handle:active + .segment-handle-visual {
     filter: none;
     box-shadow: none;
-  }
-  /* Invisible touch area extension */
-  .segment-handle::before {
-    content: '';
-    position: absolute;
-    top: -8px;
-    bottom: -8px;
-    left: -12px;
-    right: -12px;
-    min-width: 44px;
-    min-height: 44px;
+    transform: translateX(-50%);
   }
 }
 

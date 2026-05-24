@@ -121,11 +121,11 @@ describe('ConnectionWizard TanStack Form migration', () => {
 
     await screen.findByRole('heading', { name: 'Select Server' })
 
-    const betaButton = screen.getByRole('option', {
+    const betaButton = screen.getByRole('button', {
       name: /https:\/\/beta\.local/i,
     })
     fireEvent.click(betaButton)
-    expect(betaButton.getAttribute('aria-selected')).toBe('true')
+    expect(betaButton.getAttribute('aria-pressed')).toBe('true')
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByText('Connecting to')
@@ -135,8 +135,8 @@ describe('ConnectionWizard TanStack Form migration', () => {
     await screen.findByRole('heading', { name: 'Select Server' })
     expect(
       screen
-        .getByRole('option', { name: /https:\/\/beta\.local/i })
-        .getAttribute('aria-selected'),
+        .getByRole('button', { name: /https:\/\/beta\.local/i })
+        .getAttribute('aria-pressed'),
     ).toBe('true')
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))

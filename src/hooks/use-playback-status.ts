@@ -198,7 +198,7 @@ export function usePlaybackStatus({
     }
   }, [consumeActivePlaybackStatus])
 
-  const stopCurrentPlaybackStatusKeepalive = useEffectEvent(() => {
+  const stopCurrentPlaybackStatusKeepalive = useCallback(() => {
     const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
     if (!activeSession) return
 
@@ -206,7 +206,7 @@ export function usePlaybackStatus({
       ...activeSession,
       positionTicks: finalPositionTicks,
     })
-  })
+  }, [consumeActivePlaybackStatus])
 
   const reportCurrentPlaybackProgress = useEffectEvent(
     async (isPaused: boolean) => {
