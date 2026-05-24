@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useVideoPlayer } from '@/hooks/use-video-player'
+import type { PlaybackStrategy } from '@/services/video/api'
 import { getPlaybackConfig } from '@/services/video/api'
 import {
   reportPlaybackProgress,
@@ -93,18 +94,22 @@ function createItem(id = 'item-1'): BaseItemDto {
 function renderVideoPlayer(options?: {
   item?: BaseItemDto
   jellyfinPlaybackSyncEnabled?: boolean
+  onStrategyChange?: (strategy: PlaybackStrategy) => void
 }) {
   return renderHook(
     ({
       item,
       jellyfinPlaybackSyncEnabled,
+      onStrategyChange,
     }: {
       item: BaseItemDto
       jellyfinPlaybackSyncEnabled: boolean
+      onStrategyChange?: (strategy: PlaybackStrategy) => void
     }) =>
       useVideoPlayer({
         item,
         jellyfinPlaybackSyncEnabled,
+        onStrategyChange,
         t: (key) => key,
       }),
     {
@@ -112,6 +117,7 @@ function renderVideoPlayer(options?: {
         item: options?.item ?? createItem(),
         jellyfinPlaybackSyncEnabled:
           options?.jellyfinPlaybackSyncEnabled ?? false,
+        onStrategyChange: options?.onStrategyChange,
       },
     },
   )
@@ -681,6 +687,45 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
 
     expect(result.current.strategy).toBe('hls')
+  })
+
+  it('calls onStrategyChange with hls on direct-to-HLS switch via reloadHlsWithUrl', async () => {
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValueOnce('hls-fallback-session')
+
+    vi.mocked(getPlaybackConfig).mockResolvedValue({
+      strategy: 'direct',
+      url: 'https://jellyfin.example/Videos/item-1/stream',
+    })
+
+    const onStrategyChange = vi.fn<(strategy: PlaybackStrategy) => void>()
+    const { result } = renderVideoPlayer({
+      jellyfinPlaybackSyncEnabled: true,
+      onStrategyChange,
+    })
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 10
+    result.current.videoRef.current = directVideo
+
+    onStrategyChange.mockClear()
+
+    await act(async () => {
+      await result.current.reloadHlsWithUrl({
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=hls-fallback-session',
+        playSessionId: 'hls-fallback-session',
+      })
+    })
+
+    await waitFor(() => {
+      expect(onStrategyChange).toHaveBeenCalledWith('hls')
+    })
   })
 
   it('preserves direct-play position in HLS Transcode start on direct-to-HLS switch via reloadHlsWithUrl (position=42s)', async () => {
