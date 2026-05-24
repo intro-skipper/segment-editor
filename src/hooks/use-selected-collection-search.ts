@@ -1,15 +1,11 @@
-import { useSearch } from '@tanstack/react-router'
+import { getRouteApi } from '@tanstack/react-router'
+
+const rootRouteApi = getRouteApi('__root__')
 
 /**
- * Reads the optional collection search param safely across any route.
+ * Reads the optional collection search param from the root route.
+ * This keeps global callers (e.g. Header, CommandPalette) safe on detail pages.
  */
 export function useSelectedCollectionSearch(): string | undefined {
-  return useSearch({
-    strict: false,
-    shouldThrow: false,
-    select: (search) => {
-      const value = search.collection
-      return typeof value === 'string' ? value : undefined
-    },
-  })
+  return rootRouteApi.useSearch({ select: (search) => search.collection })
 }

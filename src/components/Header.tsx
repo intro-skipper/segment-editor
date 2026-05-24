@@ -6,6 +6,7 @@
 import { Suspense, lazy, useCallback, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
+  Link,
   useCanGoBack,
   useLocation,
   useNavigate,
@@ -16,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronLeft, Home, Search, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -311,11 +313,12 @@ export default function Header() {
                 </Button>
               )}
               {isDetailPage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleGoHome}
+                <Link
+                  to="/"
+                  search={selectedCollection ? { collection: selectedCollection } : undefined}
                   className={cn(
+                    'touch-manipulation',
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
                     iconButtonClass,
                     !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
                   )}
@@ -323,7 +326,7 @@ export default function Header() {
                   aria-label={t('navigation.home', 'Go to library')}
                 >
                   <Home className="size-5" aria-hidden />
-                </Button>
+                </Link>
               )}
               <Button
                 variant="ghost"

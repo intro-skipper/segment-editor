@@ -189,7 +189,7 @@ function SeasonEpisodes({
   vibrantColors,
 }: SeasonEpisodesProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/series/$itemId' })
 
   const {
     data: episodes = [],

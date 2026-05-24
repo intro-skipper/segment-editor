@@ -302,7 +302,7 @@ export function FilterView() {
 
 function useRenderFilterView() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/' })
 
   const {
     collection: selectedCollection,
