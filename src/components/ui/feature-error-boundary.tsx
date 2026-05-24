@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from 'react'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
 
@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import {
   Card,
   CardContent,
@@ -51,16 +52,8 @@ function FeatureErrorFallback({
   onRetry?: () => void
 }) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const canGoBack = useCanGoBack()
   const router = useRouter()
-
-  const handleGoBack = useCallback(() => {
-    void navigate({ to: '/' })
-  }, [navigate])
-
-  const handleGoHome = useCallback(() => {
-    void navigate({ to: '/' })
-  }, [navigate])
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -106,14 +99,16 @@ function FeatureErrorFallback({
           </Button>
           {showNavigation && (
             <>
-              <Button variant="outline" onClick={handleGoBack}>
-                <ArrowLeft className="size-4" aria-hidden="true" />
-                {t('common.go_back', 'Go Back')}
-              </Button>
-              <Button onClick={handleGoHome}>
+              {canGoBack && (
+                <Button variant="outline" onClick={() => router.history.back()}>
+                  <ArrowLeft className="size-4" aria-hidden="true" />
+                  {t('common.go_back', 'Go Back')}
+                </Button>
+              )}
+              <Link to="/" className={buttonVariants()}>
                 <Home className="size-4" aria-hidden="true" />
                 {t('common.home', 'Home')}
-              </Button>
+              </Link>
             </>
           )}
         </CardContent>

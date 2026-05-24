@@ -65,7 +65,7 @@ const AlbumCard = React.memo(function AlbumCardComponent({
 })
 
 export function ArtistView({ artist, albums }: ArtistViewProps) {
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/artist/$itemId' })
 
   const artistName = artist.Name || albums[0]?.AlbumArtist || 'Unknown Artist'
 

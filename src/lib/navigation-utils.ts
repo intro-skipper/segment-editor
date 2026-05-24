@@ -3,58 +3,34 @@
  * Consolidates route configuration used across components.
  */
 
+import type { NavigateOptions, RegisteredRouter } from '@tanstack/react-router'
+
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 
 /**
- * Route configuration by item type.
- * Maps Jellyfin item types to their corresponding route paths.
- */
-const ROUTE_MAP: Record<string, string> = {
-  [BaseItemKind.Series]: '/series/$itemId',
-  [BaseItemKind.MusicArtist]: '/artist/$itemId',
-  [BaseItemKind.MusicAlbum]: '/album/$itemId',
-} as const
-
-/**
- * Container types that should browse into their children
- * rather than opening the player/editor.
- */
-const CONTAINER_TYPES = new Set<BaseItemKind>([
-  BaseItemKind.BoxSet,
-  BaseItemKind.Folder,
-  BaseItemKind.CollectionFolder,
-  BaseItemKind.Playlist,
-  BaseItemKind.AggregateFolder,
-  BaseItemKind.UserView,
-  BaseItemKind.PhotoAlbum,
-  BaseItemKind.ManualPlaylistsFolder,
-  BaseItemKind.PlaylistsFolder,
-])
-
-/**
  * Navigation route result type.
  */
-interface NavigationRoute {
-  to: string
-  params?: { itemId: string }
-  search?: Record<string, string | undefined>
+type NavigationRoute = NavigateOptions<RegisteredRouter>
+
+function getPlayerNavigationRoute(itemId: string): NavigationRoute {
+  return {
+    to: '/player/$itemId',
+    params: { itemId },
+    search: { fetchSegments: 'true' },
+  }
 }
 
-type RouteConsumer = (...args: Array<never>) => unknown
+function getUnhandledItemKindRoute(
+  itemType: never,
+  itemId: string,
+): NavigationRoute {
+  console.warn(
+    '[navigation-utils] Unhandled BaseItemKind; defaulting to player.',
+    itemType,
+  )
 
-function asRouteArg<TConsumer extends RouteConsumer>(
-  route: NavigationRoute,
-): Parameters<TConsumer>[0] {
-  return route as Parameters<TConsumer>[0]
-}
-
-/**
- * Checks whether a media item is a container that should browse into
- * its children rather than opening the player.
- */
-function isContainerItem(item: BaseItemDto): boolean {
-  return item.Type != null && CONTAINER_TYPES.has(item.Type)
+  return getPlayerNavigationRoute(itemId)
 }
 
 /**
@@ -69,42 +45,79 @@ function isContainerItem(item: BaseItemDto): boolean {
  */
 function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   const itemId = item.Id ?? ''
+  const itemType = item.Type
 
-  // Container items browse into their children on the index page
-  if (isContainerItem(item)) {
-    return {
-      to: '/',
-      search: { collection: itemId, page: undefined, search: undefined },
-    }
-  }
+  switch (itemType) {
+    case BaseItemKind.AggregateFolder:
+    case BaseItemKind.BoxSet:
+    case BaseItemKind.CollectionFolder:
+    case BaseItemKind.Folder:
+    case BaseItemKind.ManualPlaylistsFolder:
+    case BaseItemKind.PhotoAlbum:
+    case BaseItemKind.Playlist:
+    case BaseItemKind.PlaylistsFolder:
+    case BaseItemKind.UserView:
+      return {
+        to: '/',
+        search: { collection: itemId, page: undefined, search: undefined },
+      }
 
-  // Season items navigate to their parent series view
-  if (item.Type === BaseItemKind.Season) {
-    if (!item.SeriesId) {
-      console.warn(
-        '[navigation-utils] Season item is missing SeriesId; falling back to home.',
-        item,
-      )
-      return { to: '/' }
-    }
-    return {
-      to: '/series/$itemId',
-      params: { itemId: item.SeriesId },
-    }
-  }
+    case BaseItemKind.Season:
+      if (!item.SeriesId) {
+        console.warn(
+          '[navigation-utils] Season item is missing SeriesId; falling back to home.',
+          item,
+        )
+        return { to: '/' }
+      }
+      return {
+        to: '/series/$itemId',
+        params: { itemId: item.SeriesId },
+      }
 
-  const to = ROUTE_MAP[item.Type ?? ''] ?? '/player/$itemId'
-  const isPlayable = !ROUTE_MAP[item.Type ?? '']
+    case BaseItemKind.Series:
+      return { to: '/series/$itemId', params: { itemId } }
 
-  return {
-    to,
-    params: { itemId },
-    ...(isPlayable && { search: { fetchSegments: 'true' } }),
+    case BaseItemKind.MusicArtist:
+      return { to: '/artist/$itemId', params: { itemId } }
+
+    case BaseItemKind.MusicAlbum:
+      return { to: '/album/$itemId', params: { itemId } }
+
+    case undefined:
+    case BaseItemKind.Audio:
+    case BaseItemKind.AudioBook:
+    case BaseItemKind.BasePluginFolder:
+    case BaseItemKind.Book:
+    case BaseItemKind.Channel:
+    case BaseItemKind.ChannelFolderItem:
+    case BaseItemKind.Episode:
+    case BaseItemKind.Genre:
+    case BaseItemKind.Movie:
+    case BaseItemKind.LiveTvChannel:
+    case BaseItemKind.LiveTvProgram:
+    case BaseItemKind.MusicGenre:
+    case BaseItemKind.MusicVideo:
+    case BaseItemKind.Person:
+    case BaseItemKind.Photo:
+    case BaseItemKind.Program:
+    case BaseItemKind.Recording:
+    case BaseItemKind.Studio:
+    case BaseItemKind.Trailer:
+    case BaseItemKind.TvChannel:
+    case BaseItemKind.TvProgram:
+    case BaseItemKind.UserRootFolder:
+    case BaseItemKind.Video:
+    case BaseItemKind.Year:
+      return getPlayerNavigationRoute(itemId)
+
+    default:
+      return getUnhandledItemKindRoute(itemType, itemId)
   }
 }
 
-export function navigateToMediaItem<TNavigate extends RouteConsumer>(
-  navigate: TNavigate,
+export function navigateToMediaItem(
+  navigate: (options: NavigationRoute) => Promise<void>,
   item: BaseItemDto,
 ): void {
   if (!item.Id) {
@@ -112,11 +125,11 @@ export function navigateToMediaItem<TNavigate extends RouteConsumer>(
   }
 
   const route = getNavigationRoute(item)
-  navigate(asRouteArg<TNavigate>(route))
+  void navigate(route)
 }
 
-export function preloadMediaRoute<TPreload extends RouteConsumer>(
-  preloadRoute: TPreload,
+export function preloadMediaRoute(
+  preloadRoute: (options: NavigationRoute) => Promise<unknown>,
   item: BaseItemDto,
 ): void {
   if (!item.Id) {
@@ -124,5 +137,5 @@ export function preloadMediaRoute<TPreload extends RouteConsumer>(
   }
 
   const route = getNavigationRoute(item)
-  void preloadRoute(asRouteArg<TPreload>(route))
+  void preloadRoute(route)
 }

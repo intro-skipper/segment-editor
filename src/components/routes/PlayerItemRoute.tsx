@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
-import { useItem } from '@/services/items/queries'
+import { itemsQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -47,21 +48,17 @@ export function PlayerPage() {
   const { itemId } = routeApi.useParams()
   const { fetchSegments } = routeApi.useSearch()
 
-  const { data: item, isLoading, error } = useItem(itemId)
+  const { data: item } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
 
   const imageUrl = item ? getBestImageUrl(item, 300) : null
   const vibrantColors = useVibrantColor(imageUrl || null, {
     enabled: !!imageUrl,
   })
 
-  if (isLoading) {
-    return <PlayerSkeleton />
-  }
-
-  if (error || !item) {
+  if (!item) {
     return (
       <RouteErrorFallback
-        message={error?.message || 'Item not found'}
+        message="Item not found"
         minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
       />
     )

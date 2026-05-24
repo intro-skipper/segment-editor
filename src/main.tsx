@@ -66,7 +66,10 @@ const router = createRouter({
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,
-  defaultPreloadStaleTime: 30_000,
+  // Route loaders delegate data freshness to TanStack Query via ensureQueryData.
+  // Keep Router preloads immediately stale so Query invalidation/staleTime remain
+  // the single source of truth instead of Router's default 30s preload cache.
+  defaultPreloadStaleTime: 0,
   defaultViewTransition: {
     types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {
       // Skip transition for hash-only changes (e.g., anchor links)

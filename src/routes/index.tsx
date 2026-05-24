@@ -3,7 +3,7 @@
  * Renders the FilterView for browsing media collections.
  *
  * URL search params:
- * - collection: Selected collection ID (nullable)
+ * - collection: Selected collection ID (nullable, owned by the root route)
  * - page: Current page number (defaults to 1)
  * - search: Search filter string (nullable)
  */
@@ -23,7 +23,6 @@ const FilterView = lazy(() =>
 
 /** URL search params schema for the index route */
 const indexSearchSchema = z.object({
-  collection: z.string().optional().catch(undefined),
   page: z.coerce.number().positive().int().optional().catch(1),
   search: z.string().optional().catch(undefined),
 })

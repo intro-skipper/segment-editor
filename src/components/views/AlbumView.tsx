@@ -68,7 +68,7 @@ const TrackRow = React.memo(function TrackRowComponent({
 })
 
 export function AlbumView({ album, tracks }: AlbumViewProps) {
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/album/$itemId' })
 
   const albumName = album.Name || 'Unknown Album'
   const artistName = album.AlbumArtist || album.Artists?.[0] || 'Unknown Artist'

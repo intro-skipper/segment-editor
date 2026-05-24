@@ -6,16 +6,18 @@
 import { Suspense, lazy, useCallback, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
+  Link,
   useCanGoBack,
   useLocation,
+  useMatchRoute,
   useNavigate,
-  useParams,
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronLeft, Home, Search, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,7 +119,17 @@ export default function Header() {
   const navigate = useNavigate()
   const router = useRouter()
   const canGoBack = useCanGoBack()
-  const params = useParams({ strict: false })
+  const matchRoute = useMatchRoute()
+  const albumMatch = matchRoute({ to: '/album/$itemId' })
+  const artistMatch = matchRoute({ to: '/artist/$itemId' })
+  const playerMatch = matchRoute({ to: '/player/$itemId' })
+  const seriesMatch = matchRoute({ to: '/series/$itemId' })
+  const itemId =
+    (albumMatch && albumMatch.itemId) ||
+    (artistMatch && artistMatch.itemId) ||
+    (playerMatch && playerMatch.itemId) ||
+    (seriesMatch && seriesMatch.itemId) ||
+    undefined
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
@@ -142,7 +154,6 @@ export default function Header() {
   const { data: collections } = useCollections()
 
   // Derived state
-  const itemId = (params as { itemId?: string }).itemId
   const isDetailPage = location.pathname !== '/'
 
   // Fetch current item only on detail pages
@@ -309,11 +320,16 @@ export default function Header() {
                 </Button>
               )}
               {isDetailPage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleGoHome}
+                <Link
+                  to="/"
+                  search={
+                    selectedCollection
+                      ? { collection: selectedCollection }
+                      : undefined
+                  }
                   className={cn(
+                    'touch-manipulation',
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
                     iconButtonClass,
                     !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
                   )}
@@ -321,7 +337,7 @@ export default function Header() {
                   aria-label={t('navigation.home', 'Go to library')}
                 >
                   <Home className="size-5" aria-hidden />
-                </Button>
+                </Link>
               )}
               <Button
                 variant="ghost"
