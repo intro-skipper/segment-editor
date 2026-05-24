@@ -66,7 +66,7 @@ const router = createRouter({
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,
-  defaultPreloadStaleTime: 30_000,
+  defaultPreloadStaleTime: 0,
   defaultViewTransition: {
     types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {
       // Skip transition for hash-only changes (e.g., anchor links)

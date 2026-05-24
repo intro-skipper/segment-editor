@@ -3,18 +3,10 @@
  * Consolidates route configuration used across components.
  */
 
+import type { NavigateOptions, RegisteredRouter } from '@tanstack/react-router'
+
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
-
-/**
- * Route configuration by item type.
- * Maps Jellyfin item types to their corresponding route paths.
- */
-const ROUTE_MAP: Record<string, string> = {
-  [BaseItemKind.Series]: '/series/$itemId',
-  [BaseItemKind.MusicArtist]: '/artist/$itemId',
-  [BaseItemKind.MusicAlbum]: '/album/$itemId',
-} as const
 
 /**
  * Container types that should browse into their children
@@ -35,18 +27,19 @@ const CONTAINER_TYPES = new Set<BaseItemKind>([
 /**
  * Navigation route result type.
  */
-interface NavigationRoute {
-  to: string
-  params?: { itemId: string }
-  search?: Record<string, string | undefined>
-}
+type NavigationRoute = NavigateOptions<RegisteredRouter>
 
-type RouteConsumer = (...args: Array<never>) => unknown
-
-function asRouteArg<TConsumer extends RouteConsumer>(
-  route: NavigationRoute,
-): Parameters<TConsumer>[0] {
-  return route as Parameters<TConsumer>[0]
+function getDetailRoute(itemType: BaseItemKind | undefined) {
+  switch (itemType) {
+    case BaseItemKind.Series:
+      return '/series/$itemId'
+    case BaseItemKind.MusicArtist:
+      return '/artist/$itemId'
+    case BaseItemKind.MusicAlbum:
+      return '/album/$itemId'
+    default:
+      return undefined
+  }
 }
 
 /**
@@ -93,18 +86,24 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
     }
   }
 
-  const to = ROUTE_MAP[item.Type ?? ''] ?? '/player/$itemId'
-  const isPlayable = !ROUTE_MAP[item.Type ?? '']
+  const detailRoute = getDetailRoute(item.Type)
+
+  if (detailRoute !== undefined) {
+    return {
+      to: detailRoute,
+      params: { itemId },
+    }
+  }
 
   return {
-    to,
+    to: '/player/$itemId',
     params: { itemId },
-    ...(isPlayable && { search: { fetchSegments: 'true' } }),
+    search: { fetchSegments: 'true' },
   }
 }
 
-export function navigateToMediaItem<TNavigate extends RouteConsumer>(
-  navigate: TNavigate,
+export function navigateToMediaItem(
+  navigate: (options: NavigationRoute) => Promise<void>,
   item: BaseItemDto,
 ): void {
   if (!item.Id) {
@@ -112,11 +111,11 @@ export function navigateToMediaItem<TNavigate extends RouteConsumer>(
   }
 
   const route = getNavigationRoute(item)
-  navigate(asRouteArg<TNavigate>(route))
+  void navigate(route)
 }
 
-export function preloadMediaRoute<TPreload extends RouteConsumer>(
-  preloadRoute: TPreload,
+export function preloadMediaRoute(
+  preloadRoute: (options: NavigationRoute) => Promise<unknown>,
   item: BaseItemDto,
 ): void {
   if (!item.Id) {
@@ -124,5 +123,5 @@ export function preloadMediaRoute<TPreload extends RouteConsumer>(
   }
 
   const route = getNavigationRoute(item)
-  void preloadRoute(asRouteArg<TPreload>(route))
+  void preloadRoute(route)
 }

@@ -117,7 +117,10 @@ export default function Header() {
   const navigate = useNavigate()
   const router = useRouter()
   const canGoBack = useCanGoBack()
-  const params = useParams({ strict: false })
+  const itemId = useParams({
+    strict: false,
+    select: (params) => ('itemId' in params ? params.itemId : undefined),
+  })
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
@@ -142,7 +145,6 @@ export default function Header() {
   const { data: collections } = useCollections()
 
   // Derived state
-  const itemId = (params as { itemId?: string }).itemId
   const isDetailPage = location.pathname !== '/'
 
   // Fetch current item only on detail pages
