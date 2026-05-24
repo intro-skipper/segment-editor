@@ -46,14 +46,17 @@ export const Route = createFileRoute('/player/$itemId')({
 
     assertJellyfinCredentials()
 
+    const segmentsPromise = deps.fetchSegments
+      ? queryClient.ensureQueryData(segmentsQueryOptions.list(itemId))
+      : undefined
+    void segmentsPromise?.catch(() => undefined)
+
     const item = await queryClient.ensureQueryData(
       itemsQueryOptions.detail(itemId),
     )
     assertItemFound(item, abortController.signal)
 
-    if (deps.fetchSegments) {
-      await queryClient.ensureQueryData(segmentsQueryOptions.list(itemId))
-    }
+    await segmentsPromise
   },
   errorComponent: DetailRouteErrorComponent,
   pendingComponent: PlayerSkeleton,

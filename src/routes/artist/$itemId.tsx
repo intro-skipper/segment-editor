@@ -32,12 +32,11 @@ export const Route = createFileRoute('/artist/$itemId')({
 
     assertJellyfinCredentials()
 
-    const artist = await queryClient.ensureQueryData(
-      itemsQueryOptions.detail(itemId),
-    )
+    const [artist] = await Promise.all([
+      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
+      queryClient.ensureQueryData(artistQueryOptions.albums(itemId)),
+    ])
     assertItemFound(artist, abortController.signal)
-
-    await queryClient.ensureQueryData(artistQueryOptions.albums(itemId))
   },
   errorComponent: DetailRouteErrorComponent,
   pendingComponent: ArtistSkeleton,
