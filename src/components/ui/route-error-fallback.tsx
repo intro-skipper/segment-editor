@@ -76,10 +76,7 @@ export function RouteErrorFallback({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link
-            to="/"
-            className={buttonVariants({ variant: 'outline' })}
-          >
+          <Link to="/" className={buttonVariants({ variant: 'outline' })}>
             <ArrowLeft className="size-4" aria-hidden="true" />
             {t('common.go_back', 'Go Back')}
           </Link>
@@ -89,10 +86,7 @@ export function RouteErrorFallback({
               {t('common.retry', 'Retry')}
             </Button>
           )}
-          <Link
-            to="/"
-            className={buttonVariants()}
-          >
+          <Link to="/" className={buttonVariants()}>
             <Home className="size-4" aria-hidden="true" />
             {t('common.home', 'Home')}
           </Link>

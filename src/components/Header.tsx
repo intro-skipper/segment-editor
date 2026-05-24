@@ -315,7 +315,11 @@ export default function Header() {
               {isDetailPage && (
                 <Link
                   to="/"
-                  search={selectedCollection ? { collection: selectedCollection } : undefined}
+                  search={
+                    selectedCollection
+                      ? { collection: selectedCollection }
+                      : undefined
+                  }
                   className={cn(
                     'touch-manipulation',
                     buttonVariants({ variant: 'ghost', size: 'icon' }),

@@ -98,17 +98,11 @@ function FeatureErrorFallback({
           </Button>
           {showNavigation && (
             <>
-              <Link
-                to="/"
-                className={buttonVariants({ variant: 'outline' })}
-              >
+              <Link to="/" className={buttonVariants({ variant: 'outline' })}>
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 {t('common.go_back', 'Go Back')}
               </Link>
-              <Link
-                to="/"
-                className={buttonVariants()}
-              >
+              <Link to="/" className={buttonVariants()}>
                 <Home className="size-4" aria-hidden="true" />
                 {t('common.home', 'Home')}
               </Link>
