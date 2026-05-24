@@ -97,7 +97,9 @@ type RenderVideoPlayerProps = {
   onStrategyChange?: (strategy: PlaybackStrategy) => void
 }
 
-function renderVideoPlayer(options?: Partial<RenderVideoPlayerProps>) {
+type RenderVideoPlayerOptions = Partial<RenderVideoPlayerProps>
+
+function renderVideoPlayer(options?: RenderVideoPlayerOptions) {
   const initialProps: RenderVideoPlayerProps = {
     item: options?.item ?? createItem(),
     jellyfinPlaybackSyncEnabled: options?.jellyfinPlaybackSyncEnabled ?? false,
