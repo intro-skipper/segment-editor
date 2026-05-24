@@ -696,20 +696,25 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
     [startPercent, widthPercent, segmentCssVar],
   )
 
-  const startHandleStyle = React.useMemo(
+  const startHandlePositionStyle = React.useMemo(
     () => ({
-      left: `calc(${startPercent}% - ${HANDLE_WIDTH / 2}px)`,
-      backgroundColor: segmentCssVar,
+      left: `${startPercent}%`,
     }),
-    [startPercent, segmentCssVar],
+    [startPercent],
   )
 
-  const endHandleStyle = React.useMemo(
+  const endHandlePositionStyle = React.useMemo(
     () => ({
-      left: `calc(${endPercent}% - ${HANDLE_WIDTH / 2}px)`,
+      left: `${endPercent}%`,
+    }),
+    [endPercent],
+  )
+
+  const handleVisualStyle = React.useMemo(
+    () => ({
       backgroundColor: segmentCssVar,
     }),
-    [endPercent, segmentCssVar],
+    [segmentCssVar],
   )
 
   const handleSetActiveClick = React.useCallback(
@@ -801,7 +806,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       {/* Slider track - with proper overflow handling */}
       <fieldset
         ref={sliderRef}
-        className="relative h-10 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mb-4 touch-none overflow-hidden"
+        className="relative h-11 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mb-4 touch-none overflow-visible"
         style={{ padding: `0 ${HANDLE_WIDTH / 2}px` }}
         aria-label={t('segment.sliderGroup', { type: segment.Type })}
         aria-describedby={`segment-${segment.Id}-description`}
@@ -827,44 +832,62 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           />
 
           {/* Start handle */}
-          <input
-            type="range"
-            className={cn(
-              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10 appearance-none border-0 p-0',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            )}
-            style={startHandleStyle}
-            aria-label={t('segment.startHandle', { type: segment.Type })}
-            aria-valuetext={formatTime(localStart)}
-            min={0}
-            max={localEnd - MIN_SEGMENT_GAP}
-            step={inputStep}
-            value={localStart}
-            readOnly
-            onPointerDown={handleStartPointerDown}
-            onKeyDown={handleStartKeyDown}
-            onBlur={() => handleHandleBlur('start')}
-          />
+          <span
+            className="segment-handle-hit-area absolute top-1/2 z-10"
+            style={startHandlePositionStyle}
+          >
+            <input
+              type="range"
+              className={cn(
+                'segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              )}
+              aria-label={t('segment.startHandle', { type: segment.Type })}
+              aria-valuetext={formatTime(localStart)}
+              min={0}
+              max={localEnd - MIN_SEGMENT_GAP}
+              step={inputStep}
+              value={localStart}
+              readOnly
+              onPointerDown={handleStartPointerDown}
+              onKeyDown={handleStartKeyDown}
+              onBlur={() => handleHandleBlur('start')}
+            />
+            <span
+              aria-hidden="true"
+              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-[2px]"
+              style={handleVisualStyle}
+            />
+          </span>
 
           {/* End handle */}
-          <input
-            type="range"
-            className={cn(
-              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10 appearance-none border-0 p-0',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            )}
-            style={endHandleStyle}
-            aria-label={t('segment.endHandle', { type: segment.Type })}
-            aria-valuetext={formatTime(localEnd)}
-            min={localStart + MIN_SEGMENT_GAP}
-            max={runtimeSeconds}
-            step={inputStep}
-            value={localEnd}
-            readOnly
-            onPointerDown={handleEndPointerDown}
-            onKeyDown={handleEndKeyDown}
-            onBlur={() => handleHandleBlur('end')}
-          />
+          <span
+            className="segment-handle-hit-area absolute top-1/2 z-10"
+            style={endHandlePositionStyle}
+          >
+            <input
+              type="range"
+              className={cn(
+                'segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              )}
+              aria-label={t('segment.endHandle', { type: segment.Type })}
+              aria-valuetext={formatTime(localEnd)}
+              min={localStart + MIN_SEGMENT_GAP}
+              max={runtimeSeconds}
+              step={inputStep}
+              value={localEnd}
+              readOnly
+              onPointerDown={handleEndPointerDown}
+              onKeyDown={handleEndKeyDown}
+              onBlur={() => handleHandleBlur('end')}
+            />
+            <span
+              aria-hidden="true"
+              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-[2px]"
+              style={handleVisualStyle}
+            />
+          </span>
         </div>
       </fieldset>
 

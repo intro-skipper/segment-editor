@@ -62,7 +62,11 @@ describe('Pagination', () => {
       <Pagination>
         <PaginationContent>
           <PaginationItem>
-            <PaginationLink disabled onClick={onClick} aria-label="Previous page">
+            <PaginationLink
+              disabled
+              onClick={onClick}
+              aria-label="Previous page"
+            >
               Previous
             </PaginationLink>
           </PaginationItem>
