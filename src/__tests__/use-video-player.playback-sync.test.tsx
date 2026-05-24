@@ -91,21 +91,30 @@ function createItem(id = 'item-1'): BaseItemDto {
   } as BaseItemDto
 }
 
-function renderVideoPlayer(options?: {
-  item?: BaseItemDto
-  jellyfinPlaybackSyncEnabled?: boolean
+type RenderVideoPlayerProps = {
+  item: BaseItemDto
+  jellyfinPlaybackSyncEnabled: boolean
   onStrategyChange?: (strategy: PlaybackStrategy) => void
-}) {
+}
+
+type RenderVideoPlayerOptions = Partial<RenderVideoPlayerProps>
+
+function renderVideoPlayer(options?: RenderVideoPlayerOptions) {
+  const initialProps: RenderVideoPlayerProps = {
+    item: options?.item ?? createItem(),
+    jellyfinPlaybackSyncEnabled: options?.jellyfinPlaybackSyncEnabled ?? false,
+  }
+
+  if (options?.onStrategyChange !== undefined) {
+    initialProps.onStrategyChange = options.onStrategyChange
+  }
+
   return renderHook(
     ({
       item,
       jellyfinPlaybackSyncEnabled,
       onStrategyChange,
-    }: {
-      item: BaseItemDto
-      jellyfinPlaybackSyncEnabled: boolean
-      onStrategyChange?: (strategy: PlaybackStrategy) => void
-    }) =>
+    }: RenderVideoPlayerProps) =>
       useVideoPlayer({
         item,
         jellyfinPlaybackSyncEnabled,
@@ -113,12 +122,7 @@ function renderVideoPlayer(options?: {
         t: (key) => key,
       }),
     {
-      initialProps: {
-        item: options?.item ?? createItem(),
-        jellyfinPlaybackSyncEnabled:
-          options?.jellyfinPlaybackSyncEnabled ?? false,
-        onStrategyChange: options?.onStrategyChange,
-      },
+      initialProps,
     },
   )
 }
