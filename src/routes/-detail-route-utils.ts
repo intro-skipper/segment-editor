@@ -1,6 +1,5 @@
 import { notFound } from '@tanstack/react-router'
 
-import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { getCredentials } from '@/services/jellyfin'
 import { sanitizeUrl } from '@/services/jellyfin/security'
 import { AppError } from '@/lib/unified-error'
@@ -24,17 +23,4 @@ export function assertItemFound<T>(
   }
 
   throw notFound()
-}
-
-export function DetailRouteErrorComponent({
-  error,
-}: {
-  error: Error
-}): React.ReactNode {
-  return (
-    <RouteErrorFallback
-      message={error.message}
-      minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-    />
-  )
 }

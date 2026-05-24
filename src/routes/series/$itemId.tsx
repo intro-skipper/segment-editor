@@ -4,8 +4,8 @@ import { z } from 'zod'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
+import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
-  DetailRouteErrorComponent,
   assertItemFound,
   assertJellyfinCredentials,
 } from '../-detail-route-utils'

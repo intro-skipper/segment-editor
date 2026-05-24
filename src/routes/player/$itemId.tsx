@@ -5,8 +5,8 @@ import { z } from 'zod'
 import { itemsQueryOptions } from '@/services/items/queries'
 import { segmentsQueryOptions } from '@/services/segments/queries'
 import { PlayerPage, PlayerSkeleton } from '@/components/routes/PlayerItemRoute'
+import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
-  DetailRouteErrorComponent,
   assertItemFound,
   assertJellyfinCredentials,
 } from '../-detail-route-utils'

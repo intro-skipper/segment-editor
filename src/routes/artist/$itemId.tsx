@@ -4,8 +4,8 @@ import { z } from 'zod'
 
 import { artistQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { ArtistPage, ArtistSkeleton } from '@/components/routes/ArtistItemRoute'
+import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
-  DetailRouteErrorComponent,
   assertItemFound,
   assertJellyfinCredentials,
 } from '../-detail-route-utils'

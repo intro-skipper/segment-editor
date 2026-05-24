@@ -4,8 +4,8 @@ import { z } from 'zod'
 
 import { albumQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { AlbumPage, AlbumSkeleton } from '@/components/routes/AlbumItemRoute'
+import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
-  DetailRouteErrorComponent,
   assertItemFound,
   assertJellyfinCredentials,
 } from '../-detail-route-utils'
