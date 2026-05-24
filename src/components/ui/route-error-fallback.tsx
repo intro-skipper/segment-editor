@@ -4,7 +4,12 @@
  */
 
 import { useCallback } from 'react'
-import { Link, useRouter } from '@tanstack/react-router'
+import {
+  Link,
+  useCanGoBack,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
 
@@ -40,7 +45,18 @@ export function RouteErrorFallback({
   minHeightClass = 'min-h-[var(--spacing-page-min-height-sm)]',
 }: RouteErrorFallbackProps) {
   const { t } = useTranslation()
+  const canGoBack = useCanGoBack()
+  const navigate = useNavigate()
   const router = useRouter()
+
+  const handleGoBack = useCallback(() => {
+    if (canGoBack) {
+      router.history.back()
+      return
+    }
+
+    void navigate({ to: '/' })
+  }, [canGoBack, navigate, router])
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -76,10 +92,12 @@ export function RouteErrorFallback({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link to="/" className={buttonVariants({ variant: 'outline' })}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            {t('common.go_back', 'Go Back')}
-          </Link>
+          {canGoBack && (
+            <Button variant="outline" onClick={handleGoBack}>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {t('common.go_back', 'Go Back')}
+            </Button>
+          )}
           {showRetry && (
             <Button variant="outline" onClick={handleRetry}>
               <RefreshCw className="size-4" aria-hidden="true" />

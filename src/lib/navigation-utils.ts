@@ -9,45 +9,81 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 
 /**
- * Container types that should browse into their children
- * rather than opening the player/editor.
- */
-const CONTAINER_TYPES = new Set<BaseItemKind>([
-  BaseItemKind.BoxSet,
-  BaseItemKind.Folder,
-  BaseItemKind.CollectionFolder,
-  BaseItemKind.Playlist,
-  BaseItemKind.AggregateFolder,
-  BaseItemKind.UserView,
-  BaseItemKind.PhotoAlbum,
-  BaseItemKind.ManualPlaylistsFolder,
-  BaseItemKind.PlaylistsFolder,
-])
-
-/**
  * Navigation route result type.
  */
 type NavigationRoute = NavigateOptions<RegisteredRouter>
 
-function getDetailRoute(itemType: BaseItemKind | undefined) {
-  switch (itemType) {
-    case BaseItemKind.Series:
-      return '/series/$itemId'
-    case BaseItemKind.MusicArtist:
-      return '/artist/$itemId'
-    case BaseItemKind.MusicAlbum:
-      return '/album/$itemId'
-    default:
-      return undefined
-  }
+type DetailRoute = '/series/$itemId' | '/artist/$itemId' | '/album/$itemId'
+
+type RouteIntent =
+  | { kind: 'container' }
+  | { kind: 'detail'; to: DetailRoute }
+  | { kind: 'player' }
+  | { kind: 'season' }
+
+function getUnhandledRouteIntent(itemType: never): RouteIntent {
+  console.warn(
+    '[navigation-utils] Unhandled BaseItemKind; falling back to player route.',
+    itemType,
+  )
+  return { kind: 'player' }
 }
 
-/**
- * Checks whether a media item is a container that should browse into
- * its children rather than opening the player.
- */
-function isContainerItem(item: BaseItemDto): boolean {
-  return item.Type != null && CONTAINER_TYPES.has(item.Type)
+function getRouteIntent(itemType: BaseItemKind | undefined): RouteIntent {
+  switch (itemType) {
+    case undefined:
+      return { kind: 'player' }
+
+    case BaseItemKind.AggregateFolder:
+    case BaseItemKind.BoxSet:
+    case BaseItemKind.CollectionFolder:
+    case BaseItemKind.Folder:
+    case BaseItemKind.ManualPlaylistsFolder:
+    case BaseItemKind.PhotoAlbum:
+    case BaseItemKind.Playlist:
+    case BaseItemKind.PlaylistsFolder:
+    case BaseItemKind.UserView:
+      return { kind: 'container' }
+
+    case BaseItemKind.Season:
+      return { kind: 'season' }
+
+    case BaseItemKind.Series:
+      return { kind: 'detail', to: '/series/$itemId' }
+    case BaseItemKind.MusicArtist:
+      return { kind: 'detail', to: '/artist/$itemId' }
+    case BaseItemKind.MusicAlbum:
+      return { kind: 'detail', to: '/album/$itemId' }
+
+    case BaseItemKind.Audio:
+    case BaseItemKind.AudioBook:
+    case BaseItemKind.BasePluginFolder:
+    case BaseItemKind.Book:
+    case BaseItemKind.Channel:
+    case BaseItemKind.ChannelFolderItem:
+    case BaseItemKind.Episode:
+    case BaseItemKind.Genre:
+    case BaseItemKind.LiveTvChannel:
+    case BaseItemKind.LiveTvProgram:
+    case BaseItemKind.Movie:
+    case BaseItemKind.MusicGenre:
+    case BaseItemKind.MusicVideo:
+    case BaseItemKind.Person:
+    case BaseItemKind.Photo:
+    case BaseItemKind.Program:
+    case BaseItemKind.Recording:
+    case BaseItemKind.Studio:
+    case BaseItemKind.Trailer:
+    case BaseItemKind.TvChannel:
+    case BaseItemKind.TvProgram:
+    case BaseItemKind.UserRootFolder:
+    case BaseItemKind.Video:
+    case BaseItemKind.Year:
+      return { kind: 'player' }
+
+    default:
+      return getUnhandledRouteIntent(itemType)
+  }
 }
 
 /**
@@ -62,43 +98,37 @@ function isContainerItem(item: BaseItemDto): boolean {
  */
 function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   const itemId = item.Id ?? ''
+  const routeIntent = getRouteIntent(item.Type)
 
-  // Container items browse into their children on the index page
-  if (isContainerItem(item)) {
-    return {
-      to: '/',
-      search: { collection: itemId, page: undefined, search: undefined },
-    }
-  }
-
-  // Season items navigate to their parent series view
-  if (item.Type === BaseItemKind.Season) {
-    if (!item.SeriesId) {
-      console.warn(
-        '[navigation-utils] Season item is missing SeriesId; falling back to home.',
-        item,
-      )
-      return { to: '/' }
-    }
-    return {
-      to: '/series/$itemId',
-      params: { itemId: item.SeriesId },
-    }
-  }
-
-  const detailRoute = getDetailRoute(item.Type)
-
-  if (detailRoute !== undefined) {
-    return {
-      to: detailRoute,
-      params: { itemId },
-    }
-  }
-
-  return {
-    to: '/player/$itemId',
-    params: { itemId },
-    search: { fetchSegments: 'true' },
+  switch (routeIntent.kind) {
+    case 'container':
+      return {
+        to: '/',
+        search: { collection: itemId, page: undefined, search: undefined },
+      }
+    case 'season':
+      if (!item.SeriesId) {
+        console.warn(
+          '[navigation-utils] Season item is missing SeriesId; falling back to home.',
+          item,
+        )
+        return { to: '/' }
+      }
+      return {
+        to: '/series/$itemId',
+        params: { itemId: item.SeriesId },
+      }
+    case 'detail':
+      return {
+        to: routeIntent.to,
+        params: { itemId },
+      }
+    case 'player':
+      return {
+        to: '/player/$itemId',
+        params: { itemId },
+        search: { fetchSegments: 'true' },
+      }
   }
 }
 
