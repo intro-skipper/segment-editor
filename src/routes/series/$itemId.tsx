@@ -1,9 +1,14 @@
 // @refresh reset
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
+import {
+  DetailRouteErrorComponent,
+  assertItemFound,
+  assertJellyfinCredentials,
+} from '../-detail-route-utils'
 
 const jellyfinIdSchema = z
   .string()
@@ -21,18 +26,20 @@ export const Route = createFileRoute('/series/$itemId')({
     parse: (params) => seriesParamsSchema.parse(params),
     stringify: (params) => params,
   },
-  loader: async ({ params, context }) => {
+  loader: async ({ params, context, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
 
-    await Promise.all([
-      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
-      queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId)),
-    ])
+    assertJellyfinCredentials()
+
+    const series = await queryClient.ensureQueryData(
+      itemsQueryOptions.detail(itemId),
+    )
+    assertItemFound(series, abortController.signal)
+
+    await queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId))
   },
-  onError: () => {
-    throw notFound()
-  },
+  errorComponent: DetailRouteErrorComponent,
   pendingComponent: SeriesSkeleton,
   component: SeriesPage,
 })

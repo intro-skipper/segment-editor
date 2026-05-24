@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
-import { useItem, useTracks } from '@/services/items/queries'
+import { albumQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -53,29 +54,13 @@ export function AlbumSkeleton() {
 export function AlbumPage() {
   const { itemId } = routeApi.useParams()
 
-  const {
-    data: album,
-    isLoading: isLoadingAlbum,
-    error: albumError,
-  } = useItem(itemId)
+  const { data: album } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
+  const { data: tracks } = useSuspenseQuery(albumQueryOptions.tracks(itemId))
 
-  const {
-    data: tracks,
-    isLoading: isLoadingTracks,
-    error: tracksError,
-  } = useTracks(itemId)
-
-  const isLoading = isLoadingAlbum || isLoadingTracks
-  const error = albumError || tracksError
-
-  if (isLoading) {
-    return <AlbumSkeleton />
-  }
-
-  if (error || !album) {
+  if (!album) {
     return (
       <RouteErrorFallback
-        message={error?.message || 'Album not found'}
+        message="Album not found"
         minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       />
     )
@@ -88,7 +73,7 @@ export function AlbumPage() {
         minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       >
         <Suspense fallback={<AlbumSkeleton />}>
-          <AlbumView album={album} tracks={tracks || []} />
+          <AlbumView album={album} tracks={tracks} />
         </Suspense>
       </FeatureErrorBoundary>
     </main>

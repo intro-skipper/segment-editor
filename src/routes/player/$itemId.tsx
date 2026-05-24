@@ -1,10 +1,15 @@
 // @refresh reset
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { itemsQueryOptions } from '@/services/items/queries'
 import { segmentsQueryOptions } from '@/services/segments/queries'
 import { PlayerPage, PlayerSkeleton } from '@/components/routes/PlayerItemRoute'
+import {
+  DetailRouteErrorComponent,
+  assertItemFound,
+  assertJellyfinCredentials,
+} from '../-detail-route-utils'
 
 const jellyfinIdSchema = z
   .string()
@@ -35,25 +40,22 @@ export const Route = createFileRoute('/player/$itemId')({
   },
   validateSearch: playerSearchSchema,
   loaderDeps: ({ search }) => ({ fetchSegments: search.fetchSegments }),
-  loader: async ({ params, context, deps }) => {
+  loader: async ({ params, context, deps, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
 
-    const prefetches: Array<Promise<unknown>> = [
-      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
-    ]
+    assertJellyfinCredentials()
+
+    const item = await queryClient.ensureQueryData(
+      itemsQueryOptions.detail(itemId),
+    )
+    assertItemFound(item, abortController.signal)
 
     if (deps.fetchSegments) {
-      prefetches.push(
-        queryClient.ensureQueryData(segmentsQueryOptions.list(itemId)),
-      )
+      await queryClient.ensureQueryData(segmentsQueryOptions.list(itemId))
     }
-
-    await Promise.all(prefetches)
   },
-  onError: () => {
-    throw notFound()
-  },
+  errorComponent: DetailRouteErrorComponent,
   pendingComponent: PlayerSkeleton,
   component: PlayerPage,
 })

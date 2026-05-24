@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
-import { useItem, useSeasons } from '@/services/items/queries'
+import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -48,40 +49,24 @@ export function SeriesSkeleton() {
 export function SeriesPage() {
   const { itemId } = routeApi.useParams()
 
-  const {
-    data: series,
-    isLoading: isLoadingSeries,
-    error: seriesError,
-  } = useItem(itemId)
-
-  const {
-    data: seasons,
-    isLoading: isLoadingSeasons,
-    error: seasonsError,
-  } = useSeasons(itemId)
+  const { data: series } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
+  const { data: seasons } = useSuspenseQuery(seriesQueryOptions.seasons(itemId))
 
   const imageUrl = series ? getBestImageUrl(series, 300) : null
   const vibrantColors = useVibrantColor(imageUrl || null, {
     enabled: !!imageUrl,
   })
 
-  const isLoading = isLoadingSeries || isLoadingSeasons
-  const error = seriesError || seasonsError
-
-  if (isLoading) {
-    return <SeriesSkeleton />
-  }
-
-  if (error || !series) {
+  if (!series) {
     return (
       <RouteErrorFallback
-        message={error?.message || 'Series not found'}
+        message="Series not found"
         minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       />
     )
   }
 
-  if (!seasons || seasons.length === 0) {
+  if (seasons.length === 0) {
     return (
       <RouteErrorFallback
         message="No seasons found for this series"

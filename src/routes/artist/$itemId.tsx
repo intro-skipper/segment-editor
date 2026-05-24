@@ -1,9 +1,14 @@
 // @refresh reset
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { artistQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { ArtistPage, ArtistSkeleton } from '@/components/routes/ArtistItemRoute'
+import {
+  DetailRouteErrorComponent,
+  assertItemFound,
+  assertJellyfinCredentials,
+} from '../-detail-route-utils'
 
 const jellyfinIdSchema = z
   .string()
@@ -21,18 +26,20 @@ export const Route = createFileRoute('/artist/$itemId')({
     parse: (params) => artistParamsSchema.parse(params),
     stringify: (params) => params,
   },
-  loader: async ({ params, context }) => {
+  loader: async ({ params, context, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
 
-    await Promise.all([
-      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
-      queryClient.ensureQueryData(artistQueryOptions.albums(itemId)),
-    ])
+    assertJellyfinCredentials()
+
+    const artist = await queryClient.ensureQueryData(
+      itemsQueryOptions.detail(itemId),
+    )
+    assertItemFound(artist, abortController.signal)
+
+    await queryClient.ensureQueryData(artistQueryOptions.albums(itemId))
   },
-  onError: () => {
-    throw notFound()
-  },
+  errorComponent: DetailRouteErrorComponent,
   pendingComponent: ArtistSkeleton,
   component: ArtistPage,
 })

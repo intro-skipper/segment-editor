@@ -17,6 +17,7 @@ import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Toaster } from '../components/ui/sonner'
 import { Button } from '../components/ui/button'
+import { buttonVariants } from '../components/ui/button-variants'
 import {
   Card,
   CardContent,
@@ -112,11 +113,9 @@ export function NotFoundComponent() {
             <ArrowLeft className="size-4" />
             {t('common.go_back', 'Go Back')}
           </Button>
-          <Link to="/">
-            <Button>
-              <Home className="size-4" />
-              {t('common.home', 'Home')}
-            </Button>
+          <Link to="/" className={buttonVariants()}>
+            <Home className="size-4" />
+            {t('common.home', 'Home')}
           </Link>
         </CardContent>
       </Card>

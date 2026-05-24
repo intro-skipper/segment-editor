@@ -9,8 +9,8 @@ import {
   Link,
   useCanGoBack,
   useLocation,
+  useMatchRoute,
   useNavigate,
-  useParams,
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -119,10 +119,17 @@ export default function Header() {
   const navigate = useNavigate()
   const router = useRouter()
   const canGoBack = useCanGoBack()
-  const itemId = useParams({
-    strict: false,
-    select: (params) => ('itemId' in params ? params.itemId : undefined),
-  })
+  const matchRoute = useMatchRoute()
+  const albumMatch = matchRoute({ to: '/album/$itemId' })
+  const artistMatch = matchRoute({ to: '/artist/$itemId' })
+  const playerMatch = matchRoute({ to: '/player/$itemId' })
+  const seriesMatch = matchRoute({ to: '/series/$itemId' })
+  const itemId =
+    (albumMatch && albumMatch.itemId) ||
+    (artistMatch && artistMatch.itemId) ||
+    (playerMatch && playerMatch.itemId) ||
+    (seriesMatch && seriesMatch.itemId) ||
+    undefined
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
