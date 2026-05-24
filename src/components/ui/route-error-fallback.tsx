@@ -4,12 +4,7 @@
  */
 
 import { useCallback } from 'react'
-import {
-  Link,
-  useCanGoBack,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router'
+import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
 
@@ -46,17 +41,7 @@ export function RouteErrorFallback({
 }: RouteErrorFallbackProps) {
   const { t } = useTranslation()
   const canGoBack = useCanGoBack()
-  const navigate = useNavigate()
   const router = useRouter()
-
-  const handleGoBack = useCallback(() => {
-    if (canGoBack) {
-      router.history.back()
-      return
-    }
-
-    void navigate({ to: '/' })
-  }, [canGoBack, navigate, router])
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -93,7 +78,7 @@ export function RouteErrorFallback({
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           {canGoBack && (
-            <Button variant="outline" onClick={handleGoBack}>
+            <Button variant="outline" onClick={() => router.history.back()}>
               <ArrowLeft className="size-4" aria-hidden="true" />
               {t('common.go_back', 'Go Back')}
             </Button>
