@@ -126,7 +126,7 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   vibrantColors,
 }: SegmentSliderProps) {
   const { t } = useTranslation()
-  const sliderRef = React.useRef<HTMLDivElement>(null)
+  const sliderRef = React.useRef<HTMLFieldSetElement>(null)
   const form = useForm({
     defaultValues: getSegmentFormDefaults(segment),
   })
@@ -799,11 +799,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       </div>
 
       {/* Slider track - with proper overflow handling */}
-      <div
+      <fieldset
         ref={sliderRef}
-        className="relative h-10 bg-muted/50 rounded-lg cursor-pointer mb-4 touch-none overflow-hidden"
+        className="relative h-10 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mb-4 touch-none overflow-hidden"
         style={{ padding: `0 ${HANDLE_WIDTH / 2}px` }}
-        role="group"
         aria-label={t('segment.sliderGroup', { type: segment.Type })}
         aria-describedby={`segment-${segment.Id}-description`}
         onPointerMove={handlePointerMove}
@@ -828,52 +827,46 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
           />
 
           {/* Start handle */}
-          <div
+          <input
+            type="range"
             className={cn(
-              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10',
+              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10 appearance-none border-0 p-0',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'flex items-center justify-center',
             )}
             style={startHandleStyle}
-            role="slider"
             aria-label={t('segment.startHandle', { type: segment.Type })}
-            aria-valuemin={0}
-            aria-valuemax={localEnd - MIN_SEGMENT_GAP}
-            aria-valuenow={localStart}
             aria-valuetext={formatTime(localStart)}
-            aria-orientation="horizontal"
-            tabIndex={0}
+            min={0}
+            max={localEnd - MIN_SEGMENT_GAP}
+            step={inputStep}
+            value={localStart}
+            readOnly
             onPointerDown={handleStartPointerDown}
             onKeyDown={handleStartKeyDown}
             onBlur={() => handleHandleBlur('start')}
-          >
-            <div className="w-0.5 h-4 bg-white/60 rounded-full" />
-          </div>
+          />
 
           {/* End handle */}
-          <div
+          <input
+            type="range"
             className={cn(
-              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10',
+              'segment-handle absolute top-0 bottom-0 w-3.5 cursor-ew-resize z-10 appearance-none border-0 p-0',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'flex items-center justify-center',
             )}
             style={endHandleStyle}
-            role="slider"
             aria-label={t('segment.endHandle', { type: segment.Type })}
-            aria-valuemin={localStart + MIN_SEGMENT_GAP}
-            aria-valuemax={runtimeSeconds}
-            aria-valuenow={localEnd}
             aria-valuetext={formatTime(localEnd)}
-            aria-orientation="horizontal"
-            tabIndex={0}
+            min={localStart + MIN_SEGMENT_GAP}
+            max={runtimeSeconds}
+            step={inputStep}
+            value={localEnd}
+            readOnly
             onPointerDown={handleEndPointerDown}
             onKeyDown={handleEndKeyDown}
             onBlur={() => handleHandleBlur('end')}
-          >
-            <div className="w-0.5 h-4 bg-white/60 rounded-full" />
-          </div>
+          />
         </div>
-      </div>
+      </fieldset>
 
       {/* Time inputs row */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6">

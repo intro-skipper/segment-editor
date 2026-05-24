@@ -1,4 +1,4 @@
-import { useCallback, useEffectEvent, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   stopActiveEncoding,
   stopActiveEncodingKeepalive,
@@ -43,11 +43,11 @@ export function useHlsEncoding(): UseHlsEncodingReturn {
     }
   }, [])
 
-  const stopCurrentHlsEncodingKeepalive = useEffectEvent(() => {
+  const stopCurrentHlsEncodingKeepalive = useCallback(() => {
     const playSessionId = hlsPlaySessionIdRef.current
     hlsPlaySessionIdRef.current = null
     stopActiveEncodingKeepalive({ playSessionId })
-  })
+  }, [])
 
   const stopPreviousHlsEncoding = useCallback(
     async (previousPlaySessionId: string) => {

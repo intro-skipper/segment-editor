@@ -32,6 +32,7 @@ interface Palette {
 type ResolvedTheme = 'light' | 'dark'
 
 type VibrantWorkerModule = typeof VibrantWorkerRuntime
+type VibrantWorkerClass = new () => Worker & { id: number; idle: boolean }
 
 let workerInitialized = false
 let vibrantWorkerModulePromise: Promise<VibrantWorkerModule> | null = null
@@ -54,7 +55,12 @@ const initWorker = async () => {
       loadVibrantWorkerModule(),
       import('node-vibrant/worker.worker?worker'),
     ]).then(([{ Vibrant, WorkerPipeline }, workerModule]) => {
-      Vibrant.use(new WorkerPipeline(workerModule.default as never))
+      const installPipeline = Vibrant.use.bind(Vibrant)
+      installPipeline(
+        new WorkerPipeline(
+          workerModule.default as unknown as VibrantWorkerClass,
+        ),
+      )
       workerInitialized = true
     })
   }

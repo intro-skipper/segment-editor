@@ -123,10 +123,14 @@ export function useVideoPlayer({
   const hlsCanPlayListenerRef = useRef<(() => void) | null>(null)
   const hlsRestoreFrameIdRef = useRef<number | null>(null)
 
-  const updateStrategy = useCallback((newStrategy: PlaybackStrategy) => {
-    currentStrategyRef.current = newStrategy
-    setStrategy(newStrategy)
-  }, [])
+  const updateStrategy = useCallback(
+    (newStrategy: PlaybackStrategy) => {
+      currentStrategyRef.current = newStrategy
+      setStrategy(newStrategy)
+      onStrategyChange?.(newStrategy)
+    },
+    [onStrategyChange],
+  )
 
   playbackSyncEnabledRef.current = jellyfinPlaybackSyncEnabled
 
@@ -367,7 +371,6 @@ export function useVideoPlayer({
           updateStrategy('hls')
           setVideoUrl(hlsUrl || config.url)
           scheduleHlsStateRestore()
-          onStrategyChange?.('hls')
           await startCurrentPlaybackStatus(directPositionTicks)
         }
       }
@@ -375,7 +378,6 @@ export function useVideoPlayer({
     [
       setHlsPlaySessionId,
       itemId,
-      onStrategyChange,
       playbackRequestIdRef,
       scheduleHlsStateRestore,
       setPreservedState,
@@ -437,8 +439,6 @@ export function useVideoPlayer({
       updateStrategy(config.strategy)
       setVideoUrl(config.url)
       setLoadedKey(`${loadedItemId}:${preferredAudioStreamIndex ?? ''}`)
-      onStrategyChange?.(config.strategy)
-
       if (config.strategy === 'hls' && getPreservedState(loadedItemId)) {
         scheduleHlsStateRestore()
       }
@@ -472,19 +472,21 @@ export function useVideoPlayer({
     }
   }, [])
 
-  const syncPlaybackStatusEnabled = useEffectEvent((enabled: boolean) => {
-    if (enabled) {
-      playbackSyncEnabledRef.current = true
-      void startCurrentPlaybackStatus()
+  const syncPlaybackStatus = useEffectEvent((enabled: boolean) => {
+    playbackSyncEnabledRef.current = enabled
+    if (!enabled) {
+      void stopCurrentPlaybackStatus()
       return
     }
 
-    void stopCurrentPlaybackStatus()
-    playbackSyncEnabledRef.current = false
+    const currentLoadedKey = `${itemId ?? ''}:${preferredAudioStreamIndex ?? ''}`
+    if (loadedKey === currentLoadedKey) {
+      void startCurrentPlaybackStatus()
+    }
   })
 
   useEffect(() => {
-    syncPlaybackStatusEnabled(jellyfinPlaybackSyncEnabled)
+    syncPlaybackStatus(jellyfinPlaybackSyncEnabled)
   }, [jellyfinPlaybackSyncEnabled])
 
   useEffect(() => {
@@ -657,7 +659,6 @@ export function useVideoPlayer({
           }
 
           updateStrategy('hls')
-          onStrategyChange?.('hls')
         } finally {
           intentionalSwitchRef.current = false
         }
@@ -673,7 +674,6 @@ export function useVideoPlayer({
       setHlsPlaySessionId,
       itemId,
       getActiveVideoElement,
-      onStrategyChange,
       setPreservedState,
       updateStrategy,
       scheduleHlsStateRestore,

@@ -10,4 +10,5 @@ count.txt
 .tanstack
 .wrangler
 .agents
+.omo
 package-lock.json

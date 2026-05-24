@@ -137,14 +137,18 @@ export function useJassubRenderer({
 
   const itemId = item?.Id
 
-  const teardownRenderer = useCallback(() => {
+  const clearResizeTimer = useCallback(() => {
     if (resizeTimerRef.current) {
       clearTimeout(resizeTimerRef.current)
       resizeTimerRef.current = null
     }
+  }, [])
+
+  const teardownRenderer = useCallback(() => {
+    clearResizeTimer()
     rendererRef.current?.destroy()
     rendererRef.current = null
-  }, [])
+  }, [clearResizeTimer])
 
   const destroyRenderer = useCallback(() => {
     teardownRenderer()
@@ -283,9 +287,9 @@ export function useJassubRenderer({
     return () => {
       observer.disconnect()
       document.removeEventListener('fullscreenchange', onFullscreen)
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+      clearResizeTimer()
     }
-  }, [videoRef, isActive, resize, needsJassubNow])
+  }, [videoRef, isActive, resize, needsJassubNow, clearResizeTimer])
 
   useEffect(() => {
     return () => {
