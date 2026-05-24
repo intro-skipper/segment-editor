@@ -9,45 +9,28 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 
 /**
- * Container types that should browse into their children
- * rather than opening the player/editor.
- */
-const CONTAINER_TYPES = new Set<BaseItemKind>([
-  BaseItemKind.AggregateFolder,
-  BaseItemKind.BoxSet,
-  BaseItemKind.CollectionFolder,
-  BaseItemKind.Folder,
-  BaseItemKind.ManualPlaylistsFolder,
-  BaseItemKind.PhotoAlbum,
-  BaseItemKind.Playlist,
-  BaseItemKind.PlaylistsFolder,
-  BaseItemKind.UserView,
-])
-
-/**
  * Navigation route result type.
  */
 type NavigationRoute = NavigateOptions<RegisteredRouter>
 
-function getDetailRoute(itemType: BaseItemKind | undefined) {
-  switch (itemType) {
-    case BaseItemKind.Series:
-      return '/series/$itemId'
-    case BaseItemKind.MusicArtist:
-      return '/artist/$itemId'
-    case BaseItemKind.MusicAlbum:
-      return '/album/$itemId'
-    default:
-      return undefined
+function getPlayerNavigationRoute(itemId: string): NavigationRoute {
+  return {
+    to: '/player/$itemId',
+    params: { itemId },
+    search: { fetchSegments: 'true' },
   }
 }
 
-/**
- * Checks whether a media item is a container that should browse into
- * its children rather than opening the player.
- */
-function isContainerItem(item: BaseItemDto): boolean {
-  return item.Type != null && CONTAINER_TYPES.has(item.Type)
+function getUnhandledItemKindRoute(
+  itemType: never,
+  itemId: string,
+): NavigationRoute {
+  console.warn(
+    '[navigation-utils] Unhandled BaseItemKind; defaulting to player.',
+    itemType,
+  )
+
+  return getPlayerNavigationRoute(itemId)
 }
 
 /**
@@ -62,41 +45,74 @@ function isContainerItem(item: BaseItemDto): boolean {
  */
 function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   const itemId = item.Id ?? ''
+  const itemType = item.Type
 
-  if (isContainerItem(item)) {
-    return {
-      to: '/',
-      search: { collection: itemId, page: undefined, search: undefined },
-    }
-  }
+  switch (itemType) {
+    case BaseItemKind.AggregateFolder:
+    case BaseItemKind.BoxSet:
+    case BaseItemKind.CollectionFolder:
+    case BaseItemKind.Folder:
+    case BaseItemKind.ManualPlaylistsFolder:
+    case BaseItemKind.PhotoAlbum:
+    case BaseItemKind.Playlist:
+    case BaseItemKind.PlaylistsFolder:
+    case BaseItemKind.UserView:
+      return {
+        to: '/',
+        search: { collection: itemId, page: undefined, search: undefined },
+      }
 
-  if (item.Type === BaseItemKind.Season) {
-    if (!item.SeriesId) {
-      console.warn(
-        '[navigation-utils] Season item is missing SeriesId; falling back to home.',
-        item,
-      )
-      return { to: '/' }
-    }
-    return {
-      to: '/series/$itemId',
-      params: { itemId: item.SeriesId },
-    }
-  }
+    case BaseItemKind.Season:
+      if (!item.SeriesId) {
+        console.warn(
+          '[navigation-utils] Season item is missing SeriesId; falling back to home.',
+          item,
+        )
+        return { to: '/' }
+      }
+      return {
+        to: '/series/$itemId',
+        params: { itemId: item.SeriesId },
+      }
 
-  const detailRoute = getDetailRoute(item.Type)
+    case BaseItemKind.Series:
+      return { to: '/series/$itemId', params: { itemId } }
 
-  if (detailRoute !== undefined) {
-    return {
-      to: detailRoute,
-      params: { itemId },
-    }
-  }
+    case BaseItemKind.MusicArtist:
+      return { to: '/artist/$itemId', params: { itemId } }
 
-  return {
-    to: '/player/$itemId',
-    params: { itemId },
-    search: { fetchSegments: 'true' },
+    case BaseItemKind.MusicAlbum:
+      return { to: '/album/$itemId', params: { itemId } }
+
+    case undefined:
+    case BaseItemKind.Audio:
+    case BaseItemKind.AudioBook:
+    case BaseItemKind.BasePluginFolder:
+    case BaseItemKind.Book:
+    case BaseItemKind.Channel:
+    case BaseItemKind.ChannelFolderItem:
+    case BaseItemKind.Episode:
+    case BaseItemKind.Genre:
+    case BaseItemKind.Movie:
+    case BaseItemKind.LiveTvChannel:
+    case BaseItemKind.LiveTvProgram:
+    case BaseItemKind.MusicGenre:
+    case BaseItemKind.MusicVideo:
+    case BaseItemKind.Person:
+    case BaseItemKind.Photo:
+    case BaseItemKind.Program:
+    case BaseItemKind.Recording:
+    case BaseItemKind.Studio:
+    case BaseItemKind.Trailer:
+    case BaseItemKind.TvChannel:
+    case BaseItemKind.TvProgram:
+    case BaseItemKind.UserRootFolder:
+    case BaseItemKind.Video:
+    case BaseItemKind.Year:
+      return getPlayerNavigationRoute(itemId)
+
+    default:
+      return getUnhandledItemKindRoute(itemType, itemId)
   }
 }
 
