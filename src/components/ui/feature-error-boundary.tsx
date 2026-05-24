@@ -100,10 +100,7 @@ function FeatureErrorFallback({
           {showNavigation && (
             <>
               {canGoBack && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.history.back()}
-                >
+                <Button variant="outline" onClick={() => router.history.back()}>
                   <ArrowLeft className="size-4" aria-hidden="true" />
                   {t('common.go_back', 'Go Back')}
                 </Button>

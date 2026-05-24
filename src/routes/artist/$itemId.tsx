@@ -8,7 +8,7 @@ import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
   assertItemFound,
   assertJellyfinCredentials,
-} from '../-detail-route-utils'
+} from '../-detail-route-loader-utils'
 
 const jellyfinIdSchema = z
   .string()
