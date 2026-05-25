@@ -84,6 +84,9 @@ interface SegmentTimeRange {
   endSeconds: number
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
   let state: PlaybackTimelineState = {
     currentTime: 0,
@@ -343,8 +346,12 @@ function useRenderPlayer({
     () =>
       (segments ?? [])
         .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-          const startSeconds = segment.StartTicks ?? 0
-          const endSeconds = segment.EndTicks ?? 0
+          // Segment API values are normalized to UI seconds in this app path.
+          const startSeconds = segment.StartTicks
+          const endSeconds = segment.EndTicks
+          if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
+            return acc
+          }
           if (endSeconds > startSeconds) {
             acc.push({ segment, startSeconds, endSeconds })
           }
@@ -1091,8 +1098,15 @@ function useRenderPlayer({
       segment.Id !== undefined
         ? segmentTimeRangeByIdRef.current.get(segment.Id)
         : undefined
-    const endSecs = range?.endSeconds ?? (segment.EndTicks ?? 0)
-    handleSeek(endSecs)
+    const fallbackEndSeconds = segment.EndTicks
+    const endSecs = range?.endSeconds
+    const targetEndSeconds = isFiniteNumber(endSecs)
+      ? endSecs
+      : fallbackEndSeconds
+    if (!isFiniteNumber(targetEndSeconds)) {
+      return
+    }
+    handleSeek(targetEndSeconds)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
     lastAutoSkippedSegmentIdRef.current = null
