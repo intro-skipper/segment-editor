@@ -44,10 +44,7 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
-        aria-describedby="settings-description"
-      >
+      <DialogContent className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden">
         <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />
 
