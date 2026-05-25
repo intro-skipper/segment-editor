@@ -55,7 +55,7 @@ import {
   getFrameStepTargetTime,
   getSkipStepSeconds,
 } from '@/lib/player-timing-utils'
-import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
+import { snapToFrame } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
@@ -83,6 +83,19 @@ interface SegmentTimeRange {
   startSeconds: number
   endSeconds: number
 }
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+// NOTE: Segment query layer (`services/segments/api.ts`) maps server ticks to
+// UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).
+/** Returns UI-second start time stored in the DTO's StartTicks field. */
+const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
+  segment.StartTicks
+
+/** Returns UI-second end time stored in the DTO's EndTicks field. */
+const getSegmentEnd = (segment: MediaSegmentDto): number | undefined =>
+  segment.EndTicks
 
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
   let state: PlaybackTimelineState = {
@@ -343,8 +356,13 @@ function useRenderPlayer({
     () =>
       (segments ?? [])
         .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-          const startSeconds = ticksToSeconds(segment.StartTicks)
-          const endSeconds = ticksToSeconds(segment.EndTicks)
+          // API model keeps StartTicks/EndTicks field names, but values are
+          // normalized to UI seconds in this app path.
+          const startSeconds = getSegmentStart(segment)
+          const endSeconds = getSegmentEnd(segment)
+          if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
+            return acc
+          }
           if (endSeconds > startSeconds) {
             acc.push({ segment, startSeconds, endSeconds })
           }
@@ -1091,8 +1109,14 @@ function useRenderPlayer({
       segment.Id !== undefined
         ? segmentTimeRangeByIdRef.current.get(segment.Id)
         : undefined
-    const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
-    handleSeek(endSecs)
+    const fallbackEndSeconds = getSegmentEnd(segment)
+    const targetEndSeconds = isFiniteNumber(range?.endSeconds)
+      ? range.endSeconds
+      : fallbackEndSeconds
+    if (!isFiniteNumber(targetEndSeconds)) {
+      return
+    }
+    handleSeek(targetEndSeconds)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
     lastAutoSkippedSegmentIdRef.current = null
