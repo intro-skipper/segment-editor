@@ -472,9 +472,8 @@ export function useVideoPlayer({
     }
   }, [])
 
-  const syncPlaybackStatus = useEffectEvent((enabled: boolean) => {
-    playbackSyncEnabledRef.current = enabled
-    if (!enabled) {
+  const syncPlaybackStatus = useEffectEvent(() => {
+    if (!jellyfinPlaybackSyncEnabled) {
       void stopCurrentPlaybackStatus()
       return
     }
@@ -486,7 +485,7 @@ export function useVideoPlayer({
   })
 
   useEffect(() => {
-    syncPlaybackStatus(jellyfinPlaybackSyncEnabled)
+    syncPlaybackStatus()
   }, [jellyfinPlaybackSyncEnabled])
 
   useEffect(() => {

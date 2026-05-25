@@ -147,17 +147,16 @@ export function usePlaybackStatus({
           isPaused: video?.paused ?? true,
         })
 
-        if (!isCurrentPlaybackStatusStart()) {
+        if (isCurrentPlaybackStatusStart()) {
+          activePlaybackStatusRef.current = nextSession
+        } else {
           void stopPlaybackStatus({
             ...nextSession,
             positionTicks: nextSession.latestPositionTicks,
           }).catch((err) => {
             console.debug('Failed to stop stale Jellyfin playback status', err)
           })
-          return
         }
-
-        activePlaybackStatusRef.current = nextSession
       } catch (err) {
         console.debug('Failed to start Jellyfin playback status reporting', err)
       }
