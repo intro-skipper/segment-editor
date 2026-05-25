@@ -128,6 +128,7 @@ describe('ConnectionWizard TanStack Form migration', () => {
     expect(getInput('Username').getAttribute('spellcheck')).toBe('false')
     expect(getInput('Password').name).toBe('password')
     expect(getInput('Password').autocomplete).toBe('current-password')
+    expect(getInput('Password').getAttribute('spellcheck')).toBe('false')
   })
 
   it('blocks empty discovery submit and preserves the typed draft', async () => {

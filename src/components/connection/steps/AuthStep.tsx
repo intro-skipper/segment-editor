@@ -208,6 +208,7 @@ export function AuthStep({
                       aria-invalid={!!displayError}
                       aria-describedby={displayError ? 'auth-error' : undefined}
                       autoComplete="current-password"
+                      spellCheck={false}
                       className="pr-10"
                     />
                     <button
