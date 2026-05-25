@@ -62,6 +62,7 @@ const applyTheme = (theme: Theme): void => {
     ).matches
     const resolved = theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
     root.classList.add(resolved)
+    root.style.colorScheme = resolved
   } catch {
     /* ignore in test/SSR */
   }

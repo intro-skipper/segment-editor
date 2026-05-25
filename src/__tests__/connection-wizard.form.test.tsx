@@ -88,6 +88,48 @@ describe('ConnectionWizard TanStack Form migration', () => {
       (servers: Array<ReturnType<typeof createServer>>) => servers[0] ?? null,
     )
   })
+  it('exposes a named dialog and stable credential field metadata', async () => {
+    const server = createServer('https://demo.local')
+    discoverServersMock.mockResolvedValue({
+      error: undefined,
+      servers: [server],
+    })
+
+    render(<ConnectionWizardHarness />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Connect to Jellyfin' })
+    const descriptionId = dialog.getAttribute('aria-describedby')
+    expect(descriptionId).toBe('wizard-description')
+    expect(document.getElementById(descriptionId!)?.textContent).toBe(
+      'Connection wizard to set up your Jellyfin server',
+    )
+
+    const addressInput = getInput('Server Address')
+    expect(addressInput.name).toBe('server-address')
+    expect(addressInput.autocomplete).toBe('url')
+    expect(addressInput.getAttribute('spellcheck')).toBe('false')
+
+    fireEvent.change(addressInput, { target: { value: 'demo.local' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Find Server' }))
+    await screen.findByRole('heading', { name: 'Select Server' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByText('Connecting to')
+
+    const apiKeyInput = getInput('API Key')
+    expect(apiKeyInput.name).toBe('api-key')
+    expect(apiKeyInput.autocomplete).toBe('off')
+    expect(apiKeyInput.getAttribute('spellcheck')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Username' }))
+
+    expect(getInput('Username').name).toBe('username')
+    expect(getInput('Username').autocomplete).toBe('username')
+    expect(getInput('Username').getAttribute('spellcheck')).toBe('false')
+    expect(getInput('Password').name).toBe('password')
+    expect(getInput('Password').autocomplete).toBe('current-password')
+    expect(getInput('Password').getAttribute('spellcheck')).toBe('false')
+  })
 
   it('blocks empty discovery submit and preserves the typed draft', async () => {
     render(<ConnectionWizardHarness />)
