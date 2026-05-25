@@ -83,6 +83,8 @@ export const LibraryCard = memo(function LibraryCardComponent({
             src={imageUrl}
             alt={collection.Name || 'Library'}
             loading="lazy"
+            width={480}
+            height={270}
             decoding="async"
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
@@ -105,7 +107,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
       <div className="px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 bg-secondary">
         <Icon className="size-5 flex-shrink-0" aria-hidden="true" />
         <p
-          className="text-sm md:text-base font-semibold line-clamp-1 leading-snug group-hover:text-primary"
+          className="min-w-0 text-sm md:text-base font-semibold line-clamp-1 leading-snug group-hover:text-primary"
           title={collection.Name || undefined}
         >
           {collection.Name || 'Unknown'}

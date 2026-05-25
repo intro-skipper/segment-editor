@@ -12,7 +12,13 @@ import { ServerConnectionSection } from './sections/ServerConnectionSection'
 import { ViewModeSection } from './sections/ViewModeSection'
 import { useSessionStore } from '@/stores/session-store'
 import { isPluginMode } from '@/services/jellyfin'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogCloseButton,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export function SettingsDialog() {
   const { t } = useTranslation()
@@ -42,6 +48,7 @@ export function SettingsDialog() {
         className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
         aria-describedby="settings-description"
       >
+        <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />
 
         <div className="max-h-[min(480px,70vh)] overflow-y-auto px-3 pb-3">
@@ -73,15 +80,15 @@ export function SettingsDialog() {
 
 function SettingsHeader({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-3 px-5 pt-5 pb-3">
+    <div className="flex items-center gap-3 px-5 pt-5 pb-3 pr-14">
       <div className="size-10 rounded-xl bg-primary/15 flex items-center justify-center">
-        <Settings2 className="size-5 text-primary" />
+        <Settings2 className="size-5 text-primary" aria-hidden />
       </div>
-      <div>
-        <h2 className="text-base font-semibold">{title}</h2>
-        <p id="settings-description" className="text-xs text-muted-foreground">
+      <div className="min-w-0">
+        <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+        <DialogDescription id="settings-description" className="text-xs">
           Configure your preferences
-        </p>
+        </DialogDescription>
       </div>
     </div>
   )

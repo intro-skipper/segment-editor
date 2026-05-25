@@ -12,6 +12,8 @@ import {
   Dialog,
   DialogCloseButton,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
 } from '@/components/ui/dialog'
 
 interface WizardStepContentProps {
@@ -105,9 +107,10 @@ export function ConnectionWizardContent({
         initialFocus={serverAddressInputRef}
       >
         {controller.step !== 'success' && <DialogCloseButton />}
-        <span id="wizard-description" className="sr-only">
+        <DialogTitle className="sr-only">Connect to Jellyfin</DialogTitle>
+        <DialogDescription id="wizard-description" className="sr-only">
           Connection wizard to set up your Jellyfin server
-        </span>
+        </DialogDescription>
 
         <StepIndicator currentStep={controller.step} />
 

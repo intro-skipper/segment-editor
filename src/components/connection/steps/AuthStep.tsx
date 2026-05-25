@@ -100,7 +100,7 @@ export function AuthStep({
             onClearError?.()
           }}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow]',
+            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             authMethod === 'apiKey'
               ? 'bg-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground',
@@ -119,7 +119,7 @@ export function AuthStep({
             onClearError?.()
           }}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow]',
+            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             authMethod === 'userPass'
               ? 'bg-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground',
@@ -141,7 +141,9 @@ export function AuthStep({
                 <Input
                   ref={apiKeyInputRef}
                   id="api-key"
+                  name="api-key"
                   type="password"
+                  spellCheck={false}
                   placeholder="Enter your API key…"
                   value={String(field.state.value)}
                   onChange={(e) => {
@@ -169,6 +171,7 @@ export function AuthStep({
                   <Input
                     ref={usernameInputRef}
                     id="username"
+                    name="username"
                     type="text"
                     placeholder="Enter your username…"
                     value={String(field.state.value)}
@@ -192,6 +195,7 @@ export function AuthStep({
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password…"
                       value={String(field.state.value)}
@@ -209,10 +213,11 @@ export function AuthStep({
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                       aria-label={
                         showPassword ? 'Hide password' : 'Show password'
                       }
+                      disabled={isLoading}
                     >
                       {showPassword ? (
                         <EyeOff className="size-4" aria-hidden />

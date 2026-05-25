@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "oxlint",
     "format": "prettier",
-    "check": "prettier --write . && oxlint --fix"
+    "check": "prettier --write . && oxlint --fix",
+    "doctor": "react-doctor"
   },
   "vitest": {
     "setup": [
@@ -72,6 +73,7 @@
     "vite": "^8.0.14",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.7",
-    "workbox-window": "^7.4.1"
+    "workbox-window": "^7.4.1",
+    "react-doctor": "^0.2.6"
   }
 }
