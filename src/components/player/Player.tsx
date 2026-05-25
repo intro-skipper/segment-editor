@@ -55,7 +55,7 @@ import {
   getFrameStepTargetTime,
   getSkipStepSeconds,
 } from '@/lib/player-timing-utils'
-import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
+import { snapToFrame } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
 
 const {
@@ -343,8 +343,8 @@ function useRenderPlayer({
     () =>
       (segments ?? [])
         .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-          const startSeconds = ticksToSeconds(segment.StartTicks)
-          const endSeconds = ticksToSeconds(segment.EndTicks)
+          const startSeconds = segment.StartTicks ?? 0
+          const endSeconds = segment.EndTicks ?? 0
           if (endSeconds > startSeconds) {
             acc.push({ segment, startSeconds, endSeconds })
           }
@@ -1091,7 +1091,7 @@ function useRenderPlayer({
       segment.Id !== undefined
         ? segmentTimeRangeByIdRef.current.get(segment.Id)
         : undefined
-    const endSecs = range?.endSeconds ?? ticksToSeconds(segment.EndTicks)
+    const endSecs = range?.endSeconds ?? (segment.EndTicks ?? 0)
     handleSeek(endSecs)
     setActiveSkipSegment(null)
     prevActiveSegmentIdRef.current = null
