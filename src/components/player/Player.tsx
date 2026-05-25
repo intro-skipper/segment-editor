@@ -87,6 +87,16 @@ interface SegmentTimeRange {
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
+// NOTE: Segment query layer (`services/segments/api.ts`) maps server ticks to
+// UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).
+/** Returns UI-second start time stored in the DTO's StartTicks field. */
+const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
+  segment.StartTicks
+
+/** Returns UI-second end time stored in the DTO's EndTicks field. */
+const getSegmentEnd = (segment: MediaSegmentDto): number | undefined =>
+  segment.EndTicks
+
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
   let state: PlaybackTimelineState = {
     currentTime: 0,
@@ -346,9 +356,10 @@ function useRenderPlayer({
     () =>
       (segments ?? [])
         .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-          // Segment API values are normalized to UI seconds in this app path.
-          const startSeconds = segment.StartTicks
-          const endSeconds = segment.EndTicks
+          // API model keeps StartTicks/EndTicks field names, but values are
+          // normalized to UI seconds in this app path.
+          const startSeconds = getSegmentStart(segment)
+          const endSeconds = getSegmentEnd(segment)
           if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
             return acc
           }
@@ -1098,10 +1109,9 @@ function useRenderPlayer({
       segment.Id !== undefined
         ? segmentTimeRangeByIdRef.current.get(segment.Id)
         : undefined
-    const fallbackEndSeconds = segment.EndTicks
-    const endSecs = range?.endSeconds
-    const targetEndSeconds = isFiniteNumber(endSecs)
-      ? endSecs
+    const fallbackEndSeconds = getSegmentEnd(segment)
+    const targetEndSeconds = isFiniteNumber(range?.endSeconds)
+      ? range.endSeconds
       : fallbackEndSeconds
     if (!isFiniteNumber(targetEndSeconds)) {
       return
