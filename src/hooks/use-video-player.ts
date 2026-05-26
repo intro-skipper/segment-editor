@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
-import type { PlaybackState } from '@/services/video/playback-state'
 import type { PlaybackStrategy } from '@/services/video/api'
 import {
   getPlaybackConfig,
   getPlaybackMediaSourceId,
 } from '@/services/video/api'
 import type { HlsReloadRequest } from '@/services/video/track-switching'
-import {
-  capturePlaybackState,
-  restorePlaybackStateSync,
-} from '@/services/video/playback-state'
 import { createPlaySessionId } from '@/services/video/session'
 import { secondsToTicks } from '@/lib/time-utils'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
-import { useHlsEncoding } from '@/hooks/use-hls-encoding'
-import { usePlaybackStatus } from '@/hooks/use-playback-status'
+import { useJellyfinSession } from '@/hooks/use-jellyfin-session'
+import type { JellyfinSessionDescriptor } from '@/hooks/use-jellyfin-session'
+import { usePlaybackStatePreservation } from '@/hooks/use-playback-state-preservation'
 
 export type VideoPlayerErrorType =
   | 'media_error'
@@ -54,6 +57,11 @@ interface UseVideoPlayerReturn {
   reloadHlsWithUrl: (reload: HlsReloadRequest) => Promise<void>
 }
 
+type JellyfinSessionIdentity = Omit<JellyfinSessionDescriptor, 'syncEnabled'>
+interface PendingPlaybackStatusStart {
+  positionTicksOverride?: number
+}
+
 function mapMediaErrorCode(code: number): VideoPlayerErrorType {
   switch (code) {
     case MediaError.MEDIA_ERR_ABORTED:
@@ -87,6 +95,20 @@ function createErrorFromMediaError(
   }
 }
 
+function createJellyfinSessionIdentity(
+  itemId: string,
+  mediaSourceId: string,
+  playSessionId: string,
+  strategy: PlaybackStrategy,
+): JellyfinSessionIdentity {
+  return {
+    itemId,
+    mediaSourceId,
+    playSessionId,
+    strategy,
+  }
+}
+
 export function useVideoPlayer({
   item,
   preferredAudioStreamIndex,
@@ -101,27 +123,48 @@ export function useVideoPlayer({
   const [videoUrl, setVideoUrl] = useState('')
   const [error, setError] = useState<VideoPlayerError | null>(null)
   const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined)
+  const [jellyfinSessionIdentity, setJellyfinSessionIdentity] =
+    useState<JellyfinSessionIdentity | null>(null)
+
   const itemId = item?.Id ?? null
   const mediaSourceId = item ? (getPlaybackMediaSourceId(item) ?? null) : null
   const itemRef = useRef(item)
-
   itemRef.current = item
 
   const networkRetryCountRef = useRef(0)
-  const preservedStateRef = useRef<PlaybackState | null>(null)
-  const preservedStateItemIdRef = useRef<string | null>(null)
-  const pendingHlsStateRestoreRef = useRef(false)
   const isActiveRef = useRef(true)
   const playbackRequestIdRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const emptyHlsRef = useRef<Hls | null>(null)
   const currentStrategyRef = useRef<PlaybackStrategy>('hls')
-  const playbackSyncEnabledRef = useRef(jellyfinPlaybackSyncEnabled)
   /** Guards against error handler firing during intentional strategy switches (e.g. audio track switch) */
   const intentionalSwitchRef = useRef(false)
-  const hlsRestoreVideoRef = useRef<HTMLVideoElement | null>(null)
-  const hlsCanPlayListenerRef = useRef<(() => void) | null>(null)
-  const hlsRestoreFrameIdRef = useRef<number | null>(null)
+  const pendingPlaybackStatusStartRef =
+    useRef<PendingPlaybackStatusStart | null>(null)
+
+  const preservation = usePlaybackStatePreservation()
+
+  const jellyfinSession = useMemo<JellyfinSessionDescriptor | null>(() => {
+    if (
+      !jellyfinSessionIdentity ||
+      !itemId ||
+      !mediaSourceId ||
+      jellyfinSessionIdentity.itemId !== itemId ||
+      jellyfinSessionIdentity.mediaSourceId !== mediaSourceId
+    ) {
+      return null
+    }
+
+    return {
+      ...jellyfinSessionIdentity,
+      syncEnabled: jellyfinPlaybackSyncEnabled,
+    }
+  }, [
+    itemId,
+    mediaSourceId,
+    jellyfinPlaybackSyncEnabled,
+    jellyfinSessionIdentity,
+  ])
 
   const updateStrategy = useCallback(
     (newStrategy: PlaybackStrategy) => {
@@ -131,68 +174,6 @@ export function useVideoPlayer({
     },
     [onStrategyChange],
   )
-
-  playbackSyncEnabledRef.current = jellyfinPlaybackSyncEnabled
-
-  const clearPreservedState = useCallback(() => {
-    preservedStateRef.current = null
-    preservedStateItemIdRef.current = null
-  }, [])
-
-  const hlsEncoding = useHlsEncoding()
-  const {
-    hlsPlaySessionIdRef,
-    setHlsPlaySessionId,
-    stopCurrentHlsEncoding,
-    stopCurrentHlsEncodingKeepalive,
-    stopPreviousHlsEncoding,
-  } = hlsEncoding
-
-  const setPreservedState = useCallback(
-    (
-      video: HTMLVideoElement | null | undefined,
-      stateItemId: string | null | undefined,
-    ) => {
-      if (!video || !stateItemId) {
-        return
-      }
-
-      preservedStateRef.current = capturePlaybackState(video)
-      preservedStateItemIdRef.current = stateItemId
-    },
-    [],
-  )
-
-  const getPreservedState = useCallback(
-    (requestedItemId: string | null | undefined): PlaybackState | null => {
-      if (
-        !requestedItemId ||
-        preservedStateItemIdRef.current !== requestedItemId
-      ) {
-        return null
-      }
-
-      return preservedStateRef.current
-    },
-    [],
-  )
-
-  const clearHlsStateRestoreSubscription = useCallback(() => {
-    if (hlsRestoreFrameIdRef.current !== null) {
-      window.cancelAnimationFrame(hlsRestoreFrameIdRef.current)
-      hlsRestoreFrameIdRef.current = null
-    }
-
-    if (hlsRestoreVideoRef.current && hlsCanPlayListenerRef.current) {
-      hlsRestoreVideoRef.current.removeEventListener(
-        'canplay',
-        hlsCanPlayListenerRef.current,
-      )
-    }
-
-    hlsRestoreVideoRef.current = null
-    hlsCanPlayListenerRef.current = null
-  }, [])
 
   const handleHlsError = (hlsError: HlsPlayerError | null) => {
     if (hlsError && isActiveRef.current) {
@@ -225,108 +206,33 @@ export function useVideoPlayer({
       : videoRef.current
   }, [hlsPlayer.videoRef])
 
-  const playbackStatus = usePlaybackStatus({
-    itemId,
-    mediaSourceId,
-    itemRef,
-    isActiveRef,
-    playbackRequestIdRef,
-    playbackSyncEnabledRef,
-    hlsPlaySessionIdRef: hlsPlaySessionIdRef,
-    currentStrategyRef,
+  const jellyfin = useJellyfinSession({
+    session: jellyfinSession,
     getActiveVideoElement,
-    strategy,
-    jellyfinPlaybackSyncEnabled,
   })
 
-  const {
-    startCurrentPlaybackStatus,
-    stopCurrentPlaybackStatus,
-    stopCurrentPlaybackStatusKeepalive,
-  } = playbackStatus
+  const clearQueuedPlaybackStatusStart = useCallback(() => {
+    pendingPlaybackStatusStartRef.current = null
+  }, [])
 
-  const restoreStateAndMaybeResume = useCallback(
-    (video: HTMLVideoElement, state: PlaybackState) => {
-      restorePlaybackStateSync(video, state)
-
-      if (!state.paused) {
-        video.play().catch(() => {
-          // Autoplay may be blocked by browser policy — ignore
-        })
-      }
+  const queuePlaybackStatusStart = useCallback(
+    (positionTicksOverride?: number) => {
+      pendingPlaybackStatusStartRef.current = { positionTicksOverride }
     },
     [],
   )
 
-  const restorePendingHlsState = useCallback(
-    (video: HTMLVideoElement) => {
-      if (!pendingHlsStateRestoreRef.current) {
-        return
-      }
+  const startQueuedPlaybackStatus = useEffectEvent(() => {
+    const pendingStart = pendingPlaybackStatusStartRef.current
+    if (!pendingStart) return
 
-      const savedState = getPreservedState(itemId)
-      if (!savedState) {
-        pendingHlsStateRestoreRef.current = false
-        return
-      }
+    pendingPlaybackStatusStartRef.current = null
+    void jellyfin.startPlaybackStatus(pendingStart.positionTicksOverride)
+  })
 
-      restoreStateAndMaybeResume(video, savedState)
-      clearPreservedState()
-      pendingHlsStateRestoreRef.current = false
-    },
-    [
-      clearPreservedState,
-      getPreservedState,
-      itemId,
-      restoreStateAndMaybeResume,
-    ],
-  )
-
-  const scheduleHlsStateRestore = useCallback(() => {
-    if (!itemId || !getPreservedState(itemId)) {
-      return
-    }
-
-    pendingHlsStateRestoreRef.current = true
-    clearHlsStateRestoreSubscription()
-
-    const attachRestore = () => {
-      if (!isActiveRef.current || !pendingHlsStateRestoreRef.current) {
-        return
-      }
-
-      const video = hlsPlayer.videoRef.current
-      if (!video) {
-        hlsRestoreFrameIdRef.current =
-          window.requestAnimationFrame(attachRestore)
-        return
-      }
-
-      hlsRestoreFrameIdRef.current = null
-
-      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-        restorePendingHlsState(video)
-        return
-      }
-
-      const onCanPlay = () => {
-        restorePendingHlsState(video)
-        clearHlsStateRestoreSubscription()
-      }
-
-      hlsRestoreVideoRef.current = video
-      hlsCanPlayListenerRef.current = onCanPlay
-      video.addEventListener('canplay', onCanPlay)
-    }
-
-    hlsRestoreFrameIdRef.current = window.requestAnimationFrame(attachRestore)
-  }, [
-    clearHlsStateRestoreSubscription,
-    getPreservedState,
-    hlsPlayer.videoRef,
-    itemId,
-    restorePendingHlsState,
-  ])
+  useEffect(() => {
+    startQueuedPlaybackStatus()
+  }, [jellyfinSession])
 
   const switchToHls = useCallback(
     async (requestId?: number) => {
@@ -336,7 +242,7 @@ export function useVideoPlayer({
         playbackRequestIdRef.current === resolvedRequestId &&
         itemRef.current?.Id === itemId
 
-      if (!itemId || !isCurrentHlsRequest()) return
+      if (!itemId || !mediaSourceId || !isCurrentHlsRequest()) return
 
       const currentItem = itemRef.current!
 
@@ -347,10 +253,8 @@ export function useVideoPlayer({
         videoRef.current?.currentTime ?? 0,
       )
 
-      if (videoRef.current) {
-        setPreservedState(videoRef.current, itemId)
-      }
-      await stopCurrentPlaybackStatus()
+      preservation.capture(videoRef.current, itemId)
+      await jellyfin.stopPlaybackStatus()
 
       const hlsPlaySessionId = createPlaySessionId()
 
@@ -365,24 +269,30 @@ export function useVideoPlayer({
         )
         if (isCurrentHlsRequest()) {
           const hlsUrl = config.strategy === 'hls' ? config.url : ''
-          setHlsPlaySessionId(hlsPlaySessionId)
 
           setError(null)
           updateStrategy('hls')
           setVideoUrl(hlsUrl || config.url)
-          scheduleHlsStateRestore()
-          await startCurrentPlaybackStatus(directPositionTicks)
+          setJellyfinSessionIdentity(
+            createJellyfinSessionIdentity(
+              itemId,
+              mediaSourceId,
+              hlsPlaySessionId,
+              'hls',
+            ),
+          )
+          preservation.scheduleHlsRestore(hlsPlayer.videoRef, itemId)
+          queuePlaybackStatusStart(directPositionTicks)
         }
       }
     },
     [
-      setHlsPlaySessionId,
       itemId,
-      playbackRequestIdRef,
-      scheduleHlsStateRestore,
-      setPreservedState,
-      startCurrentPlaybackStatus,
-      stopCurrentPlaybackStatus,
+      mediaSourceId,
+      preservation,
+      hlsPlayer.videoRef,
+      jellyfin,
+      queuePlaybackStatusStart,
       updateStrategy,
     ],
   )
@@ -439,8 +349,11 @@ export function useVideoPlayer({
       updateStrategy(config.strategy)
       setVideoUrl(config.url)
       setLoadedKey(`${loadedItemId}:${preferredAudioStreamIndex ?? ''}`)
-      if (config.strategy === 'hls' && getPreservedState(loadedItemId)) {
-        scheduleHlsStateRestore()
+      if (
+        config.strategy === 'hls' &&
+        preservation.getPreserved(loadedItemId)
+      ) {
+        preservation.scheduleHlsRestore(hlsPlayer.videoRef, loadedItemId)
       }
     },
   )
@@ -460,8 +373,7 @@ export function useVideoPlayer({
   )
 
   const handlePageHide = useEffectEvent(() => {
-    stopCurrentPlaybackStatusKeepalive()
-    stopCurrentHlsEncodingKeepalive()
+    jellyfin.stopAllKeepalive()
   })
 
   useEffect(() => {
@@ -472,26 +384,28 @@ export function useVideoPlayer({
     }
   }, [])
 
-  const syncPlaybackStatus = useEffectEvent((enabled: boolean) => {
-    playbackSyncEnabledRef.current = enabled
-    if (!enabled) {
-      void stopCurrentPlaybackStatus()
+  // Keep this effect keyed only to the user toggle. Item/load changes start status
+  // from the playback init path; widening these dependencies starts duplicate sessions.
+  const syncPlaybackStatus = useEffectEvent(() => {
+    if (!jellyfinPlaybackSyncEnabled) {
+      clearQueuedPlaybackStatusStart()
+      void jellyfin.stopPlaybackStatus()
       return
     }
 
     const currentLoadedKey = `${itemId ?? ''}:${preferredAudioStreamIndex ?? ''}`
     if (loadedKey === currentLoadedKey) {
-      void startCurrentPlaybackStatus()
+      void jellyfin.startPlaybackStatus()
     }
   })
 
   useEffect(() => {
-    syncPlaybackStatus(jellyfinPlaybackSyncEnabled)
+    syncPlaybackStatus()
   }, [jellyfinPlaybackSyncEnabled])
 
   useEffect(() => {
     if (!itemId) {
-      clearPreservedState()
+      preservation.clear()
       return
     }
 
@@ -499,15 +413,13 @@ export function useVideoPlayer({
     isActiveRef.current = true
     networkRetryCountRef.current = 0
     intentionalSwitchRef.current = false
-    pendingHlsStateRestoreRef.current = false
-    clearHlsStateRestoreSubscription()
+    clearQueuedPlaybackStatusStart()
+    preservation.clearHlsRestoreSubscription()
 
     const initPlayback = async () => {
       try {
         const currentItem = itemRef.current
-        if (!currentItem || currentItem.Id !== itemId) {
-          return
-        }
+        if (!currentItem || currentItem.Id !== itemId) return
 
         const hlsPlaySessionId = createPlaySessionId()
         const config = await getPlaybackConfig(
@@ -518,18 +430,23 @@ export function useVideoPlayer({
           hlsPlaySessionId,
         )
 
-        if (playbackRequestIdRef.current === requestId) {
-          setHlsPlaySessionId(
-            config.strategy === 'hls' ? hlsPlaySessionId : null,
-          )
+        if (playbackRequestIdRef.current === requestId && mediaSourceId) {
+          const playSessionId =
+            config.strategy === 'hls' ? hlsPlaySessionId : createPlaySessionId()
 
+          setJellyfinSessionIdentity(
+            createJellyfinSessionIdentity(
+              itemId,
+              mediaSourceId,
+              playSessionId,
+              config.strategy,
+            ),
+          )
           handleInitPlaybackSuccess(config, itemId)
-          await startCurrentPlaybackStatus()
+          queuePlaybackStatusStart()
         }
       } catch (err) {
-        if (playbackRequestIdRef.current !== requestId) {
-          return
-        }
+        if (playbackRequestIdRef.current !== requestId) return
         handleInitPlaybackFailure(err, itemId)
       }
     }
@@ -540,10 +457,10 @@ export function useVideoPlayer({
       // Capture current playback state before teardown so position and play state
       // survive when the effect re-runs (e.g. preferredAudioStreamIndex changed
       // after an audio track switch). Without this, the re-init starts from 0.
-      if (!getPreservedState(itemId)) {
+      if (!preservation.getPreserved(itemId)) {
         const activeVideo = getActiveVideoElement()
         if (activeVideo && activeVideo.currentTime > 0) {
-          setPreservedState(activeVideo, itemId)
+          preservation.capture(activeVideo, itemId)
         }
       }
 
@@ -553,24 +470,19 @@ export function useVideoPlayer({
         requestId + 1,
       )
       intentionalSwitchRef.current = false
-      pendingHlsStateRestoreRef.current = false
-      clearHlsStateRestoreSubscription()
-      void stopCurrentPlaybackStatus()
-      void stopCurrentHlsEncoding()
+      clearQueuedPlaybackStatusStart()
+      preservation.clearHlsRestoreSubscription()
+      void jellyfin.stopPlaybackStatus()
     }
   }, [
     itemId,
     mediaSourceId,
     preferredAudioStreamIndex,
-    getPreservedState,
     getActiveVideoElement,
-    clearPreservedState,
-    clearHlsStateRestoreSubscription,
-    setPreservedState,
-    startCurrentPlaybackStatus,
-    stopCurrentPlaybackStatus,
-    setHlsPlaySessionId,
-    stopCurrentHlsEncoding,
+    jellyfin,
+    preservation,
+    clearQueuedPlaybackStatusStart,
+    queuePlaybackStatusStart,
   ])
 
   useEffect(() => {
@@ -584,11 +496,11 @@ export function useVideoPlayer({
     video.src = videoUrl
 
     let handleCanPlay: (() => void) | null = null
-    const savedState = getPreservedState(itemId)
+    const savedState = preservation.getPreserved(itemId)
     if (savedState) {
       handleCanPlay = () => {
-        restoreStateAndMaybeResume(video, savedState)
-        clearPreservedState()
+        preservation.restoreStateAndMaybeResume(video, savedState)
+        preservation.clear()
 
         video.removeEventListener('canplay', handleCanPlay!)
       }
@@ -607,14 +519,7 @@ export function useVideoPlayer({
       video.removeAttribute('src')
       video.load()
     }
-  }, [
-    strategy,
-    videoUrl,
-    getPreservedState,
-    itemId,
-    clearPreservedState,
-    restoreStateAndMaybeResume,
-  ])
+  }, [strategy, videoUrl, preservation, itemId])
 
   const retry = useCallback(() => {
     setError(null)
@@ -629,18 +534,23 @@ export function useVideoPlayer({
 
   const reloadHlsWithUrl = useCallback(
     async ({ url, playSessionId: nextHlsPlaySessionId }: HlsReloadRequest) => {
+      if (!itemId || !mediaSourceId) return
+
       const activeVideo = getActiveVideoElement()
       const activePositionTicks = secondsToTicks(activeVideo?.currentTime ?? 0)
-      setPreservedState(activeVideo, itemId)
-      await stopCurrentPlaybackStatus()
-      const previousHlsPlaySessionId = hlsPlaySessionIdRef.current
+      preservation.capture(activeVideo, itemId)
+      await jellyfin.stopPlaybackStatus()
+
+      const previousHlsPlaySessionId =
+        jellyfinSessionIdentity?.strategy === 'hls'
+          ? jellyfinSessionIdentity.playSessionId
+          : null
       if (
         previousHlsPlaySessionId &&
         previousHlsPlaySessionId !== nextHlsPlaySessionId
       ) {
-        await stopPreviousHlsEncoding(previousHlsPlaySessionId)
+        await jellyfin.stopPreviousEncoding(previousHlsPlaySessionId)
       }
-      setHlsPlaySessionId(nextHlsPlaySessionId)
 
       setError(null)
 
@@ -664,21 +574,28 @@ export function useVideoPlayer({
         }
       }
 
+      setJellyfinSessionIdentity(
+        createJellyfinSessionIdentity(
+          itemId,
+          mediaSourceId,
+          nextHlsPlaySessionId,
+          'hls',
+        ),
+      )
       setVideoUrl(url)
-      scheduleHlsStateRestore()
-      void startCurrentPlaybackStatus(activePositionTicks)
+      preservation.scheduleHlsRestore(hlsPlayer.videoRef, itemId)
+      queuePlaybackStatusStart(activePositionTicks)
     },
     [
-      hlsPlaySessionIdRef,
-      stopPreviousHlsEncoding,
-      setHlsPlaySessionId,
       itemId,
+      mediaSourceId,
       getActiveVideoElement,
-      setPreservedState,
+      hlsPlayer.videoRef,
+      jellyfin,
+      jellyfinSessionIdentity,
+      preservation,
+      queuePlaybackStatusStart,
       updateStrategy,
-      scheduleHlsStateRestore,
-      startCurrentPlaybackStatus,
-      stopCurrentPlaybackStatus,
     ],
   )
 

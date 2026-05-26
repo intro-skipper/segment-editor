@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
+import { useJellyfinSession } from '@/hooks/use-jellyfin-session'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getPlaybackConfig } from '@/services/video/api'
@@ -289,6 +290,56 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         positionTicks: 120_000_000,
       }),
     )
+    expect(vi.mocked(stopPlaybackStatus).mock.calls[0]?.[0]).not.toHaveProperty(
+      'startId',
+    )
+    expect(vi.mocked(stopPlaybackStatus).mock.calls[0]?.[0]).not.toHaveProperty(
+      'requestId',
+    )
+  })
+
+  it('reuses a pending HLS playback status when sync is re-enabled before start resolves', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    const { rerender } = renderVideoPlayer({
+      jellyfinPlaybackSyncEnabled: true,
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+
+    rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: false })
+    rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: true })
+
+    expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
+    })
+
+    expect(stopPlaybackStatus).not.toHaveBeenCalled()
+
+    act(() => {
+      hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
+    })
+
+    await waitFor(() => {
+      expect(reportPlaybackProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'hls-session-1',
+          playMethod: 'Transcode',
+        }),
+      )
+    })
+    expect(
+      vi.mocked(reportPlaybackProgress).mock.calls[0]?.[0],
+    ).not.toHaveProperty('startId')
+    expect(
+      vi.mocked(reportPlaybackProgress).mock.calls[0]?.[0],
+    ).not.toHaveProperty('requestId')
   })
 
   it('starts playback status immediately when sync is toggled on after HLS loads', async () => {
@@ -430,6 +481,134 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         positionTicks: 120_000_000,
       }),
     )
+  })
+
+  it('does not queue active encoding keepalive for direct-play sessions on pagehide', async () => {
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+    vi.mocked(getPlaybackConfig).mockResolvedValue({
+      strategy: 'direct',
+      url: 'https://jellyfin.example/Videos/item-1/stream',
+    })
+
+    const { result } = renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 20
+    result.current.videoRef.current = directVideo
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'direct-session-1',
+          playMethod: 'DirectPlay',
+        }),
+      )
+    })
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playSessionId: 'direct-session-1',
+        positionTicks: 200_000_000,
+      }),
+    )
+    expect(stopActiveEncodingKeepalive).not.toHaveBeenCalled()
+  })
+
+  it('sends keepalive stop on pagehide for a pending synced session', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'hls-session-1',
+        positionTicks: 120_000_000,
+      }),
+    )
+    expect(
+      vi.mocked(stopPlaybackStatusKeepalive).mock.calls[0]?.[0],
+    ).not.toHaveProperty('startId')
+    expect(
+      vi.mocked(stopPlaybackStatusKeepalive).mock.calls[0]?.[0],
+    ).not.toHaveProperty('requestId')
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
+    })
+
+    expect(stopPlaybackStatus).not.toHaveBeenCalled()
+  })
+
+  it('does not promote pending playback status after sync turns off', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+    const video = document.createElement('video')
+    video.currentTime = 12
+    const session = {
+      itemId: 'item-1',
+      mediaSourceId: 'item-1-media-source',
+      playSessionId: 'hls-session-1',
+      strategy: 'hls' as const,
+      syncEnabled: true,
+    }
+
+    const { result, rerender } = renderHook(
+      ({ syncEnabled }: { syncEnabled: boolean }) =>
+        useJellyfinSession({
+          session: { ...session, syncEnabled },
+          getActiveVideoElement: () => video,
+        }),
+      {
+        initialProps: { syncEnabled: true },
+      },
+    )
+
+    let startPromise = Promise.resolve()
+    act(() => {
+      startPromise = result.current.startPlaybackStatus()
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+
+    rerender({ syncEnabled: false })
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startPromise
+    })
+
+    await waitFor(() => {
+      expect(stopPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'hls-session-1',
+          positionTicks: 120_000_000,
+        }),
+      )
+    })
   })
 
   it('reports playing pause and seek progress while sync is enabled', async () => {
@@ -591,6 +770,43 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     } finally {
       consoleDebugSpy.mockRestore()
     }
+  })
+
+  it('keeps previous HLS encoding available for pagehide keepalive while async stop is pending', async () => {
+    const stopEncodingDeferred = createDeferred()
+    vi.mocked(stopActiveEncoding).mockReturnValue(stopEncodingDeferred.promise)
+    const { result } = renderVideoPlayer()
+
+    await waitFor(() => {
+      expect(result.current.videoUrl).toContain('PlaySessionId=hls-session-1')
+    })
+
+    let reloadPromise = Promise.resolve()
+    act(() => {
+      reloadPromise = result.current.reloadHlsWithUrl({
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?AudioStreamIndex=2',
+        playSessionId: 'hls-session-2',
+      })
+    })
+
+    await waitFor(() => {
+      expect(stopActiveEncoding).toHaveBeenCalledWith({
+        playSessionId: 'hls-session-1',
+      })
+    })
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopActiveEncodingKeepalive).toHaveBeenCalledWith({
+      playSessionId: 'hls-session-1',
+    })
+
+    await act(async () => {
+      stopEncodingDeferred.resolve()
+      await reloadPromise
+    })
   })
 
   it('starts playback sync with stripped item.Id fallback mediaSourceId when MediaSources[0].Id is missing', async () => {
@@ -790,6 +1006,35 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
           positionTicks: 420_000_000,
         }),
       )
+    })
+  })
+
+  it('uses pending playback position as floor when keepalive stop sees a reset video element', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+    hlsMocks.videoRef.current!.currentTime = 42
+
+    renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ positionTicks: 420_000_000 }),
+      )
+    })
+
+    hlsMocks.videoRef.current!.currentTime = 0
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({ positionTicks: 420_000_000 }),
+    )
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
     })
   })
 
