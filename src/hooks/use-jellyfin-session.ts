@@ -184,7 +184,10 @@ export function useJellyfinSession({
     )
       ? getCurrentPositionTicks()
       : latestPositionTicks
-    const finalPositionTicks = Math.max(currentPositionTicks, latestPositionTicks)
+    const finalPositionTicks = Math.max(
+      currentPositionTicks,
+      latestPositionTicks,
+    )
     status.stopQueuedWithKeepalive = true
     playbackStatusRef.current = { state: 'idle' }
     markStartingPlaybackStatusInvalid()
