@@ -340,7 +340,6 @@ export function useJellyfinSession({
     }
   }, [
     getActiveVideoElement,
-    reportCurrentPlaybackProgress,
     session?.itemId,
     session?.mediaSourceId,
     session?.playSessionId,
