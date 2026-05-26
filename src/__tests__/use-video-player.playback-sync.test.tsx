@@ -482,6 +482,47 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     )
   })
 
+  it('does not queue active encoding keepalive for direct-play sessions on pagehide', async () => {
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+    vi.mocked(getPlaybackConfig).mockResolvedValue({
+      strategy: 'direct',
+      url: 'https://jellyfin.example/Videos/item-1/stream',
+    })
+
+    const { result } = renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 20
+    result.current.videoRef.current = directVideo
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'direct-session-1',
+          playMethod: 'DirectPlay',
+        }),
+      )
+    })
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playSessionId: 'direct-session-1',
+        positionTicks: 200_000_000,
+      }),
+    )
+    expect(stopActiveEncodingKeepalive).not.toHaveBeenCalled()
+  })
+
   it('sends keepalive stop on pagehide for a pending synced session', async () => {
     const startDeferred = createDeferred()
     vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)

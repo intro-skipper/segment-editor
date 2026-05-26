@@ -263,7 +263,9 @@ export function useJellyfinSession({
 
     const playSessionId = hlsEncodingPlaySessionIdRef.current
     hlsEncodingPlaySessionIdRef.current = null
-    stopActiveEncodingKeepalive({ playSessionId })
+    if (playSessionId) {
+      stopActiveEncodingKeepalive({ playSessionId })
+    }
   }, [stopPlaybackStatusReportingKeepalive])
 
   const reportCurrentPlaybackProgress = useEffectEvent(
