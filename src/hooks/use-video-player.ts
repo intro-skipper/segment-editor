@@ -58,7 +58,9 @@ interface UseVideoPlayerReturn {
 }
 
 type JellyfinSessionIdentity = Omit<JellyfinSessionDescriptor, 'syncEnabled'>
-interface PendingPlaybackStatusStart {
+// Waits for React to commit the new session descriptor before calling
+// jellyfin.startPlaybackStatus(positionTicksOverride).
+interface PostCommitPlaybackStatusStart {
   positionTicksOverride?: number
 }
 
@@ -139,8 +141,8 @@ export function useVideoPlayer({
   const currentStrategyRef = useRef<PlaybackStrategy>('hls')
   /** Guards against error handler firing during intentional strategy switches (e.g. audio track switch) */
   const intentionalSwitchRef = useRef(false)
-  const pendingPlaybackStatusStartRef =
-    useRef<PendingPlaybackStatusStart | null>(null)
+  const pendingPostCommitStartRef =
+    useRef<PostCommitPlaybackStatusStart | null>(null)
 
   const preservation = usePlaybackStatePreservation()
 
@@ -211,27 +213,24 @@ export function useVideoPlayer({
     getActiveVideoElement,
   })
 
-  const clearQueuedPlaybackStatusStart = useCallback(() => {
-    pendingPlaybackStatusStartRef.current = null
+  const clearPostCommitStart = useCallback(() => {
+    pendingPostCommitStartRef.current = null
   }, [])
 
-  const queuePlaybackStatusStart = useCallback(
-    (positionTicksOverride?: number) => {
-      pendingPlaybackStatusStartRef.current = { positionTicksOverride }
-    },
-    [],
-  )
+  const queuePostCommitStart = useCallback((positionTicksOverride?: number) => {
+    pendingPostCommitStartRef.current = { positionTicksOverride }
+  }, [])
 
-  const startQueuedPlaybackStatus = useEffectEvent(() => {
-    const pendingStart = pendingPlaybackStatusStartRef.current
-    if (!pendingStart) return
+  const flushPostCommitStart = useEffectEvent(() => {
+    const postCommitStart = pendingPostCommitStartRef.current
+    if (!postCommitStart) return
 
-    pendingPlaybackStatusStartRef.current = null
-    void jellyfin.startPlaybackStatus(pendingStart.positionTicksOverride)
+    pendingPostCommitStartRef.current = null
+    void jellyfin.startPlaybackStatus(postCommitStart.positionTicksOverride)
   })
 
   useEffect(() => {
-    startQueuedPlaybackStatus()
+    flushPostCommitStart()
   }, [jellyfinSession])
 
   const switchToHls = useCallback(
@@ -282,7 +281,7 @@ export function useVideoPlayer({
             ),
           )
           preservation.scheduleHlsRestore(hlsPlayer.videoRef, itemId)
-          queuePlaybackStatusStart(directPositionTicks)
+          queuePostCommitStart(directPositionTicks)
         }
       }
     },
@@ -292,7 +291,7 @@ export function useVideoPlayer({
       preservation,
       hlsPlayer.videoRef,
       jellyfin,
-      queuePlaybackStatusStart,
+      queuePostCommitStart,
       updateStrategy,
     ],
   )
@@ -388,7 +387,7 @@ export function useVideoPlayer({
   // from the playback init path; widening these dependencies starts duplicate sessions.
   const syncPlaybackStatus = useEffectEvent(() => {
     if (!jellyfinPlaybackSyncEnabled) {
-      clearQueuedPlaybackStatusStart()
+      clearPostCommitStart()
       void jellyfin.stopPlaybackStatus()
       return
     }
@@ -413,7 +412,7 @@ export function useVideoPlayer({
     isActiveRef.current = true
     networkRetryCountRef.current = 0
     intentionalSwitchRef.current = false
-    clearQueuedPlaybackStatusStart()
+    clearPostCommitStart()
     preservation.clearHlsRestoreSubscription()
 
     const initPlayback = async () => {
@@ -443,7 +442,7 @@ export function useVideoPlayer({
             ),
           )
           handleInitPlaybackSuccess(config, itemId)
-          queuePlaybackStatusStart()
+          queuePostCommitStart()
         }
       } catch (err) {
         if (playbackRequestIdRef.current !== requestId) return
@@ -470,7 +469,7 @@ export function useVideoPlayer({
         requestId + 1,
       )
       intentionalSwitchRef.current = false
-      clearQueuedPlaybackStatusStart()
+      clearPostCommitStart()
       preservation.clearHlsRestoreSubscription()
       void jellyfin.stopPlaybackStatus()
     }
@@ -481,8 +480,8 @@ export function useVideoPlayer({
     getActiveVideoElement,
     jellyfin,
     preservation,
-    clearQueuedPlaybackStatusStart,
-    queuePlaybackStatusStart,
+    clearPostCommitStart,
+    queuePostCommitStart,
   ])
 
   useEffect(() => {
@@ -584,7 +583,7 @@ export function useVideoPlayer({
       )
       setVideoUrl(url)
       preservation.scheduleHlsRestore(hlsPlayer.videoRef, itemId)
-      queuePlaybackStatusStart(activePositionTicks)
+      queuePostCommitStart(activePositionTicks)
     },
     [
       itemId,
@@ -594,7 +593,7 @@ export function useVideoPlayer({
       jellyfin,
       jellyfinSessionIdentity,
       preservation,
-      queuePlaybackStatusStart,
+      queuePostCommitStart,
       updateStrategy,
     ],
   )
