@@ -28,13 +28,21 @@ interface ActivePlaybackStatusSession {
   playMethod: PlaybackStatusPlayMethod
   latestPositionTicks: number
 }
+type StartingPlaybackStatus = Extract<PlaybackStatus, { state: 'starting' }>
 
-interface PendingPlaybackStatusSession {
-  descriptor: JellyfinSessionDescriptor
-  session: ActivePlaybackStatusSession
-  startId: number
-  stopQueuedWithKeepalive?: boolean
-}
+type PlaybackStatus =
+  | { state: 'idle' }
+  | {
+      state: 'starting'
+      descriptor: JellyfinSessionDescriptor
+      session: ActivePlaybackStatusSession
+      startToken: number
+      stopQueuedWithKeepalive?: boolean
+    }
+  | {
+      state: 'active'
+      session: ActivePlaybackStatusSession
+    }
 
 interface UseJellyfinSessionOptions {
   session: JellyfinSessionDescriptor | null
@@ -71,7 +79,7 @@ function createActiveSession(
   }
 }
 
-function isSameSession(
+function isSameSessionDescriptor(
   left: JellyfinSessionDescriptor | null,
   right: JellyfinSessionDescriptor,
 ): boolean {
@@ -84,16 +92,42 @@ function isSameSession(
   )
 }
 
-function isSameActiveSession(
-  activeSession: ActivePlaybackStatusSession,
-  descriptor: JellyfinSessionDescriptor,
+function createPlaybackStatusPayload(
+  session: ActivePlaybackStatusSession,
+  positionTicks: number,
+  isPaused: boolean,
+) {
+  return {
+    itemId: session.itemId,
+    mediaSourceId: session.mediaSourceId,
+    playSessionId: session.playSessionId,
+    playMethod: session.playMethod,
+    positionTicks,
+    isPaused,
+  }
+}
+
+function isCurrentStartingPlaybackStatus(
+  currentStatus: PlaybackStatus,
+  startingStatus: StartingPlaybackStatus,
+  currentDescriptor: JellyfinSessionDescriptor | null,
+  currentStartToken: number,
 ): boolean {
   return (
-    activeSession.itemId === descriptor.itemId &&
-    activeSession.mediaSourceId === descriptor.mediaSourceId &&
-    activeSession.playSessionId === descriptor.playSessionId &&
-    activeSession.playMethod === playMethodForStrategy(descriptor.strategy)
+    currentStatus === startingStatus &&
+    startingStatus.startToken === currentStartToken &&
+    currentDescriptor?.syncEnabled === true &&
+    isSameSessionDescriptor(currentDescriptor, startingStatus.descriptor)
   )
+}
+
+function promoteStartingPlaybackStatus(
+  startingStatus: StartingPlaybackStatus,
+): PlaybackStatus {
+  return {
+    state: 'active',
+    session: startingStatus.session,
+  }
 }
 
 export function useJellyfinSession({
@@ -101,22 +135,25 @@ export function useJellyfinSession({
   getActiveVideoElement,
 }: UseJellyfinSessionOptions): UseJellyfinSessionReturn {
   const currentSessionRef = useRef<JellyfinSessionDescriptor | null>(session)
-  const playbackStatusStartIdRef = useRef(0)
-  const activePlaybackStatusRef = useRef<ActivePlaybackStatusSession | null>(
-    null,
-  )
-  const pendingPlaybackStatusRef = useRef<PendingPlaybackStatusSession | null>(
-    null,
-  )
+  const playbackStatusRef = useRef<PlaybackStatus>({ state: 'idle' })
+  const nextStartTokenRef = useRef(0)
+  // --- HLS encoding tracking (transcode lifecycle) ---
+  // Playback status owns Jellyfin progress writes (start/progress/stop).
+  // Encoding ref owns transcode cleanup (stopActiveEncoding).
   const hlsEncodingPlaySessionIdRef = useRef<string | null>(
     session?.strategy === 'hls' ? session.playSessionId : null,
   )
 
   currentSessionRef.current = session
 
+  const markStartingPlaybackStatusInvalid = useCallback(() => {
+    nextStartTokenRef.current++
+  }, [])
+
   const getCurrentPositionTicks = useCallback((): number => {
     const video = getActiveVideoElement()
-    const activeSession = activePlaybackStatusRef.current
+    const status = playbackStatusRef.current
+    const activeSession = status.state === 'active' ? status.session : null
     if (video !== null) {
       const currentTicks = secondsToTicks(video.currentTime)
       if (activeSession) activeSession.latestPositionTicks = currentTicks
@@ -126,17 +163,21 @@ export function useJellyfinSession({
     return activeSession?.latestPositionTicks ?? 0
   }, [getActiveVideoElement])
 
-  const consumeActivePlaybackStatus = useCallback(() => {
-    const activeSession = activePlaybackStatusRef.current
+  const consumeActiveStatus = useCallback(() => {
+    const status = playbackStatusRef.current
+    const activeSession = status.state === 'active' ? status.session : null
     const finalPositionTicks = getCurrentPositionTicks()
-    activePlaybackStatusRef.current = null
-    playbackStatusStartIdRef.current++
+    if (status.state === 'active') {
+      playbackStatusRef.current = { state: 'idle' }
+    } else if (status.state === 'starting') {
+      markStartingPlaybackStatusInvalid()
+    }
 
     return { activeSession, finalPositionTicks }
-  }, [getCurrentPositionTicks])
+  }, [getCurrentPositionTicks, markStartingPlaybackStatusInvalid])
 
   const stopPlaybackStatusReporting = useCallback(async () => {
-    const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
+    const { activeSession, finalPositionTicks } = consumeActiveStatus()
     if (!activeSession) return
 
     try {
@@ -147,10 +188,11 @@ export function useJellyfinSession({
     } catch (err) {
       console.debug('Failed to stop Jellyfin playback status reporting', err)
     }
-  }, [consumeActivePlaybackStatus])
+  }, [consumeActiveStatus])
 
   const stopPlaybackStatusReportingKeepalive = useCallback(() => {
-    const { activeSession, finalPositionTicks } = consumeActivePlaybackStatus()
+    const previousStatus = playbackStatusRef.current
+    const { activeSession, finalPositionTicks } = consumeActiveStatus()
     if (activeSession) {
       stopPlaybackStatusKeepalive({
         ...activeSession,
@@ -159,77 +201,75 @@ export function useJellyfinSession({
       return
     }
 
-    const pendingSession = pendingPlaybackStatusRef.current
-    if (!pendingSession) return
+    if (previousStatus.state !== 'starting') return
 
-    pendingSession.stopQueuedWithKeepalive = true
-    pendingPlaybackStatusRef.current = null
+    previousStatus.stopQueuedWithKeepalive = true
+    playbackStatusRef.current = { state: 'idle' }
     stopPlaybackStatusKeepalive({
-      ...pendingSession.session,
+      ...previousStatus.session,
       positionTicks: Math.max(
         finalPositionTicks,
-        pendingSession.session.latestPositionTicks,
+        previousStatus.session.latestPositionTicks,
       ),
     })
-  }, [consumeActivePlaybackStatus])
+  }, [consumeActiveStatus])
 
   const startPlaybackStatusReporting = useCallback(
     async (positionTicksOverride?: number) => {
       const descriptor = currentSessionRef.current
       if (!descriptor?.syncEnabled) return
 
-      const activeSession = activePlaybackStatusRef.current
-      if (activeSession && isSameActiveSession(activeSession, descriptor)) {
+      const status = playbackStatusRef.current
+      if (status.state === 'active') {
         return
       }
 
       const video = getActiveVideoElement()
       const positionTicks =
         positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0)
-      const pendingSession = pendingPlaybackStatusRef.current
-
       if (
-        pendingSession &&
-        isSameSession(descriptor, pendingSession.descriptor)
+        status.state === 'starting' &&
+        isSameSessionDescriptor(descriptor, status.descriptor)
       ) {
-        pendingSession.startId = ++playbackStatusStartIdRef.current
-        pendingSession.session.latestPositionTicks = positionTicks
+        status.startToken = ++nextStartTokenRef.current
+        status.session.latestPositionTicks = positionTicks
         return
       }
 
-      const startId = ++playbackStatusStartIdRef.current
-      const nextSession: PendingPlaybackStatusSession = {
+      const startToken = ++nextStartTokenRef.current
+      const nextStatus: StartingPlaybackStatus = {
+        state: 'starting',
         descriptor,
         session: createActiveSession(descriptor, positionTicks),
-        startId,
+        startToken,
       }
-      pendingPlaybackStatusRef.current = nextSession
+      playbackStatusRef.current = nextStatus
 
       const isCurrentPlaybackStatusStart = () =>
-        pendingPlaybackStatusRef.current === nextSession &&
-        playbackStatusStartIdRef.current === nextSession.startId &&
-        currentSessionRef.current?.syncEnabled === true &&
-        isSameSession(currentSessionRef.current, descriptor) &&
-        !activePlaybackStatusRef.current
+        isCurrentStartingPlaybackStatus(
+          playbackStatusRef.current,
+          nextStatus,
+          currentSessionRef.current,
+          nextStartTokenRef.current,
+        )
 
       try {
         if (!isCurrentPlaybackStatusStart()) return
 
         await startPlaybackStatus({
-          itemId: nextSession.session.itemId,
-          mediaSourceId: nextSession.session.mediaSourceId,
-          playSessionId: nextSession.session.playSessionId,
-          playMethod: nextSession.session.playMethod,
-          positionTicks,
-          isPaused: video?.paused ?? true,
+          ...createPlaybackStatusPayload(
+            nextStatus.session,
+            positionTicks,
+            video?.paused ?? true,
+          ),
         })
 
         if (isCurrentPlaybackStatusStart()) {
-          activePlaybackStatusRef.current = nextSession.session
-        } else if (!nextSession.stopQueuedWithKeepalive) {
+          playbackStatusRef.current = promoteStartingPlaybackStatus(nextStatus)
+        } else if (!nextStatus.stopQueuedWithKeepalive) {
           void stopPlaybackStatus({
-            ...nextSession.session,
-            positionTicks: nextSession.session.latestPositionTicks,
+            ...nextStatus.session,
+            positionTicks: nextStatus.session.latestPositionTicks,
           }).catch((err) => {
             console.debug('Failed to stop stale Jellyfin playback status', err)
           })
@@ -237,8 +277,8 @@ export function useJellyfinSession({
       } catch (err) {
         console.debug('Failed to start Jellyfin playback status reporting', err)
       } finally {
-        if (pendingPlaybackStatusRef.current === nextSession) {
-          pendingPlaybackStatusRef.current = null
+        if (playbackStatusRef.current === nextStatus) {
+          playbackStatusRef.current = { state: 'idle' }
         }
       }
     },
@@ -272,7 +312,8 @@ export function useJellyfinSession({
 
   const reportCurrentPlaybackProgress = useEffectEvent(
     async (isPaused: boolean) => {
-      const activeSession = activePlaybackStatusRef.current
+      const status = playbackStatusRef.current
+      const activeSession = status.state === 'active' ? status.session : null
       if (!currentSessionRef.current?.syncEnabled || !activeSession) return
 
       try {

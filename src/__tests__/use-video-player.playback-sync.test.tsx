@@ -255,6 +255,80 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       )
     })
   })
+  it('preserves direct-play position when synced direct play falls back to HLS', async () => {
+    vi.stubGlobal('MediaError', {
+      MEDIA_ERR_ABORTED: 1,
+      MEDIA_ERR_NETWORK: 2,
+      MEDIA_ERR_DECODE: 3,
+      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
+      () => undefined,
+    )
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-initial-hls-session')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValueOnce('hls-session-1')
+    vi.mocked(getPlaybackConfig)
+      .mockResolvedValueOnce({
+        strategy: 'direct',
+        url: 'https://jellyfin.example/Videos/item-1/stream',
+      })
+      .mockResolvedValueOnce({
+        strategy: 'hls',
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=hls-session-1',
+      })
+
+    function Harness() {
+      const player = useVideoPlayer({
+        item: createItem(),
+        jellyfinPlaybackSyncEnabled: true,
+        t: (key) => key,
+      })
+      return (
+        <video ref={player.videoRef}>
+          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
+        </video>
+      )
+    }
+
+    const { container } = render(<Harness />)
+    const video = container.querySelector('video')!
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'direct-session-1',
+        playMethod: 'DirectPlay',
+        positionTicks: 0,
+        isPaused: true,
+      })
+    })
+
+    video.currentTime = 42
+    vi.mocked(startPlaybackStatus).mockClear()
+
+    Object.defineProperty(video, 'error', {
+      configurable: true,
+      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
+    })
+
+    act(() => {
+      video.dispatchEvent(new Event('error'))
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'hls-session-1',
+        playMethod: 'Transcode',
+        positionTicks: 420_000_000,
+        isPaused: true,
+      })
+    })
+  })
 
   it('stops stale pending playback status after sync is disabled mid-start', async () => {
     const startDeferred = createDeferred()
