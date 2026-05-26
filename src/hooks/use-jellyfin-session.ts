@@ -163,18 +163,27 @@ export function useJellyfinSession({
     return activeSession?.latestPositionTicks ?? 0
   }, [getActiveVideoElement])
 
-  const consumeActiveStatus = useCallback(() => {
-    const status = playbackStatusRef.current
-    const activeSession = status.state === 'active' ? status.session : null
-    const finalPositionTicks = getCurrentPositionTicks()
-    if (status.state === 'active') {
-      playbackStatusRef.current = { state: 'idle' }
-    } else if (status.state === 'starting') {
-      markStartingPlaybackStatusInvalid()
-    }
+  const consumeActiveStatus = useCallback(
+    (updateStartingPosition = true) => {
+      const status = playbackStatusRef.current
+      const activeSession = status.state === 'active' ? status.session : null
+      const finalPositionTicks = getCurrentPositionTicks()
+      if (status.state === 'active') {
+        playbackStatusRef.current = { state: 'idle' }
+      } else if (status.state === 'starting') {
+        if (
+          updateStartingPosition &&
+          isSameSessionDescriptor(currentSessionRef.current, status.descriptor)
+        ) {
+          status.session.latestPositionTicks = finalPositionTicks
+        }
+        markStartingPlaybackStatusInvalid()
+      }
 
-    return { activeSession, finalPositionTicks }
-  }, [getCurrentPositionTicks, markStartingPlaybackStatusInvalid])
+      return { activeSession, finalPositionTicks }
+    },
+    [getCurrentPositionTicks, markStartingPlaybackStatusInvalid],
+  )
 
   const stopPlaybackStatusReporting = useCallback(async () => {
     const { activeSession, finalPositionTicks } = consumeActiveStatus()
@@ -192,7 +201,7 @@ export function useJellyfinSession({
 
   const stopPlaybackStatusReportingKeepalive = useCallback(() => {
     const previousStatus = playbackStatusRef.current
-    const { activeSession, finalPositionTicks } = consumeActiveStatus()
+    const { activeSession, finalPositionTicks } = consumeActiveStatus(false)
     if (activeSession) {
       stopPlaybackStatusKeepalive({
         ...activeSession,

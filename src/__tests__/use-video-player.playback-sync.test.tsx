@@ -342,6 +342,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
     })
 
+    hlsMocks.videoRef.current!.currentTime = 34
     rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: false })
 
     await act(async () => {
@@ -361,7 +362,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         itemId: 'item-1',
         mediaSourceId: 'item-1-media-source',
         playSessionId: 'hls-session-1',
-        positionTicks: 120_000_000,
+        positionTicks: 340_000_000,
       }),
     )
     expect(vi.mocked(stopPlaybackStatus).mock.calls[0]?.[0]).not.toHaveProperty(
