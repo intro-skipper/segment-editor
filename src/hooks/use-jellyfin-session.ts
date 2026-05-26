@@ -98,6 +98,9 @@ function isCurrentStartingPlaybackStatus(
   currentDescriptor: JellyfinSessionDescriptor | null,
   currentStartToken: number,
 ): boolean {
+  // A starting status is current only while the exact object is installed, its
+  // token is still the latest token, sync remains enabled, and the descriptor
+  // still matches the session that issued the start request.
   return (
     currentStatus === startingStatus &&
     startingStatus.startToken === currentStartToken &&
@@ -123,6 +126,8 @@ export function useJellyfinSession({
   currentSessionRef.current = session
 
   const markStartingPlaybackStatusInvalid = useCallback(() => {
+    // Invalidate in-flight starts without dropping the starting state; a later
+    // same-descriptor start can refresh the token and reuse the network request.
     nextStartTokenRef.current++
   }, [])
 
@@ -158,6 +163,8 @@ export function useJellyfinSession({
     const status = playbackStatusRef.current
     if (status.state !== 'starting') return
 
+    // Only refresh pending position from the video when it still belongs to this
+    // descriptor. Stale starts must keep their original stored position.
     if (isSameSessionDescriptor(currentSessionRef.current, status.descriptor)) {
       status.session.latestPositionTicks = getCurrentPositionTicks()
     }
@@ -168,6 +175,8 @@ export function useJellyfinSession({
     const status = playbackStatusRef.current
     if (status.state !== 'starting') return null
 
+    // Pagehide may run after the app moved to another item. In that case, do not
+    // read the current video element; it belongs to the new descriptor.
     const latestPositionTicks = status.session.latestPositionTicks
     const currentPositionTicks = isSameSessionDescriptor(
       currentSessionRef.current,
