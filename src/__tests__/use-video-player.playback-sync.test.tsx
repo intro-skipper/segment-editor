@@ -289,6 +289,56 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         positionTicks: 120_000_000,
       }),
     )
+    expect(vi.mocked(stopPlaybackStatus).mock.calls[0]?.[0]).not.toHaveProperty(
+      'startId',
+    )
+    expect(vi.mocked(stopPlaybackStatus).mock.calls[0]?.[0]).not.toHaveProperty(
+      'requestId',
+    )
+  })
+
+  it('reuses a pending HLS playback status when sync is re-enabled before start resolves', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    const { rerender } = renderVideoPlayer({
+      jellyfinPlaybackSyncEnabled: true,
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+
+    rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: false })
+    rerender({ item: createItem(), jellyfinPlaybackSyncEnabled: true })
+
+    expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
+    })
+
+    expect(stopPlaybackStatus).not.toHaveBeenCalled()
+
+    act(() => {
+      hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
+    })
+
+    await waitFor(() => {
+      expect(reportPlaybackProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'hls-session-1',
+          playMethod: 'Transcode',
+        }),
+      )
+    })
+    expect(
+      vi.mocked(reportPlaybackProgress).mock.calls[0]?.[0],
+    ).not.toHaveProperty('startId')
+    expect(
+      vi.mocked(reportPlaybackProgress).mock.calls[0]?.[0],
+    ).not.toHaveProperty('requestId')
   })
 
   it('starts playback status immediately when sync is toggled on after HLS loads', async () => {
@@ -430,6 +480,43 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         positionTicks: 120_000_000,
       }),
     )
+  })
+
+  it('sends keepalive stop on pagehide for a pending synced session', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'hls-session-1',
+        positionTicks: 120_000_000,
+      }),
+    )
+    expect(
+      vi.mocked(stopPlaybackStatusKeepalive).mock.calls[0]?.[0],
+    ).not.toHaveProperty('startId')
+    expect(
+      vi.mocked(stopPlaybackStatusKeepalive).mock.calls[0]?.[0],
+    ).not.toHaveProperty('requestId')
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
+    })
+
+    expect(stopPlaybackStatus).not.toHaveBeenCalled()
   })
 
   it('reports playing pause and seek progress while sync is enabled', async () => {
