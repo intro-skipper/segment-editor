@@ -208,6 +208,7 @@ export function useJellyfinSession({
       const isCurrentPlaybackStatusStart = () =>
         pendingPlaybackStatusRef.current === nextSession &&
         playbackStatusStartIdRef.current === nextSession.startId &&
+        currentSessionRef.current?.syncEnabled === true &&
         isSameSession(currentSessionRef.current, descriptor) &&
         !activePlaybackStatusRef.current
 
@@ -246,14 +247,14 @@ export function useJellyfinSession({
 
   const stopPreviousEncoding = useCallback(
     async (previousPlaySessionId: string) => {
-      if (hlsEncodingPlaySessionIdRef.current === previousPlaySessionId) {
-        hlsEncodingPlaySessionIdRef.current = null
-      }
-
       try {
         await stopActiveEncoding({ playSessionId: previousPlaySessionId })
       } catch (err) {
         console.debug('Failed to stop previous Jellyfin active encoding', err)
+      } finally {
+        if (hlsEncodingPlaySessionIdRef.current === previousPlaySessionId) {
+          hlsEncodingPlaySessionIdRef.current = null
+        }
       }
     },
     [],
