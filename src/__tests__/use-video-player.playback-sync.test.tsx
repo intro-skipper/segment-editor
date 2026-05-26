@@ -921,6 +921,35 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
   })
 
+  it('uses pending playback position as floor when keepalive stop sees a reset video element', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+    hlsMocks.videoRef.current!.currentTime = 42
+
+    renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ positionTicks: 420_000_000 }),
+      )
+    })
+
+    hlsMocks.videoRef.current!.currentTime = 0
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({ positionTicks: 420_000_000 }),
+    )
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startDeferred.promise
+    })
+  })
+
   it('uses latestPositionTicks fallback when video element is unavailable at stop', async () => {
     vi.mocked(createPlaySessionId).mockReset().mockReturnValue('hls-session-1')
 

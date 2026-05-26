@@ -166,11 +166,12 @@ export function useJellyfinSession({
     pendingPlaybackStatusRef.current = null
     stopPlaybackStatusKeepalive({
       ...pendingSession.session,
-      positionTicks: getActiveVideoElement()
-        ? finalPositionTicks
-        : pendingSession.session.latestPositionTicks,
+      positionTicks: Math.max(
+        finalPositionTicks,
+        pendingSession.session.latestPositionTicks,
+      ),
     })
-  }, [consumeActivePlaybackStatus, getActiveVideoElement])
+  }, [consumeActivePlaybackStatus])
 
   const startPlaybackStatusReporting = useCallback(
     async (positionTicksOverride?: number) => {
