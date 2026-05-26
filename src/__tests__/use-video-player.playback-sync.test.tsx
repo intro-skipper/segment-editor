@@ -286,14 +286,17 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         t: (key) => key,
       })
       return (
-        <video ref={player.videoRef}>
+        <video
+          key={player.strategy}
+          data-strategy={player.strategy}
+          ref={player.videoRef}
+        >
           <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
         </video>
       )
     }
 
     const { container } = render(<Harness />)
-    const video = container.querySelector('video')!
 
     await waitFor(() => {
       expect(startPlaybackStatus).toHaveBeenCalledWith({
@@ -306,16 +309,20 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       })
     })
 
-    video.currentTime = 42
+    const directVideo = container.querySelector<HTMLVideoElement>(
+      'video[data-strategy="direct"]',
+    )
+    expect(directVideo).not.toBeNull()
+    directVideo!.currentTime = 42
     vi.mocked(startPlaybackStatus).mockClear()
 
-    Object.defineProperty(video, 'error', {
+    Object.defineProperty(directVideo, 'error', {
       configurable: true,
       value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
     })
 
     act(() => {
-      video.dispatchEvent(new Event('error'))
+      directVideo!.dispatchEvent(new Event('error'))
     })
 
     await waitFor(() => {
@@ -328,6 +335,15 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         isPaused: true,
       })
     })
+    expect(stopPlaybackStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'direct-session-1',
+        playMethod: 'DirectPlay',
+        positionTicks: 420_000_000,
+      }),
+    )
   })
 
   it('stops stale pending playback status after sync is disabled mid-start', async () => {
@@ -537,6 +553,60 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
   })
 
+  it('preserves pending playback position when stopping without a video element', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    const video = document.createElement('video')
+    video.currentTime = 12
+    let activeVideo: HTMLVideoElement | null = video
+    const session = {
+      itemId: 'item-1',
+      mediaSourceId: 'item-1-media-source',
+      playSessionId: 'hls-session-1',
+      strategy: 'hls' as const,
+      syncEnabled: true,
+    }
+
+    const { result } = renderHook(() =>
+      useJellyfinSession({
+        session,
+        getActiveVideoElement: () => activeVideo,
+      }),
+    )
+
+    let startPromise = Promise.resolve()
+    act(() => {
+      startPromise = result.current.startPlaybackStatus()
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ positionTicks: 120_000_000 }),
+      )
+    })
+
+    activeVideo = null
+
+    await act(async () => {
+      await result.current.stopPlaybackStatus()
+    })
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startPromise
+    })
+
+    await waitFor(() => {
+      expect(stopPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'hls-session-1',
+          positionTicks: 120_000_000,
+        }),
+      )
+    })
+  })
+
   it('sends keepalive stop on pagehide for an active synced session', async () => {
     renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
 
@@ -631,6 +701,76 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     await act(async () => {
       startDeferred.resolve()
       await startDeferred.promise
+    })
+
+    expect(stopPlaybackStatus).not.toHaveBeenCalled()
+  })
+  it('keeps stale pending keepalive stop on the original session position after item change', async () => {
+    const startDeferred = createDeferred()
+    vi.mocked(startPlaybackStatus).mockReturnValue(startDeferred.promise)
+
+    const originalVideo = document.createElement('video')
+    originalVideo.currentTime = 12
+    const nextVideo = document.createElement('video')
+    nextVideo.currentTime = 99
+    let activeVideo: HTMLVideoElement | null = originalVideo
+    const originalSession = {
+      itemId: 'item-1',
+      mediaSourceId: 'item-1-media-source',
+      playSessionId: 'hls-session-1',
+      strategy: 'hls' as const,
+      syncEnabled: true,
+    }
+    const nextSession = {
+      itemId: 'item-2',
+      mediaSourceId: 'item-2-media-source',
+      playSessionId: 'hls-session-2',
+      strategy: 'hls' as const,
+      syncEnabled: true,
+    }
+
+    const { result, rerender } = renderHook(
+      ({ session }) =>
+        useJellyfinSession({
+          session,
+          getActiveVideoElement: () => activeVideo,
+        }),
+      { initialProps: { session: originalSession } },
+    )
+
+    let startPromise = Promise.resolve()
+    act(() => {
+      startPromise = result.current.startPlaybackStatus()
+    })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'hls-session-1',
+          positionTicks: 120_000_000,
+        }),
+      )
+    })
+
+    activeVideo = nextVideo
+    rerender({ session: nextSession })
+
+    act(() => {
+      result.current.stopAllKeepalive()
+    })
+
+    expect(stopPlaybackStatusKeepalive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        mediaSourceId: 'item-1-media-source',
+        playSessionId: 'hls-session-1',
+        positionTicks: 120_000_000,
+      }),
+    )
+
+    await act(async () => {
+      startDeferred.resolve()
+      await startPromise
     })
 
     expect(stopPlaybackStatus).not.toHaveBeenCalled()
