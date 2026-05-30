@@ -612,7 +612,11 @@ function useRenderPlayer({
     const segmentRanges = segmentTimeRangesRef.current
     const mode = segmentSkipModeRef.current
 
-    if (mode === 'disabled' || segmentRanges.length === 0) {
+    if (
+      mode === 'disabled' ||
+      (mode !== 'button' && mode !== 'skip') ||
+      segmentRanges.length === 0
+    ) {
       if (prevActiveSegmentIdRef.current !== null) {
         prevActiveSegmentIdRef.current = null
         lastAutoSkippedSegmentIdRef.current = null
