@@ -1,8 +1,4 @@
-/**
- * EpisodeSwitcher - Responsive episode selector for video player header.
- */
-
-import { memo, useCallback, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
@@ -34,7 +30,7 @@ const EPISODE_ROW_ESTIMATE_PX = 58
 const VIRTUALIZE_THRESHOLD = 40
 const EPISODE_OVERSCAN = 6
 
-const EpisodeItemSkeleton = memo(function EpisodeItemSkeletonComponent({
+const EpisodeItemSkeleton = function EpisodeItemSkeletonComponent({
   index = 0,
 }: {
   index?: number
@@ -52,7 +48,7 @@ const EpisodeItemSkeleton = memo(function EpisodeItemSkeletonComponent({
       </div>
     </div>
   )
-})
+}
 
 interface EpisodeItemProps {
   episode: BaseItemDto
@@ -63,7 +59,7 @@ interface EpisodeItemProps {
   vibrantColors?: VibrantColors | null
 }
 
-const EpisodeItem = memo(function EpisodeItemComponent({
+const EpisodeItem = function EpisodeItemComponent({
   episode,
   isActive,
   index,
@@ -77,9 +73,9 @@ const EpisodeItem = memo(function EpisodeItemComponent({
     : null
   const episodeName = episode.Name || `Episode ${episodeNum}`
 
-  const selectEpisode = useCallback(() => {
+  const selectEpisode = () => {
     if (episode.Id) onSelect(episode.Id)
-  }, [episode.Id, onSelect])
+  }
 
   const accentStyle =
     isActive && vibrantColors
@@ -157,7 +153,7 @@ const EpisodeItem = memo(function EpisodeItemComponent({
       />
     </button>
   )
-})
+}
 
 interface SeasonButtonProps {
   season: BaseItemDto
@@ -166,15 +162,15 @@ interface SeasonButtonProps {
   vibrantColors?: VibrantColors | null
 }
 
-const SeasonButton = memo(function SeasonButtonComponent({
+const SeasonButton = function SeasonButtonComponent({
   season,
   isSelected,
   onSeasonSelect,
   vibrantColors,
 }: SeasonButtonProps) {
-  const selectSeason = useCallback(() => {
+  const selectSeason = () => {
     if (season.Id) onSeasonSelect(season.Id)
-  }, [season.Id, onSeasonSelect])
+  }
 
   const label =
     season.IndexNumber === 0 ? 'SP' : `S${season.IndexNumber ?? '?'}`
@@ -209,7 +205,7 @@ const SeasonButton = memo(function SeasonButtonComponent({
       {label}
     </button>
   )
-})
+}
 
 interface SeasonSelectorProps {
   seasons: Array<BaseItemDto>
@@ -218,7 +214,7 @@ interface SeasonSelectorProps {
   vibrantColors?: VibrantColors | null
 }
 
-const SeasonSelector = memo(function SeasonSelectorComponent({
+const SeasonSelector = function SeasonSelectorComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
@@ -246,9 +242,9 @@ const SeasonSelector = memo(function SeasonSelectorComponent({
       })}
     </div>
   )
-})
+}
 
-const EpisodeListContent = memo(function EpisodeListContentComponent({
+const EpisodeListContent = function EpisodeListContentComponent({
   episodes,
   currentEpisodeId,
   isLoading,
@@ -374,9 +370,9 @@ const EpisodeListContent = memo(function EpisodeListContentComponent({
       ))}
     </div>
   )
-})
+}
 
-export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
+export const EpisodeSwitcher = function EpisodeSwitcherComponent({
   currentEpisode,
   vibrantColors,
   className,
@@ -385,7 +381,9 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
   const navigate = useNavigate()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const prefetchedEpisodeIdsRef = useRef(new Set<string>())
+  const prefetchedEpisodeIdsRef = useRef<Set<string> | null>(null)
+  if (prefetchedEpisodeIdsRef.current === null)
+    prefetchedEpisodeIdsRef.current = new Set<string>()
   const [episodeListElement, setEpisodeListElement] =
     useState<HTMLDivElement | null>(null)
 
@@ -405,33 +403,27 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
     enabled: open && !!seriesId && !!selectedSeasonId,
   })
 
-  const handleEpisodeSelect = useCallback(
-    (episodeId: string) => {
-      setOpen(false)
-      void navigate({
-        to: '/player/$itemId',
-        params: { itemId: episodeId },
-        search: { fetchSegments: 'true' },
-      })
-    },
-    [navigate],
-  )
+  const handleEpisodeSelect = (episodeId: string) => {
+    setOpen(false)
+    void navigate({
+      to: '/player/$itemId',
+      params: { itemId: episodeId },
+      search: { fetchSegments: 'true' },
+    })
+  }
 
-  const prefetchEpisodeRoute = useCallback(
-    (episodeId: string) => {
-      if (!episodeId || prefetchedEpisodeIdsRef.current.has(episodeId)) {
-        return
-      }
+  const prefetchEpisodeRoute = (episodeId: string) => {
+    if (!episodeId || prefetchedEpisodeIdsRef.current!.has(episodeId)) {
+      return
+    }
 
-      prefetchedEpisodeIdsRef.current.add(episodeId)
-      void router.preloadRoute({
-        to: '/player/$itemId',
-        params: { itemId: episodeId },
-        search: { fetchSegments: 'true' },
-      })
-    },
-    [router],
-  )
+    prefetchedEpisodeIdsRef.current!.add(episodeId)
+    void router.preloadRoute({
+      to: '/player/$itemId',
+      params: { itemId: episodeId },
+      search: { fetchSegments: 'true' },
+    })
+  }
 
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
 
@@ -509,4 +501,4 @@ export const EpisodeSwitcher = memo(function EpisodeSwitcherComponent({
       </DropdownMenuContent>
     </DropdownMenu>
   )
-})
+}

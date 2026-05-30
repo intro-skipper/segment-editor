@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { PlaybackStatusPlayMethod } from '@/services/video/playback-session'
 import {
@@ -113,6 +113,8 @@ export function useJellyfinSession({
   session,
   getActiveVideoElement,
 }: UseJellyfinSessionOptions): UseJellyfinSessionReturn {
+  'use memo'
+
   const currentSessionRef = useRef<JellyfinSessionDescriptor | null>(session)
   const playbackStatusRef = useRef<PlaybackStatus>({ state: 'idle' })
   const nextStartTokenRef = useRef(0)
@@ -123,15 +125,17 @@ export function useJellyfinSession({
     session?.strategy === 'hls' ? session.playSessionId : null,
   )
 
-  currentSessionRef.current = session
+  useLayoutEffect(() => {
+    currentSessionRef.current = session
+  }, [session])
 
-  const markStartingPlaybackStatusInvalid = useCallback(() => {
+  const markStartingPlaybackStatusInvalid = () => {
     // Invalidate in-flight starts without dropping the starting state; a later
     // same-descriptor start can refresh the token and reuse the network request.
     nextStartTokenRef.current++
-  }, [])
+  }
 
-  const getCurrentPositionTicks = useCallback((): number => {
+  const getCurrentPositionTicks = (): number => {
     const video = getActiveVideoElement()
     const status = playbackStatusRef.current
     const sessionWithPosition =
@@ -147,9 +151,9 @@ export function useJellyfinSession({
     }
 
     return sessionWithPosition?.latestPositionTicks ?? 0
-  }, [getActiveVideoElement])
+  }
 
-  const consumeActivePlaybackStatus = useCallback(() => {
+  const consumeActivePlaybackStatus = () => {
     const status = playbackStatusRef.current
     if (status.state !== 'active') return null
 
@@ -157,9 +161,9 @@ export function useJellyfinSession({
     playbackStatusRef.current = { state: 'idle' }
 
     return { activeSession: status.session, finalPositionTicks }
-  }, [getCurrentPositionTicks])
+  }
 
-  const invalidateStartingPlaybackStatus = useCallback(() => {
+  const invalidateStartingPlaybackStatus = () => {
     const status = playbackStatusRef.current
     if (status.state !== 'starting') return
 
@@ -169,9 +173,9 @@ export function useJellyfinSession({
       status.session.latestPositionTicks = getCurrentPositionTicks()
     }
     markStartingPlaybackStatusInvalid()
-  }, [getCurrentPositionTicks, markStartingPlaybackStatusInvalid])
+  }
 
-  const queueStartingPlaybackStatusKeepaliveStop = useCallback(() => {
+  const queueStartingPlaybackStatusKeepaliveStop = () => {
     const status = playbackStatusRef.current
     if (status.state !== 'starting') return null
 
@@ -193,9 +197,9 @@ export function useJellyfinSession({
     markStartingPlaybackStatusInvalid()
 
     return { session: status.session, finalPositionTicks }
-  }, [getCurrentPositionTicks, markStartingPlaybackStatusInvalid])
+  }
 
-  const stopPlaybackStatusReporting = useCallback(async () => {
+  const stopPlaybackStatusReporting = async () => {
     const activeStatus = consumeActivePlaybackStatus()
     if (!activeStatus) {
       invalidateStartingPlaybackStatus()
@@ -210,9 +214,9 @@ export function useJellyfinSession({
     } catch (err) {
       console.debug('Failed to stop Jellyfin playback status reporting', err)
     }
-  }, [consumeActivePlaybackStatus, invalidateStartingPlaybackStatus])
+  }
 
-  const stopPlaybackStatusReportingKeepalive = useCallback(() => {
+  const stopPlaybackStatusReportingKeepalive = () => {
     const activeStatus = consumeActivePlaybackStatus()
     if (activeStatus) {
       stopPlaybackStatusKeepalive({
@@ -229,50 +233,50 @@ export function useJellyfinSession({
       ...startingStatus.session,
       positionTicks: startingStatus.finalPositionTicks,
     })
-  }, [consumeActivePlaybackStatus, queueStartingPlaybackStatusKeepaliveStop])
+  }
 
-  const startPlaybackStatusReporting = useCallback(
-    async (positionTicksOverride?: number) => {
-      const descriptor = currentSessionRef.current
-      if (!descriptor?.syncEnabled) return
+  const startPlaybackStatusReporting = async (
+    positionTicksOverride?: number,
+  ) => {
+    const descriptor = currentSessionRef.current
+    if (!descriptor?.syncEnabled) return
 
-      const status = playbackStatusRef.current
-      if (status.state === 'active') {
-        return
-      }
+    const status = playbackStatusRef.current
+    if (status.state === 'active') {
+      return
+    }
 
-      const video = getActiveVideoElement()
-      const positionTicks =
-        positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0)
-      if (
-        status.state === 'starting' &&
-        isSameSessionDescriptor(descriptor, status.descriptor)
-      ) {
-        status.startToken = ++nextStartTokenRef.current
-        status.session.latestPositionTicks = positionTicks
-        return
-      }
+    const video = getActiveVideoElement()
+    const positionTicks =
+      positionTicksOverride ?? secondsToTicks(video?.currentTime ?? 0)
+    if (
+      status.state === 'starting' &&
+      isSameSessionDescriptor(descriptor, status.descriptor)
+    ) {
+      status.startToken = ++nextStartTokenRef.current
+      status.session.latestPositionTicks = positionTicks
+      return
+    }
 
-      const startToken = ++nextStartTokenRef.current
-      const nextStatus: StartingPlaybackStatus = {
-        state: 'starting',
-        descriptor,
-        session: createActiveSession(descriptor, positionTicks),
-        startToken,
-      }
-      playbackStatusRef.current = nextStatus
+    const startToken = ++nextStartTokenRef.current
+    const nextStatus: StartingPlaybackStatus = {
+      state: 'starting',
+      descriptor,
+      session: createActiveSession(descriptor, positionTicks),
+      startToken,
+    }
+    playbackStatusRef.current = nextStatus
 
-      const isCurrentPlaybackStatusStart = () =>
-        isCurrentStartingPlaybackStatus(
-          playbackStatusRef.current,
-          nextStatus,
-          currentSessionRef.current,
-          nextStartTokenRef.current,
-        )
+    const isCurrentPlaybackStatusStart = () =>
+      isCurrentStartingPlaybackStatus(
+        playbackStatusRef.current,
+        nextStatus,
+        currentSessionRef.current,
+        nextStartTokenRef.current,
+      )
 
-      try {
-        if (!isCurrentPlaybackStatusStart()) return
-
+    try {
+      if (isCurrentPlaybackStatusStart()) {
         await startPlaybackStatus({
           itemId: nextStatus.session.itemId,
           mediaSourceId: nextStatus.session.mediaSourceId,
@@ -295,33 +299,29 @@ export function useJellyfinSession({
             console.debug('Failed to stop stale Jellyfin playback status', err)
           })
         }
-      } catch (err) {
-        console.debug('Failed to start Jellyfin playback status reporting', err)
-      } finally {
-        if (playbackStatusRef.current === nextStatus) {
-          playbackStatusRef.current = { state: 'idle' }
-        }
       }
-    },
-    [getActiveVideoElement],
-  )
+    } catch (err) {
+      console.debug('Failed to start Jellyfin playback status reporting', err)
+    }
 
-  const stopPreviousEncoding = useCallback(
-    async (previousPlaySessionId: string) => {
-      try {
-        await stopActiveEncoding({ playSessionId: previousPlaySessionId })
-      } catch (err) {
-        console.debug('Failed to stop previous Jellyfin active encoding', err)
-      } finally {
-        if (hlsEncodingPlaySessionIdRef.current === previousPlaySessionId) {
-          hlsEncodingPlaySessionIdRef.current = null
-        }
-      }
-    },
-    [],
-  )
+    if (playbackStatusRef.current === nextStatus) {
+      playbackStatusRef.current = { state: 'idle' }
+    }
+  }
 
-  const stopAllKeepalive = useCallback(() => {
+  const stopPreviousEncoding = async (previousPlaySessionId: string) => {
+    try {
+      await stopActiveEncoding({ playSessionId: previousPlaySessionId })
+    } catch (err) {
+      console.debug('Failed to stop previous Jellyfin active encoding', err)
+    }
+
+    if (hlsEncodingPlaySessionIdRef.current === previousPlaySessionId) {
+      hlsEncodingPlaySessionIdRef.current = null
+    }
+  }
+
+  const stopAllKeepalive = () => {
     stopPlaybackStatusReportingKeepalive()
 
     const playSessionId = hlsEncodingPlaySessionIdRef.current
@@ -329,7 +329,7 @@ export function useJellyfinSession({
     if (playSessionId) {
       stopActiveEncodingKeepalive({ playSessionId })
     }
-  }, [stopPlaybackStatusReportingKeepalive])
+  }
 
   const reportCurrentPlaybackProgress = useEffectEvent(
     async (isPaused: boolean) => {
@@ -409,18 +409,10 @@ export function useJellyfinSession({
     session?.syncEnabled,
   ])
 
-  return useMemo(
-    () => ({
-      startPlaybackStatus: startPlaybackStatusReporting,
-      stopPlaybackStatus: stopPlaybackStatusReporting,
-      stopAllKeepalive,
-      stopPreviousEncoding,
-    }),
-    [
-      startPlaybackStatusReporting,
-      stopPlaybackStatusReporting,
-      stopAllKeepalive,
-      stopPreviousEncoding,
-    ],
-  )
+  return {
+    startPlaybackStatus: startPlaybackStatusReporting,
+    stopPlaybackStatus: stopPlaybackStatusReporting,
+    stopAllKeepalive,
+    stopPreviousEncoding,
+  }
 }

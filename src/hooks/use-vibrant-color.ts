@@ -1,10 +1,4 @@
-/**
- * Hook to extract dominant colors from images using node-vibrant.
- * Uses Web Worker for off-main-thread processing with LRU cache.
- * Dark mode uses Muted swatches, light mode uses Vibrant swatches.
- */
-
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { formatHex, oklch, parse } from 'culori'
 import type * as VibrantWorkerRuntime from 'node-vibrant/worker'
 
@@ -93,7 +87,7 @@ const colorCacheDark = new LRUCache<string, VibrantColors>(
 const paletteCache = new LRUCache<string, Palette>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
 )
-const pending = new Map<string, Promise<Palette | null>>()
+const pendingPalettes = new Map<string, Promise<Palette | null>>()
 
 const getCache = (theme: ResolvedTheme) =>
   theme === 'dark' ? colorCacheDark : colorCacheLight
@@ -230,13 +224,13 @@ async function getPalette(url: string): Promise<Palette | null> {
   const cached = paletteCache.get(url)
   if (cached) return cached
 
-  let promise = pending.get(url)
+  let promise = pendingPalettes.get(url)
   if (!promise) {
     promise = fetchBlobUrl(url).then((blob) =>
       blob ? extractPaletteWithTimeout(url, blob, vibrantWorkerModule) : null,
     )
-    pending.set(url, promise)
-    void promise.finally(() => pending.delete(url))
+    pendingPalettes.set(url, promise)
+    void promise.finally(() => pendingPalettes.delete(url))
   }
   return promise
 }
@@ -278,21 +272,24 @@ export function useVibrantColor(
 ): VibrantColors | null {
   const enabled = options?.enabled ?? true
   const theme = useAppStore(selectTheme)
-  const resolvedTheme = useMemo(() => resolveTheme(theme), [theme])
-  const cache = useMemo(() => getCache(resolvedTheme), [resolvedTheme])
+  const resolvedTheme = resolveTheme(theme)
+  const cache = getCache(resolvedTheme)
 
-  const [colors, setColors] = useState<VibrantColors | null>(() =>
-    imageUrl && enabled ? (cache.get(imageUrl) ?? null) : null,
-  )
+  // Track only the async-fetched result; cache reads are derived during render.
+  const [pending, setPending] = useState<{
+    for: string
+    theme: ResolvedTheme
+    colors: VibrantColors
+  } | null>(null)
 
   useEffect(() => {
-    const cached = imageUrl && enabled ? (cache.get(imageUrl) ?? null) : null
-    setColors(cached)
-    if (!imageUrl || !enabled || cached) return
+    if (!imageUrl || !enabled || cache.has(imageUrl)) return
 
     let cancelled = false
     void getColors(imageUrl, resolvedTheme).then((result) => {
-      if (!cancelled && result) setColors(result)
+      if (!cancelled && result) {
+        setPending({ for: imageUrl, theme: resolvedTheme, colors: result })
+      }
     })
 
     return () => {
@@ -300,5 +297,11 @@ export function useVibrantColor(
     }
   }, [imageUrl, resolvedTheme, cache, enabled])
 
-  return colors
+  // Derive from cache synchronously during render — no extra re-render needed.
+  if (!imageUrl || !enabled) return null
+  const cached = cache.peek(imageUrl)
+  if (cached) return cached
+  return pending?.for === imageUrl && pending.theme === resolvedTheme
+    ? pending.colors
+    : null
 }

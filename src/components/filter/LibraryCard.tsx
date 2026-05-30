@@ -3,7 +3,7 @@
  * Similar to MediaCard but designed for library/collection display.
  */
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { LucideIcon } from 'lucide-react'
 
@@ -26,7 +26,7 @@ interface LibraryCardProps {
   index?: number
 }
 
-export const LibraryCard = memo(function LibraryCardComponent({
+export const LibraryCard = function LibraryCardComponent({
   collection,
   Icon,
   onSelect,
@@ -38,18 +38,18 @@ export const LibraryCard = memo(function LibraryCardComponent({
   const [imageLoaded, setImageLoaded] = useState(false)
 
   // Construct the direct image URL for the library
-  const rawImageUrl = useMemo(() => {
+  const rawImageUrl = (() => {
     if (!collection.ItemId) return null
     const baseUrl = getServerBaseUrl()
     return `${baseUrl}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
-  }, [collection.ItemId])
+  })()
 
   // Convert to blob URL for COEP compliance
   const imageUrl = useBlobUrl(rawImageUrl)
 
-  const selectLibrary = useCallback(() => {
+  const selectLibrary = () => {
     onSelect(collection.ItemId ?? null)
-  }, [collection.ItemId, onSelect])
+  }
 
   const accessibleLabel = t('items.selectLibraryButton', {
     name: collection.Name || 'Unknown',
@@ -115,4 +115,4 @@ export const LibraryCard = memo(function LibraryCardComponent({
       </div>
     </button>
   )
-})
+}

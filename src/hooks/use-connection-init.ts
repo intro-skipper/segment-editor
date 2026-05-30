@@ -1,12 +1,3 @@
-/**
- * Connection initialization hook.
- *
- * Handles both plugin mode (credentials from parent window) and
- * standalone mode (credentials from persisted store).
- *
- * @module hooks/use-connection-init
- */
-
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -41,10 +32,6 @@ interface ConnectionState {
   showWizard: boolean
 }
 
-/**
- * Initializes connection on app startup.
- * Call once in root component — other components should use `usePluginMode`.
- */
 export function useConnectionInit(): ConnectionState {
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>('idle')
@@ -80,7 +67,6 @@ export function useConnectionInit(): ConnectionState {
     const controller = new AbortController()
 
     const init = async () => {
-      // Get credentials based on mode
       const pluginCreds = isPlugin ? getPluginCredentials() : null
       const standaloneCreds =
         !isPlugin && serverAddress && apiKey
@@ -129,10 +115,10 @@ export function useConnectionInit(): ConnectionState {
       } catch {
         if (controller.signal.aborted) return
         useApiStore.getState().setConnectionStatus(false, false)
-      } finally {
-        if (!controller.signal.aborted) {
-          setValidationStatus('validated')
-        }
+      }
+
+      if (!controller.signal.aborted) {
+        setValidationStatus('validated')
       }
     }
 
@@ -155,10 +141,6 @@ export function useConnectionInit(): ConnectionState {
   }
 }
 
-/**
- * Hook for components that need connection state.
- * Does NOT initialize connection - use after `useConnectionInit` in root.
- */
 export function usePluginMode() {
   const { validAuth, serverAddress, apiKey } = useApiStore(
     useShallow((s: ReturnType<typeof useApiStore.getState>) => ({

@@ -1,7 +1,5 @@
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   startTransition,
   useState,
@@ -165,22 +163,14 @@ function MediaListRow({
   interactiveProps,
   onActivate,
 }: MediaListRowProps) {
-  const imageUrl = useMemo(
-    () => getBestImageUrl(item, 160, 240) ?? null,
-    [item],
-  )
+  const imageUrl = getBestImageUrl(item, 160, 240) ?? null
   const vibrantColors = useVibrantColor(imageUrl)
   const animationDelay = staggerDelay(index, STAGGER_FAST)
   const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
-  const cardStyle = useMemo(
-    () =>
-      vibrantColors ? { backgroundColor: vibrantColors.primary } : undefined,
-    [vibrantColors],
-  )
-  const textStyle = useMemo(
-    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
-    [vibrantColors],
-  )
+  const cardStyle = vibrantColors
+    ? { backgroundColor: vibrantColors.primary }
+    : undefined
+  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
 
   return (
     <InteractiveCard
@@ -296,6 +286,19 @@ function getPageNumbers(
 
 const routeApi = getRouteApi('/')
 
+type RootNavigate = ReturnType<typeof useNavigate>
+
+function navigateToPage(navigate: RootNavigate, pageNum: number) {
+  void navigate({
+    to: '/',
+    search: (prev) => ({
+      ...prev,
+      page: pageNum > 1 ? pageNum : undefined,
+    }),
+    replace: true,
+  })
+}
+
 export function FilterView() {
   return useRenderFilterView()
 }
@@ -317,20 +320,6 @@ function useRenderFilterView() {
     Number.isFinite(pageSize) && pageSize > 0 && pageSize <= 240 ? pageSize : 24
   const requestedPage = Math.max(1, currentPage)
   const startIndex = (requestedPage - 1) * effectivePageSize
-
-  const setCurrentPage = useCallback(
-    (pageNum: number) => {
-      void navigate({
-        to: '/',
-        search: (prev) => ({
-          ...prev,
-          page: pageNum > 1 ? pageNum : undefined,
-        }),
-        replace: true,
-      })
-    },
-    [navigate],
-  )
 
   const columns = useGridColumns()
   const navigationColumns = viewMode === 'list' ? 1 : columns
@@ -379,9 +368,9 @@ function useRenderFilterView() {
 
   useEffect(() => {
     if (currentPage !== validCurrentPage) {
-      setCurrentPage(validCurrentPage)
+      navigateToPage(navigate, validCurrentPage)
     }
-  }, [currentPage, validCurrentPage, setCurrentPage])
+  }, [currentPage, validCurrentPage, navigate])
 
   const handleItemActivate = (index: number) => {
     const item = paginatedItems.at(index)
@@ -411,10 +400,12 @@ function useRenderFilterView() {
     gridRef.current = node
   }
 
-  const preloadedUrlsRef = useRef(new Set<string>())
+  const preloadedUrlsRef = useRef<Set<string> | null>(null)
+  if (preloadedUrlsRef.current === null)
+    preloadedUrlsRef.current = new Set<string>()
 
   useEffect(() => {
-    preloadedUrlsRef.current.clear()
+    preloadedUrlsRef.current!.clear()
   }, [selectedCollection])
 
   useEffect(() => {
@@ -432,13 +423,13 @@ function useRenderFilterView() {
         const item = paginatedItems[index]
 
         const url = getBestImageUrl(item, 200)
-        if (!url || preloadedUrlsRef.current.has(url)) continue
+        if (!url || preloadedUrlsRef.current!.has(url)) continue
 
         imageUrls.push(url)
       }
 
       if (imageUrls.length > 0) {
-        imageUrls.forEach((url) => preloadedUrlsRef.current.add(url))
+        imageUrls.forEach((url) => preloadedUrlsRef.current!.add(url))
         preloadVibrantColors(imageUrls)
       }
     }
@@ -482,7 +473,7 @@ function useRenderFilterView() {
   const handlePageChange = (newPage: number) => {
     setFocusedIndex(-1)
     startTransition(() => {
-      setCurrentPage(newPage)
+      navigateToPage(navigate, newPage)
     })
     if (typeof window === 'undefined') return
 

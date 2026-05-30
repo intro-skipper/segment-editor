@@ -15,27 +15,28 @@ import { blobCache, fetchBlobUrl } from '@/lib/cache-manager'
  * @returns The blob URL, or empty string if not yet loaded or failed
  */
 export function useBlobUrl(url: string | null | undefined): string {
-  const [blobUrl, setBlobUrl] = useState(() =>
-    url ? (blobCache.get(url) ?? '') : '',
+  // Track only the async-fetched result; cache reads are derived during render.
+  const [pending, setPending] = useState<{ for: string; blob: string } | null>(
+    null,
   )
 
   useEffect(() => {
-    const cached = url ? (blobCache.get(url) ?? '') : ''
-    setBlobUrl(cached)
-    if (!url || cached) return
+    if (!url || blobCache.has(url)) return
 
     let cancelled = false
-
     void fetchBlobUrl(url).then((result) => {
       if (!cancelled && result) {
-        setBlobUrl(result)
+        setPending({ for: url, blob: result })
       }
     })
-
     return () => {
       cancelled = true
     }
   }, [url])
 
-  return blobUrl
+  // Derive from cache synchronously during render — no extra re-render needed.
+  if (!url) return ''
+  const cached = blobCache.peek(url)
+  if (cached) return cached
+  return pending?.for === url ? pending.blob : ''
 }

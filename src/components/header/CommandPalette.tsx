@@ -3,15 +3,7 @@
  * Accessible via Cmd/Ctrl+K or / keyboard shortcuts
  */
 
-import {
-  memo,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useDeferredValue, useEffect, useReducer, useRef } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Film, Loader2, Mic2, Play, Search, Tv, X } from 'lucide-react'
@@ -38,6 +30,54 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void
 }
 
+interface CommandPaletteState {
+  search: string
+  debouncedSearch: string
+  selectedIndex: number
+  includeEpisodes: boolean
+  scrollElement: HTMLDivElement | null
+}
+
+type CommandPaletteAction =
+  | { type: 'setSearch'; search: string }
+  | { type: 'setDebouncedSearch'; debouncedSearch: string }
+  | { type: 'setSelectedIndex'; selectedIndex: number }
+  | { type: 'toggleIncludeEpisodes' }
+  | { type: 'setScrollElement'; scrollElement: HTMLDivElement | null }
+  | { type: 'resetSearch' }
+
+const initialCommandPaletteState: CommandPaletteState = {
+  search: '',
+  debouncedSearch: '',
+  selectedIndex: 0,
+  includeEpisodes: false,
+  scrollElement: null,
+}
+
+function commandPaletteReducer(
+  state: CommandPaletteState,
+  action: CommandPaletteAction,
+): CommandPaletteState {
+  switch (action.type) {
+    case 'setSearch':
+      return { ...state, search: action.search, selectedIndex: 0 }
+    case 'setDebouncedSearch':
+      return { ...state, debouncedSearch: action.debouncedSearch }
+    case 'setSelectedIndex':
+      return { ...state, selectedIndex: action.selectedIndex }
+    case 'toggleIncludeEpisodes':
+      return {
+        ...state,
+        includeEpisodes: !state.includeEpisodes,
+        selectedIndex: 0,
+      }
+    case 'setScrollElement':
+      return { ...state, scrollElement: action.scrollElement }
+    case 'resetSearch':
+      return { ...state, search: '', debouncedSearch: '', selectedIndex: 0 }
+  }
+}
+
 const ITEM_ICONS: Partial<Record<BaseItemKind, typeof Film>> = {
   [BaseItemKind.Movie]: Film,
   [BaseItemKind.Series]: Tv,
@@ -46,7 +86,7 @@ const ITEM_ICONS: Partial<Record<BaseItemKind, typeof Film>> = {
   [BaseItemKind.Audio]: Mic2,
 }
 
-const SearchResultItem = memo(function SearchResultItemComponent({
+function SearchResultItem({
   item,
   optionId,
   isSelected,
@@ -62,9 +102,9 @@ const SearchResultItem = memo(function SearchResultItemComponent({
   onIntent: (item: BaseItemDto) => void
 }) {
   const Icon = (item.Type && ITEM_ICONS[item.Type]) ?? Film
-  const selectResult = useCallback(() => {
+  const selectResult = () => {
     onSelect(item)
-  }, [onSelect, item])
+  }
 
   return (
     <button
@@ -120,51 +160,54 @@ const SearchResultItem = memo(function SearchResultItemComponent({
       />
     </button>
   )
-})
+}
 
-export const CommandPalette = memo(function CommandPaletteComponent({
-  open,
-  onOpenChange,
-}: CommandPaletteProps) {
+const getResultItemKey = (item: BaseItemDto, index: number) =>
+  item.Id ?? `${item.Type ?? 'item'}-${index}`
+
+// eslint-disable-next-line react-doctor/no-giant-component -- cohesive dialog controller; extracting single-use fragments would add prop-drilling without reducing complexity
+export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const router = useRouter()
   const selectedCollection = useSelectedCollectionSearch()
-  const prefetchedItemIdsRef = useRef(new Set<string>())
+  const prefetchedItemIdsRef = useRef<Set<string> | null>(null)
+  if (prefetchedItemIdsRef.current === null) {
+    prefetchedItemIdsRef.current = new Set<string>()
+  }
 
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const [includeEpisodes, setIncludeEpisodes] = useState(false)
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
-    null,
+  const [state, dispatch] = useReducer(
+    commandPaletteReducer,
+    initialCommandPaletteState,
   )
+  const {
+    search,
+    debouncedSearch,
+    selectedIndex,
+    includeEpisodes,
+    scrollElement,
+  } = state
   const scrollElementRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const handleScrollContainerRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      scrollElementRef.current = node
-      setScrollElement(node)
-    },
-    [],
-  )
+  const handleScrollContainerRef = (node: HTMLDivElement | null) => {
+    scrollElementRef.current = node
+    dispatch({ type: 'setScrollElement', scrollElement: node })
+  }
 
   const deferredSearch = useDeferredValue(search)
   const trimmedSearch = deferredSearch.trim()
   const canSearch = debouncedSearch.length >= MIN_SEARCH_LENGTH
-  const excludedItemTypes = useMemo<Array<BaseItemKind> | undefined>(
-    () =>
-      includeEpisodes ? undefined : [BaseItemKind.Episode, BaseItemKind.Season],
-    [includeEpisodes],
-  )
+  const excludedItemTypes: Array<BaseItemKind> | undefined = includeEpisodes
+    ? undefined
+    : [BaseItemKind.Episode, BaseItemKind.Season]
 
   useEffect(() => {
     if (!open) return
 
     const timeoutId = window.setTimeout(() => {
-      setDebouncedSearch(trimmedSearch)
+      dispatch({ type: 'setDebouncedSearch', debouncedSearch: trimmedSearch })
     }, SEARCH_DEBOUNCE_MS)
 
     return () => {
@@ -180,7 +223,7 @@ export const CommandPalette = memo(function CommandPaletteComponent({
     includeMediaStreams: false,
     enabled: open && !!selectedCollection && canSearch,
   })
-  const resultItems = useMemo(() => {
+  const resultItems = (() => {
     const items = itemsData?.items ?? []
 
     if (!excludedItemTypes) {
@@ -191,25 +234,19 @@ export const CommandPalette = memo(function CommandPaletteComponent({
       (item) =>
         item.Type === undefined || !excludedItemTypes.includes(item.Type),
     )
-  }, [itemsData, excludedItemTypes])
+  })()
 
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearch(e.target.value)
-      setSelectedIndex(0)
-    },
-    [],
-  )
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    dispatch({ type: 'setSearch', search: e.target.value })
+  }
 
-  const handleClearSearch = useCallback(() => {
-    setSearch('')
-    setSelectedIndex(0)
-  }, [])
+  const handleClearSearch = () => {
+    dispatch({ type: 'setSearch', search: '' })
+  }
 
-  const handleEpisodeInclusionToggle = useCallback(() => {
-    setIncludeEpisodes((prev) => !prev)
-    setSelectedIndex(0)
-  }, [])
+  const handleEpisodeInclusionToggle = () => {
+    dispatch({ type: 'toggleIncludeEpisodes' })
+  }
 
   const listHeight =
     Math.min(resultItems.length || 1, MAX_VISIBLE_ITEMS) * ITEM_HEIGHT
@@ -237,107 +274,85 @@ export const CommandPalette = memo(function CommandPaletteComponent({
     ? virtualEndIndex
     : resultItems.length
 
-  const visibleItems = useMemo(
-    () => resultItems.slice(visibleStartIndex, visibleEndIndex),
-    [resultItems, visibleStartIndex, visibleEndIndex],
-  )
+  const visibleItems = resultItems.slice(visibleStartIndex, visibleEndIndex)
 
-  const getResultItemKey = (item: BaseItemDto, index: number) =>
-    item.Id ?? `${item.Type ?? 'item'}-${index}`
+  const setSelectedIndexWithScroll = (nextIndex: number) => {
+    dispatch({ type: 'setSelectedIndex', selectedIndex: nextIndex })
+    if (open && resultItems.length > 0 && scrollElementRef.current) {
+      const list = scrollElementRef.current
+      const itemTop = nextIndex * ITEM_HEIGHT
+      const itemBottom = itemTop + ITEM_HEIGHT
+      const viewportTop = list.scrollTop
+      const viewportBottom = viewportTop + listHeight
 
-  const setSelectedIndexWithScroll = useCallback(
-    (nextIndex: number) => {
-      setSelectedIndex(nextIndex)
-      if (open && resultItems.length > 0 && scrollElementRef.current) {
-        const list = scrollElementRef.current
-        const itemTop = nextIndex * ITEM_HEIGHT
-        const itemBottom = itemTop + ITEM_HEIGHT
-        const viewportTop = list.scrollTop
-        const viewportBottom = viewportTop + listHeight
-
-        if (itemTop < viewportTop) {
-          list.scrollTop = itemTop
-        } else if (itemBottom > viewportBottom) {
-          list.scrollTop = itemBottom - listHeight
-        }
+      if (itemTop < viewportTop) {
+        list.scrollTop = itemTop
+      } else if (itemBottom > viewportBottom) {
+        list.scrollTop = itemBottom - listHeight
       }
-    },
-    [open, resultItems.length, listHeight],
-  )
+    }
+  }
 
   const safeIndex = Math.min(selectedIndex, Math.max(0, resultItems.length - 1))
 
-  const handleOpenChange = useCallback(
-    (isOpen: boolean) => {
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      triggerRef.current = document.activeElement as HTMLElement
+    }
+
+    if (!isOpen) {
+      dispatch({ type: 'resetSearch' })
+    }
+
+    onOpenChange(isOpen)
+
+    requestAnimationFrame(() => {
       if (isOpen) {
-        triggerRef.current = document.activeElement as HTMLElement
+        inputRef.current?.focus()
+      } else {
+        triggerRef.current?.focus()
       }
+    })
+  }
 
-      if (!isOpen) {
-        setSearch('')
-        setDebouncedSearch('')
-        setSelectedIndex(0)
-      }
+  const handleSelect = (item: BaseItemDto) => {
+    navigateToMediaItem(navigate, item)
+    handleOpenChange(false)
+  }
 
-      onOpenChange(isOpen)
+  const handleIntent = (item: BaseItemDto) => {
+    const itemId = item.Id
+    const prefetchedItemIds = prefetchedItemIdsRef.current!
+    if (!itemId || prefetchedItemIds.has(itemId)) {
+      return
+    }
 
-      requestAnimationFrame(() => {
-        if (isOpen) {
-          inputRef.current?.focus()
-        } else {
-          triggerRef.current?.focus()
+    prefetchedItemIds.add(itemId)
+    preloadMediaRoute(router.preloadRoute, item)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!resultItems.length) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndexWithScroll(
+          Math.min(safeIndex + 1, resultItems.length - 1),
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndexWithScroll(Math.max(safeIndex - 1, 0))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (resultItems[safeIndex]) {
+          handleSelect(resultItems[safeIndex])
         }
-      })
-    },
-    [onOpenChange],
-  )
-
-  const handleSelect = useCallback(
-    (item: BaseItemDto) => {
-      navigateToMediaItem(navigate, item)
-      handleOpenChange(false)
-    },
-    [navigate, handleOpenChange],
-  )
-
-  const handleIntent = useCallback(
-    (item: BaseItemDto) => {
-      const itemId = item.Id
-      if (!itemId || prefetchedItemIdsRef.current.has(itemId)) {
-        return
-      }
-
-      prefetchedItemIdsRef.current.add(itemId)
-      preloadMediaRoute(router.preloadRoute, item)
-    },
-    [router],
-  )
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (!resultItems.length) return
-
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault()
-          setSelectedIndexWithScroll(
-            Math.min(safeIndex + 1, resultItems.length - 1),
-          )
-          break
-        case 'ArrowUp':
-          e.preventDefault()
-          setSelectedIndexWithScroll(Math.max(safeIndex - 1, 0))
-          break
-        case 'Enter':
-          e.preventDefault()
-          if (resultItems[safeIndex]) {
-            handleSelect(resultItems[safeIndex])
-          }
-          break
-      }
-    },
-    [resultItems, safeIndex, handleSelect, setSelectedIndexWithScroll],
-  )
+        break
+    }
+  }
 
   const activeDescendantId = resultItems[safeIndex]
     ? `search-result-${getResultItemKey(resultItems[safeIndex], safeIndex)}`
@@ -495,4 +510,4 @@ export const CommandPalette = memo(function CommandPaletteComponent({
       </DialogContent>
     </Dialog>
   )
-})
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import Hls from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
@@ -45,6 +45,30 @@ const createError = (
   recoverable,
 })
 
+function clearRecoveryTimer(
+  recoveryTimerRef: React.MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>,
+) {
+  if (recoveryTimerRef.current) {
+    clearTimeout(recoveryTimerRef.current)
+    recoveryTimerRef.current = null
+  }
+}
+
+function destroyHlsInstance(
+  hlsRef: React.RefObject<Hls | null>,
+  recoveryTimerRef: React.MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>,
+) {
+  clearRecoveryTimer(recoveryTimerRef)
+  if (hlsRef.current) {
+    hlsRef.current.destroy()
+    hlsRef.current = null
+  }
+}
+
 export function useHlsPlayer({
   videoUrl,
   onError,
@@ -77,21 +101,6 @@ export function useHlsPlayer({
     ): HlsPlayerError => createError(type, msgKey, t, recoverable),
   )
 
-  const clearRecoveryTimer = useCallback(() => {
-    if (recoveryTimerRef.current) {
-      clearTimeout(recoveryTimerRef.current)
-      recoveryTimerRef.current = null
-    }
-  }, [])
-
-  const destroyHls = useCallback(() => {
-    clearRecoveryTimer()
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
-  }, [clearRecoveryTimer])
-
   useEffect(() => {
     const video = videoRef.current
     const recoveryTimer = recoveryTimerRef
@@ -109,7 +118,7 @@ export function useHlsPlayer({
     isActiveRef.current = true
 
     reportError(null)
-    destroyHls()
+    destroyHlsInstance(hlsRef, recoveryTimerRef)
 
     if (Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG)
@@ -126,7 +135,7 @@ export function useHlsPlayer({
         reportRecoveryStart()
         recoveryFn()
 
-        clearRecoveryTimer()
+        clearRecoveryTimer(recoveryTimerRef)
         recoveryTimerRef.current = setTimeout(() => {
           if (isActiveRef.current) reportRecoveryEnd()
         }, RECOVERY_TIMEOUT_MS)
@@ -156,7 +165,7 @@ export function useHlsPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (!isActiveRef.current) return
         reportError(null)
-        clearRecoveryTimer()
+        clearRecoveryTimer(recoveryTimerRef)
         reportRecoveryEnd()
       })
 
@@ -172,14 +181,14 @@ export function useHlsPlayer({
         clearTimeout(recoveryTimer.current)
         recoveryTimer.current = null
       }
-      destroyHls()
+      destroyHlsInstance(hlsRef, recoveryTimerRef)
     }
-  }, [videoUrl, destroyHls, clearRecoveryTimer])
+  }, [videoUrl])
 
-  const retry = useCallback(() => {
+  const retry = () => {
     onError(null)
     hlsRef.current?.loadSource(videoUrl)
-  }, [onError, videoUrl])
+  }
 
   return { videoRef, hlsRef, retry }
 }

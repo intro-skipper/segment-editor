@@ -6,7 +6,6 @@
  * @module components/connection/steps/EntryStep
  */
 
-import { useCallback } from 'react'
 import { Loader2, Search, Server } from 'lucide-react'
 
 import { WizardError } from '../WizardError'
@@ -41,15 +40,12 @@ export function EntryStep({
   onRetry,
   inputRef,
 }: EntryStepProps) {
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !isLoading) {
-        e.preventDefault()
-        void onDiscover()
-      }
-    },
-    [isLoading, onDiscover],
-  )
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isLoading) {
+      e.preventDefault()
+      void onDiscover()
+    }
+  }
 
   return (
     <form.Field name="address">

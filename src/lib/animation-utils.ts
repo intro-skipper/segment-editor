@@ -4,7 +4,7 @@ export const STAGGER_NORMAL = 40
 export const STAGGER_SLOW = 50
 
 /** Maximum delay to prevent long entrance waits (ms) */
-export const MAX_STAGGER_DELAY = 300
+const MAX_STAGGER_DELAY = 300
 
 /** Returns a CSS-ready animation delay string for staggered entrances. */
 export function staggerDelay(

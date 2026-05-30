@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useForm, useStore } from '@tanstack/react-form'
 import { canGoBack, getPreviousStep } from './connection-wizard-flow'
@@ -70,104 +70,101 @@ export function useConnectionWizardController(): ConnectionWizardController {
 
   const formRef = useRef<ConnectionWizardFormApi | null>(null)
 
-  const handleFormSubmit = useCallback(
-    async (value: ConnectionWizardFormValues) => {
-      if (step === 'entry') {
-        const controller = createController()
-        setIsRequestPending(true)
-        setRequestError(null)
-
-        try {
-          const result = await discoverServers(value.address, {
-            signal: controller.signal,
-          })
-
-          if (!controller.signal.aborted) {
-            if (result.error) {
-              setIsRequestPending(false)
-              setRequestError(result.error)
-              return
-            }
-
-            if (result.servers.length === 0) {
-              setIsRequestPending(false)
-              setRequestError(
-                'No servers found at this address. Check the address and try again.',
-              )
-              return
-            }
-
-            const nextSelectedServer =
-              result.servers.find(
-                (server) => server.address === value.selectedServerAddress,
-              ) ?? findBestServer(result.servers)
-
-            setServers(result.servers)
-            setRequestError(null)
-            setIsRequestPending(false)
-            setStep('select')
-            formRef.current?.setFieldValue(
-              'selectedServerAddress',
-              nextSelectedServer?.address ?? '',
-              {
-                dontValidate: true,
-              },
-            )
-          }
-        } catch (error) {
-          if (controller.signal.aborted) return
-          setIsRequestPending(false)
-          setRequestError(
-            error instanceof Error ? error.message : 'Server discovery failed',
-          )
-        }
-        return
-      }
-
-      if (step !== 'auth') return
-
-      const selectedServer =
-        servers.find(
-          (server) => server.address === value.selectedServerAddress,
-        ) ?? null
-
-      if (!selectedServer) {
-        setStep('select')
-        return
-      }
-
+  const handleFormSubmit = async (value: ConnectionWizardFormValues) => {
+    if (step === 'entry') {
       const controller = createController()
       setIsRequestPending(true)
       setRequestError(null)
 
-      const credentials = buildCredentialsFromForm(value)
       try {
-        const result = await authenticate(selectedServer.address, credentials, {
+        const result = await discoverServers(value.address, {
           signal: controller.signal,
         })
 
         if (!controller.signal.aborted) {
-          if (!result.success) {
+          if (result.error) {
             setIsRequestPending(false)
-            setRequestError(result.error ?? 'Authentication failed')
+            setRequestError(result.error)
             return
           }
 
-          storeAuthResult(selectedServer.address, result, credentials.method)
-          setIsRequestPending(false)
+          if (result.servers.length === 0) {
+            setIsRequestPending(false)
+            setRequestError(
+              'No servers found at this address. Check the address and try again.',
+            )
+            return
+          }
+
+          const nextSelectedServer =
+            result.servers.find(
+              (server) => server.address === value.selectedServerAddress,
+            ) ?? findBestServer(result.servers)
+
+          setServers(result.servers)
           setRequestError(null)
-          setStep('success')
+          setIsRequestPending(false)
+          setStep('select')
+          formRef.current?.setFieldValue(
+            'selectedServerAddress',
+            nextSelectedServer?.address ?? '',
+            {
+              dontValidate: true,
+            },
+          )
         }
       } catch (error) {
         if (controller.signal.aborted) return
         setIsRequestPending(false)
         setRequestError(
-          error instanceof Error ? error.message : 'Authentication failed',
+          error instanceof Error ? error.message : 'Server discovery failed',
         )
       }
-    },
-    [createController, servers, step],
-  )
+      return
+    }
+
+    if (step !== 'auth') return
+
+    const selectedServer =
+      servers.find(
+        (server) => server.address === value.selectedServerAddress,
+      ) ?? null
+
+    if (!selectedServer) {
+      setStep('select')
+      return
+    }
+
+    const controller = createController()
+    setIsRequestPending(true)
+    setRequestError(null)
+
+    const credentials = buildCredentialsFromForm(value)
+    try {
+      const result = await authenticate(selectedServer.address, credentials, {
+        signal: controller.signal,
+      })
+
+      if (!controller.signal.aborted) {
+        if (!result.success) {
+          setIsRequestPending(false)
+          setRequestError(result.error ?? 'Authentication failed')
+          return
+        }
+
+        storeAuthResult(selectedServer.address, result, credentials.method)
+        setIsRequestPending(false)
+        setRequestError(null)
+        setStep('success')
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setIsRequestPending(false)
+      setRequestError(
+        error instanceof Error ? error.message : 'Authentication failed',
+      )
+    }
+  }
 
   const form = useConnectionWizardForm(step, handleFormSubmit)
 
@@ -177,63 +174,56 @@ export function useConnectionWizardController(): ConnectionWizardController {
 
   useEffect(() => abort, [abort])
 
-  const clearRequestError = useCallback(() => {
+  const clearRequestError = () => {
     setRequestError(null)
-  }, [])
+  }
 
-  const reset = useCallback(() => {
+  const reset = () => {
     abort()
     setStep('entry')
     setServers([])
     setIsRequestPending(false)
     setRequestError(null)
     form.reset(CONNECTION_WIZARD_DEFAULT_VALUES)
-  }, [abort, form])
+  }
 
   const selectedServerAddress = useStore(
     form.store,
     (state) => state.values.selectedServerAddress,
   )
 
-  const selectedServer = useMemo(
-    () =>
-      servers.find((server) => server.address === selectedServerAddress) ??
-      null,
-    [selectedServerAddress, servers],
-  )
+  const selectedServer =
+    servers.find((server) => server.address === selectedServerAddress) ?? null
 
-  const handleDiscoverSubmit = useCallback(async () => {
+  const handleDiscoverSubmit = async () => {
     await form.handleSubmit()
-  }, [form])
+  }
 
   const handleAuthSubmit = handleDiscoverSubmit
 
-  const handleRetryDiscovery = useCallback(() => {
+  const handleRetryDiscovery = () => {
     void handleDiscoverSubmit()
-  }, [handleDiscoverSubmit])
+  }
 
   const handleRetryAuth = handleRetryDiscovery
 
-  const handleServerSelect = useCallback(
-    (server: RecommendedServerInfo) => {
-      form.setFieldValue('selectedServerAddress', server.address, {
-        dontValidate: true,
-      })
-      setRequestError(null)
-    },
-    [form],
-  )
+  const handleServerSelect = (server: RecommendedServerInfo) => {
+    form.setFieldValue('selectedServerAddress', server.address, {
+      dontValidate: true,
+    })
+    setRequestError(null)
+  }
 
-  const handleProceedToAuth = useCallback(() => {
+  const handleProceedToAuth = () => {
     const nextSelectedServerAddress = form.getFieldValue(
       'selectedServerAddress',
     )
     if (!nextSelectedServerAddress.trim()) return
     setRequestError(null)
     setStep('auth')
-  }, [form])
+  }
 
-  const handleBack = useCallback(() => {
+  const handleBack = () => {
     abort()
     setIsRequestPending(false)
     setRequestError(null)
@@ -241,7 +231,7 @@ export function useConnectionWizardController(): ConnectionWizardController {
     const previousStep = getPreviousStep(step)
     if (!previousStep) return
     setStep(previousStep)
-  }, [abort, step])
+  }
 
   return {
     form,

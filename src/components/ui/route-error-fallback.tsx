@@ -1,9 +1,3 @@
-/**
- * RouteErrorFallback - Consistent error display for route-level errors.
- * Provides user-friendly error messages with retry and navigation options.
- */
-
-import { useCallback } from 'react'
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
@@ -19,20 +13,12 @@ import {
 } from '@/components/ui/card'
 
 interface RouteErrorFallbackProps {
-  /** Error message to display */
   message?: string
-  /** Whether to show retry button */
   showRetry?: boolean
-  /** Custom retry handler */
   onRetry?: () => void
-  /** Minimum height class */
   minHeightClass?: string
 }
 
-/**
- * Consistent error fallback for route-level errors.
- * Provides navigation options and optional retry functionality.
- */
 export function RouteErrorFallback({
   message,
   showRetry = true,
@@ -43,13 +29,13 @@ export function RouteErrorFallback({
   const canGoBack = useCanGoBack()
   const router = useRouter()
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     if (onRetry) {
       onRetry()
     } else {
       void router.invalidate()
     }
-  }, [onRetry, router])
+  }
 
   return (
     <div

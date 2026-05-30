@@ -1,27 +1,14 @@
-/**
- * InteractiveCard - Reusable accessible card with keyboard navigation.
- * Consolidates duplicated patterns from SeriesView, AlbumView, ArtistView.
- */
-
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 interface InteractiveCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Click handler for the card */
   onClick?: () => void
-  /** Animation delay as CSS value for staggered entrance (e.g. "120ms") */
   animationDelay?: string
-  /** Whether to animate entrance */
   animate?: boolean
-  /** Accessible label for the card */
   'aria-label'?: string
 }
 
-/**
- * Accessible interactive card with keyboard support.
- * Renders as a native <button> for proper accessibility semantics.
- */
-export const InteractiveCard = React.memo(function InteractiveCardComponent({
+export const InteractiveCard = function InteractiveCardComponent({
   onClick,
   animationDelay,
   animate = false,
@@ -52,4 +39,4 @@ export const InteractiveCard = React.memo(function InteractiveCardComponent({
       {children}
     </button>
   )
-})
+}

@@ -16,7 +16,7 @@ function Suspend(): never {
   throw NEVER
 }
 
-export function Freeze({ frozen, children }: FreezeProps) {
+function Freeze({ frozen, children }: FreezeProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null)
 
   React.useInsertionEffect(() => {

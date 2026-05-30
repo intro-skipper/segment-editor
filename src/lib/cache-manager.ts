@@ -56,6 +56,17 @@ export class LRUCache<TKey, TValue> {
   }
 
   /**
+   * Reads a cached value without updating its recency.
+   * Use this from render paths where cache reads must stay pure.
+   *
+   * @param key - The key to look up
+   * @returns The cached value or undefined if not found
+   */
+  peek(key: TKey): TValue | undefined {
+    return this.cache.get(key)
+  }
+
+  /**
    * Stores a value in the cache.
    * If the cache is at capacity, the least recently used entry is evicted.
    *

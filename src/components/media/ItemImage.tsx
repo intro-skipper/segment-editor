@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { decode } from 'blurhash'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -23,20 +23,14 @@ interface ItemImageProps {
   showFallback?: boolean
 }
 
-// Cache for decoded blurhash data URLs to avoid re-decoding
 const blurhashCache = new Map<string, string>()
 const MAX_CACHE_SIZE = 100
 
-/**
- * Decodes a blurhash string to a data URL with caching.
- * Uses canvas to render the blurhash pixels.
- */
 function decodeBlurhashToDataUrl(
   blurhash: string,
   width: number = 32,
   height: number = 32,
 ): string | null {
-  // Check cache first
   const cacheKey = `${blurhash}-${width}-${height}`
   const cached = blurhashCache.get(cacheKey)
   if (cached) return cached
@@ -55,7 +49,6 @@ function decodeBlurhashToDataUrl(
 
     const dataUrl = canvas.toDataURL()
 
-    // Add to cache with LRU eviction
     if (blurhashCache.size >= MAX_CACHE_SIZE) {
       const firstKey = blurhashCache.keys().next().value
       if (firstKey) blurhashCache.delete(firstKey)
@@ -68,10 +61,6 @@ function decodeBlurhashToDataUrl(
   }
 }
 
-/**
- * ItemImage component displays a media item's image with blurhash placeholder.
- * Shows a blurred placeholder while the full image loads, then fades in the actual image.
- */
 export function ItemImage({
   item,
   maxWidth = 300,
@@ -92,32 +81,26 @@ export function ItemImage({
     dataUrl: string | null
   } | null>(null)
 
-  // Start with the raw image URL to avoid unnecessary blob fetches.
-  // Fall back to blob URL only if the raw URL fails due to COEP/CORP restrictions.
-  const rawImageUrl = useMemo(
-    () => getBestImageUrl(item, maxWidth, maxHeight) ?? null,
-    [item, maxWidth, maxHeight],
-  )
+  const rawImageUrl = getBestImageUrl(item, maxWidth, maxHeight) ?? null
   const useBlobFallback =
     rawImageUrl !== null && blobFallbackSource === rawImageUrl
   const blobImageUrl = useBlobUrl(useBlobFallback ? rawImageUrl : null)
   const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
 
-  // Resolve blurhash lazily to keep render path cheap.
-  const blurhash = useMemo(() => getImageBlurhash(item) ?? null, [item])
-  const cachedBlurhashDataUrl = useMemo(() => {
+  const blurhash = getImageBlurhash(item) ?? null
+  const cachedBlurhashDataUrl = (() => {
     if (!blurhash) return null
     return blurhashCache.get(`${blurhash}-32-32`) ?? null
-  }, [blurhash])
+  })()
 
-  const blurhashDataUrl = useMemo(() => {
+  const blurhashDataUrl = (() => {
     if (!blurhash) return null
     if (cachedBlurhashDataUrl) return cachedBlurhashDataUrl
     if (decodedBlurhashState?.blurhash === blurhash) {
       return decodedBlurhashState.dataUrl
     }
     return null
-  }, [blurhash, cachedBlurhashDataUrl, decodedBlurhashState])
+  })()
 
   useEffect(() => {
     if (!blurhash || cachedBlurhashDataUrl) {
@@ -143,7 +126,6 @@ export function ItemImage({
     }
   }, [blurhash, cachedBlurhashDataUrl])
 
-  // Reset state when image source changes using key pattern
   const imageKey = imageUrl || rawImageUrl || item.Id
   const isLoaded = imageUrl !== null && loadedSource === imageUrl
 
@@ -173,7 +155,6 @@ export function ItemImage({
   const shouldShowFallback =
     (!imageUrl && !blurhashDataUrl) || hasFinalImageError
 
-  // No image available and no placeholder to show
   if (shouldShowFallback) {
     if (!showFallback) return null
 
@@ -202,7 +183,6 @@ export function ItemImage({
         className,
       )}
     >
-      {/* Blurhash placeholder */}
       {blurhashDataUrl && !isLoaded && (
         <img
           src={blurhashDataUrl}
@@ -214,12 +194,10 @@ export function ItemImage({
         />
       )}
 
-      {/* Actual image with native lazy loading */}
       {imageUrl && (
         <img
           ref={(el) => {
             imgRef.current = el
-            // Check if already cached when ref is set
             if (el?.complete && el.naturalWidth > 0) {
               setLoadedSource(el.currentSrc || imageUrl)
             }

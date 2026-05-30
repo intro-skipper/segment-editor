@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, Music, Play } from 'lucide-react'
 
@@ -22,7 +21,7 @@ interface TrackRowProps {
   onTrackSelect: (trackId: string) => void
 }
 
-const TrackRow = React.memo(function TrackRowComponent({
+const TrackRow = function TrackRowComponent({
   track,
   trackId,
   index,
@@ -33,9 +32,9 @@ const TrackRow = React.memo(function TrackRowComponent({
     ? formatReadableTime(ticksToSeconds(track.RunTimeTicks))
     : '--:--'
 
-  const handleSelectTrack = React.useCallback(() => {
+  const handleSelectTrack = () => {
     onTrackSelect(trackId)
-  }, [onTrackSelect, trackId])
+  }
 
   return (
     <InteractiveCard
@@ -65,7 +64,7 @@ const TrackRow = React.memo(function TrackRowComponent({
       </div>
     </InteractiveCard>
   )
-})
+}
 
 export function AlbumView({ album, tracks }: AlbumViewProps) {
   const navigate = useNavigate({ from: '/album/$itemId' })
@@ -73,21 +72,15 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
   const albumName = album.Name || 'Unknown Album'
   const artistName = album.AlbumArtist || album.Artists?.[0] || 'Unknown Artist'
 
-  const handleBack = React.useCallback(
-    () => void navigate({ to: '/' }),
-    [navigate],
-  )
+  const handleBack = () => void navigate({ to: '/' })
 
-  const handleTrackClick = React.useCallback(
-    (trackId: string) => {
-      void navigate({
-        to: '/player/$itemId',
-        params: { itemId: trackId },
-        search: { fetchSegments: 'true' },
-      })
-    },
-    [navigate],
-  )
+  const handleTrackClick = (trackId: string) => {
+    void navigate({
+      to: '/player/$itemId',
+      params: { itemId: trackId },
+      search: { fetchSegments: 'true' },
+    })
+  }
 
   return (
     <div className="space-y-6">
