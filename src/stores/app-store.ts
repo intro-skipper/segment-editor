@@ -136,7 +136,7 @@ export const useAppStore = create<AppStore>()(
           return persistedState
         }
         let state = persistedState as Record<string, unknown>
-        if (version < 1 && state.segmentSkipMode === 'auto') {
+        if (state.segmentSkipMode === 'auto') {
           state = { ...state, segmentSkipMode: 'skip' }
         }
         if (version < 2 && !('jellyfinPlaybackSyncEnabled' in state)) {
