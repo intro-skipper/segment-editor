@@ -1,5 +1,5 @@
-minimumReleaseAge: 10080
-trustPolicy: no-downgrade
+minimumReleaseAge: 0
+trustPolicy: allow-all
 allowBuilds:
   msgpackr-extract: true
   msw: true
