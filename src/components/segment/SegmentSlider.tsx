@@ -186,7 +186,6 @@ export function SegmentSlider({
     return true
   }
 
-
   const markLocalRangeDirtyIfChanged = (nextRange: {
     start: number
     end: number
@@ -217,7 +216,6 @@ export function SegmentSlider({
       type === 'start'
         ? { ...stableRangeRef.current, start: nextValue }
         : { ...stableRangeRef.current, end: nextValue }
-
 
     if (markDirty) {
       markLocalRangeDirtyIfChanged(nextRange)

@@ -87,8 +87,11 @@ function findPreferredSubtitleIndex(
   return null
 }
 
-function getTrackSwitchErrorMessage(error: { message: string }): string {
-  return error.message
+function getTrackSwitchErrorMessage(
+  error: { message: string },
+  fallback: string,
+): string {
+  return error.message ? error.message : fallback
 }
 
 function getCaughtTrackSwitchErrorMessage(
@@ -252,7 +255,10 @@ export function useTrackManager({
               },
         )
       } else if (result.error) {
-        const errorMsg = getTrackSwitchErrorMessage(result.error)
+        const errorMsg = getTrackSwitchErrorMessage(
+          result.error,
+          t('player.tracks.error.switchFailed'),
+        )
         setError(errorMsg)
         showError(errorMsg)
       }
@@ -320,7 +326,10 @@ export function useTrackManager({
               },
         )
       } else if (result.error) {
-        const errorMsg = getTrackSwitchErrorMessage(result.error)
+        const errorMsg = getTrackSwitchErrorMessage(
+          result.error,
+          t('player.tracks.error.switchFailed'),
+        )
         setError(errorMsg)
         showError(errorMsg)
       }

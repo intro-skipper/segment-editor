@@ -1252,7 +1252,7 @@ function useRenderPlayer({
           onKeyDown={handleVideoContainerKeyDown}
           aria-label={t('player.videoPlayer')}
         >
-          {/* Captions are rendered from Jellyfin subtitle metadata when a real VTT source is available. */}
+          {/* Captions are data-dependent: native VTT tracks are rendered when Jellyfin exposes them; ASS/SSA subtitles are rendered by JASSUB. */}
           {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
           <video
             ref={videoRef}
