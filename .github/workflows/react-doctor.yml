@@ -2,21 +2,20 @@ name: React Doctor
 
 on:
   pull_request:
-  push:
-    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
-  pull-requests: write # required to post PR comments
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: react-doctor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   react-doctor:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0 # required for `diff`
-      - uses: millionco/react-doctor@19afa9ba3ba673e3df682ee919423a21cdf14313
-        with:
-          diff: master
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: millionco/react-doctor@main
