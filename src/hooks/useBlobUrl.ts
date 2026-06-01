@@ -6,8 +6,35 @@
  * Uses the shared blobCache and fetchBlobUrl for consistency with useVibrantColor.
  */
 
-import { useEffect, useState } from 'react'
-import { blobCache, fetchBlobUrl } from '@/lib/cache-manager'
+import { useSyncExternalStore } from 'react'
+import {
+  blobCache,
+  fetchBlobUrl,
+  getBlobCacheUrlSnapshot,
+  subscribeBlobCacheUrl,
+} from '@/lib/cache-manager'
+
+function subscribeBlobUrl(
+  url: string | null | undefined,
+  onStoreChange: () => void,
+): () => void {
+  const unsubscribe = subscribeBlobCacheUrl(url, () => {
+    onStoreChange()
+    if (url && !getBlobCacheUrlSnapshot(url)) {
+      void fetchBlobUrl(url)
+    }
+  })
+
+  if (url) {
+    if (getBlobCacheUrlSnapshot(url)) {
+      blobCache.get(url)
+    } else {
+      void fetchBlobUrl(url)
+    }
+  }
+
+  return unsubscribe
+}
 
 /**
  * Fetches an image URL and returns a blob URL that bypasses COEP restrictions.
@@ -15,27 +42,12 @@ import { blobCache, fetchBlobUrl } from '@/lib/cache-manager'
  * @returns The blob URL, or empty string if not yet loaded or failed
  */
 export function useBlobUrl(url: string | null | undefined): string {
-  const [blobUrl, setBlobUrl] = useState(() =>
-    url ? (blobCache.get(url) ?? '') : '',
+  const cached = useSyncExternalStore(
+    (onStoreChange) => subscribeBlobUrl(url, onStoreChange),
+    () => getBlobCacheUrlSnapshot(url),
+    () => getBlobCacheUrlSnapshot(url),
   )
 
-  useEffect(() => {
-    const cached = url ? (blobCache.get(url) ?? '') : ''
-    setBlobUrl(cached)
-    if (!url || cached) return
-
-    let cancelled = false
-
-    void fetchBlobUrl(url).then((result) => {
-      if (!cancelled && result) {
-        setBlobUrl(result)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [url])
-
-  return blobUrl
+  if (!url) return ''
+  return cached
 }

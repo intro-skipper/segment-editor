@@ -1,17 +1,4 @@
-/**
- * useTrackManager - Hook for managing audio and subtitle track selection.
- *
- * Features:
- * - Extracts available tracks from media item
- * - Handles track switching for both HLS and direct play modes
- * - Manages active track state
- * - Provides error handling with notifications
- * - Auto-selects tracks based on user preferences
- *
- * @module hooks/use-track-manager
- */
-
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -38,37 +25,20 @@ import { showError } from '@/lib/notifications'
 import { languagesMatch } from '@/lib/language-utils'
 import { useAppStore } from '@/stores/app-store'
 
-/**
- * Options for the useTrackManager hook.
- */
 interface UseTrackManagerOptions {
-  /** The Jellyfin item containing media source information */
   item: BaseItemDto | null
-  /** Current playback strategy (direct or hls) */
   strategy: PlaybackStrategy
-  /** Ref to the video element */
   videoRef: React.RefObject<HTMLVideoElement | null>
-  /** Ref to the HLS.js instance (required for HLS mode) */
   hlsRef?: React.RefObject<Hls | null>
-  /** Translation function for error messages */
   t: (key: string) => string
-  /** Callback to reload HLS stream with new URL (for audio track switching) */
   onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
 }
 
-/**
- * Return value from the useTrackManager hook.
- */
 interface UseTrackManagerReturn {
-  /** Current state of available and active tracks */
   trackState: TrackState
-  /** Select an audio track by index */
   selectAudioTrack: (index: number) => Promise<void>
-  /** Select a subtitle track by index, or null to turn off subtitles */
   selectSubtitleTrack: (index: number | null) => Promise<void>
-  /** Whether a track switch operation is in progress */
   isLoading: boolean
-  /** Current error message, if any */
   error: string | null
 }
 
@@ -80,10 +50,6 @@ interface UserTrackSelectionState {
   subtitleIndex: number | null
 }
 
-/**
- * Finds the best audio track index based on preferences.
- * Priority: 1) Matching preferred language, 2) Default track, 3) First track
- */
 function findPreferredAudioIndex(
   audioTracks: Array<AudioTrackInfo>,
   preferredLanguage: string | null,
@@ -101,10 +67,6 @@ function findPreferredAudioIndex(
   return audioTracks.length > 0 ? audioTracks[0].index : 0
 }
 
-/**
- * Finds the best subtitle track index based on preferences.
- * Priority: 1) Matching preferred language (if enabled), 2) Default track (if enabled), 3) null (off)
- */
 function findPreferredSubtitleIndex(
   subtitleTracks: Array<SubtitleTrackInfo>,
   preferredLanguage: string | null,
@@ -125,18 +87,21 @@ function findPreferredSubtitleIndex(
   return null
 }
 
-/**
- * Hook for managing audio and subtitle track selection.
- *
- * This hook extracts available tracks from a media item and provides
- * functions to switch between them. It handles both HLS and direct play
- * modes, delegating to the appropriate switching service.
- *
- * Auto-selects tracks based on user preferences stored in the app store.
- *
- * @param options - Hook options including item, strategy, and refs
- * @returns Track state and selection functions
- */
+function getTrackSwitchErrorMessage(
+  error: { message: string },
+  fallback: string,
+): string {
+  return error.message ? error.message : fallback
+}
+
+function getCaughtTrackSwitchErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (error instanceof Error) return error.message
+  return fallback
+}
+
 export function useTrackManager({
   item,
   strategy,
@@ -145,6 +110,8 @@ export function useTrackManager({
   t,
   onReloadHls,
 }: UseTrackManagerOptions): UseTrackManagerReturn {
+  'use memo'
+
   const [userSelection, setUserSelection] = useState<UserTrackSelectionState>({
     key: '',
     hasAudioSelection: false,
@@ -155,7 +122,9 @@ export function useTrackManager({
   const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const abortControllerRef = useRef<AbortController>(new AbortController())
+  const abortControllerRef = useRef<AbortController | null>(null)
+  if (abortControllerRef.current === null)
+    abortControllerRef.current = new AbortController()
   useEffect(() => {
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -177,34 +146,20 @@ export function useTrackManager({
     })),
   )
 
-  const { audioTracks, subtitleTracks } = useMemo(() => {
+  const { audioTracks, subtitleTracks } = (() => {
     if (!item) {
       return { audioTracks: [], subtitleTracks: [] }
     }
     return extractTracks(item as Parameters<typeof extractTracks>[0])
-  }, [item])
+  })()
 
   const itemId = item?.Id ?? undefined
 
-  const trackResetKey = useMemo(
-    () =>
-      [
-        itemId ?? '',
-        preferredAudioLanguage ?? '',
-        preferredSubtitleLanguage ?? '',
-        subtitlesEnabled ? '1' : '0',
-        audioTracks.length,
-        subtitleTracks.length,
-      ].join('|'),
-    [
-      itemId,
-      preferredAudioLanguage,
-      preferredSubtitleLanguage,
-      subtitlesEnabled,
-      audioTracks.length,
-      subtitleTracks.length,
-    ],
-  )
+  const trackResetKey = `${itemId ?? ''}|${preferredAudioLanguage ?? ''}|${
+    preferredSubtitleLanguage ?? ''
+  }|${subtitlesEnabled ? '1' : '0'}|${audioTracks.length}|${
+    subtitleTracks.length
+  }`
 
   const preferredAudioIndex = itemId
     ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
@@ -228,196 +183,166 @@ export function useTrackManager({
       ? userSelection.subtitleIndex
       : preferredSubtitleIndex
 
-  const trackState: TrackState = useMemo(
-    () => ({
-      audioTracks,
-      subtitleTracks,
-      activeAudioIndex,
-      activeSubtitleIndex,
-    }),
-    [audioTracks, subtitleTracks, activeAudioIndex, activeSubtitleIndex],
-  )
+  const trackState: TrackState = {
+    audioTracks,
+    subtitleTracks,
+    activeAudioIndex,
+    activeSubtitleIndex,
+  }
 
   const mediaSourceId = item?.MediaSources?.[0]?.Id ?? undefined
 
-  const audioTrackMap = useMemo(
-    () => new Map(audioTracks.map((track) => [track.index, track])),
-    [audioTracks],
+  const audioTrackMap = new Map(
+    audioTracks.map((track) => [track.index, track]),
   )
 
-  const subtitleTrackMap = useMemo(
-    () => new Map(subtitleTracks.map((track) => [track.index, track])),
-    [subtitleTracks],
+  const subtitleTrackMap = new Map(
+    subtitleTracks.map((track) => [track.index, track]),
   )
 
-  const createSwitchOptions = useCallback(
-    (videoElement: HTMLVideoElement) => ({
-      strategy,
-      videoElement,
-      hlsInstance: hlsRef?.current,
-      itemId,
-      mediaSourceId,
-      audioTracks,
-      subtitleTracks,
-      onReloadHls,
-      signal: abortControllerRef.current.signal,
-    }),
-    [
-      strategy,
-      hlsRef,
-      itemId,
-      mediaSourceId,
-      audioTracks,
-      subtitleTracks,
-      onReloadHls,
-    ],
-  )
+  const createSwitchOptions = (videoElement: HTMLVideoElement) => ({
+    strategy,
+    videoElement,
+    hlsInstance: hlsRef?.current,
+    itemId,
+    mediaSourceId,
+    audioTracks,
+    subtitleTracks,
+    onReloadHls,
+    signal: abortControllerRef.current!.signal,
+  })
 
-  const selectAudioTrack = useCallback(
-    async (index: number): Promise<void> => {
-      const video = videoRef.current
-      if (!video) {
-        setError(t('player.tracks.error.noVideo'))
-        return
+  const selectAudioTrack = async (index: number): Promise<void> => {
+    const video = videoRef.current
+    if (!video) {
+      setError(t('player.tracks.error.noVideo'))
+      return
+    }
+
+    const track = audioTrackMap.get(index)
+    if (!track) {
+      const errorMsg = t('player.tracks.error.trackNotFound')
+      setError(errorMsg)
+      showError(errorMsg)
+      return
+    }
+
+    if (index === trackState.activeAudioIndex) {
+      return
+    }
+
+    setIsTrackOperationPending(true)
+    setError(null)
+
+    try {
+      const result: TrackSwitchResult = await switchAudioTrack(
+        index,
+        createSwitchOptions(video),
+      )
+
+      if (result.success) {
+        setUserSelection((prev) =>
+          prev.key === trackResetKey
+            ? { ...prev, hasAudioSelection: true, audioIndex: index }
+            : {
+                key: trackResetKey,
+                hasAudioSelection: true,
+                audioIndex: index,
+                hasSubtitleSelection: false,
+                subtitleIndex: null,
+              },
+        )
+      } else if (result.error) {
+        const errorMsg = getTrackSwitchErrorMessage(
+          result.error,
+          t('player.tracks.error.switchFailed'),
+        )
+        setError(errorMsg)
+        showError(errorMsg)
       }
+    } catch (err) {
+      const errorMsg = getCaughtTrackSwitchErrorMessage(
+        err,
+        t('player.tracks.error.switchFailed'),
+      )
+      setError(errorMsg)
+      showError(errorMsg)
+    }
 
-      const track = audioTrackMap.get(index)
+    setIsTrackOperationPending(false)
+  }
+
+  const selectSubtitleTrack = async (index: number | null): Promise<void> => {
+    const video = videoRef.current
+    if (!video) {
+      setError(t('player.tracks.error.noVideo'))
+      return
+    }
+
+    let selectedTrack: SubtitleTrackInfo | null = null
+    if (index !== null) {
+      const track = subtitleTrackMap.get(index)
       if (!track) {
         const errorMsg = t('player.tracks.error.trackNotFound')
         setError(errorMsg)
         showError(errorMsg)
         return
       }
+      selectedTrack = track
+    }
 
-      if (index === trackState.activeAudioIndex) {
-        return
-      }
+    if (index === trackState.activeSubtitleIndex) {
+      return
+    }
 
-      setIsTrackOperationPending(true)
-      setError(null)
+    if (selectedTrack !== null && requiresJassubRenderer(selectedTrack)) {
+      void preloadJassubRenderer().catch(() => {})
+    }
 
-      try {
-        const result: TrackSwitchResult = await switchAudioTrack(index, {
-          ...createSwitchOptions(video),
-        })
+    setIsTrackOperationPending(true)
+    setError(null)
 
-        if (result.success) {
-          setUserSelection((prev) =>
-            prev.key === trackResetKey
-              ? { ...prev, hasAudioSelection: true, audioIndex: index }
-              : {
-                  key: trackResetKey,
-                  hasAudioSelection: true,
-                  audioIndex: index,
-                  hasSubtitleSelection: false,
-                  subtitleIndex: null,
-                },
-          )
-        } else if (result.error) {
-          const errorMsg =
-            result.error.message || t('player.tracks.error.switchFailed')
-          setError(errorMsg)
-          showError(errorMsg)
-        }
-      } catch (err) {
-        const errorMsg =
-          err instanceof Error
-            ? err.message
-            : t('player.tracks.error.switchFailed')
+    try {
+      const result: TrackSwitchResult = await switchSubtitleTrack(
+        index,
+        createSwitchOptions(video),
+      )
+
+      if (result.success) {
+        setUserSelection((prev) =>
+          prev.key === trackResetKey
+            ? {
+                ...prev,
+                hasSubtitleSelection: true,
+                subtitleIndex: index,
+              }
+            : {
+                key: trackResetKey,
+                hasAudioSelection: false,
+                audioIndex: 0,
+                hasSubtitleSelection: true,
+                subtitleIndex: index,
+              },
+        )
+      } else if (result.error) {
+        const errorMsg = getTrackSwitchErrorMessage(
+          result.error,
+          t('player.tracks.error.switchFailed'),
+        )
         setError(errorMsg)
         showError(errorMsg)
-      } finally {
-        setIsTrackOperationPending(false)
       }
-    },
-    [
-      videoRef,
-      t,
-      audioTrackMap,
-      trackState.activeAudioIndex,
-      createSwitchOptions,
-      trackResetKey,
-    ],
-  )
+    } catch (err) {
+      const errorMsg = getCaughtTrackSwitchErrorMessage(
+        err,
+        t('player.tracks.error.switchFailed'),
+      )
+      setError(errorMsg)
+      showError(errorMsg)
+    }
 
-  const selectSubtitleTrack = useCallback(
-    async (index: number | null): Promise<void> => {
-      const video = videoRef.current
-      if (!video) {
-        setError(t('player.tracks.error.noVideo'))
-        return
-      }
-
-      if (index !== null) {
-        const track = subtitleTrackMap.get(index)
-        if (!track) {
-          const errorMsg = t('player.tracks.error.trackNotFound')
-          setError(errorMsg)
-          showError(errorMsg)
-          return
-        }
-      }
-
-      if (index === trackState.activeSubtitleIndex) {
-        return
-      }
-
-      setIsTrackOperationPending(true)
-      setError(null)
-
-      try {
-        const selectedTrack =
-          index === null ? null : subtitleTrackMap.get(index)
-        if (selectedTrack && requiresJassubRenderer(selectedTrack)) {
-          void preloadJassubRenderer().catch(() => {})
-        }
-
-        const result: TrackSwitchResult = await switchSubtitleTrack(index, {
-          ...createSwitchOptions(video),
-        })
-
-        if (result.success) {
-          setUserSelection((prev) =>
-            prev.key === trackResetKey
-              ? {
-                  ...prev,
-                  hasSubtitleSelection: true,
-                  subtitleIndex: index,
-                }
-              : {
-                  key: trackResetKey,
-                  hasAudioSelection: false,
-                  audioIndex: 0,
-                  hasSubtitleSelection: true,
-                  subtitleIndex: index,
-                },
-          )
-        } else if (result.error) {
-          const errorMsg =
-            result.error.message || t('player.tracks.error.switchFailed')
-          setError(errorMsg)
-          showError(errorMsg)
-        }
-      } catch (err) {
-        const errorMsg =
-          err instanceof Error
-            ? err.message
-            : t('player.tracks.error.switchFailed')
-        setError(errorMsg)
-        showError(errorMsg)
-      } finally {
-        setIsTrackOperationPending(false)
-      }
-    },
-    [
-      videoRef,
-      t,
-      subtitleTrackMap,
-      trackState.activeSubtitleIndex,
-      createSwitchOptions,
-      trackResetKey,
-    ],
-  )
+    setIsTrackOperationPending(false)
+  }
 
   return {
     trackState,

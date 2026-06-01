@@ -1,12 +1,3 @@
-/**
- * LanguageSection Component
- *
- * Locale/language selection settings section.
- *
- * @module components/settings/sections/LanguageSection
- */
-
-import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe } from 'lucide-react'
 
@@ -20,23 +11,17 @@ export function LanguageSection() {
   const locale = useAppStore((s) => s.locale)
   const setLocale = useAppStore((s) => s.setLocale)
 
-  const options = useMemo<Array<SelectOption<Locale>>>(
-    () => [
-      { value: 'auto', label: t('app.locale.auto') },
-      { value: 'en-US', label: t('app.locale.en-US') },
-      { value: 'de', label: t('app.locale.de') },
-      { value: 'fr', label: t('app.locale.fr') },
-    ],
-    [t],
-  )
+  const options: Array<SelectOption<Locale>> = [
+    { value: 'auto', label: t('app.locale.auto') },
+    { value: 'en-US', label: t('app.locale.en-US') },
+    { value: 'de', label: t('app.locale.de') },
+    { value: 'fr', label: t('app.locale.fr') },
+  ]
 
-  const handleChange = useCallback(
-    (value: Locale) => {
-      setLocale(value)
-      void i18n.changeLanguage(getEffectiveLocale(value))
-    },
-    [setLocale, i18n],
-  )
+  const handleChange = (value: Locale) => {
+    setLocale(value)
+    void i18n.changeLanguage(getEffectiveLocale(value))
+  }
 
   return (
     <SelectSettingsSection

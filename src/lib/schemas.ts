@@ -8,10 +8,6 @@
 
 import { z } from 'zod'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Jellyfin ID schema - accepts both standard UUID format (with dashes)
  * and Jellyfin's 32-character hex format (without dashes).
@@ -58,37 +54,29 @@ export const TimeInputSchema = z.union([
 
 export const MediaSegmentArraySchema = z.array(MediaSegmentSchema)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// API Response Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Base item schema for Jellyfin media items.
  * Uses passthrough() to allow additional fields from API while validating core fields.
  */
-const BaseItemSchema = z
-  .object({
-    Id: JellyfinIdSchema.optional(),
-    Name: z.string().optional(),
-    Type: z.string().optional(),
-    ParentId: JellyfinIdSchema.optional().nullable(),
-    SeriesId: JellyfinIdSchema.optional().nullable(),
-    SeasonId: JellyfinIdSchema.optional().nullable(),
-    RunTimeTicks: z.number().nonnegative().optional().nullable(),
-    IndexNumber: z.number().int().optional().nullable(),
-    ParentIndexNumber: z.number().int().optional().nullable(),
-  })
-  .passthrough()
+const BaseItemSchema = z.looseObject({
+  Id: JellyfinIdSchema.optional(),
+  Name: z.string().optional(),
+  Type: z.string().optional(),
+  ParentId: JellyfinIdSchema.optional().nullable(),
+  SeriesId: JellyfinIdSchema.optional().nullable(),
+  SeasonId: JellyfinIdSchema.optional().nullable(),
+  RunTimeTicks: z.number().nonnegative().optional().nullable(),
+  IndexNumber: z.number().int().optional().nullable(),
+  ParentIndexNumber: z.number().int().optional().nullable(),
+})
 
 export const BaseItemArraySchema = z.array(BaseItemSchema)
 
-const VirtualFolderSchema = z
-  .object({
-    Name: z.string().optional(),
-    ItemId: z.string().optional(),
-    CollectionType: z.string().optional().nullable(),
-  })
-  .passthrough()
+const VirtualFolderSchema = z.looseObject({
+  Name: z.string().optional(),
+  ItemId: z.string().optional(),
+  CollectionType: z.string().optional().nullable(),
+})
 
 export const VirtualFolderArraySchema = z.array(VirtualFolderSchema)
 
@@ -100,10 +88,6 @@ const SearchInputSchema = z
   .string()
   .max(200, 'Search query too long')
   .transform((val) => val.trim())
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation Helpers (only for commonly used patterns)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const isValidItemId = (id: unknown): id is string =>
   ItemIdSchema.safeParse(id).success

@@ -3,7 +3,7 @@
  * Similar to MediaCard but designed for library/collection display.
  */
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { LucideIcon } from 'lucide-react'
 
@@ -26,7 +26,7 @@ interface LibraryCardProps {
   index?: number
 }
 
-export const LibraryCard = memo(function LibraryCardComponent({
+export const LibraryCard = function LibraryCardComponent({
   collection,
   Icon,
   onSelect,
@@ -36,20 +36,32 @@ export const LibraryCard = memo(function LibraryCardComponent({
   const { t } = useTranslation()
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [useBlobFallback, setUseBlobFallback] = useState(false)
 
   // Construct the direct image URL for the library
-  const rawImageUrl = useMemo(() => {
-    if (!collection.ItemId) return null
-    const baseUrl = getServerBaseUrl()
-    return `${baseUrl}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
-  }, [collection.ItemId])
+  const rawImageUrl = collection.ItemId
+    ? `${getServerBaseUrl()}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
+    : null
 
-  // Convert to blob URL for COEP compliance
-  const imageUrl = useBlobUrl(rawImageUrl)
+  // Start with the direct image URL; only fetch a blob fallback if COEP/CORS
+  // blocks the image. Fetching every library image as a blob up front can
+  // allocate a large number of object URLs during the library landing view.
+  const blobImageUrl = useBlobUrl(useBlobFallback ? rawImageUrl : null)
+  const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
 
-  const selectLibrary = useCallback(() => {
+  const handleImageError = () => {
+    if (!useBlobFallback && rawImageUrl) {
+      setImageLoaded(false)
+      setUseBlobFallback(true)
+      return
+    }
+
+    setImageError(true)
+  }
+
+  const selectLibrary = () => {
     onSelect(collection.ItemId ?? null)
-  }, [collection.ItemId, onSelect])
+  }
 
   const accessibleLabel = t('items.selectLibraryButton', {
     name: collection.Name || 'Unknown',
@@ -87,7 +99,7 @@ export const LibraryCard = memo(function LibraryCardComponent({
             height={270}
             decoding="async"
             onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
+            onError={handleImageError}
             className={cn(
               'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
               imageLoaded ? 'opacity-100' : 'opacity-0',
@@ -115,4 +127,4 @@ export const LibraryCard = memo(function LibraryCardComponent({
       </div>
     </button>
   )
-})
+}

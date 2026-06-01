@@ -77,6 +77,71 @@ function snapAndClampEnd(
   return clampEndToBounds(snapToFrame(value, frameStep), start, runtime)
 }
 
+interface SegmentRange {
+  start: number
+  end: number
+}
+
+interface SegmentSyncSnapshot {
+  id: MediaSegmentDto['Id']
+  startTicks: MediaSegmentDto['StartTicks']
+  endTicks: MediaSegmentDto['EndTicks']
+  type: MediaSegmentDto['Type']
+}
+
+function getSegmentSyncSnapshot(segment: MediaSegmentDto): SegmentSyncSnapshot {
+  return {
+    id: segment.Id,
+    startTicks: segment.StartTicks,
+    endTicks: segment.EndTicks,
+    type: segment.Type,
+  }
+}
+
+function areSegmentSyncSnapshotsEqual(
+  a: SegmentSyncSnapshot,
+  b: SegmentSyncSnapshot,
+): boolean {
+  return (
+    a.id === b.id &&
+    a.startTicks === b.startTicks &&
+    a.endTicks === b.endTicks &&
+    a.type === b.type
+  )
+}
+
+function syncSegmentProps(
+  segment: MediaSegmentDto,
+  lastSyncedPropsRef: React.RefObject<SegmentSyncSnapshot | null>,
+  stableRangeRef: React.RefObject<SegmentRange>,
+  setStableRange: React.Dispatch<React.SetStateAction<SegmentRange>>,
+  resetForm: () => void,
+): boolean {
+  const nextSnapshot = getSegmentSyncSnapshot(segment)
+  const previousSnapshot = lastSyncedPropsRef.current
+  if (
+    previousSnapshot &&
+    areSegmentSyncSnapshotsEqual(previousSnapshot, nextSnapshot)
+  ) {
+    return false
+  }
+
+  lastSyncedPropsRef.current = nextSnapshot
+
+  const nextRange = {
+    start: segment.StartTicks ?? 0,
+    end: segment.EndTicks ?? 0,
+  }
+  stableRangeRef.current = nextRange
+  setStableRange((current) =>
+    current.start === nextRange.start && current.end === nextRange.end
+      ? current
+      : nextRange,
+  )
+  resetForm()
+  return true
+}
+
 interface SegmentSliderProps {
   /** The segment to display and edit */
   segment: MediaSegmentDto
@@ -110,7 +175,8 @@ interface SegmentSliderProps {
  * SegmentSlider component.
  * Displays a segment with dual-handle range slider and numeric inputs.
  */
-export const SegmentSlider = React.memo(function SegmentSliderComponent({
+// eslint-disable-next-line react-doctor/no-giant-component -- cohesive range-editing controller; prior extraction caused broad prop bags and unnecessary complexity
+export function SegmentSlider({
   segment,
   index,
   isActive,
@@ -125,78 +191,94 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   onEdit,
   vibrantColors,
 }: SegmentSliderProps) {
+  'use memo'
   const { t } = useTranslation()
   const sliderRef = React.useRef<HTMLFieldSetElement>(null)
   const form = useForm({
     defaultValues: getSegmentFormDefaults(segment),
   })
   const formValues = useStore(form.store, (state) => state.values)
-  const [isDragging, setIsDragging] = React.useState<'start' | 'end' | null>(
-    null,
-  )
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
-  const [activeInput, setActiveInput] = React.useState<'start' | 'end' | null>(
-    null,
-  )
-  const [stableRange, setStableRange] = React.useState({
+  const activeInputRef = React.useRef<'start' | 'end' | null>(null)
+  const [stableRange, setStableRange] = React.useState<SegmentRange>({
     start: segment.StartTicks ?? 0,
     end: segment.EndTicks ?? 0,
   })
-  const stableRangeRef = React.useRef(stableRange)
-  const lastSyncedPropsRef = React.useRef({
-    id: segment.Id,
-    startTicks: segment.StartTicks,
-    endTicks: segment.EndTicks,
-    type: segment.Type,
-  })
-  const isDraggingRef = React.useRef(isDragging)
+  const stableRangeRef = React.useRef<SegmentRange>(stableRange)
+  const lastSyncedPropsRef = React.useRef<SegmentSyncSnapshot | null>(null)
+  if (lastSyncedPropsRef.current === null) {
+    lastSyncedPropsRef.current = getSegmentSyncSnapshot(segment)
+  }
+  const isDraggingRef = React.useRef<'start' | 'end' | null>(null)
   const pointerCaptureTargetRef = React.useRef<HTMLElement | null>(null)
   const pointerIdRef = React.useRef<number | null>(null)
   const rafRef = React.useRef<number | null>(null)
   const pendingPositionRef = React.useRef<number | null>(null)
+  const hasLocalRangeDirtyRef = React.useRef(false)
 
-  const updateStableRange = React.useCallback(
-    (nextRange: { start: number; end: number }) => {
-      stableRangeRef.current = nextRange
-      setStableRange((current) =>
-        current.start === nextRange.start && current.end === nextRange.end
-          ? current
-          : nextRange,
-      )
+  const syncSegmentPropsIfChanged = () => {
+    if (isDraggingRef.current || activeInputRef.current !== null) return false
+
+    return syncSegmentProps(
+      segment,
+      lastSyncedPropsRef,
+      stableRangeRef,
+      setStableRange,
+      () => form.reset(getSegmentFormDefaults(segment)),
+    )
+  }
+
+  const markLocalRangeDirtyIfChanged = (nextRange: {
+    start: number
+    end: number
+  }) => {
+    const currentRange = stableRangeRef.current
+    if (
+      nextRange.start !== currentRange.start ||
+      nextRange.end !== currentRange.end
+    ) {
+      hasLocalRangeDirtyRef.current = true
+    }
+  }
+  const updateStableRange = (nextRange: { start: number; end: number }) => {
+    stableRangeRef.current = nextRange
+    setStableRange((current) =>
+      current.start === nextRange.start && current.end === nextRange.end
+        ? current
+        : nextRange,
+    )
+  }
+
+  const applyDraftBoundary = (
+    type: 'start' | 'end',
+    nextValue: number,
+    markDirty = false,
+  ) => {
+    const nextRange =
+      type === 'start'
+        ? { ...stableRangeRef.current, start: nextValue }
+        : { ...stableRangeRef.current, end: nextValue }
+
+    if (markDirty) {
+      markLocalRangeDirtyIfChanged(nextRange)
+    }
+    updateStableRange(nextRange)
+    form.setFieldValue(
+      type === 'start' ? 'startText' : 'endText',
+      formatSegmentInputSeconds(nextValue),
+      { dontValidate: true },
+    )
+
+    return nextRange
+  }
+
+  const { draftRange, validation } = getSegmentDraftState(
+    formValues,
+    {
+      startSeconds: stableRange.start,
+      endSeconds: stableRange.end,
     },
-    [],
-  )
-
-  const applyDraftBoundary = React.useCallback(
-    (type: 'start' | 'end', nextValue: number) => {
-      const nextRange =
-        type === 'start'
-          ? { ...stableRangeRef.current, start: nextValue }
-          : { ...stableRangeRef.current, end: nextValue }
-
-      updateStableRange(nextRange)
-      form.setFieldValue(
-        type === 'start' ? 'startText' : 'endText',
-        formatSegmentInputSeconds(nextValue),
-        { dontValidate: true },
-      )
-
-      return nextRange
-    },
-    [form, updateStableRange],
-  )
-
-  const { draftRange, validation } = React.useMemo(
-    () =>
-      getSegmentDraftState(
-        formValues,
-        {
-          startSeconds: stableRange.start,
-          endSeconds: stableRange.end,
-        },
-        runtimeSeconds,
-      ),
-    [formValues, runtimeSeconds, stableRange.end, stableRange.start],
+    runtimeSeconds,
   )
 
   const liveRange = validation.valid
@@ -209,10 +291,6 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   const localStart = liveRange.start
   const localEnd = liveRange.end
 
-  React.useLayoutEffect(() => {
-    isDraggingRef.current = isDragging
-  }, [isDragging])
-
   React.useEffect(
     () => () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
@@ -221,47 +299,25 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
   )
 
   React.useLayoutEffect(() => {
-    if (isDragging || activeInput !== null) return
+    if (isDraggingRef.current || activeInputRef.current !== null) return
 
-    const prev = lastSyncedPropsRef.current
-    const propsChanged =
-      prev.id !== segment.Id ||
-      prev.startTicks !== segment.StartTicks ||
-      prev.endTicks !== segment.EndTicks ||
-      prev.type !== segment.Type
-
-    if (!propsChanged) return
-
-    lastSyncedPropsRef.current = {
-      id: segment.Id,
-      startTicks: segment.StartTicks,
-      endTicks: segment.EndTicks,
-      type: segment.Type,
-    }
-
-    updateStableRange({
-      start: segment.StartTicks ?? 0,
-      end: segment.EndTicks ?? 0,
-    })
-    form.reset(getSegmentFormDefaults(segment))
-  }, [form, segment, isDragging, activeInput, updateStableRange])
+    syncSegmentProps(
+      segment,
+      lastSyncedPropsRef,
+      stableRangeRef,
+      setStableRange,
+      () => form.reset(getSegmentFormDefaults(segment)),
+    )
+  }, [form, segment])
 
   const segmentColor = getSegmentColor(formValues.type)
   const segmentCssVar = getSegmentCssVar(formValues.type)
 
-  const segmentStyles = React.useMemo(() => {
-    const startPercent =
-      runtimeSeconds > 0 ? (localStart / runtimeSeconds) * 100 : 0
-    const endPercent =
-      runtimeSeconds > 0 ? (localEnd / runtimeSeconds) * 100 : 100
-    return {
-      startPercent,
-      endPercent,
-      widthPercent: endPercent - startPercent,
-    }
-  }, [localStart, localEnd, runtimeSeconds])
-
-  const { startPercent, endPercent, widthPercent } = segmentStyles
+  const startPercent =
+    runtimeSeconds > 0 ? (localStart / runtimeSeconds) * 100 : 0
+  const endPercent =
+    runtimeSeconds > 0 ? (localEnd / runtimeSeconds) * 100 : 100
+  const widthPercent = endPercent - startPercent
 
   const duration = localEnd - localStart
 
@@ -274,225 +330,220 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
 
   const inputStep = frameStep ?? MIN_SEGMENT_GAP
 
-  const commitSegmentUpdate = React.useCallback(
-    (start: number, end: number) => {
-      if (!segment.Id) return
+  const commitSegmentUpdate = (start: number, end: number): boolean => {
+    if (!segment.Id) return false
 
-      const currentStart = segment.StartTicks ?? 0
-      const currentEnd = segment.EndTicks ?? 0
-      if (start === currentStart && end === currentEnd) return
+    const currentStart = segment.StartTicks ?? 0
+    const currentEnd = segment.EndTicks ?? 0
+    if (start === currentStart && end === currentEnd) return false
 
-      const nextValidation = validateSegmentFormValues(
-        getSegmentFormDefaults({
-          Type: segment.Type ?? 'Unknown',
-          StartTicks: start,
-          EndTicks: end,
-        }),
-      )
-      if (!nextValidation.valid) return
+    const nextValidation = validateSegmentFormValues(
+      getSegmentFormDefaults({
+        Type: segment.Type ?? 'Unknown',
+        StartTicks: start,
+        EndTicks: end,
+      }),
+    )
+    if (!nextValidation.valid) return false
 
-      onUpdate({ id: segment.Id, start, end })
-    },
-    [segment, onUpdate],
-  )
+    onUpdate({ id: segment.Id, start, end })
+    return true
+  }
 
-  const handleStartPointerDown = React.useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsDragging('start')
-      onSetActive(index)
+  const commitRangeAfterInteraction = (start: number, end: number): boolean => {
+    if (!hasLocalRangeDirtyRef.current && syncSegmentPropsIfChanged()) {
+      return false
+    }
 
-      const captureTarget = e.currentTarget as HTMLElement
-      captureTarget.setPointerCapture(e.pointerId)
-      pointerCaptureTargetRef.current = captureTarget
-      pointerIdRef.current = e.pointerId
-    },
-    [index, onSetActive],
-  )
+    const didCommit = commitSegmentUpdate(start, end)
+    if (!didCommit) syncSegmentPropsIfChanged()
+    hasLocalRangeDirtyRef.current = false
+    return didCommit
+  }
 
-  const handleEndPointerDown = React.useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsDragging('end')
-      onSetActive(index)
+  const handleStartPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    isDraggingRef.current = 'start'
+    hasLocalRangeDirtyRef.current = false
+    onSetActive(index)
 
-      const captureTarget = e.currentTarget as HTMLElement
-      captureTarget.setPointerCapture(e.pointerId)
-      pointerCaptureTargetRef.current = captureTarget
-      pointerIdRef.current = e.pointerId
-    },
-    [index, onSetActive],
-  )
+    const captureTarget = e.currentTarget as HTMLElement
+    captureTarget.setPointerCapture(e.pointerId)
+    pointerCaptureTargetRef.current = captureTarget
+    pointerIdRef.current = e.pointerId
+  }
 
-  const handlePointerMove = React.useCallback(
-    (e: React.PointerEvent) => {
-      const dragging = isDraggingRef.current
-      if (!dragging || !sliderRef.current) return
+  const handleEndPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    isDraggingRef.current = 'end'
+    hasLocalRangeDirtyRef.current = false
+    onSetActive(index)
 
-      const rect = sliderRef.current.getBoundingClientRect()
-      const percent = Math.max(
-        0,
-        Math.min(100, ((e.clientX - rect.left) / rect.width) * 100),
-      )
-      const newTime = (percent / 100) * runtimeSeconds
+    const captureTarget = e.currentTarget as HTMLElement
+    captureTarget.setPointerCapture(e.pointerId)
+    pointerCaptureTargetRef.current = captureTarget
+    pointerIdRef.current = e.pointerId
+  }
 
-      pendingPositionRef.current = newTime
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const dragging = isDraggingRef.current
+    if (!dragging || !sliderRef.current) return
 
-      if (rafRef.current === null) {
-        rafRef.current = requestAnimationFrame(() => {
-          rafRef.current = null
-          const pendingTime = pendingPositionRef.current
-          if (pendingTime === null) return
+    const rect = sliderRef.current.getBoundingClientRect()
+    const percent = Math.max(
+      0,
+      Math.min(100, ((e.clientX - rect.left) / rect.width) * 100),
+    )
+    const newTime = (percent / 100) * runtimeSeconds
 
-          const currentDragging = isDraggingRef.current
-          if (currentDragging === 'start') {
-            const nextStart = clampStartToBounds(
-              pendingTime,
-              stableRangeRef.current.end,
-            )
-            applyDraftBoundary('start', nextStart)
-          } else if (currentDragging === 'end') {
-            const nextEnd = clampEndToBounds(
-              pendingTime,
-              stableRangeRef.current.start,
-              runtimeSeconds,
-            )
-            applyDraftBoundary('end', nextEnd)
-          }
-        })
-      }
-    },
-    [applyDraftBoundary, runtimeSeconds],
-  )
+    pendingPositionRef.current = newTime
 
-  const handlePointerUp = React.useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDraggingRef.current) return
-
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null
-      }
+        const pendingTime = pendingPositionRef.current
+        if (pendingTime === null) return
 
-      const pendingTime = pendingPositionRef.current
-      if (pendingTime !== null) {
         const currentDragging = isDraggingRef.current
         if (currentDragging === 'start') {
-          const newStart = snapAndClampStart(
+          const nextStart = clampStartToBounds(
             pendingTime,
             stableRangeRef.current.end,
-            frameStep,
           )
-          applyDraftBoundary('start', newStart)
-        } else {
-          const newEnd = snapAndClampEnd(
+          applyDraftBoundary('start', nextStart, true)
+        } else if (currentDragging === 'end') {
+          const nextEnd = clampEndToBounds(
             pendingTime,
             stableRangeRef.current.start,
             runtimeSeconds,
-            frameStep,
           )
-          applyDraftBoundary('end', newEnd)
+          applyDraftBoundary('end', nextEnd, true)
         }
-        pendingPositionRef.current = null
-      }
+      })
+    }
+  }
 
-      const captureTarget = pointerCaptureTargetRef.current
-      const pointerId = pointerIdRef.current ?? e.pointerId
-      if (captureTarget && captureTarget.hasPointerCapture(pointerId)) {
-        captureTarget.releasePointerCapture(pointerId)
-      }
-      pointerCaptureTargetRef.current = null
-      pointerIdRef.current = null
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return
 
-      setIsDragging(null)
-      commitSegmentUpdate(
-        stableRangeRef.current.start,
-        stableRangeRef.current.end,
-      )
-    },
-    [applyDraftBoundary, commitSegmentUpdate, runtimeSeconds, frameStep],
-  )
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
 
-  const handleInputChange = React.useCallback(
-    (type: 'start' | 'end', value: string) => {
-      form.setFieldValue(type === 'start' ? 'startText' : 'endText', value)
-
-      const nextValues =
-        type === 'start'
-          ? { ...formValues, startText: value }
-          : { ...formValues, endText: value }
-      const nextDraftState = getSegmentDraftState(
-        nextValues,
-        {
-          startSeconds: stableRangeRef.current.start,
-          endSeconds: stableRangeRef.current.end,
-        },
-        runtimeSeconds,
-      )
-
-      if (nextDraftState.validation.valid) {
-        updateStableRange({
-          start: nextDraftState.draftRange.startSeconds,
-          end: nextDraftState.draftRange.endSeconds,
-        })
-      }
-    },
-    [form, formValues, runtimeSeconds, updateStableRange],
-  )
-
-  const handleInputBlur = React.useCallback(
-    (type: 'start' | 'end') => {
-      setActiveInput(null)
-
-      if (!validation.valid) {
-        // Revert the edited field to the last committed valid value
-        form.setFieldValue(
-          type === 'start' ? 'startText' : 'endText',
-          formatSegmentInputSeconds(
-            type === 'start'
-              ? stableRangeRef.current.start
-              : stableRangeRef.current.end,
-          ),
-          { dontValidate: true },
+    const pendingTime = pendingPositionRef.current
+    if (pendingTime !== null) {
+      const currentDragging = isDraggingRef.current
+      if (currentDragging === 'start') {
+        const newStart = snapAndClampStart(
+          pendingTime,
+          stableRangeRef.current.end,
+          frameStep,
         )
+        applyDraftBoundary('start', newStart, true)
+      } else {
+        const newEnd = snapAndClampEnd(
+          pendingTime,
+          stableRangeRef.current.start,
+          runtimeSeconds,
+          frameStep,
+        )
+        applyDraftBoundary('end', newEnd, true)
+      }
+      pendingPositionRef.current = null
+    }
+
+    const captureTarget = pointerCaptureTargetRef.current
+    const pointerId = pointerIdRef.current ?? e.pointerId
+    if (captureTarget && captureTarget.hasPointerCapture(pointerId)) {
+      captureTarget.releasePointerCapture(pointerId)
+    }
+    pointerCaptureTargetRef.current = null
+    pointerIdRef.current = null
+
+    isDraggingRef.current = null
+
+    commitRangeAfterInteraction(
+      stableRangeRef.current.start,
+      stableRangeRef.current.end,
+    )
+  }
+
+  const handleInputChange = (type: 'start' | 'end', value: string) => {
+    form.setFieldValue(type === 'start' ? 'startText' : 'endText', value)
+
+    const nextValues =
+      type === 'start'
+        ? { ...formValues, startText: value }
+        : { ...formValues, endText: value }
+    const nextDraftState = getSegmentDraftState(
+      nextValues,
+      {
+        startSeconds: stableRangeRef.current.start,
+        endSeconds: stableRangeRef.current.end,
+      },
+      runtimeSeconds,
+    )
+
+    if (nextDraftState.validation.valid) {
+      const nextRange = {
+        start: nextDraftState.draftRange.startSeconds,
+        end: nextDraftState.draftRange.endSeconds,
+      }
+      markLocalRangeDirtyIfChanged(nextRange)
+      updateStableRange(nextRange)
+    }
+  }
+
+  const handleInputBlur = (type: 'start' | 'end') => {
+    activeInputRef.current = null
+
+    if (!validation.valid) {
+      if (syncSegmentPropsIfChanged()) {
+        hasLocalRangeDirtyRef.current = false
         return
       }
+      hasLocalRangeDirtyRef.current = false
 
-      let nextStart = stableRangeRef.current.start
-      let nextEnd = stableRangeRef.current.end
+      // Revert the edited field to the last committed valid value
+      form.setFieldValue(
+        type === 'start' ? 'startText' : 'endText',
+        formatSegmentInputSeconds(
+          type === 'start'
+            ? stableRangeRef.current.start
+            : stableRangeRef.current.end,
+        ),
+        { dontValidate: true },
+      )
+      return
+    }
 
-      if (type === 'start') {
-        const nextRange = applyDraftBoundary(
-          'start',
-          snapAndClampStart(nextStart, nextEnd, frameStep),
-        )
-        nextStart = nextRange.start
-        nextEnd = nextRange.end
-      } else {
-        const nextRange = applyDraftBoundary(
-          'end',
-          snapAndClampEnd(nextEnd, nextStart, runtimeSeconds, frameStep),
-        )
-        nextStart = nextRange.start
-        nextEnd = nextRange.end
-      }
+    let nextStart = stableRangeRef.current.start
+    let nextEnd = stableRangeRef.current.end
 
-      commitSegmentUpdate(nextStart, nextEnd)
-    },
-    [
-      applyDraftBoundary,
-      commitSegmentUpdate,
-      form,
-      runtimeSeconds,
-      frameStep,
-      validation.valid,
-    ],
-  )
+    if (type === 'start') {
+      const nextRange = applyDraftBoundary(
+        'start',
+        snapAndClampStart(nextStart, nextEnd, frameStep),
+      )
+      nextStart = nextRange.start
+      nextEnd = nextRange.end
+    } else {
+      const nextRange = applyDraftBoundary(
+        'end',
+        snapAndClampEnd(nextEnd, nextStart, runtimeSeconds, frameStep),
+      )
+      nextStart = nextRange.start
+      nextEnd = nextRange.end
+    }
+
+    commitRangeAfterInteraction(nextStart, nextEnd)
+  }
 
   // Copy segment to system clipboard as JSON
-  const handleCopy = React.useCallback(async () => {
+  const handleCopy = async () => {
     setCopyMenuOpen(false)
     const nextSegment = buildSegmentFromFormValues(
       segment,
@@ -513,41 +564,33 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
         message: t('editor.copyFailed', 'Clipboard access denied'),
       })
     }
-  }, [formValues, runtimeSeconds, segment, t])
+  }
 
   // Copy all segments to system clipboard as JSON
-  const handleCopyAllAsJson = React.useCallback(() => {
+  const handleCopyAllAsJson = () => {
     setCopyMenuOpen(false)
     onCopyAllAsJson?.()
-  }, [onCopyAllAsJson])
+  }
 
-  const handleEdit = React.useCallback(() => onEdit?.(index), [index, onEdit])
+  const handleEdit = () => onEdit?.(index)
 
-  const handleDelete = React.useCallback(
-    () => onDelete(index),
-    [index, onDelete],
-  )
-  const handleSeekStart = React.useCallback(
-    () => onPlayerTimestamp(localStart),
-    [localStart, onPlayerTimestamp],
-  )
-  const handleSeekEnd = React.useCallback(
-    () => onPlayerTimestamp(localEnd),
-    [localEnd, onPlayerTimestamp],
-  )
+  const handleDelete = () => onDelete(index)
+  const handleSeekStart = () => onPlayerTimestamp(localStart)
+  const handleSeekEnd = () => onPlayerTimestamp(localEnd)
 
   // Set timestamp from current player position
-  const handleSetStartToZero = React.useCallback(() => {
+  const handleSetStartToZero = () => {
     const nextStart = snapAndClampStart(
       0,
       stableRangeRef.current.end,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('start', nextStart)
+    const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
-  }, [applyDraftBoundary, commitSegmentUpdate, frameStep])
+    hasLocalRangeDirtyRef.current = false
+  }
 
-  const handleSetEndToDuration = React.useCallback(() => {
+  const handleSetEndToDuration = () => {
     if (!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0) return
     const nextEnd = snapAndClampEnd(
       runtimeSeconds,
@@ -555,11 +598,12 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       runtimeSeconds,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('end', nextEnd)
+    const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
-  }, [applyDraftBoundary, commitSegmentUpdate, frameStep, runtimeSeconds])
+    hasLocalRangeDirtyRef.current = false
+  }
 
-  const handleSetStartFromPlayer = React.useCallback(() => {
+  const handleSetStartFromPlayer = () => {
     const currentTime = getPlayerTime?.()
     if (currentTime === undefined) return
     const nextStart = snapAndClampStart(
@@ -567,10 +611,11 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       stableRangeRef.current.end,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('start', nextStart)
+    const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
-  }, [applyDraftBoundary, commitSegmentUpdate, frameStep, getPlayerTime])
-  const handleSetEndFromPlayer = React.useCallback(() => {
+    hasLocalRangeDirtyRef.current = false
+  }
+  const handleSetEndFromPlayer = () => {
     const currentTime = getPlayerTime?.()
     if (currentTime === undefined) return
     const nextEnd = snapAndClampEnd(
@@ -579,148 +624,110 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       runtimeSeconds,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('end', nextEnd)
+    const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
-  }, [
-    applyDraftBoundary,
-    commitSegmentUpdate,
-    frameStep,
-    getPlayerTime,
-    runtimeSeconds,
-  ])
+    hasLocalRangeDirtyRef.current = false
+  }
 
-  const handleHandleBlur = React.useCallback(
-    (type: 'start' | 'end') => {
-      if (type === 'start') {
-        const nextRange = applyDraftBoundary(
-          'start',
-          snapAndClampStart(
-            stableRangeRef.current.start,
-            stableRangeRef.current.end,
-            frameStep,
-          ),
-        )
-        commitSegmentUpdate(nextRange.start, nextRange.end)
-        return
-      }
-
+  const handleHandleBlur = (type: 'start' | 'end') => {
+    if (type === 'start') {
       const nextRange = applyDraftBoundary(
-        'end',
-        snapAndClampEnd(
-          stableRangeRef.current.end,
+        'start',
+        snapAndClampStart(
           stableRangeRef.current.start,
-          runtimeSeconds,
+          stableRangeRef.current.end,
           frameStep,
         ),
       )
-      commitSegmentUpdate(nextRange.start, nextRange.end)
-    },
-    [applyDraftBoundary, commitSegmentUpdate, runtimeSeconds, frameStep],
-  )
+      commitRangeAfterInteraction(nextRange.start, nextRange.end)
+      return
+    }
 
-  const handleStartKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      const result = handleStartHandleKeyboard(
-        e.key,
-        e.shiftKey,
-        stableRangeRef.current.start,
+    const nextRange = applyDraftBoundary(
+      'end',
+      snapAndClampEnd(
         stableRangeRef.current.end,
-        MIN_SEGMENT_GAP,
-      )
-      if (result.handled) {
-        e.preventDefault()
-        const nextStart = snapAndClampStart(
-          result.newValue,
-          stableRangeRef.current.end,
-          frameStep,
-        )
-        applyDraftBoundary('start', nextStart)
-      }
-    },
-    [applyDraftBoundary, frameStep],
-  )
-
-  const handleEndKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      const result = handleEndHandleKeyboard(
-        e.key,
-        e.shiftKey,
         stableRangeRef.current.start,
-        stableRangeRef.current.end,
         runtimeSeconds,
-        MIN_SEGMENT_GAP,
+        frameStep,
+      ),
+    )
+    commitRangeAfterInteraction(nextRange.start, nextRange.end)
+  }
+
+  const handleStartKeyDown = (e: React.KeyboardEvent) => {
+    const result = handleStartHandleKeyboard(
+      e.key,
+      e.shiftKey,
+      stableRangeRef.current.start,
+      stableRangeRef.current.end,
+      MIN_SEGMENT_GAP,
+    )
+    if (result.handled) {
+      e.preventDefault()
+      const nextStart = snapAndClampStart(
+        result.newValue,
+        stableRangeRef.current.end,
+        frameStep,
       )
-      if (result.handled) {
-        e.preventDefault()
-        const nextEnd = snapAndClampEnd(
-          result.newValue,
-          stableRangeRef.current.start,
-          runtimeSeconds,
-          frameStep,
-        )
-        applyDraftBoundary('end', nextEnd)
+      applyDraftBoundary('start', nextStart, true)
+    }
+  }
+
+  const handleEndKeyDown = (e: React.KeyboardEvent) => {
+    const result = handleEndHandleKeyboard(
+      e.key,
+      e.shiftKey,
+      stableRangeRef.current.start,
+      stableRangeRef.current.end,
+      runtimeSeconds,
+      MIN_SEGMENT_GAP,
+    )
+    if (result.handled) {
+      e.preventDefault()
+      const nextEnd = snapAndClampEnd(
+        result.newValue,
+        stableRangeRef.current.start,
+        runtimeSeconds,
+        frameStep,
+      )
+      applyDraftBoundary('end', nextEnd, true)
+    }
+  }
+
+  const containerStyle = vibrantColors
+    ? {
+        borderColor: isActive
+          ? vibrantColors.primary
+          : vibrantColors.primary + '30',
+        boxShadow: isActive
+          ? `0 8px 32px ${vibrantColors.primary}15`
+          : undefined,
       }
-    },
-    [applyDraftBoundary, runtimeSeconds, frameStep],
-  )
+    : undefined
 
-  // Memoize style objects to prevent re-renders
-  const containerStyle = React.useMemo(
-    () =>
-      vibrantColors
-        ? {
-            borderColor: isActive
-              ? vibrantColors.primary
-              : vibrantColors.primary + '30',
-            boxShadow: isActive
-              ? `0 8px 32px ${vibrantColors.primary}15`
-              : undefined,
-          }
-        : undefined,
-    [vibrantColors, isActive],
-  )
+  const iconStyle = vibrantColors ? { color: vibrantColors.primary } : undefined
 
-  const iconStyle = React.useMemo(
-    () => (vibrantColors ? { color: vibrantColors.primary } : undefined),
-    [vibrantColors],
-  )
+  const segmentRangeStyle = {
+    left: `${startPercent}%`,
+    width: `${widthPercent}%`,
+    backgroundColor: segmentCssVar,
+    opacity: 0.7,
+  }
 
-  // Memoize slider handle styles
-  const segmentRangeStyle = React.useMemo(
-    () => ({
-      left: `${startPercent}%`,
-      width: `${widthPercent}%`,
-      backgroundColor: segmentCssVar,
-      opacity: 0.7,
-    }),
-    [startPercent, widthPercent, segmentCssVar],
-  )
+  const startHandlePositionStyle = {
+    left: `${startPercent}%`,
+  }
 
-  const startHandlePositionStyle = React.useMemo(
-    () => ({
-      left: `${startPercent}%`,
-    }),
-    [startPercent],
-  )
+  const endHandlePositionStyle = {
+    left: `${endPercent}%`,
+  }
 
-  const endHandlePositionStyle = React.useMemo(
-    () => ({
-      left: `${endPercent}%`,
-    }),
-    [endPercent],
-  )
+  const handleVisualStyle = {
+    backgroundColor: segmentCssVar,
+  }
 
-  const handleVisualStyle = React.useMemo(
-    () => ({
-      backgroundColor: segmentCssVar,
-    }),
-    [segmentCssVar],
-  )
-
-  const handleSetActiveClick = React.useCallback(
-    () => onSetActive(index),
-    [onSetActive, index],
-  )
+  const handleSetActiveClick = () => onSetActive(index)
 
   return (
     <div
@@ -949,7 +956,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
                 min="0"
                 max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
                 value={String(field.state.value)}
-                onFocus={() => setActiveInput('start')}
+                onFocus={() => {
+                  activeInputRef.current = 'start'
+                  hasLocalRangeDirtyRef.current = false
+                }}
                 onChange={(e) => handleInputChange('start', e.target.value)}
                 onBlur={() => {
                   field.handleBlur()
@@ -1026,7 +1036,10 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
                 min={localStart + MIN_SEGMENT_GAP}
                 max={runtimeSeconds}
                 value={String(field.state.value)}
-                onFocus={() => setActiveInput('end')}
+                onFocus={() => {
+                  activeInputRef.current = 'end'
+                  hasLocalRangeDirtyRef.current = false
+                }}
                 onChange={(e) => handleInputChange('end', e.target.value)}
                 onBlur={() => {
                   field.handleBlur()
@@ -1058,4 +1071,4 @@ export const SegmentSlider = React.memo(function SegmentSliderComponent({
       )}
     </div>
   )
-})
+}

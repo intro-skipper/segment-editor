@@ -3,7 +3,7 @@
  * Provides optimistic updates, rollback verification, and cache invalidation.
  */
 
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import type { MediaSegmentDto } from '@/types/jellyfin'
@@ -33,7 +33,6 @@ const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
 
 const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
 
-// Shared utilities
 const handleMutationError = (operation: string) => (error: unknown) => {
   const e = QueryError.from(error)
   if (e.code === ErrorCodes.CANCELLED) return
@@ -46,14 +45,13 @@ const handleMutationError = (operation: string) => (error: unknown) => {
 
 const useAbortController = () => {
   const ref = useRef<AbortController | null>(null)
-  return useCallback(() => {
+  return () => {
     ref.current?.abort()
     ref.current = new AbortController()
     return ref.current
-  }, [])
+  }
 }
 
-/** Wraps async fn with QueryError conversion */
 const wrapMutationFn =
   <TInput, TResult>(
     fn: (input: TInput, signal: AbortSignal) => Promise<TResult>,
@@ -67,7 +65,6 @@ const wrapMutationFn =
     }
   }
 
-/** Rollback helper for optimistic updates */
 const rollbackSegments = (
   qc: QueryClient,
   itemId: string,
@@ -132,10 +129,7 @@ export const useDeleteSegment = () => {
     onSuccess: (_data, segment) => {
       if (segment.ItemId) showSuccess('Segment deleted')
     },
-    onSettled: () => {
-      // Keep optimistic cache result to avoid redundant refetch.
-      // Rollback path already restores previous data when needed.
-    },
+    onSettled: () => {},
   })
 }
 

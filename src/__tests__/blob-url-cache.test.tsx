@@ -1,0 +1,101 @@
+// @vitest-environment jsdom
+
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { useBlobUrl } from '@/hooks/useBlobUrl'
+import { blobCache, getBlobCacheUrlSnapshot } from '@/lib/cache-manager'
+
+const cachedUrl = 'https://example.test/cached.jpg'
+const newerUrl = 'https://example.test/newer.jpg'
+const evictedUrl = 'https://example.test/evicted.jpg'
+
+beforeEach(() => {
+  blobCache.clear()
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+  blobCache.clear()
+})
+
+describe('useBlobUrl', () => {
+  it('promotes cached blob URLs outside render', async () => {
+    blobCache.set(cachedUrl, 'blob:cached')
+    blobCache.set(newerUrl, 'blob:newer')
+
+    const { result } = renderHook(() => useBlobUrl(cachedUrl))
+
+    expect(result.current).toBe('blob:cached')
+
+    await waitFor(() => {
+      expect(Array.from(blobCache.keys()).at(-1)).toBe(cachedUrl)
+    })
+  })
+
+  it('exposes cache mutations in snapshots before subscriptions exist', () => {
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('')
+
+    blobCache.set(cachedUrl, 'blob:cached')
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('blob:cached')
+
+    blobCache.delete(cachedUrl)
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('')
+  })
+
+  it('does not return a revoked blob URL after cache eviction', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise<Response>(() => {}),
+    )
+    blobCache.set(cachedUrl, 'blob:cached')
+
+    const { result, rerender } = renderHook(
+      ({ url }: { url: string | null }) => useBlobUrl(url),
+      { initialProps: { url: cachedUrl as string | null } },
+    )
+
+    expect(result.current).toBe('blob:cached')
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    rerender({ url: null })
+    blobCache.delete(cachedUrl)
+    rerender({ url: cachedUrl })
+
+    expect(result.current).toBe('')
+  })
+
+  it('refetches when the active URL is evicted from the shared cache', async () => {
+    const createObjectURL = vi.fn(() => 'blob:refetched')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL,
+      revokeObjectURL,
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new Blob(['image-bytes']), {
+        status: 200,
+      }),
+    )
+    blobCache.set(evictedUrl, 'blob:cached')
+
+    const { result } = renderHook(() => useBlobUrl(evictedUrl))
+
+    expect(result.current).toBe('blob:cached')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    act(() => {
+      blobCache.delete(evictedUrl)
+    })
+
+    await waitFor(() => {
+      expect(result.current).toBe('blob:refetched')
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})

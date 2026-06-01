@@ -30,6 +30,7 @@ interface AppState {
   trackPreferences: TrackPreferences
   /** How to handle segments during playback: show a button, auto-skip, or do nothing */
   segmentSkipMode: SegmentSkipMode
+  segmentSkipModeRevision: number
   jellyfinPlaybackSyncEnabled: boolean
 }
 
@@ -88,6 +89,7 @@ const initialState: AppState = {
     subtitlesEnabled: false,
   },
   segmentSkipMode: 'button',
+  segmentSkipModeRevision: 0,
   jellyfinPlaybackSyncEnabled: false,
 }
 
@@ -124,7 +126,15 @@ export const useAppStore = create<AppStore>()(
             subtitlesEnabled: enabled,
           },
         })),
-      setSegmentSkipMode: (segmentSkipMode) => set({ segmentSkipMode }),
+      setSegmentSkipMode: (segmentSkipMode) =>
+        set((state) =>
+          state.segmentSkipMode === segmentSkipMode
+            ? state
+            : {
+                segmentSkipMode,
+                segmentSkipModeRevision: state.segmentSkipModeRevision + 1,
+              },
+        ),
       setJellyfinPlaybackSyncEnabled: (jellyfinPlaybackSyncEnabled) =>
         set({ jellyfinPlaybackSyncEnabled }),
     }),

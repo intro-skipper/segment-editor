@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SkipForward } from 'lucide-react'
 
@@ -12,23 +11,20 @@ export function SegmentSkipModeSection() {
   const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
   const setSegmentSkipMode = useAppStore((s) => s.setSegmentSkipMode)
 
-  const options = useMemo<Array<SelectOption<SegmentSkipMode>>>(
-    () => [
-      {
-        value: 'button',
-        label: t('settings.segmentSkipMode.button'),
-      },
-      {
-        value: 'skip',
-        label: t('settings.segmentSkipMode.skip'),
-      },
-      {
-        value: 'disabled',
-        label: t('settings.segmentSkipMode.disabled'),
-      },
-    ],
-    [t],
-  )
+  const options: Array<SelectOption<SegmentSkipMode>> = [
+    {
+      value: 'button',
+      label: t('settings.segmentSkipMode.button'),
+    },
+    {
+      value: 'skip',
+      label: t('settings.segmentSkipMode.skip'),
+    },
+    {
+      value: 'disabled',
+      label: t('settings.segmentSkipMode.disabled'),
+    },
+  ]
 
   return (
     <SelectSettingsSection

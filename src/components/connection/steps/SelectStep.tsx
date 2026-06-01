@@ -1,13 +1,4 @@
-/**
- * SelectStep Component
- *
- * Second step of the connection wizard - server selection.
- * Displays discovered servers with quality scores and keyboard navigation.
- *
- * @module components/connection/steps/SelectStep
- */
-
-import { useCallback, useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -174,57 +165,49 @@ function ServerList({
   const listRef = useRef<HTMLDivElement>(null)
   const focusedGenerationRef = useRef<string | null>(null)
 
-  const discoveryGeneration = useMemo(
-    () =>
-      isLoading ? null : servers.map((server) => server.address).join('\u001f'),
-    [isLoading, servers],
-  )
+  const discoveryGeneration = isLoading
+    ? null
+    : servers.map((server) => server.address).join('\u001f')
 
-  const focusFirstServerButton = useCallback(
-    (element: HTMLButtonElement | null) => {
-      if (!element || !discoveryGeneration) return
-      if (focusedGenerationRef.current === discoveryGeneration) return
+  const focusFirstServerButton = (element: HTMLButtonElement | null) => {
+    if (!element || !discoveryGeneration) return
+    if (focusedGenerationRef.current === discoveryGeneration) return
 
-      focusedGenerationRef.current = discoveryGeneration
-      element.focus()
-    },
-    [discoveryGeneration],
-  )
+    focusedGenerationRef.current = discoveryGeneration
+    element.focus()
+  }
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (!listRef.current) return
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!listRef.current) return
 
-      const buttons = Array.from(listRef.current.querySelectorAll('button'))
-      const currentIndex = buttons.findIndex(
-        (btn) => btn === document.activeElement,
-      )
+    const buttons = Array.from(listRef.current.querySelectorAll('button'))
+    const currentIndex = buttons.findIndex(
+      (btn) => btn === document.activeElement,
+    )
 
-      let nextIndex = currentIndex
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault()
-          nextIndex = Math.min(currentIndex + 1, buttons.length - 1)
-          break
-        case 'ArrowUp':
-          e.preventDefault()
-          nextIndex = Math.max(currentIndex - 1, 0)
-          break
-        case 'Home':
-          e.preventDefault()
-          nextIndex = 0
-          break
-        case 'End':
-          e.preventDefault()
-          nextIndex = buttons.length - 1
-          break
-        default:
-          return
-      }
-      buttons[nextIndex]?.focus()
-    },
-    [],
-  )
+    let nextIndex = currentIndex
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        nextIndex = Math.min(currentIndex + 1, buttons.length - 1)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        nextIndex = Math.max(currentIndex - 1, 0)
+        break
+      case 'Home':
+        e.preventDefault()
+        nextIndex = 0
+        break
+      case 'End':
+        e.preventDefault()
+        nextIndex = buttons.length - 1
+        break
+      default:
+        return
+    }
+    buttons[nextIndex]?.focus()
+  }
 
   if (isLoading) {
     return (
