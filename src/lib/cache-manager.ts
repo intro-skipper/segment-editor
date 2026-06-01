@@ -10,11 +10,11 @@ import { CACHE_CONFIG } from './constants'
 /**
  * Options for LRU cache configuration.
  */
-interface LRUCacheOptions<TValue> {
+interface LRUCacheOptions<TKey, TValue> {
   /** Callback invoked when an entry is evicted from the cache */
   onEvict?: (value: TValue) => void
   /** Callback invoked after cache contents change */
-  onChange?: () => void
+  onChange?: (key: TKey) => void
 }
 
 /**
@@ -28,14 +28,14 @@ export class LRUCache<TKey, TValue> {
   private cache = new Map<TKey, TValue>()
   private readonly maxSize: number
   private readonly onEvict?: (value: TValue) => void
-  private readonly onChange?: () => void
+  private readonly onChange?: (key: TKey) => void
   /**
    * Creates a new LRU cache with the specified maximum size.
    *
    * @param maxSize - Maximum number of entries before eviction occurs
    * @param options - Optional configuration including eviction callback
    */
-  constructor(maxSize: number, options?: LRUCacheOptions<TValue>) {
+  constructor(maxSize: number, options?: LRUCacheOptions<TKey, TValue>) {
     this.maxSize = Math.max(1, maxSize)
     this.onEvict = options?.onEvict
     this.onChange = options?.onChange
@@ -88,11 +88,12 @@ export class LRUCache<TKey, TValue> {
         this.cache.delete(firstKey)
         if (evictedValue !== undefined) {
           this.invokeEvict(evictedValue)
+          this.invokeChange(firstKey)
         }
       }
     }
     this.cache.set(key, value)
-    this.invokeChange()
+    this.invokeChange(key)
   }
 
   /**
@@ -119,7 +120,7 @@ export class LRUCache<TKey, TValue> {
       if (value !== undefined) {
         this.invokeEvict(value)
       }
-      this.invokeChange()
+      this.invokeChange(key)
     }
     return deleted
   }
@@ -129,13 +130,15 @@ export class LRUCache<TKey, TValue> {
    * Invokes onEvict callback for each entry if configured.
    */
   clear(): void {
-    const hadEntries = this.cache.size > 0
+    const entries = Array.from(this.cache.entries())
     if (this.onEvict) {
-      this.cache.forEach((value) => this.invokeEvict(value))
+      for (const [, value] of entries) {
+        this.invokeEvict(value)
+      }
     }
     this.cache.clear()
-    if (hadEntries) {
-      this.invokeChange()
+    for (const [key] of entries) {
+      this.invokeChange(key)
     }
   }
 
@@ -181,9 +184,9 @@ export class LRUCache<TKey, TValue> {
   /**
    * Safely invokes the change callback, catching any errors.
    */
-  private invokeChange(): void {
+  private invokeChange(key: TKey): void {
     try {
-      this.onChange?.()
+      this.onChange?.(key)
     } catch {
       // Ignore subscriber errors so cache mutation cannot fail.
     }
@@ -201,21 +204,38 @@ export interface VibrantColors {
   accentText: string
 }
 
-const blobCacheListeners = new Set<() => void>()
-let blobCacheRevision = 0
+const blobCacheListeners = new Map<string, Set<() => void>>()
+const blobCacheRevisions = new Map<string, number>()
 
-function notifyBlobCacheChange(): void {
-  blobCacheRevision++
-  blobCacheListeners.forEach((listener) => listener())
+function notifyBlobCacheChange(url: string): void {
+  blobCacheRevisions.set(url, (blobCacheRevisions.get(url) ?? 0) + 1)
+  blobCacheListeners.get(url)?.forEach((listener) => listener())
 }
 
-export function subscribeBlobCache(listener: () => void): () => void {
-  blobCacheListeners.add(listener)
-  return () => blobCacheListeners.delete(listener)
+export function subscribeBlobCacheUrl(
+  url: string | null | undefined,
+  listener: () => void,
+): () => void {
+  if (!url) return () => {}
+
+  let listeners = blobCacheListeners.get(url)
+  if (!listeners) {
+    listeners = new Set()
+    blobCacheListeners.set(url, listeners)
+  }
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      blobCacheListeners.delete(url)
+    }
+  }
 }
 
-export function getBlobCacheSnapshot(): number {
-  return blobCacheRevision
+export function getBlobCacheUrlSnapshot(
+  url: string | null | undefined,
+): number {
+  return url ? (blobCacheRevisions.get(url) ?? 0) : 0
 }
 
 /**

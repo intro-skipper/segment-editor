@@ -182,7 +182,6 @@ const buildColors = (
 
 const EXTRACTION_TIMEOUT_MS = 5000
 
-
 async function extractPalette(
   url: string,
   blobUrl: string,
@@ -236,23 +235,26 @@ async function extractPalette(
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       try {
+        if (hasResolved()) return
         const compressedBlob = await new Promise<Blob | null>((onBlob) => {
           canvas.toBlob(onBlob, 'image/jpeg', 0.6)
         })
-        if (hasResolved()) return
         if (!compressedBlob) {
           resolveOnce(null)
           return
         }
+        if (hasResolved()) return
 
         const compressedUrl = URL.createObjectURL(compressedBlob)
         try {
+          if (hasResolved()) return
           const palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
             .quality(1)
             .getPalette()
-          if (hasResolved()) return
-          paletteCache.set(url, palette)
-          resolveOnce(palette)
+          if (!hasResolved()) {
+            paletteCache.set(url, palette)
+            resolveOnce(palette)
+          }
         } finally {
           URL.revokeObjectURL(compressedUrl)
         }

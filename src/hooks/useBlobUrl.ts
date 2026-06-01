@@ -10,8 +10,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   blobCache,
   fetchBlobUrl,
-  getBlobCacheSnapshot,
-  subscribeBlobCache,
+  getBlobCacheUrlSnapshot,
+  subscribeBlobCacheUrl,
 } from '@/lib/cache-manager'
 
 /**
@@ -21,9 +21,9 @@ import {
  */
 export function useBlobUrl(url: string | null | undefined): string {
   const blobCacheRevision = useSyncExternalStore(
-    subscribeBlobCache,
-    getBlobCacheSnapshot,
-    getBlobCacheSnapshot,
+    (onStoreChange) => subscribeBlobCacheUrl(url, onStoreChange),
+    () => getBlobCacheUrlSnapshot(url),
+    () => getBlobCacheUrlSnapshot(url),
   )
   const [, rerenderAfterBlobLoad] = useState(0)
   const previousUrlRef = useRef<string | null | undefined>(undefined)
