@@ -155,14 +155,11 @@ export function useTrackManager({
 
   const itemId = item?.Id ?? undefined
 
-  const trackResetKey = [
-    itemId ?? '',
-    preferredAudioLanguage ?? '',
-    preferredSubtitleLanguage ?? '',
-    subtitlesEnabled ? '1' : '0',
-    audioTracks.length,
-    subtitleTracks.length,
-  ].join('|')
+  const trackResetKey = `${itemId ?? ''}|${preferredAudioLanguage ?? ''}|${
+    preferredSubtitleLanguage ?? ''
+  }|${subtitlesEnabled ? '1' : '0'}|${audioTracks.length}|${
+    subtitleTracks.length
+  }`
 
   const preferredAudioIndex = itemId
     ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
@@ -238,9 +235,10 @@ export function useTrackManager({
     setError(null)
 
     try {
-      const result: TrackSwitchResult = await switchAudioTrack(index, {
-        ...createSwitchOptions(video),
-      })
+      const result: TrackSwitchResult = await switchAudioTrack(
+        index,
+        createSwitchOptions(video),
+      )
 
       if (result.success) {
         setUserSelection((prev) =>
@@ -305,9 +303,10 @@ export function useTrackManager({
     setError(null)
 
     try {
-      const result: TrackSwitchResult = await switchSubtitleTrack(index, {
-        ...createSwitchOptions(video),
-      })
+      const result: TrackSwitchResult = await switchSubtitleTrack(
+        index,
+        createSwitchOptions(video),
+      )
 
       if (result.success) {
         setUserSelection((prev) =>

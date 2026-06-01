@@ -231,18 +231,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     includeMediaStreams: false,
     enabled: open && !!selectedCollection && canSearch,
   })
-  const resultItems = (() => {
-    const items = itemsData?.items ?? []
-
-    if (!excludedItemTypes) {
-      return items
-    }
-
-    return items.filter(
-      (item) =>
-        item.Type === undefined || !excludedItemTypes.includes(item.Type),
-    )
-  })()
+  const queriedItems = itemsData?.items ?? []
+  const resultItems = excludedItemTypes
+    ? queriedItems.filter(
+        (item) =>
+          item.Type === undefined || !excludedItemTypes.includes(item.Type),
+      )
+    : queriedItems
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     dispatch({ type: 'searchChanged', value: e.target.value })

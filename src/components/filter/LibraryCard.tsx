@@ -39,11 +39,9 @@ export const LibraryCard = function LibraryCardComponent({
   const [useBlobFallback, setUseBlobFallback] = useState(false)
 
   // Construct the direct image URL for the library
-  const rawImageUrl = (() => {
-    if (!collection.ItemId) return null
-    const baseUrl = getServerBaseUrl()
-    return `${baseUrl}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
-  })()
+  const rawImageUrl = collection.ItemId
+    ? `${getServerBaseUrl()}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
+    : null
 
   // Start with the direct image URL; only fetch a blob fallback if COEP/CORS
   // blocks the image. Fetching every library image as a blob up front can

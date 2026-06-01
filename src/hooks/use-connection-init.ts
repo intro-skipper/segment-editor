@@ -63,6 +63,10 @@ function trySetInvalidConnectionStatus(): void {
   }
 }
 
+function isSignalActive(signal: AbortSignal): boolean {
+  return !signal.aborted
+}
+
 export function useConnectionInit(): ConnectionState {
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>('idle')
@@ -132,8 +136,7 @@ export function useConnectionInit(): ConnectionState {
           signal: controller.signal,
         })
 
-        const isStillActive = () => !controller.signal.aborted
-        if (isStillActive()) {
+        if (isSignalActive(controller.signal)) {
           try {
             applyConnectionValidationResult(result)
           } catch {
@@ -145,8 +148,7 @@ export function useConnectionInit(): ConnectionState {
         trySetInvalidConnectionStatus()
       }
 
-      const isValidationActive = () => !controller.signal.aborted
-      if (isValidationActive()) {
+      if (isSignalActive(controller.signal)) {
         setValidationStatus('validated')
       }
     }

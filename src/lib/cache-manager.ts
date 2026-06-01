@@ -13,6 +13,8 @@ import { CACHE_CONFIG } from './constants'
 interface LRUCacheOptions<TValue> {
   /** Callback invoked when an entry is evicted from the cache */
   onEvict?: (value: TValue) => void
+  /** Callback invoked after cache contents change */
+  onChange?: () => void
 }
 
 /**
@@ -26,7 +28,7 @@ export class LRUCache<TKey, TValue> {
   private cache = new Map<TKey, TValue>()
   private readonly maxSize: number
   private readonly onEvict?: (value: TValue) => void
-
+  private readonly onChange?: () => void
   /**
    * Creates a new LRU cache with the specified maximum size.
    *
@@ -36,6 +38,7 @@ export class LRUCache<TKey, TValue> {
   constructor(maxSize: number, options?: LRUCacheOptions<TValue>) {
     this.maxSize = Math.max(1, maxSize)
     this.onEvict = options?.onEvict
+    this.onChange = options?.onChange
   }
 
   /**
@@ -89,6 +92,7 @@ export class LRUCache<TKey, TValue> {
       }
     }
     this.cache.set(key, value)
+    this.invokeChange()
   }
 
   /**
@@ -111,8 +115,11 @@ export class LRUCache<TKey, TValue> {
   delete(key: TKey): boolean {
     const value = this.cache.get(key)
     const deleted = this.cache.delete(key)
-    if (deleted && value !== undefined) {
-      this.invokeEvict(value)
+    if (deleted) {
+      if (value !== undefined) {
+        this.invokeEvict(value)
+      }
+      this.invokeChange()
     }
     return deleted
   }
@@ -122,10 +129,14 @@ export class LRUCache<TKey, TValue> {
    * Invokes onEvict callback for each entry if configured.
    */
   clear(): void {
+    const hadEntries = this.cache.size > 0
     if (this.onEvict) {
       this.cache.forEach((value) => this.invokeEvict(value))
     }
     this.cache.clear()
+    if (hadEntries) {
+      this.invokeChange()
+    }
   }
 
   /**
@@ -166,6 +177,17 @@ export class LRUCache<TKey, TValue> {
       // Ignore eviction callback errors (e.g., URL.revokeObjectURL on invalid URL)
     }
   }
+
+  /**
+   * Safely invokes the change callback, catching any errors.
+   */
+  private invokeChange(): void {
+    try {
+      this.onChange?.()
+    } catch {
+      // Ignore subscriber errors so cache mutation cannot fail.
+    }
+  }
 }
 
 /**
@@ -177,6 +199,23 @@ export interface VibrantColors {
   accent: string
   text: string
   accentText: string
+}
+
+const blobCacheListeners = new Set<() => void>()
+let blobCacheRevision = 0
+
+function notifyBlobCacheChange(): void {
+  blobCacheRevision++
+  blobCacheListeners.forEach((listener) => listener())
+}
+
+export function subscribeBlobCache(listener: () => void): () => void {
+  blobCacheListeners.add(listener)
+  return () => blobCacheListeners.delete(listener)
+}
+
+export function getBlobCacheSnapshot(): number {
+  return blobCacheRevision
 }
 
 /**
@@ -193,6 +232,7 @@ export const blobCache = new LRUCache<string, string>(
         URL.revokeObjectURL(url)
       }
     },
+    onChange: notifyBlobCacheChange,
   },
 )
 

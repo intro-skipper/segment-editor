@@ -291,19 +291,11 @@ export function SegmentSlider({
   const segmentColor = getSegmentColor(formValues.type)
   const segmentCssVar = getSegmentCssVar(formValues.type)
 
-  const segmentStyles = (() => {
-    const startPercent =
-      runtimeSeconds > 0 ? (localStart / runtimeSeconds) * 100 : 0
-    const endPercent =
-      runtimeSeconds > 0 ? (localEnd / runtimeSeconds) * 100 : 100
-    return {
-      startPercent,
-      endPercent,
-      widthPercent: endPercent - startPercent,
-    }
-  })()
-
-  const { startPercent, endPercent, widthPercent } = segmentStyles
+  const startPercent =
+    runtimeSeconds > 0 ? (localStart / runtimeSeconds) * 100 : 0
+  const endPercent =
+    runtimeSeconds > 0 ? (localEnd / runtimeSeconds) * 100 : 100
+  const widthPercent = endPercent - startPercent
 
   const duration = localEnd - localStart
 

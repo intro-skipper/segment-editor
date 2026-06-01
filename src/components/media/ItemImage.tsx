@@ -88,19 +88,15 @@ export function ItemImage({
   const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
 
   const blurhash = getImageBlurhash(item) ?? null
-  const cachedBlurhashDataUrl = (() => {
-    if (!blurhash) return null
-    return blurhashCache.get(`${blurhash}-32-32`) ?? null
-  })()
+  const cachedBlurhashDataUrl = blurhash
+    ? (blurhashCache.get(`${blurhash}-32-32`) ?? null)
+    : null
 
-  const blurhashDataUrl = (() => {
-    if (!blurhash) return null
-    if (cachedBlurhashDataUrl) return cachedBlurhashDataUrl
-    if (decodedBlurhashState?.blurhash === blurhash) {
-      return decodedBlurhashState.dataUrl
-    }
-    return null
-  })()
+  const blurhashDataUrl =
+    cachedBlurhashDataUrl ??
+    (decodedBlurhashState?.blurhash === blurhash
+      ? decodedBlurhashState.dataUrl
+      : null)
 
   useEffect(() => {
     if (!blurhash || cachedBlurhashDataUrl) {

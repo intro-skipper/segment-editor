@@ -107,12 +107,7 @@ export function useHlsPlayer({
 
     if (!video || !videoUrl) {
       isActiveRef.current = false
-      return () => {
-        if (recoveryTimer.current) {
-          clearTimeout(recoveryTimer.current)
-          recoveryTimer.current = null
-        }
-      }
+      return () => clearRecoveryTimer(recoveryTimer)
     }
 
     isActiveRef.current = true
@@ -177,10 +172,6 @@ export function useHlsPlayer({
 
     return () => {
       isActiveRef.current = false
-      if (recoveryTimer.current) {
-        clearTimeout(recoveryTimer.current)
-        recoveryTimer.current = null
-      }
       destroyHlsInstance(hlsRef, recoveryTimerRef)
     }
   }, [videoUrl])

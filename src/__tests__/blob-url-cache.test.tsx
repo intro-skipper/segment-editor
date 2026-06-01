@@ -8,6 +8,7 @@ import { blobCache } from '@/lib/cache-manager'
 
 const cachedUrl = 'https://example.test/cached.jpg'
 const newerUrl = 'https://example.test/newer.jpg'
+const evictedUrl = 'https://example.test/evicted.jpg'
 
 beforeEach(() => {
   blobCache.clear()
@@ -55,5 +56,35 @@ describe('useBlobUrl', () => {
     rerender({ url: cachedUrl })
 
     expect(result.current).toBe('')
+  })
+
+  it('refetches when the active URL is evicted from the shared cache', async () => {
+    const createObjectURL = vi.fn(() => 'blob:refetched')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL,
+      revokeObjectURL,
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new Blob(['image-bytes']), {
+        status: 200,
+      }),
+    )
+    blobCache.set(evictedUrl, 'blob:cached')
+
+    const { result } = renderHook(() => useBlobUrl(evictedUrl))
+
+    expect(result.current).toBe('blob:cached')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    act(() => {
+      blobCache.delete(evictedUrl)
+    })
+
+    await waitFor(() => {
+      expect(result.current).toBe('blob:refetched')
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

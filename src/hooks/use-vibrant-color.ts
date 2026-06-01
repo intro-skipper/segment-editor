@@ -4,7 +4,7 @@ import type * as VibrantWorkerRuntime from 'node-vibrant/worker'
 
 import type { Theme } from '@/stores/app-store'
 import type { VibrantColors } from '@/lib/cache-manager'
-import { LRUCache, fetchBlobUrl } from '@/lib/cache-manager'
+import { LRUCache, blobCache, fetchBlobUrl } from '@/lib/cache-manager'
 import { CACHE_CONFIG } from '@/lib/constants'
 import { selectTheme, useAppStore } from '@/stores/app-store'
 
@@ -182,6 +182,34 @@ const buildColors = (
 
 const EXTRACTION_TIMEOUT_MS = 5000
 
+function resolveWithPaletteTimeout(
+  promise: Promise<Palette | null>,
+): Promise<Palette | null> {
+  return new Promise((resolve) => {
+    let settled = false
+    const timeoutId = setTimeout(() => {
+      if (settled) return
+      settled = true
+      resolve(null)
+    }, EXTRACTION_TIMEOUT_MS)
+
+    void promise.then(
+      (palette) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        resolve(palette)
+      },
+      () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        resolve(null)
+      },
+    )
+  })
+}
+
 async function extractPalette(
   url: string,
   blobUrl: string,
@@ -192,7 +220,7 @@ async function extractPalette(
 
   return new Promise((resolve) => {
     const img = new Image()
-    let settled = false
+    let resolved = false
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const clearTimeoutIfNeeded = () => {
@@ -207,11 +235,9 @@ async function extractPalette(
       img.onerror = null
     }
 
-    const hasSettled = () => settled
-
     const resolveOnce = (palette: Palette | null) => {
-      if (settled) return
-      settled = true
+      if (resolved) return
+      resolved = true
       clearTimeoutIfNeeded()
       detachImageHandlers()
       resolve(palette)
@@ -223,6 +249,7 @@ async function extractPalette(
     }, EXTRACTION_TIMEOUT_MS)
 
     img.onload = async () => {
+      clearTimeoutIfNeeded()
       detachImageHandlers()
       const { canvas, ctx } = shared
       const scale = Math.min(50 / img.width, 50 / img.height, 1)
@@ -231,28 +258,24 @@ async function extractPalette(
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       try {
-        if (hasSettled()) return
         const compressedBlob = await new Promise<Blob | null>((onBlob) => {
           canvas.toBlob(onBlob, 'image/jpeg', 0.6)
         })
-        if (!compressedBlob || hasSettled()) {
-          if (!compressedBlob) resolveOnce(null)
+        if (!compressedBlob) {
+          resolveOnce(null)
           return
         }
 
         const compressedUrl = URL.createObjectURL(compressedBlob)
-        let palette: Palette
         try {
-          palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
+          const palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
             .quality(1)
             .getPalette()
-          if (hasSettled()) return
+          paletteCache.set(url, palette)
+          resolveOnce(palette)
         } finally {
           URL.revokeObjectURL(compressedUrl)
         }
-
-        paletteCache.set(url, palette)
-        resolveOnce(palette)
       } catch {
         resolveOnce(null)
       }
@@ -283,13 +306,18 @@ async function getPalette(url: string): Promise<Palette | null> {
       return queuePaletteTask(async () => {
         const queuedCachedPalette = paletteCache.get(url)
         if (queuedCachedPalette) return queuedCachedPalette
-        return extractPalette(url, blob, vibrantWorkerModule)
+
+        const queuedBlob =
+          blobCache.peek(url) === blob ? blob : await fetchBlobUrl(url)
+        if (!queuedBlob) return null
+
+        return extractPalette(url, queuedBlob, vibrantWorkerModule)
       })
     })()
     pendingPalettes.set(url, promise)
     void promise.finally(() => pendingPalettes.delete(url))
   }
-  return promise
+  return resolveWithPaletteTimeout(promise)
 }
 
 async function getColors(
@@ -332,33 +360,26 @@ export function useVibrantColor(
   const resolvedTheme = resolveTheme(theme)
   const cache = getCache(resolvedTheme)
 
-  const [cachedColors, setCachedColors] = useState<{
-    for: string
-    theme: ResolvedTheme
-    colors: VibrantColors
-  } | null>(null)
+  const cachedColors =
+    imageUrl && enabled ? (cache.peek(imageUrl) ?? null) : null
+  const [, rerenderAfterColorLoad] = useState(0)
 
   useEffect(() => {
     if (!imageUrl || !enabled) return
 
+    if (cache.get(imageUrl)) return
+
     let cancelled = false
     void getColors(imageUrl, resolvedTheme).then((result) => {
       if (!cancelled && result) {
-        setCachedColors({ for: imageUrl, theme: resolvedTheme, colors: result })
+        rerenderAfterColorLoad((version) => version + 1)
       }
     })
 
     return () => {
       cancelled = true
     }
-  }, [imageUrl, resolvedTheme, cache, enabled])
+  }, [imageUrl, resolvedTheme, cache, enabled, cachedColors])
 
-  if (!imageUrl || !enabled) return null
-  if (cachedColors?.for === imageUrl && cachedColors.theme === resolvedTheme) {
-    return cachedColors.colors
-  }
-
-  // Pure render-time fallback for already-populated caches. Cached hits are
-  // promoted in the effect above without scheduling an extra state update.
-  return cache.peek(imageUrl) ?? null
+  return cachedColors
 }
