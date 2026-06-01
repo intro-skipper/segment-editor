@@ -182,33 +182,6 @@ const buildColors = (
 
 const EXTRACTION_TIMEOUT_MS = 5000
 
-function resolveWithPaletteTimeout(
-  promise: Promise<Palette | null>,
-): Promise<Palette | null> {
-  return new Promise((resolve) => {
-    let settled = false
-    const timeoutId = setTimeout(() => {
-      if (settled) return
-      settled = true
-      resolve(null)
-    }, EXTRACTION_TIMEOUT_MS)
-
-    void promise.then(
-      (palette) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeoutId)
-        resolve(palette)
-      },
-      () => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeoutId)
-        resolve(null)
-      },
-    )
-  })
-}
 
 async function extractPalette(
   url: string,
@@ -324,7 +297,7 @@ async function getPalette(url: string): Promise<Palette | null> {
     pendingPalettes.set(url, promise)
     void promise.finally(() => pendingPalettes.delete(url))
   }
-  return resolveWithPaletteTimeout(promise)
+  return promise
 }
 
 async function getColors(

@@ -6,7 +6,7 @@
  * Uses the shared blobCache and fetchBlobUrl for consistency with useVibrantColor.
  */
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   blobCache,
   fetchBlobUrl,
@@ -26,28 +26,51 @@ export function useBlobUrl(url: string | null | undefined): string {
     getBlobCacheSnapshot,
   )
   const [, rerenderAfterBlobLoad] = useState(0)
+  const previousUrlRef = useRef<string | null | undefined>(undefined)
+  const lastFetchAttemptUrlRef = useRef<string | null>(null)
+  const lastRenderedBlobUrlRef = useRef<string | null>(null)
+
+  const cached = url ? blobCache.peek(url) : undefined
 
   useEffect(() => {
+    if (previousUrlRef.current !== url) {
+      previousUrlRef.current = url
+      lastFetchAttemptUrlRef.current = null
+      lastRenderedBlobUrlRef.current = null
+    }
+
     if (!url) return
 
-    const cached = blobCache.get(url)
-    if (cached) return
+    const promotedCached = blobCache.get(url)
+    if (promotedCached) {
+      lastRenderedBlobUrlRef.current = promotedCached
+      return
+    }
+
+    const shouldRetryEvictedActiveUrl =
+      lastRenderedBlobUrlRef.current !== null &&
+      lastFetchAttemptUrlRef.current === url
+    if (
+      lastFetchAttemptUrlRef.current === url &&
+      !shouldRetryEvictedActiveUrl
+    ) {
+      return
+    }
+
+    lastFetchAttemptUrlRef.current = url
+    lastRenderedBlobUrlRef.current = null
 
     let cancelled = false
     void fetchBlobUrl(url).then((result) => {
-      if (!cancelled && result && blobCache.peek(url) !== result) {
+      if (!cancelled && result) {
         rerenderAfterBlobLoad((version) => version + 1)
       }
     })
     return () => {
       cancelled = true
     }
-  }, [url, blobCacheRevision])
+  }, [url, blobCacheRevision, cached])
 
   if (!url) return ''
-  const cached = blobCache.peek(url)
-
-  // Pure render-time fallback for already-populated caches. Cached hits are
-  // promoted in the effect above without scheduling an extra state update.
   return cached ?? ''
 }
