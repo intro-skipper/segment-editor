@@ -221,6 +221,7 @@ async function extractPalette(
   return new Promise((resolve) => {
     const img = new Image()
     let resolved = false
+    let imageLoaded = false
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const clearTimeoutIfNeeded = () => {
@@ -243,13 +244,17 @@ async function extractPalette(
       resolve(palette)
     }
 
+    const hasResolved = () => resolved
+
     timeoutId = setTimeout(() => {
-      img.src = ''
+      if (!imageLoaded) {
+        img.src = ''
+      }
       resolveOnce(null)
     }, EXTRACTION_TIMEOUT_MS)
 
     img.onload = async () => {
-      clearTimeoutIfNeeded()
+      imageLoaded = true
       detachImageHandlers()
       const { canvas, ctx } = shared
       const scale = Math.min(50 / img.width, 50 / img.height, 1)
@@ -261,6 +266,7 @@ async function extractPalette(
         const compressedBlob = await new Promise<Blob | null>((onBlob) => {
           canvas.toBlob(onBlob, 'image/jpeg', 0.6)
         })
+        if (hasResolved()) return
         if (!compressedBlob) {
           resolveOnce(null)
           return
@@ -271,6 +277,7 @@ async function extractPalette(
           const palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
             .quality(1)
             .getPalette()
+          if (hasResolved()) return
           paletteCache.set(url, palette)
           resolveOnce(palette)
         } finally {
