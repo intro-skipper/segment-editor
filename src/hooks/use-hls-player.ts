@@ -46,26 +46,11 @@ const createError = (
 })
 
 function clearRecoveryTimer(
-  recoveryTimerRef: React.MutableRefObject<ReturnType<
-    typeof setTimeout
-  > | null>,
+  recoveryTimerRef: React.RefObject<ReturnType<typeof setTimeout> | null>,
 ) {
   if (recoveryTimerRef.current) {
     clearTimeout(recoveryTimerRef.current)
     recoveryTimerRef.current = null
-  }
-}
-
-function destroyHlsInstance(
-  hlsRef: React.RefObject<Hls | null>,
-  recoveryTimerRef: React.MutableRefObject<ReturnType<
-    typeof setTimeout
-  > | null>,
-) {
-  clearRecoveryTimer(recoveryTimerRef)
-  if (hlsRef.current) {
-    hlsRef.current.destroy()
-    hlsRef.current = null
   }
 }
 
@@ -107,13 +92,22 @@ export function useHlsPlayer({
 
     if (!video || !videoUrl) {
       isActiveRef.current = false
-      return () => clearRecoveryTimer(recoveryTimer)
+      return () => {
+        if (recoveryTimer.current) {
+          clearTimeout(recoveryTimer.current)
+          recoveryTimer.current = null
+        }
+      }
     }
 
     isActiveRef.current = true
 
     reportError(null)
-    destroyHlsInstance(hlsRef, recoveryTimerRef)
+    clearRecoveryTimer(recoveryTimerRef)
+    if (hlsRef.current) {
+      hlsRef.current.destroy()
+      hlsRef.current = null
+    }
 
     if (Hls.isSupported()) {
       const hls = new Hls(HLS_CONFIG)
@@ -172,7 +166,14 @@ export function useHlsPlayer({
 
     return () => {
       isActiveRef.current = false
-      destroyHlsInstance(hlsRef, recoveryTimerRef)
+      if (recoveryTimer.current) {
+        clearTimeout(recoveryTimer.current)
+        recoveryTimer.current = null
+      }
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
     }
   }, [videoUrl])
 
