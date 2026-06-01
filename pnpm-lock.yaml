@@ -51,8 +51,8 @@ importers:
         specifier: ^26.3.0
         version: 26.3.0(typescript@6.0.3)
       jassub:
-        specifier: 2.5.1
-        version: 2.5.1
+        specifier: 2.5.3
+        version: 2.5.3
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.6)
@@ -787,8 +787,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@dotenvx/dotenvx@1.69.2':
-    resolution: {integrity: sha512-60Vh31k5bAAPq57Isx+Iopl2FrZQzZyUc4kh/OESgXiwhrKXqdxEn3JGTGSawng1DkkeC4jofFq1VpPJqNQx4w==}
+  '@dotenvx/dotenvx@1.70.0':
+    resolution: {integrity: sha512-vC/rom87ym8HEyVdzZZS6/PYGg1Z5fmozUZ8l6cw1sYAxdL1lEyvE/JbK8cMFQoq3GsR/P1PiQRY+VXMtDN9bw==}
     hasBin: true
 
   '@ecies/ciphers@0.2.6':
@@ -2535,8 +2535,8 @@ packages:
     resolution: {integrity: sha512-Cxwpt2SfTzTtXcfOlzGEee8O+c+MmUgGrNiBcXnuWxuFJHe6a5Hz7qwhwe5OgaSYI0IJvkLqWX1ASG+cJOkEiA==}
     engines: {node: '>=10'}
 
-  ansis@4.3.0:
-    resolution: {integrity: sha512-44mvgtPvohuU/70DdY5Oz2AIrLJ9k6/5x4KmoSvPwO+5Moijo0+N9D0fKbbYZQWP1hNm5CpOf+E01jhxG/r8xg==}
+  ansis@4.3.1:
+    resolution: {integrity: sha512-BJ8/l4R5LRE7hW9WdSuGYrLSHi2ynxeFpDFbH0K/CgNeY/tyhk+vO6TYxXC5r5CpUhNVX310xzPsN/H9lCdfOA==}
     engines: {node: '>=14'}
 
   any-base@1.1.0:
@@ -3698,8 +3698,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  jassub@2.5.1:
-    resolution: {integrity: sha512-cQrQa42zfhNCBcNsYfep8E9acLW66PP87M3ZiNyWPEUyj4JBGhi7buf6aOhUbkNRkHe9iA+TNTZms0JJcS7zIA==}
+  jassub@2.5.3:
+    resolution: {integrity: sha512-BC3k8/juZDJzKcpu0mvSxZbr1Szi2CBydaDLRkLcpMH9Xd/Jt/+fuY98kCwqVDbcqKGkh03cKQw73KWZUcECKg==}
 
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
@@ -6028,7 +6028,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@dotenvx/dotenvx@1.69.2':
+  '@dotenvx/dotenvx@1.70.0':
     dependencies:
       commander: 11.1.0
       dotenv: 17.4.2
@@ -7185,7 +7185,7 @@ snapshots:
       '@babel/generator': 7.29.7
       '@babel/parser': 7.29.7
       '@babel/types': 7.29.7
-      ansis: 4.3.0
+      ansis: 4.3.1
       babel-dead-code-elimination: 1.0.12
       diff: 8.0.4
       pathe: 2.0.3
@@ -7468,7 +7468,7 @@ snapshots:
 
   ansi-styles@5.2.0: {}
 
-  ansis@4.3.0: {}
+  ansis@4.3.1: {}
 
   any-base@1.1.0: {}
 
@@ -8705,7 +8705,7 @@ snapshots:
       filelist: 1.0.6
       picocolors: 1.1.1
 
-  jassub@2.5.1:
+  jassub@2.5.3:
     dependencies:
       abslink: 1.2.2
       lfa-ponyfill: 1.1.0
@@ -9660,7 +9660,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@babel/plugin-transform-typescript': 7.29.7(@babel/core@7.29.7)
       '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
-      '@dotenvx/dotenvx': 1.69.2
+      '@dotenvx/dotenvx': 1.70.0
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       '@types/validate-npm-package-name': 4.0.2
       browserslist: 4.28.2
