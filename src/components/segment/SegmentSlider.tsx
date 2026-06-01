@@ -77,6 +77,71 @@ function snapAndClampEnd(
   return clampEndToBounds(snapToFrame(value, frameStep), start, runtime)
 }
 
+interface SegmentRange {
+  start: number
+  end: number
+}
+
+interface SegmentSyncSnapshot {
+  id: MediaSegmentDto['Id']
+  startTicks: MediaSegmentDto['StartTicks']
+  endTicks: MediaSegmentDto['EndTicks']
+  type: MediaSegmentDto['Type']
+}
+
+function getSegmentSyncSnapshot(segment: MediaSegmentDto): SegmentSyncSnapshot {
+  return {
+    id: segment.Id,
+    startTicks: segment.StartTicks,
+    endTicks: segment.EndTicks,
+    type: segment.Type,
+  }
+}
+
+function areSegmentSyncSnapshotsEqual(
+  a: SegmentSyncSnapshot,
+  b: SegmentSyncSnapshot,
+): boolean {
+  return (
+    a.id === b.id &&
+    a.startTicks === b.startTicks &&
+    a.endTicks === b.endTicks &&
+    a.type === b.type
+  )
+}
+
+function syncSegmentProps(
+  segment: MediaSegmentDto,
+  lastSyncedPropsRef: React.RefObject<SegmentSyncSnapshot | null>,
+  stableRangeRef: React.RefObject<SegmentRange>,
+  setStableRange: React.Dispatch<React.SetStateAction<SegmentRange>>,
+  resetForm: () => void,
+): boolean {
+  const nextSnapshot = getSegmentSyncSnapshot(segment)
+  const previousSnapshot = lastSyncedPropsRef.current
+  if (
+    previousSnapshot &&
+    areSegmentSyncSnapshotsEqual(previousSnapshot, nextSnapshot)
+  ) {
+    return false
+  }
+
+  lastSyncedPropsRef.current = nextSnapshot
+
+  const nextRange = {
+    start: segment.StartTicks ?? 0,
+    end: segment.EndTicks ?? 0,
+  }
+  stableRangeRef.current = nextRange
+  setStableRange((current) =>
+    current.start === nextRange.start && current.end === nextRange.end
+      ? current
+      : nextRange,
+  )
+  resetForm()
+  return true
+}
+
 interface SegmentSliderProps {
   /** The segment to display and edit */
   segment: MediaSegmentDto
@@ -135,17 +200,15 @@ export function SegmentSlider({
   const formValues = useStore(form.store, (state) => state.values)
   const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
   const activeInputRef = React.useRef<'start' | 'end' | null>(null)
-  const [stableRange, setStableRange] = React.useState({
+  const [stableRange, setStableRange] = React.useState<SegmentRange>({
     start: segment.StartTicks ?? 0,
     end: segment.EndTicks ?? 0,
   })
-  const stableRangeRef = React.useRef(stableRange)
-  const lastSyncedPropsRef = React.useRef({
-    id: segment.Id,
-    startTicks: segment.StartTicks,
-    endTicks: segment.EndTicks,
-    type: segment.Type,
-  })
+  const stableRangeRef = React.useRef<SegmentRange>(stableRange)
+  const lastSyncedPropsRef = React.useRef<SegmentSyncSnapshot | null>(null)
+  if (lastSyncedPropsRef.current === null) {
+    lastSyncedPropsRef.current = getSegmentSyncSnapshot(segment)
+  }
   const isDraggingRef = React.useRef<'start' | 'end' | null>(null)
   const pointerCaptureTargetRef = React.useRef<HTMLElement | null>(null)
   const pointerIdRef = React.useRef<number | null>(null)
@@ -156,34 +219,13 @@ export function SegmentSlider({
   const syncSegmentPropsIfChanged = () => {
     if (isDraggingRef.current || activeInputRef.current !== null) return false
 
-    const prev = lastSyncedPropsRef.current
-    const propsChanged =
-      prev.id !== segment.Id ||
-      prev.startTicks !== segment.StartTicks ||
-      prev.endTicks !== segment.EndTicks ||
-      prev.type !== segment.Type
-
-    if (!propsChanged) return false
-
-    lastSyncedPropsRef.current = {
-      id: segment.Id,
-      startTicks: segment.StartTicks,
-      endTicks: segment.EndTicks,
-      type: segment.Type,
-    }
-
-    const nextRange = {
-      start: segment.StartTicks ?? 0,
-      end: segment.EndTicks ?? 0,
-    }
-    stableRangeRef.current = nextRange
-    setStableRange((current) =>
-      current.start === nextRange.start && current.end === nextRange.end
-        ? current
-        : nextRange,
+    return syncSegmentProps(
+      segment,
+      lastSyncedPropsRef,
+      stableRangeRef,
+      setStableRange,
+      () => form.reset(getSegmentFormDefaults(segment)),
     )
-    form.reset(getSegmentFormDefaults(segment))
-    return true
   }
 
   const markLocalRangeDirtyIfChanged = (nextRange: {
@@ -259,33 +301,13 @@ export function SegmentSlider({
   React.useLayoutEffect(() => {
     if (isDraggingRef.current || activeInputRef.current !== null) return
 
-    const prev = lastSyncedPropsRef.current
-    const propsChanged =
-      prev.id !== segment.Id ||
-      prev.startTicks !== segment.StartTicks ||
-      prev.endTicks !== segment.EndTicks ||
-      prev.type !== segment.Type
-
-    if (!propsChanged) return
-
-    lastSyncedPropsRef.current = {
-      id: segment.Id,
-      startTicks: segment.StartTicks,
-      endTicks: segment.EndTicks,
-      type: segment.Type,
-    }
-
-    const nextRange = {
-      start: segment.StartTicks ?? 0,
-      end: segment.EndTicks ?? 0,
-    }
-    stableRangeRef.current = nextRange
-    setStableRange((current) =>
-      current.start === nextRange.start && current.end === nextRange.end
-        ? current
-        : nextRange,
+    syncSegmentProps(
+      segment,
+      lastSyncedPropsRef,
+      stableRangeRef,
+      setStableRange,
+      () => form.reset(getSegmentFormDefaults(segment)),
     )
-    form.reset(getSegmentFormDefaults(segment))
   }, [form, segment])
 
   const segmentColor = getSegmentColor(formValues.type)
