@@ -95,14 +95,22 @@ export function useConnectionInit(): ConnectionState {
       // Standalone mode: validate credentials before marking as connected
       setValidationStatus('validating')
 
+      let result: Awaited<ReturnType<typeof testConnectionWithCredentials>>
       try {
-        const result = await testConnectionWithCredentials(creds, {
+        result = await testConnectionWithCredentials(creds, {
           signal: controller.signal,
         })
+      } catch {
+        if (controller.signal.aborted) return
+        useApiStore.getState().setConnectionStatus(false, false)
+        setValidationStatus('validated')
+        return
+      }
 
-        if (!controller.signal.aborted) {
-          const store = useApiStore.getState()
-          if (result.valid && result.authenticated) {
+      if (!controller.signal.aborted) {
+        const store = useApiStore.getState()
+        if (result.valid) {
+          if (result.authenticated) {
             useApiStore.setState({
               serverVersion: result.serverVersion,
               validConnection: true,
@@ -111,10 +119,9 @@ export function useConnectionInit(): ConnectionState {
           } else {
             store.setConnectionStatus(false, false)
           }
+        } else {
+          store.setConnectionStatus(false, false)
         }
-      } catch {
-        if (controller.signal.aborted) return
-        useApiStore.getState().setConnectionStatus(false, false)
       }
 
       if (!controller.signal.aborted) {

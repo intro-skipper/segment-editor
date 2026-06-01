@@ -296,12 +296,12 @@ export function SegmentSlider({
 
   const inputStep = frameStep ?? MIN_SEGMENT_GAP
 
-  const commitSegmentUpdate = (start: number, end: number) => {
-    if (!segment.Id) return
+  const commitSegmentUpdate = (start: number, end: number): boolean => {
+    if (!segment.Id) return false
 
     const currentStart = segment.StartTicks ?? 0
     const currentEnd = segment.EndTicks ?? 0
-    if (start === currentStart && end === currentEnd) return
+    if (start === currentStart && end === currentEnd) return false
 
     const nextValidation = validateSegmentFormValues(
       getSegmentFormDefaults({
@@ -310,9 +310,10 @@ export function SegmentSlider({
         EndTicks: end,
       }),
     )
-    if (!nextValidation.valid) return
+    if (!nextValidation.valid) return false
 
     onUpdate({ id: segment.Id, start, end })
+    return true
   }
 
   const handleStartPointerDown = (e: React.PointerEvent) => {
@@ -416,9 +417,12 @@ export function SegmentSlider({
     pointerIdRef.current = null
 
     isDraggingRef.current = null
-    if (syncSegmentPropsIfChanged()) return
 
-    commitSegmentUpdate(stableRangeRef.current.start, stableRangeRef.current.end)
+    const didCommit = commitSegmentUpdate(
+      stableRangeRef.current.start,
+      stableRangeRef.current.end,
+    )
+    if (!didCommit) syncSegmentPropsIfChanged()
   }
 
   const handleInputChange = (type: 'start' | 'end', value: string) => {
@@ -447,9 +451,10 @@ export function SegmentSlider({
 
   const handleInputBlur = (type: 'start' | 'end') => {
     activeInputRef.current = null
-    if (syncSegmentPropsIfChanged()) return
 
     if (!validation.valid) {
+      if (syncSegmentPropsIfChanged()) return
+
       // Revert the edited field to the last committed valid value
       form.setFieldValue(
         type === 'start' ? 'startText' : 'endText',
@@ -482,7 +487,8 @@ export function SegmentSlider({
       nextEnd = nextRange.end
     }
 
-    commitSegmentUpdate(nextStart, nextEnd)
+    const didCommit = commitSegmentUpdate(nextStart, nextEnd)
+    if (!didCommit) syncSegmentPropsIfChanged()
   }
 
   // Copy segment to system clipboard as JSON

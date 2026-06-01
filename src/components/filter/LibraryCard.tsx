@@ -36,6 +36,7 @@ export const LibraryCard = function LibraryCardComponent({
   const { t } = useTranslation()
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [useBlobFallback, setUseBlobFallback] = useState(false)
 
   // Construct the direct image URL for the library
   const rawImageUrl = (() => {
@@ -44,8 +45,21 @@ export const LibraryCard = function LibraryCardComponent({
     return `${baseUrl}/Items/${collection.ItemId}/Images/Primary?maxWidth=480`
   })()
 
-  // Convert to blob URL for COEP compliance
-  const imageUrl = useBlobUrl(rawImageUrl)
+  // Start with the direct image URL; only fetch a blob fallback if COEP/CORS
+  // blocks the image. Fetching every library image as a blob up front can
+  // allocate a large number of object URLs during the library landing view.
+  const blobImageUrl = useBlobUrl(useBlobFallback ? rawImageUrl : null)
+  const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
+
+  const handleImageError = () => {
+    if (!useBlobFallback && rawImageUrl) {
+      setImageLoaded(false)
+      setUseBlobFallback(true)
+      return
+    }
+
+    setImageError(true)
+  }
 
   const selectLibrary = () => {
     onSelect(collection.ItemId ?? null)
@@ -87,7 +101,7 @@ export const LibraryCard = function LibraryCardComponent({
             height={270}
             decoding="async"
             onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
+            onError={handleImageError}
             className={cn(
               'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
               imageLoaded ? 'opacity-100' : 'opacity-0',

@@ -275,6 +275,8 @@ export function useJellyfinSession({
         nextStartTokenRef.current,
       )
 
+    const isInitiallyPaused = video === null ? true : video.paused
+
     try {
       if (isCurrentPlaybackStatusStart()) {
         await startPlaybackStatus({
@@ -283,7 +285,7 @@ export function useJellyfinSession({
           playSessionId: nextStatus.session.playSessionId,
           playMethod: nextStatus.session.playMethod,
           positionTicks,
-          isPaused: video?.paused ?? true,
+          isPaused: isInitiallyPaused,
         })
 
         if (isCurrentPlaybackStatusStart()) {

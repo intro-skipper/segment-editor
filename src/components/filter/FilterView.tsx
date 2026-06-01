@@ -396,16 +396,19 @@ function useRenderFilterView() {
     })
 
   const setVirtualizedGridRef = (node: HTMLDivElement | null) => {
-    setVirtualizedGridElement(node)
+    setVirtualizedGridElement((currentElement) =>
+      currentElement === node ? currentElement : node,
+    )
     gridRef.current = node
   }
 
   const preloadedUrlsRef = useRef<Set<string> | null>(null)
-  if (preloadedUrlsRef.current === null)
+  if (preloadedUrlsRef.current === null) {
     preloadedUrlsRef.current = new Set<string>()
+  }
 
   useEffect(() => {
-    preloadedUrlsRef.current!.clear()
+    preloadedUrlsRef.current?.clear()
   }, [selectedCollection])
 
   useEffect(() => {
@@ -417,19 +420,22 @@ function useRenderFilterView() {
     )
 
     const preloadVisibleColors = () => {
+      const preloadedUrls = preloadedUrlsRef.current
+      if (preloadedUrls === null) return
+
       const imageUrls: Array<string> = []
 
       for (let index = 0; index < maxPreloadCount; index++) {
         const item = paginatedItems[index]
 
         const url = getBestImageUrl(item, 200)
-        if (!url || preloadedUrlsRef.current!.has(url)) continue
+        if (!url || preloadedUrls.has(url)) continue
 
         imageUrls.push(url)
       }
 
       if (imageUrls.length > 0) {
-        imageUrls.forEach((url) => preloadedUrlsRef.current!.add(url))
+        imageUrls.forEach((url) => preloadedUrls.add(url))
         preloadVibrantColors(imageUrls)
       }
     }

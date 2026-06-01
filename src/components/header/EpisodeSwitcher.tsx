@@ -382,8 +382,9 @@ export const EpisodeSwitcher = function EpisodeSwitcherComponent({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const prefetchedEpisodeIdsRef = useRef<Set<string> | null>(null)
-  if (prefetchedEpisodeIdsRef.current === null)
+  if (prefetchedEpisodeIdsRef.current === null) {
     prefetchedEpisodeIdsRef.current = new Set<string>()
+  }
   const [episodeListElement, setEpisodeListElement] =
     useState<HTMLDivElement | null>(null)
 
@@ -413,11 +414,14 @@ export const EpisodeSwitcher = function EpisodeSwitcherComponent({
   }
 
   const prefetchEpisodeRoute = (episodeId: string) => {
-    if (!episodeId || prefetchedEpisodeIdsRef.current!.has(episodeId)) {
+    const prefetchedEpisodeIds = prefetchedEpisodeIdsRef.current
+    if (prefetchedEpisodeIds === null) return
+
+    if (!episodeId || prefetchedEpisodeIds.has(episodeId)) {
       return
     }
 
-    prefetchedEpisodeIdsRef.current!.add(episodeId)
+    prefetchedEpisodeIds.add(episodeId)
     void router.preloadRoute({
       to: '/player/$itemId',
       params: { itemId: episodeId },

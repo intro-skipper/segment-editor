@@ -87,6 +87,18 @@ function findPreferredSubtitleIndex(
   return null
 }
 
+function getTrackSwitchErrorMessage(error: { message: string }): string {
+  return error.message
+}
+
+function getCaughtTrackSwitchErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (error instanceof Error) return error.message
+  return fallback
+}
+
 export function useTrackManager({
   item,
   strategy,
@@ -95,6 +107,8 @@ export function useTrackManager({
   t,
   onReloadHls,
 }: UseTrackManagerOptions): UseTrackManagerReturn {
+  'use memo'
+
   const [userSelection, setUserSelection] = useState<UserTrackSelectionState>({
     key: '',
     hasAudioSelection: false,
@@ -238,16 +252,15 @@ export function useTrackManager({
               },
         )
       } else if (result.error) {
-        const errorMsg =
-          result.error.message || t('player.tracks.error.switchFailed')
+        const errorMsg = getTrackSwitchErrorMessage(result.error)
         setError(errorMsg)
         showError(errorMsg)
       }
     } catch (err) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : t('player.tracks.error.switchFailed')
+      const errorMsg = getCaughtTrackSwitchErrorMessage(
+        err,
+        t('player.tracks.error.switchFailed'),
+      )
       setError(errorMsg)
       showError(errorMsg)
     }
@@ -262,6 +275,7 @@ export function useTrackManager({
       return
     }
 
+    let selectedTrack: SubtitleTrackInfo | null = null
     if (index !== null) {
       const track = subtitleTrackMap.get(index)
       if (!track) {
@@ -270,21 +284,21 @@ export function useTrackManager({
         showError(errorMsg)
         return
       }
+      selectedTrack = track
     }
 
     if (index === trackState.activeSubtitleIndex) {
       return
     }
 
+    if (selectedTrack !== null && requiresJassubRenderer(selectedTrack)) {
+      void preloadJassubRenderer().catch(() => {})
+    }
+
     setIsTrackOperationPending(true)
     setError(null)
 
     try {
-      const selectedTrack = index === null ? null : subtitleTrackMap.get(index)
-      if (selectedTrack && requiresJassubRenderer(selectedTrack)) {
-        void preloadJassubRenderer().catch(() => {})
-      }
-
       const result: TrackSwitchResult = await switchSubtitleTrack(index, {
         ...createSwitchOptions(video),
       })
@@ -306,16 +320,15 @@ export function useTrackManager({
               },
         )
       } else if (result.error) {
-        const errorMsg =
-          result.error.message || t('player.tracks.error.switchFailed')
+        const errorMsg = getTrackSwitchErrorMessage(result.error)
         setError(errorMsg)
         showError(errorMsg)
       }
     } catch (err) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : t('player.tracks.error.switchFailed')
+      const errorMsg = getCaughtTrackSwitchErrorMessage(
+        err,
+        t('player.tracks.error.switchFailed'),
+      )
       setError(errorMsg)
       showError(errorMsg)
     }

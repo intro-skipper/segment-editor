@@ -86,6 +86,11 @@ interface SegmentTimeRange {
   endSeconds: number
 }
 
+interface ActiveSkipSegmentState {
+  segment: MediaSegmentDto
+  segmentSkipModeRevision: number
+}
+
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
@@ -343,14 +348,15 @@ function useRenderPlayer({
     playbackSpeedIndex,
   } = state
 
+  const { segmentSkipMode, segmentSkipModeRevision } = useAppStore(
+    useShallow((s) => ({
+      segmentSkipMode: s.segmentSkipMode,
+      segmentSkipModeRevision: s.segmentSkipModeRevision,
+    })),
+  )
+  const segmentSkipModeRef = useRef(segmentSkipMode)
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
-
-  const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
-  const segmentSkipModeRef = useRef(segmentSkipMode)
-  useLayoutEffect(() => {
-    segmentSkipModeRef.current = segmentSkipMode
-  }, [segmentSkipMode])
 
   const jellyfinPlaybackSyncEnabled = useAppStore(
     (s) => s.jellyfinPlaybackSyncEnabled,
@@ -387,10 +393,21 @@ function useRenderPlayer({
     segmentTimeRangeByIdRef.current = segmentTimeRangeById
   }, [segmentTimeRangeById])
 
-  const [activeSkipSegment, setActiveSkipSegment] =
-    useState<MediaSegmentDto | null>(null)
+  const [activeSkipSegmentState, setActiveSkipSegmentState] =
+    useState<ActiveSkipSegmentState | null>(null)
   const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
   const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
+
+  useLayoutEffect(() => {
+    segmentSkipModeRef.current = segmentSkipMode
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+  }, [segmentSkipMode, segmentSkipModeRevision])
+
+  const activeSkipSegment =
+    activeSkipSegmentState?.segmentSkipModeRevision === segmentSkipModeRevision
+      ? activeSkipSegmentState.segment
+      : null
 
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -614,7 +631,7 @@ function useRenderPlayer({
       if (prevActiveSegmentIdRef.current !== null) {
         prevActiveSegmentIdRef.current = null
         lastAutoSkippedSegmentIdRef.current = null
-        setActiveSkipSegment(null)
+        setActiveSkipSegmentState(null)
       }
       return
     }
@@ -650,7 +667,14 @@ function useRenderPlayer({
         lastAutoSkippedSegmentIdRef.current = null
       }
       if (mode === 'button') {
-        setActiveSkipSegment(active)
+        setActiveSkipSegmentState(
+          active
+            ? {
+                segment: active,
+                segmentSkipModeRevision,
+              }
+            : null,
+        )
       }
     }
 
@@ -1105,7 +1129,7 @@ function useRenderPlayer({
       return
     }
     handleSeek(targetEndSeconds)
-    setActiveSkipSegment(null)
+    setActiveSkipSegmentState(null)
     prevActiveSegmentIdRef.current = null
     lastAutoSkippedSegmentIdRef.current = null
   }

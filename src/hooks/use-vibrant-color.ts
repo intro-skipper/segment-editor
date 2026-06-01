@@ -88,6 +88,31 @@ const paletteCache = new LRUCache<string, Palette>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
 )
 const pendingPalettes = new Map<string, Promise<Palette | null>>()
+const MAX_PALETTE_EXTRACTION_CONCURRENCY = 1
+const paletteTaskQueue: Array<() => void> = []
+let activePaletteTaskCount = 0
+
+function queuePaletteTask(
+  task: () => Promise<Palette | null>,
+): Promise<Palette | null> {
+  return new Promise((resolve) => {
+    const run = () => {
+      activePaletteTaskCount++
+      void task()
+        .then(resolve, () => resolve(null))
+        .finally(() => {
+          activePaletteTaskCount--
+          paletteTaskQueue.shift()?.()
+        })
+    }
+
+    if (activePaletteTaskCount < MAX_PALETTE_EXTRACTION_CONCURRENCY) {
+      run()
+    } else {
+      paletteTaskQueue.push(run)
+    }
+  })
+}
 
 const getCache = (theme: ResolvedTheme) =>
   theme === 'dark' ? colorCacheDark : colorCacheLight
@@ -167,7 +192,38 @@ async function extractPalette(
 
   return new Promise((resolve) => {
     const img = new Image()
+    let settled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const clearTimeoutIfNeeded = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    }
+
+    const detachImageHandlers = () => {
+      img.onload = null
+      img.onerror = null
+    }
+
+    const hasSettled = () => settled
+
+    const resolveOnce = (palette: Palette | null) => {
+      if (settled) return
+      settled = true
+      clearTimeoutIfNeeded()
+      detachImageHandlers()
+      resolve(palette)
+    }
+
+    timeoutId = setTimeout(() => {
+      img.src = ''
+      resolveOnce(null)
+    }, EXTRACTION_TIMEOUT_MS)
+
     img.onload = async () => {
+      detachImageHandlers()
       const { canvas, ctx } = shared
       const scale = Math.min(50 / img.width, 50 / img.height, 1)
       canvas.width = Math.floor(img.width * scale)
@@ -175,11 +231,12 @@ async function extractPalette(
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       try {
+        if (hasSettled()) return
         const compressedBlob = await new Promise<Blob | null>((onBlob) => {
           canvas.toBlob(onBlob, 'image/jpeg', 0.6)
         })
-        if (!compressedBlob) {
-          resolve(null)
+        if (!compressedBlob || hasSettled()) {
+          if (!compressedBlob) resolveOnce(null)
           return
         }
 
@@ -189,46 +246,41 @@ async function extractPalette(
           palette = await vibrantWorkerModule.Vibrant.from(compressedUrl)
             .quality(1)
             .getPalette()
+          if (hasSettled()) return
         } finally {
           URL.revokeObjectURL(compressedUrl)
         }
 
         paletteCache.set(url, palette)
-        resolve(palette)
+        resolveOnce(palette)
       } catch {
-        resolve(null)
+        resolveOnce(null)
       }
     }
-    img.onerror = () => resolve(null)
+    img.onerror = () => resolveOnce(null)
     img.decoding = 'async'
     img.crossOrigin = 'anonymous'
     img.src = blobUrl
   })
 }
 
-async function extractPaletteWithTimeout(
-  url: string,
-  blobUrl: string,
-  vibrantWorkerModule: VibrantWorkerModule,
-): Promise<Palette | null> {
-  return Promise.race([
-    extractPalette(url, blobUrl, vibrantWorkerModule),
-    new Promise<null>((r) => setTimeout(() => r(null), EXTRACTION_TIMEOUT_MS)),
-  ])
-}
-
 async function getPalette(url: string): Promise<Palette | null> {
-  await initWorker()
-  const vibrantWorkerModule = await loadVibrantWorkerModule()
-
   const cached = paletteCache.get(url)
   if (cached) return cached
 
   let promise = pendingPalettes.get(url)
   if (!promise) {
-    promise = fetchBlobUrl(url).then((blob) =>
-      blob ? extractPaletteWithTimeout(url, blob, vibrantWorkerModule) : null,
-    )
+    promise = queuePaletteTask(async () => {
+      const cachedPalette = paletteCache.get(url)
+      if (cachedPalette) return cachedPalette
+
+      const blob = await fetchBlobUrl(url)
+      if (!blob) return null
+
+      await initWorker()
+      const vibrantWorkerModule = await loadVibrantWorkerModule()
+      return extractPalette(url, blob, vibrantWorkerModule)
+    })
     pendingPalettes.set(url, promise)
     void promise.finally(() => pendingPalettes.delete(url))
   }
@@ -275,20 +327,19 @@ export function useVibrantColor(
   const resolvedTheme = resolveTheme(theme)
   const cache = getCache(resolvedTheme)
 
-  // Track only the async-fetched result; cache reads are derived during render.
-  const [pending, setPending] = useState<{
+  const [cachedColors, setCachedColors] = useState<{
     for: string
     theme: ResolvedTheme
     colors: VibrantColors
   } | null>(null)
 
   useEffect(() => {
-    if (!imageUrl || !enabled || cache.has(imageUrl)) return
+    if (!imageUrl || !enabled) return
 
     let cancelled = false
     void getColors(imageUrl, resolvedTheme).then((result) => {
       if (!cancelled && result) {
-        setPending({ for: imageUrl, theme: resolvedTheme, colors: result })
+        setCachedColors({ for: imageUrl, theme: resolvedTheme, colors: result })
       }
     })
 
@@ -297,11 +348,12 @@ export function useVibrantColor(
     }
   }, [imageUrl, resolvedTheme, cache, enabled])
 
-  // Derive from cache synchronously during render — no extra re-render needed.
   if (!imageUrl || !enabled) return null
-  const cached = cache.peek(imageUrl)
-  if (cached) return cached
-  return pending?.for === imageUrl && pending.theme === resolvedTheme
-    ? pending.colors
-    : null
+  if (cachedColors?.for === imageUrl && cachedColors.theme === resolvedTheme) {
+    return cachedColors.colors
+  }
+
+  // Pure render-time fallback for already-populated caches. Cached hits are
+  // promoted in the effect above without scheduling an extra state update.
+  return cache.peek(imageUrl) ?? null
 }

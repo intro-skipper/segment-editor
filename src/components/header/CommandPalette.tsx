@@ -3,7 +3,13 @@
  * Accessible via Cmd/Ctrl+K or / keyboard shortcuts
  */
 
-import { useDeferredValue, useEffect, useReducer, useRef } from 'react'
+import {
+  useDeferredValue,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Film, Loader2, Mic2, Play, Search, Tv, X } from 'lucide-react'
@@ -35,23 +41,21 @@ interface CommandPaletteState {
   debouncedSearch: string
   selectedIndex: number
   includeEpisodes: boolean
-  scrollElement: HTMLDivElement | null
 }
 
 type CommandPaletteAction =
-  | { type: 'setSearch'; search: string }
-  | { type: 'setDebouncedSearch'; debouncedSearch: string }
-  | { type: 'setSelectedIndex'; selectedIndex: number }
-  | { type: 'toggleIncludeEpisodes' }
-  | { type: 'setScrollElement'; scrollElement: HTMLDivElement | null }
-  | { type: 'resetSearch' }
+  | { type: 'searchChanged'; value: string }
+  | { type: 'searchCleared' }
+  | { type: 'debouncedSearchChanged'; value: string }
+  | { type: 'selectedIndexChanged'; value: number }
+  | { type: 'episodeInclusionToggled' }
+  | { type: 'closed' }
 
-const initialCommandPaletteState: CommandPaletteState = {
+const COMMAND_PALETTE_INITIAL_STATE: CommandPaletteState = {
   search: '',
   debouncedSearch: '',
   selectedIndex: 0,
   includeEpisodes: false,
-  scrollElement: null,
 }
 
 function commandPaletteReducer(
@@ -59,22 +63,27 @@ function commandPaletteReducer(
   action: CommandPaletteAction,
 ): CommandPaletteState {
   switch (action.type) {
-    case 'setSearch':
-      return { ...state, search: action.search, selectedIndex: 0 }
-    case 'setDebouncedSearch':
-      return { ...state, debouncedSearch: action.debouncedSearch }
-    case 'setSelectedIndex':
-      return { ...state, selectedIndex: action.selectedIndex }
-    case 'toggleIncludeEpisodes':
+    case 'searchChanged':
+      return { ...state, search: action.value, selectedIndex: 0 }
+    case 'searchCleared':
+      return { ...state, search: '', selectedIndex: 0 }
+    case 'debouncedSearchChanged':
+      return { ...state, debouncedSearch: action.value }
+    case 'selectedIndexChanged':
+      return { ...state, selectedIndex: action.value }
+    case 'episodeInclusionToggled':
       return {
         ...state,
         includeEpisodes: !state.includeEpisodes,
         selectedIndex: 0,
       }
-    case 'setScrollElement':
-      return { ...state, scrollElement: action.scrollElement }
-    case 'resetSearch':
-      return { ...state, search: '', debouncedSearch: '', selectedIndex: 0 }
+    case 'closed':
+      return {
+        ...state,
+        search: '',
+        debouncedSearch: '',
+        selectedIndex: 0,
+      }
   }
 }
 
@@ -175,26 +184,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   if (prefetchedItemIdsRef.current === null) {
     prefetchedItemIdsRef.current = new Set<string>()
   }
-
   const [state, dispatch] = useReducer(
     commandPaletteReducer,
-    initialCommandPaletteState,
+    COMMAND_PALETTE_INITIAL_STATE,
   )
-  const {
-    search,
-    debouncedSearch,
-    selectedIndex,
-    includeEpisodes,
-    scrollElement,
-  } = state
+  const { search, debouncedSearch, selectedIndex, includeEpisodes } = state
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
+    null,
+  )
   const scrollElementRef = useRef<HTMLDivElement | null>(null)
+  const [setSearchResultsElement] = useState(
+    () => (element: HTMLDivElement | null) => {
+      scrollElementRef.current = element
+      setScrollElement((currentElement) =>
+        currentElement === element ? currentElement : element,
+      )
+    },
+  )
   const triggerRef = useRef<HTMLElement | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleScrollContainerRef = (node: HTMLDivElement | null) => {
-    scrollElementRef.current = node
-    dispatch({ type: 'setScrollElement', scrollElement: node })
-  }
 
   const deferredSearch = useDeferredValue(search)
   const trimmedSearch = deferredSearch.trim()
@@ -207,7 +215,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     if (!open) return
 
     const timeoutId = window.setTimeout(() => {
-      dispatch({ type: 'setDebouncedSearch', debouncedSearch: trimmedSearch })
+      dispatch({ type: 'debouncedSearchChanged', value: trimmedSearch })
     }, SEARCH_DEBOUNCE_MS)
 
     return () => {
@@ -237,15 +245,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   })()
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    dispatch({ type: 'setSearch', search: e.target.value })
+    dispatch({ type: 'searchChanged', value: e.target.value })
   }
 
   const handleClearSearch = () => {
-    dispatch({ type: 'setSearch', search: '' })
+    dispatch({ type: 'searchCleared' })
   }
 
   const handleEpisodeInclusionToggle = () => {
-    dispatch({ type: 'toggleIncludeEpisodes' })
+    dispatch({ type: 'episodeInclusionToggled' })
   }
 
   const listHeight =
@@ -277,9 +285,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const visibleItems = resultItems.slice(visibleStartIndex, visibleEndIndex)
 
   const setSelectedIndexWithScroll = (nextIndex: number) => {
-    dispatch({ type: 'setSelectedIndex', selectedIndex: nextIndex })
-    if (open && resultItems.length > 0 && scrollElementRef.current) {
-      const list = scrollElementRef.current
+    dispatch({ type: 'selectedIndexChanged', value: nextIndex })
+    const list = scrollElementRef.current
+    if (open && resultItems.length > 0 && list) {
       const itemTop = nextIndex * ITEM_HEIGHT
       const itemBottom = itemTop + ITEM_HEIGHT
       const viewportTop = list.scrollTop
@@ -301,7 +309,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
 
     if (!isOpen) {
-      dispatch({ type: 'resetSearch' })
+      dispatch({ type: 'closed' })
     }
 
     onOpenChange(isOpen)
@@ -321,8 +329,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }
 
   const handleIntent = (item: BaseItemDto) => {
+    const prefetchedItemIds = prefetchedItemIdsRef.current
+    if (prefetchedItemIds === null) return
+
     const itemId = item.Id
-    const prefetchedItemIds = prefetchedItemIdsRef.current!
     if (!itemId || prefetchedItemIds.has(itemId)) {
       return
     }
@@ -446,7 +456,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           {resultItems.length > 0 ? (
             <div
               id="search-results"
-              ref={handleScrollContainerRef}
+              ref={setSearchResultsElement}
               className="overflow-y-auto"
               style={{ height: listHeight }}
               aria-label={t('search.results', 'Search results')}

@@ -131,6 +131,8 @@ export function useVideoPlayer({
   onRecoveryEnd,
   t,
 }: UseVideoPlayerOptions): UseVideoPlayerReturn {
+  'use memo'
+
   const [strategy, setStrategy] = useState<PlaybackStrategy>('hls')
   const [videoUrl, setVideoUrl] = useState('')
   const [error, setError] = useState<VideoPlayerError | null>(null)
@@ -359,14 +361,6 @@ export function useVideoPlayer({
     },
   )
 
-  const clearPreservedPlaybackState = useEffectEvent(() => {
-    preservation.clear()
-  })
-
-  const clearHlsRestoreSubscription = useEffectEvent(() => {
-    preservation.clearHlsRestoreSubscription()
-  })
-
   const capturePlaybackStateIfNeeded = useEffectEvent((stateItemId: string) => {
     if (preservation.getPreserved(stateItemId)) return
 
@@ -376,10 +370,6 @@ export function useVideoPlayer({
     }
   })
 
-  const getPreservedPlaybackState = useEffectEvent(
-    (stateItemId: string | null) => preservation.getPreserved(stateItemId),
-  )
-
   const restoreDirectPlayStateAndClear = useEffectEvent(
     (video: HTMLVideoElement, state: PlaybackState) => {
       preservation.restoreStateAndMaybeResume(video, state)
@@ -387,7 +377,20 @@ export function useVideoPlayer({
     },
   )
 
-  const stopPlaybackStatusEvent = useEffectEvent(() => {
+  const getPreservedPlaybackState = useEffectEvent(
+    (stateItemId: string | null | undefined) =>
+      preservation.getPreserved(stateItemId),
+  )
+
+  const clearPlaybackPreservation = useEffectEvent(() => {
+    preservation.clear()
+  })
+
+  const clearHlsRestoreSubscription = useEffectEvent(() => {
+    preservation.clearHlsRestoreSubscription()
+  })
+
+  const stopPlaybackStatus = useEffectEvent(() => {
     void jellyfin.stopPlaybackStatus()
   })
 
@@ -424,7 +427,7 @@ export function useVideoPlayer({
 
   useEffect(() => {
     if (!itemId) {
-      clearPreservedPlaybackState()
+      clearPlaybackPreservation()
       return
     }
 
@@ -436,10 +439,10 @@ export function useVideoPlayer({
     clearHlsRestoreSubscription()
 
     const initPlayback = async () => {
-      try {
-        const currentItem = itemRef.current
-        if (!currentItem || currentItem.Id !== itemId) return
+      const currentItem = itemRef.current
+      if (currentItem === null || currentItem.Id !== itemId) return
 
+      try {
         const hlsPlaySessionId = createPlaySessionId()
         const config = await getPlaybackConfig(
           currentItem,
@@ -449,20 +452,24 @@ export function useVideoPlayer({
           hlsPlaySessionId,
         )
 
-        if (playbackRequestIdRef.current === requestId && mediaSourceId) {
-          const playSessionId =
-            config.strategy === 'hls' ? hlsPlaySessionId : createPlaySessionId()
+        if (playbackRequestIdRef.current === requestId) {
+          if (mediaSourceId !== null) {
+            let playSessionId = hlsPlaySessionId
+            if (config.strategy !== 'hls') {
+              playSessionId = createPlaySessionId()
+            }
 
-          setJellyfinSessionIdentity(
-            createJellyfinSessionIdentity(
-              itemId,
-              mediaSourceId,
-              playSessionId,
-              config.strategy,
-            ),
-          )
-          handleInitPlaybackSuccess(config, itemId)
-          pendingPostCommitStartRef.current = {}
+            setJellyfinSessionIdentity(
+              createJellyfinSessionIdentity(
+                itemId,
+                mediaSourceId,
+                playSessionId,
+                config.strategy,
+              ),
+            )
+            handleInitPlaybackSuccess(config, itemId)
+            pendingPostCommitStartRef.current = {}
+          }
         }
       } catch (err) {
         if (playbackRequestIdRef.current !== requestId) return
@@ -486,7 +493,7 @@ export function useVideoPlayer({
       intentionalSwitchRef.current = false
       pendingPostCommitStartRef.current = null
       clearHlsRestoreSubscription()
-      stopPlaybackStatusEvent()
+      stopPlaybackStatus()
     }
   }, [itemId, mediaSourceId, preferredAudioStreamIndex])
 
