@@ -208,8 +208,11 @@ const blobCacheListeners = new Map<string, Set<() => void>>()
 const blobCacheRevisions = new Map<string, number>()
 
 function notifyBlobCacheChange(url: string): void {
+  const listeners = blobCacheListeners.get(url)
+  if (!listeners) return
+
   blobCacheRevisions.set(url, (blobCacheRevisions.get(url) ?? 0) + 1)
-  blobCacheListeners.get(url)?.forEach((listener) => listener())
+  listeners.forEach((listener) => listener())
 }
 
 export function subscribeBlobCacheUrl(
@@ -228,6 +231,7 @@ export function subscribeBlobCacheUrl(
     listeners.delete(listener)
     if (listeners.size === 0) {
       blobCacheListeners.delete(url)
+      blobCacheRevisions.delete(url)
     }
   }
 }
