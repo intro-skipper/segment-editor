@@ -35,9 +35,12 @@ export function useBlobUrl(url: string | null | undefined): string {
   }, [url])
 
   if (!url) return ''
-  if (cachedBlobUrl?.for === url) return cachedBlobUrl.blob
+  const cached = blobCache.peek(url)
+  if (cachedBlobUrl?.for === url && cachedBlobUrl.blob === cached) {
+    return cachedBlobUrl.blob
+  }
 
   // Pure render-time fallback for already-populated caches. Cached hits are
   // promoted in the effect above without scheduling an extra state update.
-  return blobCache.peek(url) ?? ''
+  return cached ?? ''
 }

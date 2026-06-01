@@ -270,7 +270,7 @@ async function getPalette(url: string): Promise<Palette | null> {
 
   let promise = pendingPalettes.get(url)
   if (!promise) {
-    promise = queuePaletteTask(async () => {
+    promise = (async () => {
       const cachedPalette = paletteCache.get(url)
       if (cachedPalette) return cachedPalette
 
@@ -279,8 +279,13 @@ async function getPalette(url: string): Promise<Palette | null> {
 
       await initWorker()
       const vibrantWorkerModule = await loadVibrantWorkerModule()
-      return extractPalette(url, blob, vibrantWorkerModule)
-    })
+
+      return queuePaletteTask(async () => {
+        const queuedCachedPalette = paletteCache.get(url)
+        if (queuedCachedPalette) return queuedCachedPalette
+        return extractPalette(url, blob, vibrantWorkerModule)
+      })
+    })()
     pendingPalettes.set(url, promise)
     void promise.finally(() => pendingPalettes.delete(url))
   }

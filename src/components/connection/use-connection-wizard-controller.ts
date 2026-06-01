@@ -169,7 +169,16 @@ export function useConnectionWizardController(): ConnectionWizardController {
       return
     }
 
-    storeAuthResult(selectedServer.address, result, credentials.method)
+    try {
+      storeAuthResult(selectedServer.address, result, credentials.method)
+    } catch (error) {
+      setIsRequestPending(false)
+      setRequestError(
+        error instanceof Error ? error.message : 'Authentication failed',
+      )
+      return
+    }
+
     setIsRequestPending(false)
     setRequestError(null)
     setStep('success')

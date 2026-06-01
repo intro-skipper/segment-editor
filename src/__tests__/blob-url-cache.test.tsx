@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { blobCache } from '@/lib/cache-manager'
@@ -15,6 +15,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   blobCache.clear()
 })
 
@@ -30,5 +31,29 @@ describe('useBlobUrl', () => {
     await waitFor(() => {
       expect(Array.from(blobCache.keys()).at(-1)).toBe(cachedUrl)
     })
+  })
+
+  it('does not return a revoked blob URL after cache eviction', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise<Response>(() => {}),
+    )
+    blobCache.set(cachedUrl, 'blob:cached')
+
+    const { result, rerender } = renderHook(
+      ({ url }: { url: string | null }) => useBlobUrl(url),
+      { initialProps: { url: cachedUrl as string | null } },
+    )
+
+    expect(result.current).toBe('blob:cached')
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    rerender({ url: null })
+    blobCache.delete(cachedUrl)
+    rerender({ url: cachedUrl })
+
+    expect(result.current).toBe('')
   })
 })

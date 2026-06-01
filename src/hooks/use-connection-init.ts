@@ -32,6 +32,37 @@ interface ConnectionState {
   showWizard: boolean
 }
 
+type ConnectionValidationResult = Awaited<
+  ReturnType<typeof testConnectionWithCredentials>
+>
+
+function applyConnectionValidationResult(
+  result: ConnectionValidationResult,
+): void {
+  const store = useApiStore.getState()
+  if (result.valid) {
+    if (result.authenticated) {
+      useApiStore.setState({
+        serverVersion: result.serverVersion,
+        validConnection: true,
+        validAuth: true,
+      })
+    } else {
+      store.setConnectionStatus(false, false)
+    }
+  } else {
+    store.setConnectionStatus(false, false)
+  }
+}
+
+function trySetInvalidConnectionStatus(): void {
+  try {
+    useApiStore.getState().setConnectionStatus(false, false)
+  } catch {
+    // Validation completion must not depend on storage availability.
+  }
+}
+
 export function useConnectionInit(): ConnectionState {
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>('idle')
@@ -95,36 +126,24 @@ export function useConnectionInit(): ConnectionState {
       // Standalone mode: validate credentials before marking as connected
       setValidationStatus('validating')
 
-      let result: Awaited<ReturnType<typeof testConnectionWithCredentials>>
       try {
-        result = await testConnectionWithCredentials(creds, {
+        const result = await testConnectionWithCredentials(creds, {
           signal: controller.signal,
         })
+        if (controller.signal.aborted) return
+
+        try {
+          applyConnectionValidationResult(result)
+        } catch {
+          trySetInvalidConnectionStatus()
+        }
       } catch {
         if (controller.signal.aborted) return
-        useApiStore.getState().setConnectionStatus(false, false)
-        setValidationStatus('validated')
-        return
+        trySetInvalidConnectionStatus()
       }
 
-      if (!controller.signal.aborted) {
-        const store = useApiStore.getState()
-        if (result.valid) {
-          if (result.authenticated) {
-            useApiStore.setState({
-              serverVersion: result.serverVersion,
-              validConnection: true,
-              validAuth: true,
-            })
-          } else {
-            store.setConnectionStatus(false, false)
-          }
-        } else {
-          store.setConnectionStatus(false, false)
-        }
-      }
-
-      if (!controller.signal.aborted) {
+      const isValidationActive = () => !controller.signal.aborted
+      if (isValidationActive()) {
         setValidationStatus('validated')
       }
     }

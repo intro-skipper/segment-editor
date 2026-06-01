@@ -151,6 +151,7 @@ export function SegmentSlider({
   const pointerIdRef = React.useRef<number | null>(null)
   const rafRef = React.useRef<number | null>(null)
   const pendingPositionRef = React.useRef<number | null>(null)
+  const hasLocalRangeDirtyRef = React.useRef(false)
 
   const syncSegmentPropsIfChanged = () => {
     if (isDraggingRef.current || activeInputRef.current !== null) return false
@@ -185,6 +186,19 @@ export function SegmentSlider({
     return true
   }
 
+
+  const markLocalRangeDirtyIfChanged = (nextRange: {
+    start: number
+    end: number
+  }) => {
+    const currentRange = stableRangeRef.current
+    if (
+      nextRange.start !== currentRange.start ||
+      nextRange.end !== currentRange.end
+    ) {
+      hasLocalRangeDirtyRef.current = true
+    }
+  }
   const updateStableRange = (nextRange: { start: number; end: number }) => {
     stableRangeRef.current = nextRange
     setStableRange((current) =>
@@ -194,12 +208,20 @@ export function SegmentSlider({
     )
   }
 
-  const applyDraftBoundary = (type: 'start' | 'end', nextValue: number) => {
+  const applyDraftBoundary = (
+    type: 'start' | 'end',
+    nextValue: number,
+    markDirty = false,
+  ) => {
     const nextRange =
       type === 'start'
         ? { ...stableRangeRef.current, start: nextValue }
         : { ...stableRangeRef.current, end: nextValue }
 
+
+    if (markDirty) {
+      markLocalRangeDirtyIfChanged(nextRange)
+    }
     updateStableRange(nextRange)
     form.setFieldValue(
       type === 'start' ? 'startText' : 'endText',
@@ -316,10 +338,22 @@ export function SegmentSlider({
     return true
   }
 
+  const commitRangeAfterInteraction = (start: number, end: number): boolean => {
+    if (!hasLocalRangeDirtyRef.current && syncSegmentPropsIfChanged()) {
+      return false
+    }
+
+    const didCommit = commitSegmentUpdate(start, end)
+    if (!didCommit) syncSegmentPropsIfChanged()
+    hasLocalRangeDirtyRef.current = false
+    return didCommit
+  }
+
   const handleStartPointerDown = (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
     isDraggingRef.current = 'start'
+    hasLocalRangeDirtyRef.current = false
     onSetActive(index)
 
     const captureTarget = e.currentTarget as HTMLElement
@@ -332,6 +366,7 @@ export function SegmentSlider({
     e.preventDefault()
     e.stopPropagation()
     isDraggingRef.current = 'end'
+    hasLocalRangeDirtyRef.current = false
     onSetActive(index)
 
     const captureTarget = e.currentTarget as HTMLElement
@@ -365,14 +400,14 @@ export function SegmentSlider({
             pendingTime,
             stableRangeRef.current.end,
           )
-          applyDraftBoundary('start', nextStart)
+          applyDraftBoundary('start', nextStart, true)
         } else if (currentDragging === 'end') {
           const nextEnd = clampEndToBounds(
             pendingTime,
             stableRangeRef.current.start,
             runtimeSeconds,
           )
-          applyDraftBoundary('end', nextEnd)
+          applyDraftBoundary('end', nextEnd, true)
         }
       })
     }
@@ -395,7 +430,7 @@ export function SegmentSlider({
           stableRangeRef.current.end,
           frameStep,
         )
-        applyDraftBoundary('start', newStart)
+        applyDraftBoundary('start', newStart, true)
       } else {
         const newEnd = snapAndClampEnd(
           pendingTime,
@@ -403,7 +438,7 @@ export function SegmentSlider({
           runtimeSeconds,
           frameStep,
         )
-        applyDraftBoundary('end', newEnd)
+        applyDraftBoundary('end', newEnd, true)
       }
       pendingPositionRef.current = null
     }
@@ -418,11 +453,10 @@ export function SegmentSlider({
 
     isDraggingRef.current = null
 
-    const didCommit = commitSegmentUpdate(
+    commitRangeAfterInteraction(
       stableRangeRef.current.start,
       stableRangeRef.current.end,
     )
-    if (!didCommit) syncSegmentPropsIfChanged()
   }
 
   const handleInputChange = (type: 'start' | 'end', value: string) => {
@@ -442,10 +476,12 @@ export function SegmentSlider({
     )
 
     if (nextDraftState.validation.valid) {
-      updateStableRange({
+      const nextRange = {
         start: nextDraftState.draftRange.startSeconds,
         end: nextDraftState.draftRange.endSeconds,
-      })
+      }
+      markLocalRangeDirtyIfChanged(nextRange)
+      updateStableRange(nextRange)
     }
   }
 
@@ -453,7 +489,11 @@ export function SegmentSlider({
     activeInputRef.current = null
 
     if (!validation.valid) {
-      if (syncSegmentPropsIfChanged()) return
+      if (syncSegmentPropsIfChanged()) {
+        hasLocalRangeDirtyRef.current = false
+        return
+      }
+      hasLocalRangeDirtyRef.current = false
 
       // Revert the edited field to the last committed valid value
       form.setFieldValue(
@@ -487,8 +527,7 @@ export function SegmentSlider({
       nextEnd = nextRange.end
     }
 
-    const didCommit = commitSegmentUpdate(nextStart, nextEnd)
-    if (!didCommit) syncSegmentPropsIfChanged()
+    commitRangeAfterInteraction(nextStart, nextEnd)
   }
 
   // Copy segment to system clipboard as JSON
@@ -534,8 +573,9 @@ export function SegmentSlider({
       stableRangeRef.current.end,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('start', nextStart)
+    const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
+    hasLocalRangeDirtyRef.current = false
   }
 
   const handleSetEndToDuration = () => {
@@ -546,8 +586,9 @@ export function SegmentSlider({
       runtimeSeconds,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('end', nextEnd)
+    const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
+    hasLocalRangeDirtyRef.current = false
   }
 
   const handleSetStartFromPlayer = () => {
@@ -558,8 +599,9 @@ export function SegmentSlider({
       stableRangeRef.current.end,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('start', nextStart)
+    const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
+    hasLocalRangeDirtyRef.current = false
   }
   const handleSetEndFromPlayer = () => {
     const currentTime = getPlayerTime?.()
@@ -570,8 +612,9 @@ export function SegmentSlider({
       runtimeSeconds,
       frameStep,
     )
-    const nextRange = applyDraftBoundary('end', nextEnd)
+    const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
+    hasLocalRangeDirtyRef.current = false
   }
 
   const handleHandleBlur = (type: 'start' | 'end') => {
@@ -584,7 +627,7 @@ export function SegmentSlider({
           frameStep,
         ),
       )
-      commitSegmentUpdate(nextRange.start, nextRange.end)
+      commitRangeAfterInteraction(nextRange.start, nextRange.end)
       return
     }
 
@@ -597,7 +640,7 @@ export function SegmentSlider({
         frameStep,
       ),
     )
-    commitSegmentUpdate(nextRange.start, nextRange.end)
+    commitRangeAfterInteraction(nextRange.start, nextRange.end)
   }
 
   const handleStartKeyDown = (e: React.KeyboardEvent) => {
@@ -615,7 +658,7 @@ export function SegmentSlider({
         stableRangeRef.current.end,
         frameStep,
       )
-      applyDraftBoundary('start', nextStart)
+      applyDraftBoundary('start', nextStart, true)
     }
   }
 
@@ -636,7 +679,7 @@ export function SegmentSlider({
         runtimeSeconds,
         frameStep,
       )
-      applyDraftBoundary('end', nextEnd)
+      applyDraftBoundary('end', nextEnd, true)
     }
   }
 
@@ -903,6 +946,7 @@ export function SegmentSlider({
                 value={String(field.state.value)}
                 onFocus={() => {
                   activeInputRef.current = 'start'
+                  hasLocalRangeDirtyRef.current = false
                 }}
                 onChange={(e) => handleInputChange('start', e.target.value)}
                 onBlur={() => {
@@ -982,6 +1026,7 @@ export function SegmentSlider({
                 value={String(field.state.value)}
                 onFocus={() => {
                   activeInputRef.current = 'end'
+                  hasLocalRangeDirtyRef.current = false
                 }}
                 onChange={(e) => handleInputChange('end', e.target.value)}
                 onBlur={() => {
