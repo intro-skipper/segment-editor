@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { formatHex, oklch, parse } from 'culori'
 import type * as VibrantWorkerRuntime from 'node-vibrant/worker'
 
@@ -78,11 +78,28 @@ darkModeQuery?.addEventListener('change', (e) => {
 const resolveTheme = (theme: Theme): ResolvedTheme =>
   theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
 
+const colorCacheListeners: Record<
+  ResolvedTheme,
+  Map<string, Set<() => void>>
+> = {
+  light: new Map(),
+  dark: new Map(),
+}
+
+function notifyColorCacheChange(theme: ResolvedTheme, url: string): void {
+  const listeners = colorCacheListeners[theme].get(url)
+  if (!listeners) return
+
+  listeners.forEach((listener) => listener())
+}
+
 const colorCacheLight = new LRUCache<string, VibrantColors>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
+  { onChange: (url) => notifyColorCacheChange('light', url) },
 )
 const colorCacheDark = new LRUCache<string, VibrantColors>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
+  { onChange: (url) => notifyColorCacheChange('dark', url) },
 )
 const paletteCache = new LRUCache<string, Palette>(
   CACHE_CONFIG.MAX_COLOR_CACHE_SIZE,
@@ -116,6 +133,51 @@ function queuePaletteTask(
 
 const getCache = (theme: ResolvedTheme) =>
   theme === 'dark' ? colorCacheDark : colorCacheLight
+
+function subscribeColorCacheUrl(
+  theme: ResolvedTheme,
+  url: string | null,
+  listener: () => void,
+): () => void {
+  if (!url) return () => {}
+
+  const listenersByUrl = colorCacheListeners[theme]
+  let listeners = listenersByUrl.get(url)
+  if (!listeners) {
+    listeners = new Set()
+    listenersByUrl.set(url, listeners)
+  }
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      listenersByUrl.delete(url)
+    }
+  }
+}
+
+function getColorCacheSnapshot(
+  theme: ResolvedTheme,
+  url: string | null,
+  enabled: boolean,
+): VibrantColors | null {
+  return url && enabled ? (getCache(theme).peek(url) ?? null) : null
+}
+
+function subscribeColorExtraction(
+  theme: ResolvedTheme,
+  url: string | null,
+  enabled: boolean,
+  listener: () => void,
+): () => void {
+  const unsubscribe = subscribeColorCacheUrl(theme, url, listener)
+
+  if (url && enabled && !getColorCacheSnapshot(theme, url, enabled)) {
+    void getColors(url, theme)
+  }
+
+  return unsubscribe
+}
 
 let sharedCanvas: {
   canvas: HTMLCanvasElement
@@ -340,28 +402,12 @@ export function useVibrantColor(
   const enabled = options?.enabled ?? true
   const theme = useAppStore(selectTheme)
   const resolvedTheme = resolveTheme(theme)
-  const cache = getCache(resolvedTheme)
-
-  const cachedColors =
-    imageUrl && enabled ? (cache.peek(imageUrl) ?? null) : null
-  const [, rerenderAfterColorLoad] = useState(0)
-
-  useEffect(() => {
-    if (!imageUrl || !enabled) return
-
-    if (cache.get(imageUrl)) return
-
-    let cancelled = false
-    void getColors(imageUrl, resolvedTheme).then((result) => {
-      if (!cancelled && result) {
-        rerenderAfterColorLoad((version) => version + 1)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [imageUrl, resolvedTheme, cache, enabled, cachedColors])
+  const cachedColors = useSyncExternalStore(
+    (onStoreChange) =>
+      subscribeColorExtraction(resolvedTheme, imageUrl, enabled, onStoreChange),
+    () => getColorCacheSnapshot(resolvedTheme, imageUrl, enabled),
+    () => null,
+  )
 
   return cachedColors
 }

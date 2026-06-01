@@ -205,13 +205,11 @@ export interface VibrantColors {
 }
 
 const blobCacheListeners = new Map<string, Set<() => void>>()
-const blobCacheRevisions = new Map<string, number>()
 
 function notifyBlobCacheChange(url: string): void {
   const listeners = blobCacheListeners.get(url)
   if (!listeners) return
 
-  blobCacheRevisions.set(url, (blobCacheRevisions.get(url) ?? 0) + 1)
   listeners.forEach((listener) => listener())
 }
 
@@ -231,15 +229,14 @@ export function subscribeBlobCacheUrl(
     listeners.delete(listener)
     if (listeners.size === 0) {
       blobCacheListeners.delete(url)
-      blobCacheRevisions.delete(url)
     }
   }
 }
 
 export function getBlobCacheUrlSnapshot(
   url: string | null | undefined,
-): number {
-  return url ? (blobCacheRevisions.get(url) ?? 0) : 0
+): string {
+  return url ? (blobCache.peek(url) ?? '') : ''
 }
 
 /**

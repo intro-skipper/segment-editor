@@ -4,7 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBlobUrl } from '@/hooks/useBlobUrl'
-import { blobCache } from '@/lib/cache-manager'
+import { blobCache, getBlobCacheUrlSnapshot } from '@/lib/cache-manager'
 
 const cachedUrl = 'https://example.test/cached.jpg'
 const newerUrl = 'https://example.test/newer.jpg'
@@ -33,6 +33,16 @@ describe('useBlobUrl', () => {
     await waitFor(() => {
       expect(Array.from(blobCache.keys()).at(-1)).toBe(cachedUrl)
     })
+  })
+
+  it('exposes cache mutations in snapshots before subscriptions exist', () => {
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('')
+
+    blobCache.set(cachedUrl, 'blob:cached')
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('blob:cached')
+
+    blobCache.delete(cachedUrl)
+    expect(getBlobCacheUrlSnapshot(cachedUrl)).toBe('')
   })
 
   it('does not return a revoked blob URL after cache eviction', async () => {
