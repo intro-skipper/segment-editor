@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback } from 'react'
+import { Suspense, lazy } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 
@@ -59,15 +59,12 @@ export function SeriesPage() {
     enabled: !!imageUrl,
   })
 
-  const handleSeasonSelect = useCallback(
-    (id: string) => {
-      void navigate({
-        search: (prev) => ({ ...prev, seasonId: id }),
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  const handleSeasonSelect = (id: string) => {
+    void navigate({
+      search: (prev) => ({ ...prev, seasonId: id }),
+      replace: true,
+    })
+  }
 
   if (!series) {
     return (
