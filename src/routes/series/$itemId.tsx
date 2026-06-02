@@ -31,6 +31,7 @@ export const Route = createFileRoute('/series/$itemId')({
     stringify: (params) => params,
   },
   validateSearch: seriesSearchSchema,
+  loaderDeps: ({ params }) => ({ itemId: params.itemId }),
   loader: async ({ params, context, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
