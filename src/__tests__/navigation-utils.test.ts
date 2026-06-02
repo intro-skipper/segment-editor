@@ -20,10 +20,14 @@ describe('navigation-utils', () => {
   })
 
   it('does not add a season search param when no season is known', () => {
-    expect(getSeriesNavigationRoute(seriesId, null)).toEqual({
+    const expectedRoute = {
       to: '/series/$itemId',
       params: { itemId: seriesId },
-    })
+    }
+
+    expect(getSeriesNavigationRoute(seriesId)).toEqual(expectedRoute)
+    expect(getSeriesNavigationRoute(seriesId, undefined)).toEqual(expectedRoute)
+    expect(getSeriesNavigationRoute(seriesId, null)).toEqual(expectedRoute)
   })
 
   it('opens season media items on their parent series with that season selected', () => {
@@ -37,6 +41,7 @@ describe('navigation-utils', () => {
 
     navigateToMediaItem(navigate, season)
 
+    expect(navigate).toHaveBeenCalledTimes(1)
     expect(navigate).toHaveBeenCalledWith({
       to: '/series/$itemId',
       params: { itemId: seriesId },
