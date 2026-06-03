@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
 
@@ -19,7 +18,7 @@ interface AlbumCardProps {
   onAlbumSelect: (albumId: string) => void
 }
 
-const AlbumCard = React.memo(function AlbumCardComponent({
+const AlbumCard = function AlbumCardComponent({
   album,
   albumId,
   onAlbumSelect,
@@ -28,9 +27,9 @@ const AlbumCard = React.memo(function AlbumCardComponent({
   const year = album.ProductionYear ? ` (${album.ProductionYear})` : ''
   const ariaLabel = `View album: ${albumName}${year}`
 
-  const handleSelectAlbum = React.useCallback(() => {
+  const handleSelectAlbum = () => {
     onAlbumSelect(albumId)
-  }, [onAlbumSelect, albumId])
+  }
 
   return (
     <InteractiveCard
@@ -62,24 +61,18 @@ const AlbumCard = React.memo(function AlbumCardComponent({
       </div>
     </InteractiveCard>
   )
-})
+}
 
 export function ArtistView({ artist, albums }: ArtistViewProps) {
   const navigate = useNavigate({ from: '/artist/$itemId' })
 
   const artistName = artist.Name || albums[0]?.AlbumArtist || 'Unknown Artist'
 
-  const handleBack = React.useCallback(
-    () => void navigate({ to: '/' }),
-    [navigate],
-  )
+  const handleBack = () => void navigate({ to: '/' })
 
-  const handleAlbumClick = React.useCallback(
-    (albumId: string) => {
-      void navigate({ to: '/album/$itemId', params: { itemId: albumId } })
-    },
-    [navigate],
-  )
+  const handleAlbumClick = (albumId: string) => {
+    void navigate({ to: '/album/$itemId', params: { itemId: albumId } })
+  }
 
   return (
     <div className="space-y-6">

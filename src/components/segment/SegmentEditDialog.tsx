@@ -1,7 +1,3 @@
-/**
- * SegmentEditDialog - Dialog for editing segment details with validation.
- */
-
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Save, Trash2 } from 'lucide-react'
@@ -114,27 +110,23 @@ function SegmentEditDialogContent({
   })
 
   const values = useStore(form.store, (state) => state.values)
-  const { draftRange, validation } = React.useMemo(
-    () =>
-      getSegmentDraftState(
-        values,
-        {
-          startSeconds: segment.StartTicks ?? 0,
-          endSeconds: segment.EndTicks ?? 0,
-        },
-        runtimeSeconds,
-      ),
-    [segment.EndTicks, segment.StartTicks, values, runtimeSeconds],
+  const { draftRange, validation } = getSegmentDraftState(
+    values,
+    {
+      startSeconds: segment.StartTicks ?? 0,
+      endSeconds: segment.EndTicks ?? 0,
+    },
+    runtimeSeconds,
   )
   const segmentColor = getSegmentColor(values.type)
   const duration = Math.max(0, draftRange.endSeconds - draftRange.startSeconds)
 
-  const handleClose = React.useCallback(() => {
+  const handleClose = () => {
     onClose()
     requestAnimationFrame(() => {
       triggerRef.current?.focus()
     })
-  }, [onClose])
+  }
 
   React.useLayoutEffect(() => {
     triggerRef.current = open
@@ -142,26 +134,23 @@ function SegmentEditDialogContent({
       : triggerRef.current
   }, [open])
 
-  const handleSave = React.useCallback(() => {
+  const handleSave = () => {
     void form.handleSubmit()
-  }, [form])
+  }
 
   /** Clamps a field value to the valid time range on blur, then triggers validation. */
-  const handleTimeFieldBlur = React.useCallback(
-    (field: {
-      state: { value: unknown }
-      handleChange: (v: string) => void
-      handleBlur: () => void
-    }) => {
-      const { min, max } = getSegmentTimeBounds(runtimeSeconds)
-      const clamped = clampTimeText(String(field.state.value), min, max)
-      if (clamped !== null) field.handleChange(clamped)
-      field.handleBlur()
-    },
-    [runtimeSeconds],
-  )
+  const handleTimeFieldBlur = (field: {
+    state: { value: unknown }
+    handleChange: (v: string) => void
+    handleBlur: () => void
+  }) => {
+    const { min, max } = getSegmentTimeBounds(runtimeSeconds)
+    const clamped = clampTimeText(String(field.state.value), min, max)
+    if (clamped !== null) field.handleChange(clamped)
+    field.handleBlur()
+  }
 
-  const handleCopy = React.useCallback(async () => {
+  const handleCopy = async () => {
     try {
       const result = segmentsToIntroSkipperClipboardText([segment])
       await navigator.clipboard.writeText(result.text)
@@ -175,7 +164,7 @@ function SegmentEditDialogContent({
         message: t('editor.copyFailed', 'Clipboard access denied'),
       })
     }
-  }, [segment, t])
+  }
 
   function handleConfirmDelete() {
     onDelete(segment)

@@ -1,5 +1,5 @@
 {
-  "projectName": "segment-editor-react",
+  "projectName": "segment-editor",
   "mode": "file-router",
   "typescript": true,
   "tailwind": true,

@@ -1,12 +1,3 @@
-/**
- * Connection initialization hook.
- *
- * Handles both plugin mode (credentials from parent window) and
- * standalone mode (credentials from persisted store).
- *
- * @module hooks/use-connection-init
- */
-
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -41,10 +32,41 @@ interface ConnectionState {
   showWizard: boolean
 }
 
-/**
- * Initializes connection on app startup.
- * Call once in root component — other components should use `usePluginMode`.
- */
+type ConnectionValidationResult = Awaited<
+  ReturnType<typeof testConnectionWithCredentials>
+>
+
+function applyConnectionValidationResult(
+  result: ConnectionValidationResult,
+): void {
+  const store = useApiStore.getState()
+  if (result.valid) {
+    if (result.authenticated) {
+      useApiStore.setState({
+        serverVersion: result.serverVersion,
+        validConnection: true,
+        validAuth: true,
+      })
+    } else {
+      store.setConnectionStatus(false, false)
+    }
+  } else {
+    store.setConnectionStatus(false, false)
+  }
+}
+
+function trySetInvalidConnectionStatus(): void {
+  try {
+    useApiStore.getState().setConnectionStatus(false, false)
+  } catch {
+    // Validation completion must not depend on storage availability.
+  }
+}
+
+function isSignalActive(signal: AbortSignal): boolean {
+  return !signal.aborted
+}
+
 export function useConnectionInit(): ConnectionState {
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>('idle')
@@ -80,7 +102,6 @@ export function useConnectionInit(): ConnectionState {
     const controller = new AbortController()
 
     const init = async () => {
-      // Get credentials based on mode
       const pluginCreds = isPlugin ? getPluginCredentials() : null
       const standaloneCreds =
         !isPlugin && serverAddress && apiKey
@@ -110,29 +131,25 @@ export function useConnectionInit(): ConnectionState {
       setValidationStatus('validating')
 
       try {
+        if (controller.signal.aborted) return
         const result = await testConnectionWithCredentials(creds, {
           signal: controller.signal,
         })
 
-        if (!controller.signal.aborted) {
-          const store = useApiStore.getState()
-          if (result.valid && result.authenticated) {
-            useApiStore.setState({
-              serverVersion: result.serverVersion,
-              validConnection: true,
-              validAuth: true,
-            })
-          } else {
-            store.setConnectionStatus(false, false)
+        if (isSignalActive(controller.signal)) {
+          try {
+            applyConnectionValidationResult(result)
+          } catch {
+            trySetInvalidConnectionStatus()
           }
         }
       } catch {
         if (controller.signal.aborted) return
-        useApiStore.getState().setConnectionStatus(false, false)
-      } finally {
-        if (!controller.signal.aborted) {
-          setValidationStatus('validated')
-        }
+        trySetInvalidConnectionStatus()
+      }
+
+      if (isSignalActive(controller.signal)) {
+        setValidationStatus('validated')
       }
     }
 
@@ -155,10 +172,6 @@ export function useConnectionInit(): ConnectionState {
   }
 }
 
-/**
- * Hook for components that need connection state.
- * Does NOT initialize connection - use after `useConnectionInit` in root.
- */
 export function usePluginMode() {
   const { validAuth, serverAddress, apiKey } = useApiStore(
     useShallow((s: ReturnType<typeof useApiStore.getState>) => ({

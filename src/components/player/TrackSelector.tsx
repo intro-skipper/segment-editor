@@ -1,4 +1,3 @@
-import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
@@ -30,7 +29,7 @@ interface TrackSelectorProps {
   portalContainer?: React.RefObject<HTMLElement | null>
 }
 
-export const TrackSelector = memo(function TrackSelectorComponent({
+export const TrackSelector = function TrackSelectorComponent({
   trackState,
   onSelectAudio,
   onSelectSubtitle,
@@ -210,4 +209,4 @@ export const TrackSelector = memo(function TrackSelectorComponent({
       </DropdownMenuContent>
     </DropdownMenu>
   )
-})
+}

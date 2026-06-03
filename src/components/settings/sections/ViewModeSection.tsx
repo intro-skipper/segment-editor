@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { LayoutList } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -12,13 +11,11 @@ export function ViewModeSection() {
   const viewMode = useSessionStore((s) => s.viewMode)
   const setViewMode = useSessionStore((s) => s.setViewMode)
 
-  const options = useMemo<Array<SelectOption<ViewMode>>>(
-    () =>
-      VIEW_MODE_OPTIONS.map((mode) => ({
-        value: mode,
-        label: t(`app.viewMode.${mode}`),
-      })),
-    [t],
+  const options: Array<SelectOption<ViewMode>> = VIEW_MODE_OPTIONS.map(
+    (mode) => ({
+      value: mode,
+      label: t(`app.viewMode.${mode}`),
+    }),
   )
 
   return (

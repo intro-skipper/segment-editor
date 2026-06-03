@@ -10,9 +10,11 @@ import { CACHE_CONFIG } from './constants'
 /**
  * Options for LRU cache configuration.
  */
-interface LRUCacheOptions<TValue> {
+interface LRUCacheOptions<TKey, TValue> {
   /** Callback invoked when an entry is evicted from the cache */
   onEvict?: (value: TValue) => void
+  /** Callback invoked after cache contents change */
+  onChange?: (key: TKey) => void
 }
 
 /**
@@ -26,16 +28,17 @@ export class LRUCache<TKey, TValue> {
   private cache = new Map<TKey, TValue>()
   private readonly maxSize: number
   private readonly onEvict?: (value: TValue) => void
-
+  private readonly onChange?: (key: TKey) => void
   /**
    * Creates a new LRU cache with the specified maximum size.
    *
    * @param maxSize - Maximum number of entries before eviction occurs
    * @param options - Optional configuration including eviction callback
    */
-  constructor(maxSize: number, options?: LRUCacheOptions<TValue>) {
+  constructor(maxSize: number, options?: LRUCacheOptions<TKey, TValue>) {
     this.maxSize = Math.max(1, maxSize)
     this.onEvict = options?.onEvict
+    this.onChange = options?.onChange
   }
 
   /**
@@ -53,6 +56,17 @@ export class LRUCache<TKey, TValue> {
       this.cache.set(key, value)
     }
     return value
+  }
+
+  /**
+   * Reads a cached value without updating its recency.
+   * Use this from render paths where cache reads must stay pure.
+   *
+   * @param key - The key to look up
+   * @returns The cached value or undefined if not found
+   */
+  peek(key: TKey): TValue | undefined {
+    return this.cache.get(key)
   }
 
   /**
@@ -74,10 +88,12 @@ export class LRUCache<TKey, TValue> {
         this.cache.delete(firstKey)
         if (evictedValue !== undefined) {
           this.invokeEvict(evictedValue)
+          this.invokeChange(firstKey)
         }
       }
     }
     this.cache.set(key, value)
+    this.invokeChange(key)
   }
 
   /**
@@ -100,8 +116,11 @@ export class LRUCache<TKey, TValue> {
   delete(key: TKey): boolean {
     const value = this.cache.get(key)
     const deleted = this.cache.delete(key)
-    if (deleted && value !== undefined) {
-      this.invokeEvict(value)
+    if (deleted) {
+      if (value !== undefined) {
+        this.invokeEvict(value)
+      }
+      this.invokeChange(key)
     }
     return deleted
   }
@@ -111,10 +130,16 @@ export class LRUCache<TKey, TValue> {
    * Invokes onEvict callback for each entry if configured.
    */
   clear(): void {
+    const entries = Array.from(this.cache.entries())
     if (this.onEvict) {
-      this.cache.forEach((value) => this.invokeEvict(value))
+      for (const [, value] of entries) {
+        this.invokeEvict(value)
+      }
     }
     this.cache.clear()
+    for (const [key] of entries) {
+      this.invokeChange(key)
+    }
   }
 
   /**
@@ -155,6 +180,17 @@ export class LRUCache<TKey, TValue> {
       // Ignore eviction callback errors (e.g., URL.revokeObjectURL on invalid URL)
     }
   }
+
+  /**
+   * Safely invokes the change callback, catching any errors.
+   */
+  private invokeChange(key: TKey): void {
+    try {
+      this.onChange?.(key)
+    } catch {
+      // Ignore subscriber errors so cache mutation cannot fail.
+    }
+  }
 }
 
 /**
@@ -166,6 +202,41 @@ export interface VibrantColors {
   accent: string
   text: string
   accentText: string
+}
+
+const blobCacheListeners = new Map<string, Set<() => void>>()
+
+function notifyBlobCacheChange(url: string): void {
+  const listeners = blobCacheListeners.get(url)
+  if (!listeners) return
+
+  listeners.forEach((listener) => listener())
+}
+
+export function subscribeBlobCacheUrl(
+  url: string | null | undefined,
+  listener: () => void,
+): () => void {
+  if (!url) return () => {}
+
+  let listeners = blobCacheListeners.get(url)
+  if (!listeners) {
+    listeners = new Set()
+    blobCacheListeners.set(url, listeners)
+  }
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      blobCacheListeners.delete(url)
+    }
+  }
+}
+
+export function getBlobCacheUrlSnapshot(
+  url: string | null | undefined,
+): string {
+  return url ? (blobCache.peek(url) ?? '') : ''
 }
 
 /**
@@ -182,6 +253,7 @@ export const blobCache = new LRUCache<string, string>(
         URL.revokeObjectURL(url)
       }
     },
+    onChange: notifyBlobCacheChange,
   },
 )
 

@@ -1,8 +1,0 @@
-export { ServerConnectionSection } from './ServerConnectionSection'
-export { AppearanceSection } from './AppearanceSection'
-export { LanguageSection } from './LanguageSection'
-export { PageSizeSection } from './PageSizeSection'
-export { ViewModeSection } from './ViewModeSection'
-export { CodecCompatibilitySection } from './CodecCompatibilitySection'
-export { SegmentSkipModeSection } from './SegmentSkipModeSection'
-export { JellyfinPlaybackSyncSection } from './JellyfinPlaybackSyncSection'

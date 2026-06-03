@@ -1,11 +1,4 @@
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useState,
-} from 'react'
+import { Suspense, lazy, useEffect, useEffectEvent, useState } from 'react'
 import { Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router'
 
 import { useTranslation } from 'react-i18next'
@@ -61,9 +54,9 @@ function HeaderFallback() {
   const { t } = useTranslation()
   const router = useRouter()
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = () => {
     void router.invalidate()
-  }, [router])
+  }
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80">
@@ -85,9 +78,9 @@ export function NotFoundComponent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  const handleGoBack = useCallback(() => {
+  const handleGoBack = () => {
     void navigate({ to: '/' })
-  }, [navigate])
+  }
 
   return (
     <div className="flex min-h-[var(--spacing-page-min-height-sm)] items-center justify-center p-4">
@@ -123,13 +116,6 @@ export function NotFoundComponent() {
   )
 }
 
-/**
- * Root layout component that initializes the application.
- * - Auto-connects in plugin mode when parent ApiClient is available
- * - Validates persisted credentials on startup for standalone mode
- * - Shows connection wizard if credentials are invalid/expired
- * - Renders global UI elements (Header, Settings, Toaster)
- */
 export function RootComponent() {
   const { t } = useTranslation()
   const showSkipToMain = !pluginMode
@@ -176,13 +162,13 @@ export function RootComponent() {
 
   const wizardOpen = showWizard && !wizardDismissed
 
-  const handleWizardOpenChange = useCallback((open: boolean) => {
+  const handleWizardOpenChange = (open: boolean) => {
     if (!open) setWizardDismissed(true)
-  }, [])
+  }
 
-  const handleWizardComplete = useCallback(() => {
+  const handleWizardComplete = () => {
     setWizardDismissed(true)
-  }, [])
+  }
 
   return (
     <HotkeysProvider>

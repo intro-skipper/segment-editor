@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings2 } from 'lucide-react'
 
@@ -29,18 +29,15 @@ export function SettingsDialog() {
 
   const pluginMode = isPluginMode()
 
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (open) {
-        triggerRef.current = document.activeElement as HTMLElement
-      }
-      setSettingsOpen(open)
-      if (!open) {
-        requestAnimationFrame(() => triggerRef.current?.focus())
-      }
-    },
-    [setSettingsOpen],
-  )
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      triggerRef.current = document.activeElement as HTMLElement
+    }
+    setSettingsOpen(open)
+    if (!open) {
+      requestAnimationFrame(() => triggerRef.current?.focus())
+    }
+  }
 
   return (
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>

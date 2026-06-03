@@ -1,5 +1,3 @@
-/** TanStack Query hooks for fetching Jellyfin media items and collections. */
-
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import type { PagedItemsResult } from '@/services/items/api'
@@ -122,7 +120,6 @@ export const artistQueryOptions = {
     }),
 } as const
 
-// Internal until a route/root loader needs collection prefetching.
 const collectionsQueryOptions = {
   list: () =>
     createStandardQueryOptions<Array<VirtualFolderInfo>>({
@@ -178,24 +175,6 @@ export const useSeasons = (seriesId: string, opts?: UseEntityOptions) => {
   return useQuery({
     ...seriesQueryOptions.seasons(seriesId),
     enabled: isEntityQueryEnabled(seriesId, validAuth, opts),
-  })
-}
-
-export const useTracks = (albumId: string, opts?: UseEntityOptions) => {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...albumQueryOptions.tracks(albumId),
-    enabled: isEntityQueryEnabled(albumId, validAuth, opts),
-  })
-}
-
-export const useAlbums = (artistId: string, opts?: UseEntityOptions) => {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...artistQueryOptions.albums(artistId),
-    enabled: isEntityQueryEnabled(artistId, validAuth, opts),
   })
 }
 

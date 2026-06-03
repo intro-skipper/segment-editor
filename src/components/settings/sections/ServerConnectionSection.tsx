@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle, LogOut, Server, XCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
@@ -31,22 +31,22 @@ export function ServerConnectionSection() {
     })),
   )
 
-  const handleOpenWizard = useCallback(() => setWizardOpen(true), [])
+  const handleOpenWizard = () => setWizardOpen(true)
 
-  const handleWizardComplete = useCallback(() => {
+  const handleWizardComplete = () => {
     showNotification({
       type: 'positive',
       message: t('login.connect_success', 'Successfully connected to server'),
     })
-  }, [t])
+  }
 
-  const handleDisconnect = useCallback(() => {
+  const handleDisconnect = () => {
     clearAuth()
     showNotification({
       type: 'info',
       message: t('login.disconnected', 'Disconnected from server'),
     })
-  }, [clearAuth, t])
+  }
 
   const isConnected = validConnection && validAuth
 
@@ -88,8 +88,6 @@ export function ServerConnectionSection() {
     </>
   )
 }
-
-// Sub-components for cleaner separation
 
 interface ConnectedStateProps {
   serverAddress: string

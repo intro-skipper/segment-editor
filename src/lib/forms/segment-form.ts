@@ -8,7 +8,7 @@ const SEGMENT_TIME_TEXT_REGEX = /^-?[\d:.eE+\- ]+$/
 const MAX_DECIMALS = 3
 const TIME_MULTIPLIERS = [1, 60, 3600] as const
 
-interface SegmentFormValues {
+export interface SegmentFormValues {
   type: MediaSegmentType
   startText: string
   endText: string

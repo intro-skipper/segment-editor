@@ -186,10 +186,7 @@ function useRenderPlayerEditor({
       enabled: fetchSegments && !!item.Id,
     })
 
-  const sortedServerSegments = React.useMemo(
-    () => serverSegments.toSorted(sortSegmentsByStart),
-    [serverSegments],
-  )
+  const sortedServerSegments = serverSegments.toSorted(sortSegmentsByStart)
 
   const [localEditingSegments, setLocalEditingSegments] =
     React.useState<Array<MediaSegmentDto> | null>(null)
@@ -210,12 +207,9 @@ function useRenderPlayerEditor({
 
   const saveAbortRef = React.useRef<AbortController | null>(null)
 
-  const updateEditingSegments = React.useCallback(
-    (updater: SegmentUpdater) => {
-      setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
-    },
-    [sortedServerSegments],
-  )
+  const updateEditingSegments = (updater: SegmentUpdater) => {
+    setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
+  }
 
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
@@ -235,143 +229,123 @@ function useRenderPlayerEditor({
 
   const frameStepSeconds = resolveFrameStepSeconds(item)
 
-  const handleCreateSegment = React.useCallback(
-    (data: CreateSegmentData) => {
-      const newSegment: MediaSegmentDto = {
-        Id: generateUUID(),
-        ItemId: item.Id,
-        Type: data.type,
-        StartTicks: data.start,
-        EndTicks: data.end ?? data.start + 1,
+  const handleCreateSegment = (data: CreateSegmentData) => {
+    const newSegment: MediaSegmentDto = {
+      Id: generateUUID(),
+      ItemId: item.Id,
+      Type: data.type,
+      StartTicks: data.start,
+      EndTicks: data.end ?? data.start + 1,
+    }
+
+    updateEditingSegments((prev) => {
+      const { nextSegments, insertedIndex } = insertSegmentSorted(
+        prev,
+        newSegment,
+      )
+      setActiveIndex(insertedIndex)
+      return nextSegments
+    })
+  }
+
+  const handleUpdateSegmentTimestamp = (data: TimestampUpdate) => {
+    updateEditingSegments((prev) => {
+      if (prev.length === 0) return prev
+
+      const targetIndex = data.index ?? activeIndex
+      const segment = prev[targetIndex] as MediaSegmentDto | undefined
+      if (segment === undefined) return prev
+
+      const updatedSegment: MediaSegmentDto = {
+        ...segment,
+        StartTicks: data.start ? data.currentTime : segment.StartTicks,
+        EndTicks: data.start ? segment.EndTicks : data.currentTime,
       }
 
-      updateEditingSegments((prev) => {
-        const { nextSegments, insertedIndex } = insertSegmentSorted(
-          prev,
-          newSegment,
-        )
-        setActiveIndex(insertedIndex)
-        return nextSegments
-      })
-    },
-    [item.Id, updateEditingSegments],
-  )
+      const { nextSegments, insertedIndex } = replaceSegmentSorted(
+        prev,
+        updatedSegment,
+      )
+      setActiveIndex(insertedIndex)
 
-  const handleUpdateSegmentTimestamp = React.useCallback(
-    (data: TimestampUpdate) => {
-      updateEditingSegments((prev) => {
-        if (prev.length === 0) return prev
+      return nextSegments
+    })
+  }
 
-        const targetIndex = data.index ?? activeIndex
-        const segment = prev[targetIndex] as MediaSegmentDto | undefined
-        if (segment === undefined) return prev
-
-        const updatedSegment: MediaSegmentDto = {
-          ...segment,
-          StartTicks: data.start ? data.currentTime : segment.StartTicks,
-          EndTicks: data.start ? segment.EndTicks : data.currentTime,
-        }
-
-        const { nextSegments, insertedIndex } = replaceSegmentSorted(
-          prev,
-          updatedSegment,
-        )
-        setActiveIndex(insertedIndex)
-
-        return nextSegments
-      })
-    },
-    [activeIndex, updateEditingSegments],
-  )
-
-  const getPlayerTime = React.useCallback(() => {
+  const getPlayerTime = () => {
     const raw = getCurrentTimeRef.current?.()
     if (raw === undefined) return undefined
     return snapToFrame(raw, frameStepSeconds)
-  }, [frameStepSeconds])
+  }
 
-  const handleUpdateSegment = React.useCallback(
-    (data: SegmentUpdate) => {
-      updateEditingSegments((prev) => {
-        const segmentToUpdate = prev.find((seg) => seg.Id === data.id)
-        if (!segmentToUpdate) return prev
+  const handleUpdateSegment = (data: SegmentUpdate) => {
+    updateEditingSegments((prev) => {
+      const segmentToUpdate = prev.find((seg) => seg.Id === data.id)
+      if (!segmentToUpdate) return prev
 
-        const { nextSegments } = replaceSegmentSorted(prev, {
-          ...segmentToUpdate,
-          StartTicks: data.start,
-          EndTicks: data.end,
-        })
-
-        return nextSegments
+      const { nextSegments } = replaceSegmentSorted(prev, {
+        ...segmentToUpdate,
+        StartTicks: data.start,
+        EndTicks: data.end,
       })
-    },
-    [updateEditingSegments],
-  )
 
-  const handleDeleteSegment = React.useCallback(
-    (index: number) => {
-      updateEditingSegments((prev) => {
-        if (index < 0 || index >= prev.length) return prev
+      return nextSegments
+    })
+  }
 
-        const updated = [...prev]
-        updated.splice(index, 1)
+  const handleDeleteSegment = (index: number) => {
+    updateEditingSegments((prev) => {
+      if (index < 0 || index >= prev.length) return prev
 
-        setActiveIndex((prevIndex) => {
-          if (updated.length === 0) return 0
-          if (prevIndex > index) return prevIndex - 1
-          return Math.max(0, Math.min(prevIndex, updated.length - 1))
-        })
+      const updated = [...prev]
+      updated.splice(index, 1)
 
-        return updated
+      setActiveIndex((prevIndex) => {
+        if (updated.length === 0) return 0
+        if (prevIndex > index) return prevIndex - 1
+        return Math.max(0, Math.min(prevIndex, updated.length - 1))
       })
-    },
-    [updateEditingSegments],
-  )
 
-  const handlePlayerTimestamp = React.useCallback((timestamp: number) => {
+      return updated
+    })
+  }
+
+  const handlePlayerTimestamp = (timestamp: number) => {
     if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
     setPlayerTimestamp(timestamp)
     timestampTimeoutRef.current = setTimeout(
       () => setPlayerTimestamp(undefined),
       100,
     )
-  }, [])
+  }
 
-  const handleOpenEditDialog = React.useCallback((index: number) => {
+  const handleOpenEditDialog = (index: number) => {
     setEditingSegmentIndex(index)
     setEditDialogOpen(true)
-  }, [])
+  }
 
-  const handleCloseEditDialog = React.useCallback(() => {
+  const handleCloseEditDialog = () => {
     setEditDialogOpen(false)
     setEditingSegmentIndex(null)
-  }, [])
+  }
 
-  const handleSaveSegmentFromDialog = React.useCallback(
-    (updatedSegment: MediaSegmentDto) => {
-      updateEditingSegments((prev) => {
-        const { nextSegments, insertedIndex } = replaceSegmentSorted(
-          prev,
-          updatedSegment,
-        )
-        setActiveIndex(insertedIndex)
-        return nextSegments
-      })
-    },
-    [updateEditingSegments],
-  )
-
-  const handleDeleteSegmentFromDialog = React.useCallback(
-    (segment: MediaSegmentDto) => {
-      updateEditingSegments((prev) =>
-        prev.filter((seg) => seg.Id !== segment.Id),
+  const handleSaveSegmentFromDialog = (updatedSegment: MediaSegmentDto) => {
+    updateEditingSegments((prev) => {
+      const { nextSegments, insertedIndex } = replaceSegmentSorted(
+        prev,
+        updatedSegment,
       )
-      setActiveIndex((prev) => Math.max(0, prev - 1))
-    },
-    [updateEditingSegments],
-  )
+      setActiveIndex(insertedIndex)
+      return nextSegments
+    })
+  }
 
-  const handlePasteFromClipboard = React.useCallback(() => {
+  const handleDeleteSegmentFromDialog = (segment: MediaSegmentDto) => {
+    updateEditingSegments((prev) => prev.filter((seg) => seg.Id !== segment.Id))
+    setActiveIndex((prev) => Math.max(0, prev - 1))
+  }
+
+  const handlePasteFromClipboard = () => {
     if (!item.Id) return
     const itemId = item.Id
 
@@ -415,9 +389,9 @@ function useRenderPlayerEditor({
           message: t('editor.noSegmentInClipboard', 'No segment in clipboard'),
         })
       })
-  }, [item.Id, runtimeSeconds, t, updateEditingSegments])
+  }
 
-  const handleSaveAll = React.useCallback(async () => {
+  const handleSaveAll = async () => {
     if (!item.Id || isSaving) return
 
     saveAbortRef.current?.abort()
@@ -441,9 +415,9 @@ function useRenderPlayerEditor({
         })
       }
     } catch {}
-  }, [item.Id, isSaving, serverSegments, batchSaveMutation, t])
+  }
 
-  const handleCopyAllAsJson = React.useCallback(async () => {
+  const handleCopyAllAsJson = async () => {
     const segmentsToCopy = editingSegmentsRef.current
     if (segmentsToCopy.length === 0) {
       showNotification({
@@ -478,14 +452,14 @@ function useRenderPlayerEditor({
         message: t('editor.copyFailed', 'Clipboard access denied'),
       })
     }
-  }, [t])
+  }
 
-  const dismissImportDialog = React.useCallback(() => {
+  const dismissImportDialog = () => {
     pendingImportRef.current = null
     setImportDialogOpen(false)
-  }, [])
+  }
 
-  const handleImportReplace = React.useCallback(() => {
+  const handleImportReplace = () => {
     const pending = pendingImportRef.current
     if (!pending) return
 
@@ -502,9 +476,9 @@ function useRenderPlayerEditor({
     })
 
     dismissImportDialog()
-  }, [dismissImportDialog, updateEditingSegments])
+  }
 
-  const handleImportMerge = React.useCallback(() => {
+  const handleImportMerge = () => {
     const pending = pendingImportRef.current
     if (!pending) return
 
@@ -520,7 +494,7 @@ function useRenderPlayerEditor({
     })
 
     dismissImportDialog()
-  }, [dismissImportDialog, updateEditingSegments])
+  }
 
   const handleImportCancel = dismissImportDialog
 

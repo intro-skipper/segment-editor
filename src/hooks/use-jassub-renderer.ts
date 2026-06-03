@@ -1,9 +1,10 @@
-/**
- * useJassubRenderer - Hook for managing JASSUB ASS/SSA subtitle rendering.
- * @module hooks/use-jassub-renderer
- */
-
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
@@ -106,6 +107,57 @@ function getErrorMessage(error: unknown, t: (key: string) => string): string {
   return t('player.subtitle.error.jassubInit')
 }
 
+function clearResizeTimer(
+  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+) {
+  if (resizeTimerRef.current) {
+    clearTimeout(resizeTimerRef.current)
+    resizeTimerRef.current = null
+  }
+}
+
+function teardownJassubRenderer(
+  rendererRef: React.MutableRefObject<JassubRendererResult | null>,
+  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+) {
+  clearResizeTimer(resizeTimerRef)
+  rendererRef.current?.destroy()
+  rendererRef.current = null
+}
+
+function scheduleRendererResize(
+  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  rendererRef: React.MutableRefObject<JassubRendererResult | null>,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  prevVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
+) {
+  if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
+  resizeTimerRef.current = setTimeout(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+
+    // During strategy transitions the video element may be detached with 0×0
+    // layout. JASSUB's worker would set OffscreenCanvas.width to NaN, throwing.
+    const video = videoRef.current
+    if (!video || video.clientWidth <= 0 || video.clientHeight <= 0) return
+
+    // During strategy switches (direct <-> HLS) videoRef resolves to a
+    // different HTMLVideoElement while the old renderer is still alive.
+    // Calling resize() would make the worker read dimensions from the
+    // stale/detached element, causing OffscreenCanvas errors in the worker.
+    if (video !== prevVideoRef.current) return
+
+    try {
+      // resize() posts to the JASSUB web worker — the worker may still reject
+      // asynchronously if it reads stale dimensions, so swallow the rejection.
+      // The next resize after JASSUB is re-created will recover.
+      void Promise.resolve(renderer.instance.resize()).catch(() => {})
+    } catch (resizeError) {
+      void resizeError
+    }
+  }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
+}
+
 export function useJassubRenderer({
   videoRef,
   activeTrack,
@@ -131,62 +183,26 @@ export function useJassubRenderer({
   const prevVideoRef = useRef<HTMLVideoElement | null>(null)
   const initTokenRef = useRef<symbol | null>(null)
 
-  userOffsetRef.current = userOffset
-  transcodingRef.current = transcodingOffsetTicks
-  itemRef.current = item
+  useLayoutEffect(() => {
+    userOffsetRef.current = userOffset
+  }, [userOffset])
+  useLayoutEffect(() => {
+    transcodingRef.current = transcodingOffsetTicks
+  }, [transcodingOffsetTicks])
+  useLayoutEffect(() => {
+    itemRef.current = item
+  }, [item])
 
   const itemId = item?.Id
 
-  const clearResizeTimer = useCallback(() => {
-    if (resizeTimerRef.current) {
-      clearTimeout(resizeTimerRef.current)
-      resizeTimerRef.current = null
-    }
-  }, [])
+  const resize = () => {
+    scheduleRendererResize(resizeTimerRef, rendererRef, videoRef, prevVideoRef)
+  }
 
-  const teardownRenderer = useCallback(() => {
-    clearResizeTimer()
-    rendererRef.current?.destroy()
-    rendererRef.current = null
-  }, [clearResizeTimer])
-
-  const destroyRenderer = useCallback(() => {
-    teardownRenderer()
-    setRendererState((s) => ({ ...s, isActive: false }))
-  }, [teardownRenderer])
-
-  const resize = useCallback(() => {
-    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
-    resizeTimerRef.current = setTimeout(() => {
-      const renderer = rendererRef.current
-      if (!renderer) return
-
-      // During strategy transitions the video element may be detached with 0×0
-      // layout. JASSUB's worker would set OffscreenCanvas.width to NaN, throwing.
-      const video = videoRef.current
-      if (!video || video.clientWidth <= 0 || video.clientHeight <= 0) return
-
-      // During strategy switches (direct <-> HLS) videoRef resolves to a
-      // different HTMLVideoElement while the old renderer is still alive.
-      // Calling resize() would make the worker read dimensions from the
-      // stale/detached element, causing OffscreenCanvas errors in the worker.
-      if (video !== prevVideoRef.current) return
-
-      try {
-        // resize() posts to the JASSUB web worker — the worker may still reject
-        // asynchronously if it reads stale dimensions, so swallow the rejection.
-        // The next resize after JASSUB is re-created will recover.
-        void Promise.resolve(renderer.instance.resize()).catch(() => {})
-      } catch (resizeError) {
-        void resizeError
-      }
-    }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
-  }, [videoRef])
-
-  const setUserOffset = useCallback((offset: number) => {
+  const setUserOffset = (offset: number) => {
     userOffsetRef.current = offset
     rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
-  }, [])
+  }
 
   const reportInitError = useEffectEvent((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err)
@@ -200,7 +216,7 @@ export function useJassubRenderer({
     const needsJassub = activeTrack && requiresJassubRenderer(activeTrack)
 
     if (!needsJassub || !video || !itemId) {
-      teardownRenderer()
+      teardownJassubRenderer(rendererRef, resizeTimerRef)
       return
     }
 
@@ -225,9 +241,13 @@ export function useJassubRenderer({
     const initAbortController = new AbortController()
 
     const init = async () => {
-      destroyRenderer()
-
-      setRendererState((s) => ({ ...s, isLoading: true, error: null }))
+      teardownJassubRenderer(rendererRef, resizeTimerRef)
+      setRendererState((s) => ({
+        ...s,
+        isActive: false,
+        isLoading: true,
+        error: null,
+      }))
 
       try {
         await Promise.all([
@@ -269,7 +289,7 @@ export function useJassubRenderer({
         initTokenRef.current = null
       }
     }
-  }, [activeTrack, itemId, videoRef, destroyRenderer, teardownRenderer])
+  }, [activeTrack, itemId, videoRef])
 
   const needsJassubNow =
     !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id
@@ -278,24 +298,40 @@ export function useJassubRenderer({
     const video = videoRef.current
     if (!video || !isActive || !needsJassubNow) return
 
-    const observer = new ResizeObserver(resize)
+    const observer = new ResizeObserver(() => {
+      scheduleRendererResize(
+        resizeTimerRef,
+        rendererRef,
+        videoRef,
+        prevVideoRef,
+      )
+    })
     observer.observe(video)
 
-    const onFullscreen = () => setTimeout(resize, 150)
+    const onFullscreen = () =>
+      setTimeout(() => {
+        scheduleRendererResize(
+          resizeTimerRef,
+          rendererRef,
+          videoRef,
+          prevVideoRef,
+        )
+      }, 150)
     document.addEventListener('fullscreenchange', onFullscreen)
 
     return () => {
       observer.disconnect()
       document.removeEventListener('fullscreenchange', onFullscreen)
-      clearResizeTimer()
+      clearResizeTimer(resizeTimerRef)
     }
-  }, [videoRef, isActive, resize, needsJassubNow, clearResizeTimer])
+  }, [videoRef, isActive, needsJassubNow])
 
   useEffect(() => {
     return () => {
-      destroyRenderer()
+      teardownJassubRenderer(rendererRef, resizeTimerRef)
+      setRendererState((s) => ({ ...s, isActive: false }))
     }
-  }, [destroyRenderer])
+  }, [])
 
   return {
     isActive: needsJassubNow && isActive,

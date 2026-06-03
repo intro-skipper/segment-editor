@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play } from 'lucide-react'
@@ -18,6 +17,8 @@ import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 interface SeriesViewProps {
   series: BaseItemDto
   seasons: Array<BaseItemDto>
+  selectedSeasonId?: string | null
+  onSeasonSelect: (seasonId: string) => void
   vibrantColors?: VibrantColors | null
 }
 
@@ -31,7 +32,7 @@ interface SeasonTabsProps {
 const isSpecialSeason = (s: BaseItemDto) =>
   s.IndexNumber === 0 || (s.Name || '').toLowerCase().includes('special')
 
-const SeasonTabs = React.memo(function SeasonTabsComponent({
+const SeasonTabs = function SeasonTabsComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
@@ -39,7 +40,7 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
 }: SeasonTabsProps) {
   const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
 
-  const orderedSeasons = React.useMemo(() => {
+  const orderedSeasons = (() => {
     const normal: typeof seasons = []
     const specials: typeof seasons = []
     for (const s of seasons) {
@@ -47,7 +48,7 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
       else normal.push(s)
     }
     return [...normal, ...specials]
-  }, [seasons])
+  })()
 
   return (
     <div
@@ -84,7 +85,7 @@ const SeasonTabs = React.memo(function SeasonTabsComponent({
       })}
     </div>
   )
-})
+}
 
 interface EpisodeCardProps {
   episode: BaseItemDto
@@ -94,7 +95,7 @@ interface EpisodeCardProps {
   vibrantColors?: VibrantColors | null
 }
 
-const EpisodeCard = React.memo(function EpisodeCardComponent({
+const EpisodeCard = function EpisodeCardComponent({
   episode,
   episodeId,
   index,
@@ -109,23 +110,18 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
     : null
   const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
 
-  const cardStyle = React.useMemo(
-    () =>
-      vibrantColors ? { backgroundColor: vibrantColors.primary } : undefined,
-    [vibrantColors],
-  )
-  const textStyle = React.useMemo(
-    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
-    [vibrantColors],
-  )
+  const cardStyle = vibrantColors
+    ? { backgroundColor: vibrantColors.primary }
+    : undefined
+  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
 
   const episodeName = episode.Name || episodeLabel
   const ariaLabel = runtime
     ? `${episodeLabel}: ${episodeName}, ${runtime} minutes`
     : `${episodeLabel}: ${episodeName}`
-  const selectEpisode = React.useCallback(() => {
+  const selectEpisode = () => {
     onEpisodeClick(episodeId)
-  }, [onEpisodeClick, episodeId])
+  }
 
   return (
     <InteractiveCard
@@ -175,7 +171,7 @@ const EpisodeCard = React.memo(function EpisodeCardComponent({
       </div>
     </InteractiveCard>
   )
-})
+}
 
 interface SeasonEpisodesProps {
   seriesId: string
@@ -198,16 +194,13 @@ function SeasonEpisodes({
     refetch,
   } = useEpisodes(seriesId, season.Id ?? '', { enabled: !!season.Id })
 
-  const handleEpisodeClick = React.useCallback(
-    (episodeId: string) => {
-      void navigate({
-        to: '/player/$itemId',
-        params: { itemId: episodeId },
-        search: { fetchSegments: 'true' },
-      })
-    },
-    [navigate],
-  )
+  const handleEpisodeClick = (episodeId: string) => {
+    void navigate({
+      to: '/player/$itemId',
+      params: { itemId: episodeId },
+      search: { fetchSegments: 'true' },
+    })
+  }
 
   if (isLoading) {
     return (
@@ -263,30 +256,28 @@ function SeasonEpisodes({
 export function SeriesView({
   series,
   seasons,
+  selectedSeasonId: selectedSeasonIdProp,
+  onSeasonSelect,
   vibrantColors,
 }: SeriesViewProps) {
   const { t } = useTranslation()
 
-  const findDefaultSeasonId = React.useCallback(() => {
+  const findDefaultSeasonId = () => {
     const firstNonSpecial = seasons.find((s) => !isSpecialSeason(s))
     return firstNonSpecial?.Id ?? seasons[0]?.Id ?? null
-  }, [seasons])
+  }
 
-  const [selectedSeasonId, setSelectedSeasonId] = React.useState<string | null>(
-    findDefaultSeasonId,
-  )
-
-  const resolvedSelectedSeasonId = React.useMemo(() => {
+  const resolvedSelectedSeasonId = (() => {
     if (seasons.length === 0) {
       return null
     }
 
-    const hasSelected = selectedSeasonId
-      ? seasons.some((s) => s.Id === selectedSeasonId)
+    const hasSelected = selectedSeasonIdProp
+      ? seasons.some((s) => s.Id === selectedSeasonIdProp)
       : false
 
-    return hasSelected ? selectedSeasonId : findDefaultSeasonId()
-  }, [seasons, selectedSeasonId, findDefaultSeasonId])
+    return hasSelected ? (selectedSeasonIdProp ?? null) : findDefaultSeasonId()
+  })()
 
   const selectedSeason = seasons.find((s) => s.Id === resolvedSelectedSeasonId)
 
@@ -306,7 +297,7 @@ export function SeriesView({
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
-        onSeasonSelect={setSelectedSeasonId}
+        onSeasonSelect={onSeasonSelect}
         vibrantColors={vibrantColors}
       />
 

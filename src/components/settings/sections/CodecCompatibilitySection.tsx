@@ -1,12 +1,5 @@
-/**
- * CodecCompatibilitySection Component
- *
- * Shows browser codec compatibility information for direct play.
- *
- * @module components/settings/sections/CodecCompatibilitySection
- */
-
-import { useCallback, useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useReducer } from 'react'
+import type { Dispatch } from 'react'
 import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
 
 import { SettingsSection } from '../primitives/SettingsSection'
@@ -136,6 +129,24 @@ async function getCodecSupportResults() {
   return { videoResults, audioResults }
 }
 
+async function runCodecProbe(
+  dispatch: Dispatch<CodecCompatibilityAction>,
+  clearProbeCache: boolean,
+) {
+  if (clearProbeCache) {
+    clearCache()
+  }
+
+  dispatch({ type: 'PROBE_STARTED' })
+
+  try {
+    const { videoResults, audioResults } = await getCodecSupportResults()
+    dispatch({ type: 'PROBE_SUCCEEDED', videoResults, audioResults })
+  } catch {
+    dispatch({ type: 'PROBE_FAILED' })
+  }
+}
+
 function CodecList({ title, codecs }: CodecListProps) {
   return (
     <div className="space-y-2">
@@ -163,43 +174,25 @@ function CodecList({ title, codecs }: CodecListProps) {
   )
 }
 
-/**
- * Settings section showing codec compatibility for direct play.
- */
 export function CodecCompatibilitySection() {
   const [state, dispatch] = useReducer(
     codecCompatibilityReducer,
     initialCodecCompatibilityState,
   )
-  const supportedContainers = useMemo(() => getDirectPlayContainers(), [])
+  const supportedContainers = getDirectPlayContainers()
 
-  const runCodecProbe = useCallback(async (clearProbeCache: boolean) => {
-    if (clearProbeCache) {
-      clearCache()
-    }
+  const handleRefresh = () => {
+    void runCodecProbe(dispatch, true)
+  }
 
-    dispatch({ type: 'PROBE_STARTED' })
-
-    try {
-      const { videoResults, audioResults } = await getCodecSupportResults()
-      dispatch({ type: 'PROBE_SUCCEEDED', videoResults, audioResults })
-    } catch {
-      dispatch({ type: 'PROBE_FAILED' })
-    }
-  }, [])
-
-  const handleRefresh = useCallback(() => {
-    void runCodecProbe(true)
-  }, [runCodecProbe])
-
-  const handleExpand = useCallback(() => {
+  const handleExpand = () => {
     dispatch({ type: 'EXPAND_SECTION' })
-  }, [])
+  }
 
   useEffect(() => {
     if (!state.isExpanded || state.hasLoaded) return
-    void runCodecProbe(false)
-  }, [state.isExpanded, state.hasLoaded, runCodecProbe])
+    void runCodecProbe(dispatch, false)
+  }, [state.isExpanded, state.hasLoaded])
 
   return (
     <SettingsSection icon={Monitor} title="Direct Play Compatibility">

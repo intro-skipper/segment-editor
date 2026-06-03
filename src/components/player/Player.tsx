@@ -1,9 +1,7 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -66,6 +64,10 @@ const {
 
 const PLAYBACK_UPDATE_INTERVAL_MS = 120
 
+function getPlaybackTimestampMs() {
+  return performance.now()
+}
+
 interface PlaybackTimelineState {
   currentTime: number
   duration: number
@@ -82,6 +84,11 @@ interface SegmentTimeRange {
   segment: MediaSegmentDto
   startSeconds: number
   endSeconds: number
+}
+
+interface ActiveSkipSegmentState {
+  segment: MediaSegmentDto
+  segmentSkipModeRevision: number
 }
 
 const isFiniteNumber = (value: unknown): value is number =>
@@ -341,55 +348,66 @@ function useRenderPlayer({
     playbackSpeedIndex,
   } = state
 
+  const { segmentSkipMode, segmentSkipModeRevision } = useAppStore(
+    useShallow((s) => ({
+      segmentSkipMode: s.segmentSkipMode,
+      segmentSkipModeRevision: s.segmentSkipModeRevision,
+    })),
+  )
+  const segmentSkipModeRef = useRef(segmentSkipMode)
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
-
-  const segmentSkipMode = useAppStore((s) => s.segmentSkipMode)
-  const segmentSkipModeRef = useRef(segmentSkipMode)
-  segmentSkipModeRef.current = segmentSkipMode
 
   const jellyfinPlaybackSyncEnabled = useAppStore(
     (s) => s.jellyfinPlaybackSyncEnabled,
   )
 
-  const segmentTimeRanges = useMemo<Array<SegmentTimeRange>>(
-    () =>
-      (segments ?? [])
-        .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-          // API model keeps StartTicks/EndTicks field names, but values are
-          // normalized to UI seconds in this app path.
-          const startSeconds = getSegmentStart(segment)
-          const endSeconds = getSegmentEnd(segment)
-          if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
-            return acc
-          }
-          if (endSeconds > startSeconds) {
-            acc.push({ segment, startSeconds, endSeconds })
-          }
-          return acc
-        }, [])
-        .sort((a, b) => a.startSeconds - b.startSeconds),
-    [segments],
-  )
-  const segmentTimeRangeById = useMemo<Map<string, SegmentTimeRange>>(
-    () =>
-      segmentTimeRanges.reduce((map, r) => {
-        if (r.segment.Id !== undefined) {
-          map.set(r.segment.Id, r)
-        }
-        return map
-      }, new Map<string, SegmentTimeRange>()),
-    [segmentTimeRanges],
-  )
+  const segmentTimeRanges: Array<SegmentTimeRange> = (segments ?? [])
+    .reduce<Array<SegmentTimeRange>>((acc, segment) => {
+      // API model keeps StartTicks/EndTicks field names, but values are
+      // normalized to UI seconds in this app path.
+      const startSeconds = getSegmentStart(segment)
+      const endSeconds = getSegmentEnd(segment)
+      if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
+        return acc
+      }
+      if (endSeconds > startSeconds) {
+        acc.push({ segment, startSeconds, endSeconds })
+      }
+      return acc
+    }, [])
+    .sort((a, b) => a.startSeconds - b.startSeconds)
+  const segmentTimeRangeById: Map<string, SegmentTimeRange> =
+    segmentTimeRanges.reduce((map, r) => {
+      if (r.segment.Id !== undefined) {
+        map.set(r.segment.Id, r)
+      }
+      return map
+    }, new Map<string, SegmentTimeRange>())
   const segmentTimeRangesRef = useRef(segmentTimeRanges)
-  segmentTimeRangesRef.current = segmentTimeRanges
+  useLayoutEffect(() => {
+    segmentTimeRangesRef.current = segmentTimeRanges
+  }, [segmentTimeRanges])
   const segmentTimeRangeByIdRef = useRef(segmentTimeRangeById)
-  segmentTimeRangeByIdRef.current = segmentTimeRangeById
+  useLayoutEffect(() => {
+    segmentTimeRangeByIdRef.current = segmentTimeRangeById
+  }, [segmentTimeRangeById])
 
-  const [activeSkipSegment, setActiveSkipSegment] =
-    useState<MediaSegmentDto | null>(null)
+  const [activeSkipSegmentState, setActiveSkipSegmentState] =
+    useState<ActiveSkipSegmentState | null>(null)
   const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
   const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
+
+  useLayoutEffect(() => {
+    segmentSkipModeRef.current = segmentSkipMode
+    prevActiveSegmentIdRef.current = null
+    lastAutoSkippedSegmentIdRef.current = null
+  }, [segmentSkipMode, segmentSkipModeRevision])
+
+  const activeSkipSegment =
+    activeSkipSegmentState?.segmentSkipModeRevision === segmentSkipModeRevision
+      ? activeSkipSegmentState.segment
+      : null
 
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -442,7 +460,7 @@ function useRenderPlayer({
   const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  const handleVideoError = useCallback((error: VideoPlayerError | null) => {
+  const handleVideoError = (error: VideoPlayerError | null) => {
     if (error) {
       const hlsError: HlsPlayerError = {
         type: mapVideoErrorType(error.type),
@@ -453,23 +471,20 @@ function useRenderPlayer({
     } else {
       dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
     }
-  }, [])
+  }
 
-  const handleStrategyChange = useCallback(
-    (strategy: PlaybackStrategy) => {
-      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
+  const handleStrategyChange = (strategy: PlaybackStrategy) => {
+    dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
 
-      if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
-        showNotification({
-          type: 'info',
-          message: t('player.notification.switchedToTranscode'),
-          duration: 3000,
-        })
-      }
-      previousStrategyRef.current = strategy
-    },
-    [t],
-  )
+    if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
+      showNotification({
+        type: 'info',
+        message: t('player.notification.switchedToTranscode'),
+        duration: 3000,
+      })
+    }
+    previousStrategyRef.current = strategy
+  }
 
   const preferredAudioLanguage = useAppStore(
     (s) => s.trackPreferences.preferredAudioLanguage,
@@ -535,7 +550,7 @@ function useRenderPlayer({
           (track) => track.index === trackState.activeSubtitleIndex,
         ) ?? null)
 
-  const nativeCaptionTracks = useMemo(() => {
+  const nativeCaptionTracks = (() => {
     const itemId = item.Id
     if (strategy !== 'direct' || !itemId) return []
 
@@ -559,7 +574,7 @@ function useRenderPlayer({
     }
 
     return tracks
-  }, [item.Id, strategy, trackState.subtitleTracks])
+  })()
   const primaryCaptionTrack = nativeCaptionTracks.at(0)
   const additionalCaptionTracks = nativeCaptionTracks.slice(1)
 
@@ -612,15 +627,11 @@ function useRenderPlayer({
     const segmentRanges = segmentTimeRangesRef.current
     const mode = segmentSkipModeRef.current
 
-    if (
-      mode === 'disabled' ||
-      (mode !== 'button' && mode !== 'skip') ||
-      segmentRanges.length === 0
-    ) {
+    if (mode === 'disabled' || segmentRanges.length === 0) {
       if (prevActiveSegmentIdRef.current !== null) {
         prevActiveSegmentIdRef.current = null
         lastAutoSkippedSegmentIdRef.current = null
-        setActiveSkipSegment(null)
+        setActiveSkipSegmentState(null)
       }
       return
     }
@@ -656,7 +667,14 @@ function useRenderPlayer({
         lastAutoSkippedSegmentIdRef.current = null
       }
       if (mode === 'button') {
-        setActiveSkipSegment(active)
+        setActiveSkipSegmentState(
+          active
+            ? {
+                segment: active,
+                segmentSkipModeRevision,
+              }
+            : null,
+        )
       }
     }
 
@@ -678,7 +696,7 @@ function useRenderPlayer({
 
     checkSegmentSkip(nextTime)
 
-    const now = performance.now()
+    const now = getPlaybackTimestampMs()
     const elapsed = now - lastPlaybackUpdateAtRef.current
     if (
       elapsed >= PLAYBACK_UPDATE_INTERVAL_MS &&
@@ -701,7 +719,7 @@ function useRenderPlayer({
       if (latestTime === undefined) return
 
       currentTimeRef.current = latestTime
-      lastPlaybackUpdateAtRef.current = performance.now()
+      lastPlaybackUpdateAtRef.current = getPlaybackTimestampMs()
       publishTimelineTime(latestTime)
     }, remainingDelay)
   }
@@ -788,7 +806,7 @@ function useRenderPlayer({
     clearPlaybackUpdateTimer()
     video.currentTime = time
     currentTimeRef.current = time
-    lastPlaybackUpdateAtRef.current = performance.now()
+    lastPlaybackUpdateAtRef.current = getPlaybackTimestampMs()
     publishTimelineTime(time)
   }
 
@@ -899,11 +917,9 @@ function useRenderPlayer({
   const toggleSubtitles = async () => {
     try {
       if (trackState.activeSubtitleIndex !== null) {
-        // Subtitles are on — turn them off
         await selectSubtitleTrack(null)
         setSubtitlesEnabled(false)
       } else if (trackState.subtitleTracks.length > 0) {
-        // Subtitles are off — turn on the first available track
         const firstTrack = trackState.subtitleTracks[0]
         await selectSubtitleTrack(firstTrack.index)
         setSubtitlesEnabled(true)
@@ -1034,11 +1050,9 @@ function useRenderPlayer({
     const timeSinceLastInteraction = now - lastInteractionTimeRef.current
     lastInteractionTimeRef.current = now
 
-    // Clear any pending single-tap/click action
     clearSingleTapTimer()
 
     if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
-      // Double-tap/click detected
       if (isFullscreen) {
         toggleVideoFitMode()
         // Show controls/OSD after changing fit mode so user gets feedback
@@ -1102,12 +1116,6 @@ function useRenderPlayer({
     }
   }, [])
 
-  useEffect(() => {
-    prevActiveSegmentIdRef.current = null
-    lastAutoSkippedSegmentIdRef.current = null
-    setActiveSkipSegment(null)
-  }, [segmentSkipMode])
-
   const handleSkipSegment = (segment: MediaSegmentDto) => {
     const range =
       segment.Id !== undefined
@@ -1121,7 +1129,7 @@ function useRenderPlayer({
       return
     }
     handleSeek(targetEndSeconds)
-    setActiveSkipSegment(null)
+    setActiveSkipSegmentState(null)
     prevActiveSegmentIdRef.current = null
     lastAutoSkippedSegmentIdRef.current = null
   }
@@ -1217,7 +1225,6 @@ function useRenderPlayer({
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      {/* Fullscreen container - wraps everything */}
       <section
         ref={containerRef}
         aria-label={t('player.videoPlayer')}
@@ -1228,7 +1235,6 @@ function useRenderPlayer({
         onMouseMove={handleFullscreenMouseMove}
         onMouseLeave={handleContainerMouseLeave}
       >
-        {/* Video container */}
         <button
           type="button"
           tabIndex={0}
@@ -1246,7 +1252,7 @@ function useRenderPlayer({
           onKeyDown={handleVideoContainerKeyDown}
           aria-label={t('player.videoPlayer')}
         >
-          {/* Captions are rendered from Jellyfin subtitle metadata when a real VTT source is available. */}
+          {/* Captions are data-dependent: native VTT tracks are rendered when Jellyfin exposes them; ASS/SSA subtitles are rendered by JASSUB. */}
           {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
           <video
             ref={videoRef}
@@ -1290,7 +1296,6 @@ function useRenderPlayer({
           </video>
         </button>
 
-        {/* Error overlay - strategy-aware */}
         {playerError && !isRecovering ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
             <AlertTriangle className="size-12 text-destructive mb-4" />
@@ -1317,7 +1322,6 @@ function useRenderPlayer({
           </div>
         ) : null}
 
-        {/* Loading/Recovery indicator */}
         {isVideoLoading || isRecovering ? (
           <output
             className="absolute inset-0 flex items-center justify-center bg-black/60"
@@ -1335,7 +1339,6 @@ function useRenderPlayer({
           </output>
         ) : null}
 
-        {/* Segment skip button overlay */}
         {segmentSkipMode === 'button' &&
         activeSkipSegment &&
         !playerError &&

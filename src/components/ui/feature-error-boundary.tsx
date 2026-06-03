@@ -1,9 +1,3 @@
-/**
- * FeatureErrorBoundary - Specialized error boundary for major feature areas.
- * Provides a user-friendly fallback UI that doesn't crash the entire app.
- */
-
-import { useCallback } from 'react'
 import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
@@ -22,22 +16,13 @@ import {
 } from '@/components/ui/card'
 
 interface FeatureErrorBoundaryProps {
-  /** Child components to wrap */
   children: ReactNode
-  /** Feature name for error logging and display */
   featureName: string
-  /** Minimum height class for the fallback UI */
   minHeightClass?: string
-  /** Whether to show navigation options */
   showNavigation?: boolean
-  /** Custom error message */
   errorMessage?: string
 }
 
-/**
- * Fallback UI component for feature errors.
- * Provides retry, back, and home navigation options.
- */
 function FeatureErrorFallback({
   featureName,
   minHeightClass = 'min-h-[var(--spacing-page-min-height-sm)]',
@@ -55,14 +40,14 @@ function FeatureErrorFallback({
   const canGoBack = useCanGoBack()
   const router = useRouter()
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     if (onRetry) {
       onRetry()
       return
     }
 
     void router.invalidate()
-  }, [onRetry, router])
+  }
 
   return (
     <div
@@ -117,10 +102,6 @@ function FeatureErrorFallback({
   )
 }
 
-/**
- * FeatureErrorBoundary wraps major feature areas with error handling.
- * Provides a user-friendly fallback that allows recovery without page reload.
- */
 export function FeatureErrorBoundary({
   children,
   featureName,

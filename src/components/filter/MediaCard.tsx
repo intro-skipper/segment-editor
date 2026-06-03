@@ -1,9 +1,4 @@
-/**
- * MediaCard - Clickable media item card with dynamic color extraction.
- * Navigates to appropriate view based on item type.
- */
-
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
@@ -84,7 +79,6 @@ function observeCardInView(element: Element, onVisible: () => void) {
   }
 }
 
-/** Label key mapping by item type */
 const LABEL_KEY_MAP: Record<string, string> = {
   [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
   [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
@@ -93,7 +87,7 @@ const LABEL_KEY_MAP: Record<string, string> = {
   [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
 }
 
-export const MediaCard = memo(function MediaCardComponent({
+export const MediaCard = function MediaCardComponent({
   item,
   className,
   index = 0,
@@ -119,66 +113,51 @@ export const MediaCard = memo(function MediaCardComponent({
     })
   }, [])
 
-  const imageUrl = useMemo(() => getBestImageUrl(item, 200), [item])
+  const imageUrl = getBestImageUrl(item, 200)
   const vibrantColors = useVibrantColor(imageUrl ?? null, {
     enabled: isInView,
   })
 
-  const prefetchRoute = useCallback(() => {
+  const prefetchRoute = () => {
     if (hasPrefetchedRef.current || !item.Id) return
 
     hasPrefetchedRef.current = true
     preloadMediaRoute(router.preloadRoute, item)
-  }, [item, router])
+  }
 
-  const handleFocusPrefetch = useCallback(
-    (event: React.FocusEvent<HTMLElement>) => {
-      prefetchRoute()
-      onFocus?.(event)
-    },
-    [onFocus, prefetchRoute],
-  )
+  const handleFocusPrefetch = (event: React.FocusEvent<HTMLElement>) => {
+    prefetchRoute()
+    onFocus?.(event)
+  }
 
-  const handleNavigateToItem = useCallback(() => {
+  const handleNavigateToItem = () => {
     navigateToMediaItem(navigate, item)
-  }, [item, navigate])
+  }
 
-  // Compute accessible label using translation
-  const accessibleLabel = useMemo(() => {
+  const accessibleLabel = (() => {
     const name = item.Name ?? 'Unknown'
     const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
     const labelKey =
       LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
     return t(labelKey, { name: `${name}${year}` })
-  }, [item, t])
+  })()
 
   // Derived values - no useMemo needed for simple computations
   const animationDelay = staggerDelay(index, STAGGER_FAST)
 
-  // Memoize style objects to prevent re-renders
-  const textBoxStyle = useMemo(
-    () =>
-      vibrantColors
-        ? {
-            background: vibrantColors.primary,
-            color: vibrantColors.text,
-          }
-        : undefined,
-    [vibrantColors],
-  )
+  const textBoxStyle = vibrantColors
+    ? {
+        background: vibrantColors.primary,
+        color: vibrantColors.text,
+      }
+    : undefined
 
-  const cardStyle = useMemo(
-    () => ({
-      animationDelay,
-      backgroundColor: vibrantColors?.primary ?? 'var(--card)',
-    }),
-    [animationDelay, vibrantColors?.primary],
-  )
+  const cardStyle = {
+    animationDelay,
+    backgroundColor: vibrantColors?.primary ?? 'var(--card)',
+  }
 
-  const textStyle = useMemo(
-    () => (vibrantColors ? { color: vibrantColors.text } : undefined),
-    [vibrantColors],
-  )
+  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
 
   return (
     <div
@@ -205,7 +184,6 @@ export const MediaCard = memo(function MediaCardComponent({
         )}
         style={cardStyle}
       >
-        {/* Item Thumbnail */}
         <ItemImage
           item={item}
           maxWidth={200}
@@ -213,7 +191,6 @@ export const MediaCard = memo(function MediaCardComponent({
           className="w-full"
         />
 
-        {/* Item Name - with extracted poster color */}
         <div
           className="px-3 py-2.5 md:px-4 md:py-3 transition-colors duration-500"
           style={textBoxStyle}
@@ -244,4 +221,4 @@ export const MediaCard = memo(function MediaCardComponent({
       </button>
     </div>
   )
-})
+}

@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { getRouteApi } from '@tanstack/react-router'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
@@ -48,6 +48,8 @@ export function SeriesSkeleton() {
 
 export function SeriesPage() {
   const { itemId } = routeApi.useParams()
+  const { seasonId } = routeApi.useSearch()
+  const navigate = useNavigate({ from: '/series/$itemId' })
 
   const { data: series } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
   const { data: seasons } = useSuspenseQuery(seriesQueryOptions.seasons(itemId))
@@ -56,6 +58,13 @@ export function SeriesPage() {
   const vibrantColors = useVibrantColor(imageUrl || null, {
     enabled: !!imageUrl,
   })
+
+  const handleSeasonSelect = (id: string) => {
+    void navigate({
+      search: (prev) => ({ ...prev, seasonId: id }),
+      replace: true,
+    })
+  }
 
   if (!series) {
     return (
@@ -93,6 +102,8 @@ export function SeriesPage() {
             <SeriesView
               series={series}
               seasons={seasons}
+              selectedSeasonId={seasonId}
+              onSeasonSelect={handleSeasonSelect}
               vibrantColors={vibrantColors}
             />
           </Suspense>

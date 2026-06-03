@@ -21,6 +21,21 @@ function getPlayerNavigationRoute(itemId: string): NavigationRoute {
   }
 }
 
+export function getSeriesNavigationRoute(
+  seriesId: string,
+  seasonId?: string | null,
+): NavigationRoute {
+  if (seasonId) {
+    return {
+      to: '/series/$itemId',
+      params: { itemId: seriesId },
+      search: { seasonId },
+    }
+  }
+
+  return { to: '/series/$itemId', params: { itemId: seriesId } }
+}
+
 function getUnhandledItemKindRoute(
   itemType: never,
   itemId: string,
@@ -37,7 +52,7 @@ function getUnhandledItemKindRoute(
  * Gets the navigation route for a media item based on its type.
  * - Container types (BoxSet, Folder, Playlist, etc.) browse into their children.
  * - Series, artists, and albums navigate to their detail views.
- * - Season items navigate to their parent series view.
+ * - Season items navigate to their parent series view with the season selected.
  * - Other items navigate to the player with segment fetching enabled.
  *
  * @param item - The media item to get navigation route for
@@ -70,13 +85,10 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
         )
         return { to: '/' }
       }
-      return {
-        to: '/series/$itemId',
-        params: { itemId: item.SeriesId },
-      }
+      return getSeriesNavigationRoute(item.SeriesId, item.Id)
 
     case BaseItemKind.Series:
-      return { to: '/series/$itemId', params: { itemId } }
+      return getSeriesNavigationRoute(itemId)
 
     case BaseItemKind.MusicArtist:
       return { to: '/artist/$itemId', params: { itemId } }

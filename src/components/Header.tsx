@@ -1,9 +1,4 @@
-/**
- * Header - Minimal navigation header
- * Single-responsibility: Navigation + collection selection + settings access
- */
-
-import { Suspense, lazy, useCallback, useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
@@ -28,6 +23,7 @@ import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
+import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
 import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import { getBestImageUrl } from '@/services/video/api'
@@ -47,10 +43,6 @@ const EpisodeSwitcher = lazy(() =>
     default: module.EpisodeSwitcher,
   })),
 )
-
-// ============================================================================
-// Sub-Components (inline for performance - avoids memo overhead for simple UI)
-// ============================================================================
 
 interface CollectionSelectorProps {
   collections: Array<{ ItemId?: string | null; Name?: string | null }>
@@ -99,7 +91,6 @@ function CollectionSelector({
   )
 }
 
-/** Shared styles for icon buttons */
 const iconButtonClass = cn(
   'size-11 rounded-full',
   'transition-colors duration-150',
@@ -108,10 +99,6 @@ const iconButtonClass = cn(
 
 /** Pre-computed platform-aware shortcut display for search button title */
 const MOD_K_DISPLAY = formatForDisplay('Mod+K')
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function Header() {
   const { t } = useTranslation()
@@ -135,28 +122,22 @@ export default function Header() {
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
-  const handleCollectionSelect = useCallback(
-    (collectionId: string | null) => {
-      void navigate({
-        to: '/',
-        search: {
-          collection: collectionId ?? undefined,
-          page: undefined,
-          search: undefined,
-        },
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  const handleCollectionSelect = (collectionId: string | null) => {
+    void navigate({
+      to: '/',
+      search: {
+        collection: collectionId ?? undefined,
+        page: undefined,
+        search: undefined,
+      },
+      replace: true,
+    })
+  }
 
-  // Collections query
   const { data: collections } = useCollections()
 
-  // Derived state
   const isDetailPage = location.pathname !== '/'
 
-  // Fetch current item only on detail pages
   const { data: currentItem } = useItem(itemId ?? '', {
     enabled: isDetailPage && !!itemId,
   })
@@ -166,7 +147,6 @@ export default function Header() {
     enabled: isDetailPage && !!headerImageUrl,
   })
 
-  // Compute page title and check if on player page
   const isPlayerPage = location.pathname.startsWith('/player/')
   let pageTitle = ''
   let isEpisode = false
@@ -210,8 +190,7 @@ export default function Header() {
 
     if (isEpisode && seriesId) {
       void navigate({
-        to: '/series/$itemId',
-        params: { itemId: seriesId },
+        ...getSeriesNavigationRoute(seriesId, currentItem?.SeasonId),
         replace: true,
       })
       return
@@ -242,7 +221,6 @@ export default function Header() {
           aria-label={t('accessibility.navigation', 'Main navigation')}
         >
           <div className="flex items-center justify-between gap-4">
-            {/* Left: Navigation / Collection selector */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {isDetailPage ? (
                 <>
@@ -295,7 +273,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* Right: Actions */}
             <div className="flex items-center gap-2 shrink-0">
               {selectedCollection && (
                 <Button
