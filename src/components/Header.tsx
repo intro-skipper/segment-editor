@@ -23,6 +23,7 @@ import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
+import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
 import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import { getBestImageUrl } from '@/services/video/api'
@@ -189,8 +190,7 @@ export default function Header() {
 
     if (isEpisode && seriesId) {
       void navigate({
-        to: '/series/$itemId',
-        params: { itemId: seriesId },
+        ...getSeriesNavigationRoute(seriesId, currentItem?.SeasonId),
         replace: true,
       })
       return

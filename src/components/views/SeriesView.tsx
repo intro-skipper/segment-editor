@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play } from 'lucide-react'
@@ -18,6 +17,8 @@ import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 interface SeriesViewProps {
   series: BaseItemDto
   seasons: Array<BaseItemDto>
+  selectedSeasonId?: string | null
+  onSeasonSelect: (seasonId: string) => void
   vibrantColors?: VibrantColors | null
 }
 
@@ -255,6 +256,8 @@ function SeasonEpisodes({
 export function SeriesView({
   series,
   seasons,
+  selectedSeasonId: selectedSeasonIdProp,
+  onSeasonSelect,
   vibrantColors,
 }: SeriesViewProps) {
   const { t } = useTranslation()
@@ -264,20 +267,16 @@ export function SeriesView({
     return firstNonSpecial?.Id ?? seasons[0]?.Id ?? null
   }
 
-  const [selectedSeasonId, setSelectedSeasonId] = React.useState<string | null>(
-    findDefaultSeasonId,
-  )
-
   const resolvedSelectedSeasonId = (() => {
     if (seasons.length === 0) {
       return null
     }
 
-    const hasSelected = selectedSeasonId
-      ? seasons.some((s) => s.Id === selectedSeasonId)
+    const hasSelected = selectedSeasonIdProp
+      ? seasons.some((s) => s.Id === selectedSeasonIdProp)
       : false
 
-    return hasSelected ? selectedSeasonId : findDefaultSeasonId()
+    return hasSelected ? (selectedSeasonIdProp ?? null) : findDefaultSeasonId()
   })()
 
   const selectedSeason = seasons.find((s) => s.Id === resolvedSelectedSeasonId)
@@ -298,7 +297,7 @@ export function SeriesView({
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
-        onSeasonSelect={setSelectedSeasonId}
+        onSeasonSelect={onSeasonSelect}
         vibrantColors={vibrantColors}
       />
 

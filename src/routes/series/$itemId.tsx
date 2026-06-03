@@ -21,11 +21,16 @@ const seriesParamsSchema = z.object({
   itemId: jellyfinIdSchema,
 })
 
+const seriesSearchSchema = z.object({
+  seasonId: jellyfinIdSchema.optional().catch(undefined),
+})
+
 export const Route = createFileRoute('/series/$itemId')({
   params: {
     parse: (params) => seriesParamsSchema.parse(params),
     stringify: (params) => params,
   },
+  validateSearch: seriesSearchSchema,
   loader: async ({ params, context, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
