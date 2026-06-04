@@ -50,8 +50,8 @@ function IndexSkeleton() {
 
 export const Route = createFileRoute('/')({
   component: IndexPage,
-  loader: async () => {
-    await loadFilterView()
+  loader: () => {
+    void loadFilterView().catch(() => undefined)
   },
   validateSearch: indexSearchSchema,
   pendingComponent: IndexSkeleton,
