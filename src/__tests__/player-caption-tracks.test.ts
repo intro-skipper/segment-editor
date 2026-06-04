@@ -64,8 +64,23 @@ describe('buildNativeCaptionTracks', () => {
       },
     ])
     expect(getSubtitleDeliveryUrlMock).toHaveBeenCalledTimes(3)
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(1, 'item-1', 1, 'vtt')
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(2, 'item-1', 2, 'vtt')
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(3, 'item-1', 3, 'vtt')
+    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
+      1,
+      'item-1',
+      1,
+      'vtt',
+    )
+    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
+      2,
+      'item-1',
+      2,
+      'vtt',
+    )
+    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
+      3,
+      'item-1',
+      3,
+      'vtt',
+    )
   })
 })

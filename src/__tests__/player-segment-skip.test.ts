@@ -31,12 +31,12 @@ describe('player segment skip helpers', () => {
     ])
 
     expect(ranges.map((range) => range.segment.Id)).toEqual(['recap', 'intro'])
-    expect(ranges.map((range) => [range.startSeconds, range.endSeconds])).toEqual(
-      [
-        [10, 20],
-        [30, 40],
-      ],
-    )
+    expect(
+      ranges.map((range) => [range.startSeconds, range.endSeconds]),
+    ).toEqual([
+      [10, 20],
+      [30, 40],
+    ])
 
     const rangeById = buildSegmentTimeRangeById(ranges)
     expect(rangeById.get('recap')?.segment).toBe(recap)

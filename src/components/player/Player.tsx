@@ -6,18 +6,11 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import {
-  AlertTriangle,
-  Expand,
-  RefreshCw,
-  Shrink,
-  SkipForward,
-} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
 import { PlayerScrubber } from './PlayerScrubber'
-import { PlayerControls } from './PlayerControls'
+import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
 import {
@@ -46,9 +39,7 @@ import { getBestImageUrl } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { useSessionStore } from '@/stores/session-store'
 import { useAppStore } from '@/stores/app-store'
-import { cn } from '@/lib/utils'
 import { languagesMatch } from '@/lib/language-utils'
-import { Button } from '@/components/ui/button'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
@@ -164,7 +155,6 @@ function TimelineScrubber({
   )
 }
 
-
 function findPreferredAudioStreamIndex(
   item: BaseItemDto,
   preferredLanguage: string | null,
@@ -190,7 +180,6 @@ function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
       return 'unknown'
   }
 }
-
 
 interface PlayerProps {
   item: BaseItemDto
@@ -409,10 +398,10 @@ function useRenderPlayer({
     setPreferredSubtitleLanguage,
     setSubtitlesEnabled,
   } = useAppStore(
-    useShallow((state) => ({
-      setPreferredAudioLanguage: state.setPreferredAudioLanguage,
-      setPreferredSubtitleLanguage: state.setPreferredSubtitleLanguage,
-      setSubtitlesEnabled: state.setSubtitlesEnabled,
+    useShallow((appState) => ({
+      setPreferredAudioLanguage: appState.setPreferredAudioLanguage,
+      setPreferredSubtitleLanguage: appState.setPreferredSubtitleLanguage,
+      setSubtitlesEnabled: appState.setSubtitlesEnabled,
     })),
   )
 
@@ -454,7 +443,6 @@ function useRenderPlayer({
       userOffset: subtitleOffset,
       t,
     })
-
 
   const handleSubtitleOffsetChange = (offset: number) => {
     dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
@@ -928,204 +916,57 @@ function useRenderPlayer({
   } satisfies PlayerControlsProps
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
-      <section
-        ref={containerRef}
-        aria-label={t('player.videoPlayer')}
-        className={cn(
-          'relative',
-          isFullscreen && 'fixed inset-0 z-50 bg-black outline-none',
-        )}
-        onMouseMove={handleFullscreenMouseMove}
-        onMouseLeave={handleContainerMouseLeave}
-      >
-        <button
-          type="button"
-          tabIndex={0}
-          className={cn(
-            'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
-            isFullscreen
-              ? cn(
-                  'w-full h-full',
-                  showFullscreenControls ? 'cursor-default' : 'cursor-none',
-                )
-              : 'aspect-video cursor-pointer',
-          )}
-          onClick={handleVideoInteraction}
-          onTouchEnd={handleVideoInteraction}
-          onKeyDown={handleVideoContainerKeyDown}
-          aria-label={t('player.videoPlayer')}
-        >
-          {/* Captions are data-dependent: native VTT tracks are rendered when Jellyfin exposes them; ASS/SSA subtitles are rendered by JASSUB. */}
-          {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
-          <video
-            ref={videoRef}
-            className={cn(
-              'w-full h-full',
-              isFullscreen
-                ? videoFitMode === 'contain'
-                  ? 'object-contain'
-                  : 'object-cover'
-                : 'object-contain',
-            )}
-            poster={posterUrl}
-            crossOrigin="anonymous"
-            preload="metadata"
-            playsInline
-            aria-label={t('player.videoPlayer')}
-            onTimeUpdate={handleTimeUpdate}
-            onDurationChange={handleDurationChange}
-            onProgress={handleProgress}
-            onPlay={handlePlay}
-            onPause={handlePause}
-          >
-            {primaryCaptionTrack ? (
-              <track
-                key={primaryCaptionTrack.index}
-                kind="captions"
-                src={primaryCaptionTrack.src}
-                srcLang={primaryCaptionTrack.language}
-                label={primaryCaptionTrack.label}
-              />
-            ) : null}
-            {additionalCaptionTracks.map((track) => (
-              <track
-                key={track.index}
-                kind="captions"
-                src={track.src}
-                srcLang={track.language}
-                label={track.label}
-              />
-            ))}
-          </video>
-        </button>
-
-        {playerError && !isRecovering ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
-            <AlertTriangle className="size-12 text-destructive mb-4" />
-            <p className="text-lg font-medium mb-2">{playerError.message}</p>
-            {strategy === 'direct' && playerError.type === 'media' ? (
-              <p className="text-sm text-muted-foreground mb-2">
-                {t('player.error.directPlayFailed')}
-              </p>
-            ) : null}
-            {playerError.recoverable ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.stopPropagation()
-                  handleRetry()
-                }}
-                className="mt-2"
-              >
-                <RefreshCw className="size-4 mr-2" />
-                {t('player.retry')}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {isVideoLoading || isRecovering ? (
-          <output
-            className="absolute inset-0 flex items-center justify-center bg-black/60"
-            aria-live="polite"
-            aria-busy="true"
-          >
-            <div className="animate-spin" aria-hidden="true">
-              <RefreshCw className="size-8 text-white" />
-            </div>
-            <span className="sr-only">
-              {isRecovering
-                ? t('player.recovering', 'Recovering playback')
-                : t('accessibility.loading')}
-            </span>
-          </output>
-        ) : null}
-
-        {segmentSkipMode === 'button' &&
-        activeSkipSegment &&
-        !playerError &&
-        !isVideoLoading ? (
-          <div
-            className="absolute bottom-4 right-4 z-20"
-            data-player-controls-overlay="true"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSkipSegment(activeSkipSegment)}
-              className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
-              aria-label={t('player.skipSegment', {
-                type: t(`segmentType.${activeSkipSegment.Type}`),
-              })}
-            >
-              <SkipForward className="size-4" aria-hidden="true" />
-              {t('player.skipSegment', {
-                type: t(`segmentType.${activeSkipSegment.Type}`),
-              })}
-            </Button>
-          </div>
-        ) : null}
-
-        {isFullscreen ? (
-          <div
-            className={cn(
-              'absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
-              showFullscreenControls
-                ? 'opacity-100'
-                : 'opacity-0 pointer-events-none',
-            )}
-            aria-hidden={!showFullscreenControls}
-            inert={!showFullscreenControls || undefined}
-          >
-            <div
-              className="max-w-[90%] mx-auto"
-              data-player-controls-overlay="true"
-            >
-              <div className="flex justify-end mb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleVideoFitMode}
-                  className="text-white/70 hover:text-white hover:bg-white/10 text-xs gap-1.5"
-                  aria-label={
-                    videoFitMode === 'contain'
-                      ? t('player.fillScreen', 'Fill screen')
-                      : t('player.fitScreen', 'Fit to screen')
-                  }
-                >
-                  {videoFitMode === 'contain' ? (
-                    <>
-                      <Expand className="size-4" />
-                      {t('player.fill', 'Fill')}
-                    </>
-                  ) : (
-                    <>
-                      <Shrink className="size-4" />
-                      {t('player.fit', 'Fit')}
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <TimelineScrubber
-                timelineStore={timelineStore}
-                item={item}
-                segments={segments}
-                vibrantColors={vibrantColors}
-                onSeek={handleSeek}
-                className="mb-4"
-              />
-
-              <PlayerControls {...playerControlsProps} />
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      {!isFullscreen ? (
-        <>
+    <PlayerSurface
+      className={className}
+      refs={{
+        container: containerRef,
+        video: videoRef,
+      }}
+      fullscreen={{
+        isFullscreen,
+        showControls: showFullscreenControls,
+        videoFitMode,
+        onMouseMove: handleFullscreenMouseMove,
+        onMouseLeave: handleContainerMouseLeave,
+        onToggleVideoFitMode: toggleVideoFitMode,
+      }}
+      video={{
+        posterUrl,
+        primaryCaptionTrack,
+        additionalCaptionTracks,
+        onInteraction: handleVideoInteraction,
+        onKeyDown: handleVideoContainerKeyDown,
+        onTimeUpdate: handleTimeUpdate,
+        onDurationChange: handleDurationChange,
+        onProgress: handleProgress,
+        onPlay: handlePlay,
+        onPause: handlePause,
+      }}
+      playback={{
+        error: playerError,
+        isRecovering,
+        strategy,
+        isVideoLoading,
+        onRetry: handleRetry,
+      }}
+      segmentSkip={{
+        mode: segmentSkipMode,
+        activeSegment: activeSkipSegment,
+        onSkipSegment: handleSkipSegment,
+      }}
+      controls={{
+        props: playerControlsProps,
+        fullscreenTimelineScrubber: (
+          <TimelineScrubber
+            timelineStore={timelineStore}
+            item={item}
+            segments={segments}
+            vibrantColors={vibrantColors}
+            onSeek={handleSeek}
+            className="mb-4"
+          />
+        ),
+        inlineTimelineScrubber: (
           <TimelineScrubber
             timelineStore={timelineStore}
             item={item}
@@ -1133,10 +974,8 @@ function useRenderPlayer({
             vibrantColors={vibrantColors}
             onSeek={handleSeek}
           />
-
-          <PlayerControls {...playerControlsProps} />
-        </>
-      ) : null}
-    </div>
+        ),
+      }}
+    />
   )
 }

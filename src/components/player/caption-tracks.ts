@@ -12,7 +12,7 @@ export interface NativeCaptionTrack {
 export function buildNativeCaptionTracks(
   strategy: PlaybackStrategy,
   itemId: string | undefined,
-  subtitleTracks: readonly SubtitleTrackInfo[],
+  subtitleTracks: ReadonlyArray<SubtitleTrackInfo>,
 ): Array<NativeCaptionTrack> {
   if (strategy !== 'direct' || !itemId || subtitleTracks.length === 0) return []
 

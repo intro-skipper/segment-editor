@@ -1,11 +1,5 @@
-import {
-  useEffect,
-  useEffectEvent,
-  useReducer,
-  useRef,
-  type MouseEvent,
-  type TouchEvent,
-} from 'react'
+import { useEffect, useEffectEvent, useReducer, useRef } from 'react'
+import type { MouseEvent, TouchEvent } from 'react'
 
 import { PLAYER_CONFIG } from '@/lib/constants'
 

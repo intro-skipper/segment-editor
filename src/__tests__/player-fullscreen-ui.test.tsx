@@ -28,8 +28,7 @@ let cancelAnimationFrameMock: (handle: number) => void
 
 function renderFullscreenUi(options: RenderFullscreenUiOptions = {}) {
   const onTogglePlay = options.onTogglePlay ?? vi.fn()
-  const onResizeSubtitleRenderer =
-    options.onResizeSubtitleRenderer ?? vi.fn()
+  const onResizeSubtitleRenderer = options.onResizeSubtitleRenderer ?? vi.fn()
 
   return {
     ...renderHook(() =>
@@ -59,10 +58,7 @@ function flushNextAnimationFrame() {
   })
 }
 
-function createMouseInteraction(
-  target: HTMLElement,
-  detail = 1,
-): MouseEvent {
+function createMouseInteraction(target: HTMLElement, detail = 1): MouseEvent {
   return { target, detail } as unknown as MouseEvent
 }
 
