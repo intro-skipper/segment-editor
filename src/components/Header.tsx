@@ -42,17 +42,9 @@ const preloadSettingsDialog = () => {
   void loadSettingsDialog().catch(ignorePreloadError)
 }
 
-const CommandPalette = lazy(() =>
-  loadCommandPalette().then((module) => ({
-    default: module.CommandPalette,
-  })),
-)
+const CommandPalette = lazy(loadCommandPalette)
 
-const EpisodeSwitcher = lazy(() =>
-  loadEpisodeSwitcher().then((module) => ({
-    default: module.EpisodeSwitcher,
-  })),
-)
+const EpisodeSwitcher = lazy(loadEpisodeSwitcher)
 
 interface CollectionSelectorProps {
   collections: Array<{ ItemId?: string | null; Name?: string | null }>

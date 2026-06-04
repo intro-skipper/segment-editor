@@ -372,7 +372,7 @@ const EpisodeListContent = function EpisodeListContentComponent({
   )
 }
 
-export const EpisodeSwitcher = function EpisodeSwitcherComponent({
+export default function EpisodeSwitcher({
   currentEpisode,
   vibrantColors,
   className,

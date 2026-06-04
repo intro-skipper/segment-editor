@@ -143,31 +143,10 @@ export class LRUCache<TKey, TValue> {
   }
 
   /**
-   * Returns the current number of entries in the cache.
-   */
-  get size(): number {
-    return this.cache.size
-  }
-
-  /**
-   * Returns the maximum capacity of the cache.
-   */
-  get capacity(): number {
-    return this.maxSize
-  }
-
-  /**
    * Returns all keys in the cache, from oldest to newest.
    */
   keys(): IterableIterator<TKey> {
     return this.cache.keys()
-  }
-
-  /**
-   * Returns all values in the cache, from oldest to newest.
-   */
-  values(): IterableIterator<TValue> {
-    return this.cache.values()
   }
 
   /**

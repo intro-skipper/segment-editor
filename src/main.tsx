@@ -8,7 +8,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 
-import * as TanStackQueryProvider from './integrations/tanstack-query/root-provider.tsx'
+import { Provider as TanStackQueryProvider } from './integrations/tanstack-query/root-provider.tsx'
 import {
   QUERY_GC_TIMES,
   QUERY_STALE_TIMES,
@@ -116,17 +116,17 @@ if (rootElement) {
   if (pluginMode && isJellyfinDesktopClient()) {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider.Provider queryClient={queryClient}>
+        <TanStackQueryProvider queryClient={queryClient}>
           <DesktopFallback />
-        </TanStackQueryProvider.Provider>
+        </TanStackQueryProvider>
       </StrictMode>,
     )
   } else {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider.Provider queryClient={queryClient}>
+        <TanStackQueryProvider queryClient={queryClient}>
           <RouterProvider router={router} />
-        </TanStackQueryProvider.Provider>
+        </TanStackQueryProvider>
       </StrictMode>,
     )
   }

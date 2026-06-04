@@ -175,7 +175,10 @@ const getResultItemKey = (item: BaseItemDto, index: number) =>
   item.Id ?? `${item.Type ?? 'item'}-${index}`
 
 // eslint-disable-next-line react-doctor/no-giant-component -- cohesive dialog controller; extracting single-use fragments would add prop-drilling without reducing complexity
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export default function CommandPalette({
+  open,
+  onOpenChange,
+}: CommandPaletteProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const router = useRouter()

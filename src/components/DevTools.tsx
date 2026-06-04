@@ -13,7 +13,7 @@ const DEVTOOLS_PLUGINS = [
   TanStackQueryDevtools,
 ]
 
-export function DevTools() {
+export default function DevTools() {
   return (
     <TanStackDevtools config={DEVTOOLS_CONFIG} plugins={DEVTOOLS_PLUGINS} />
   )

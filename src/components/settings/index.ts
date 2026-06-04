@@ -6,4 +6,4 @@
  * @module components/settings
  */
 
-export { SettingsDialog } from './SettingsDialog'
+export { default } from './SettingsDialog'

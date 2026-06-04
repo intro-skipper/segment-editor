@@ -299,7 +299,7 @@ function navigateToPage(navigate: RootNavigate, pageNum: number) {
   })
 }
 
-export function FilterView() {
+export default function FilterView() {
   return useRenderFilterView()
 }
 

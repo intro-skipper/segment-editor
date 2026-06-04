@@ -15,7 +15,7 @@ import type {
   UseSuspenseQueryOptions,
 } from '@tanstack/react-query'
 
-export type CacheDuration = 'SHORT' | 'MEDIUM' | 'LONG'
+type CacheDuration = 'SHORT' | 'MEDIUM' | 'LONG'
 
 interface StandardQueryOptions<TData> {
   queryKey: QueryKey

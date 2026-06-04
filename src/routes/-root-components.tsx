@@ -29,19 +29,9 @@ const loadSettingsDialog = () => import('../components/settings')
 const loadConnectionWizard = () =>
   import('../components/connection/ConnectionWizard')
 
-const DevTools = import.meta.env.DEV
-  ? lazy(() =>
-      loadDevTools().then((module) => ({
-        default: module.DevTools,
-      })),
-    )
-  : null
+const DevTools = import.meta.env.DEV ? lazy(loadDevTools) : null
 
-const SettingsDialog = lazy(() =>
-  loadSettingsDialog().then((module) => ({
-    default: module.SettingsDialog,
-  })),
-)
+const SettingsDialog = lazy(loadSettingsDialog)
 
 const ConnectionWizard = lazy(() =>
   loadConnectionWizard().then((module) => ({

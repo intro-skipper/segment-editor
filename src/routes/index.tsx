@@ -16,11 +16,7 @@ import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 
 const loadFilterView = () => import('@/components/filter/FilterView')
-const FilterView = lazy(() =>
-  loadFilterView().then((module) => ({
-    default: module.FilterView,
-  })),
-)
+const FilterView = lazy(loadFilterView)
 
 /** URL search params schema for the index route */
 const indexSearchSchema = z.object({

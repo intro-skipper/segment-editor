@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-export function SettingsDialog() {
+export default function SettingsDialog() {
   const { t } = useTranslation()
   const triggerRef = useRef<HTMLElement | null>(null)
 
