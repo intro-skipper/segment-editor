@@ -9,7 +9,7 @@ const {
   DOUBLE_TAP_THRESHOLD_MS,
 } = PLAYER_CONFIG
 
-type VideoFitMode = 'contain' | 'cover'
+export type VideoFitMode = 'contain' | 'cover'
 
 interface FullscreenPlayerUiState {
   isFullscreen: boolean

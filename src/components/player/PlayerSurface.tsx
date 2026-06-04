@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { PlayerControls } from './PlayerControls'
+import type { VideoFitMode } from './use-fullscreen-player-ui'
 import type { PlayerControlsProps } from './PlayerControls'
 import type { NativeCaptionTrack } from './caption-tracks'
 import type { MediaSegmentDto } from '@/types/jellyfin'
@@ -23,8 +24,6 @@ import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-
-type VideoFitMode = 'contain' | 'cover'
 type VideoInteractionHandler = (event: MouseEvent | TouchEvent) => void
 
 interface PlayerSurfaceFullscreenState {
