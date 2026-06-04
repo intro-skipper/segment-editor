@@ -27,8 +27,11 @@ import {
   isPluginMode,
 } from './services/jellyfin/core'
 import { DesktopFallback } from './components/DesktopFallback'
+import { installVitePreloadErrorHandler } from './lib/vite-preload-error'
 
 import './styles.css'
+
+installVitePreloadErrorHandler()
 
 const queryClient = new QueryClient({
   defaultOptions: {

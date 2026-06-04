@@ -40,6 +40,7 @@ export const Route = createFileRoute('/series/$itemId')({
     const [series] = await Promise.all([
       queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
       queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId)),
+      import('@/components/views/SeriesView'),
     ])
     assertItemFound(series, abortController.signal)
   },

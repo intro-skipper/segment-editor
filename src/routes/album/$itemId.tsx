@@ -35,6 +35,7 @@ export const Route = createFileRoute('/album/$itemId')({
     const [album] = await Promise.all([
       queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
       queryClient.ensureQueryData(albumQueryOptions.tracks(itemId)),
+      import('@/components/views/AlbumView'),
     ])
     assertItemFound(album, abortController.signal)
   },

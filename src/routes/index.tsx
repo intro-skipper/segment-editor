@@ -15,8 +15,9 @@ import { z } from 'zod'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 
+const loadFilterView = () => import('@/components/filter/FilterView')
 const FilterView = lazy(() =>
-  import('@/components/filter/FilterView').then((module) => ({
+  loadFilterView().then((module) => ({
     default: module.FilterView,
   })),
 )
@@ -49,6 +50,9 @@ function IndexSkeleton() {
 
 export const Route = createFileRoute('/')({
   component: IndexPage,
+  loader: async () => {
+    await loadFilterView()
+  },
   validateSearch: indexSearchSchema,
   pendingComponent: IndexSkeleton,
 })

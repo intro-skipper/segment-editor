@@ -50,13 +50,15 @@ export const Route = createFileRoute('/player/$itemId')({
       ? queryClient.ensureQueryData(segmentsQueryOptions.list(itemId))
       : undefined
     void segmentsPromise?.catch(() => undefined)
+    const playerEditorModulePromise = import('@/components/player/PlayerEditor')
+    void playerEditorModulePromise.catch(() => undefined)
 
     const item = await queryClient.ensureQueryData(
       itemsQueryOptions.detail(itemId),
     )
     assertItemFound(item, abortController.signal)
 
-    await segmentsPromise
+    await Promise.all([segmentsPromise, playerEditorModulePromise])
   },
   errorComponent: DetailRouteErrorComponent,
   pendingComponent: PlayerSkeleton,

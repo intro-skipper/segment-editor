@@ -24,22 +24,27 @@ import { registerPwaUpdates } from '../lib/pwa'
 import { isPluginMode } from '../services/jellyfin/core'
 import { useSessionStore } from '../stores/session-store'
 
+const loadDevTools = () => import('../components/DevTools')
+const loadSettingsDialog = () => import('../components/settings')
+const loadConnectionWizard = () =>
+  import('../components/connection/ConnectionWizard')
+
 const DevTools = import.meta.env.DEV
   ? lazy(() =>
-      import('../components/DevTools').then((module) => ({
+      loadDevTools().then((module) => ({
         default: module.DevTools,
       })),
     )
   : null
 
 const SettingsDialog = lazy(() =>
-  import('../components/settings').then((module) => ({
+  loadSettingsDialog().then((module) => ({
     default: module.SettingsDialog,
   })),
 )
 
 const ConnectionWizard = lazy(() =>
-  import('../components/connection/ConnectionWizard').then((module) => ({
+  loadConnectionWizard().then((module) => ({
     default: module.ConnectionWizard,
   })),
 )
