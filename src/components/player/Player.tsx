@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+import type { ReactEventHandler } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -517,9 +518,8 @@ function useRenderPlayer({
     }
   }
 
-  const handleTimeUpdate = () => {
-    const video = videoRef.current
-    if (!video) return
+  const handleTimeUpdate: ReactEventHandler<HTMLVideoElement> = (event) => {
+    const video = event.currentTarget
 
     const nextTime = video.currentTime
     currentTimeRef.current = nextTime
@@ -554,28 +554,26 @@ function useRenderPlayer({
     }, remainingDelay)
   }
 
-  const handleDurationChange = () => {
-    const duration = videoRef.current?.duration
-    if (duration !== undefined) {
-      durationRef.current = duration
-      timelineStore.setState({ duration })
-    }
+  const handleDurationChange: ReactEventHandler<HTMLVideoElement> = (event) => {
+    const duration = event.currentTarget.duration
+    durationRef.current = duration
+    timelineStore.setState({ duration })
   }
 
-  const handleProgress = () => {
-    const video = videoRef.current
-    if (video?.buffered.length) {
+  const handleProgress: ReactEventHandler<HTMLVideoElement> = (event) => {
+    const video = event.currentTarget
+    if (video.buffered.length) {
       timelineStore.setState({
         buffered: video.buffered.end(video.buffered.length - 1),
       })
     }
   }
 
-  const handlePlay = () => {
+  const handlePlay: ReactEventHandler<HTMLVideoElement> = () => {
     dispatch({ type: 'PLAY_STATE', isPlaying: true })
   }
 
-  const handlePause = () => {
+  const handlePause: ReactEventHandler<HTMLVideoElement> = () => {
     dispatch({ type: 'PLAY_STATE', isPlaying: false })
   }
 
@@ -949,18 +947,16 @@ function useRenderPlayer({
             : null
           : null
       }
-      controls={{
-        props: playerControlsProps,
-        timelineScrubber: (
-          <TimelineScrubber
-            timelineStore={timelineStore}
-            item={item}
-            segments={segments}
-            vibrantColors={vibrantColors}
-            onSeek={handleSeek}
-          />
-        ),
-      }}
+      controlsProps={playerControlsProps}
+      timelineScrubber={
+        <TimelineScrubber
+          timelineStore={timelineStore}
+          item={item}
+          segments={segments}
+          vibrantColors={vibrantColors}
+          onSeek={handleSeek}
+        />
+      }
     />
   )
 }

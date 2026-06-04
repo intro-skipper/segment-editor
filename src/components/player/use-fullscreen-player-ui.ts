@@ -121,6 +121,7 @@ export function useFullscreenPlayerUi({
   }
 
   const scheduleHideControls = () => {
+    clearHideControlsTimer()
     hideControlsTimeoutRef.current = setTimeout(() => {
       dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
     }, CONTROLS_HIDE_DELAY_MS)
@@ -131,7 +132,6 @@ export function useFullscreenPlayerUi({
 
     if (isFs) {
       dispatchFullscreenUi({ type: 'ENTER_FULLSCREEN' })
-      clearHideControlsTimer()
       scheduleHideControls()
     } else {
       dispatchFullscreenUi({ type: 'EXIT_FULLSCREEN' })
@@ -162,7 +162,6 @@ export function useFullscreenPlayerUi({
   }
 
   const resetHideControlsTimer = () => {
-    clearHideControlsTimer()
     dispatchFullscreenUi({ type: 'SHOW_CONTROLS' })
     if (isFullscreen) {
       scheduleHideControls()

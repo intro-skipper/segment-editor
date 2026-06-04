@@ -4,7 +4,7 @@
 
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, SyntheticEvent } from 'react'
 
 import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
@@ -268,9 +268,9 @@ describe('Player controls wiring', () => {
     })
     expect(surfaceProps.playback.error).toBe(null)
     expect(surfaceProps.segmentSkip).toBeNull()
-    expect(surfaceProps.controls.timelineScrubber).toBeTruthy()
+    expect(surfaceProps.timelineScrubber).toBeTruthy()
 
-    const controlsProps = surfaceProps.controls.props
+    const controlsProps = surfaceProps.controlsProps
     expect(controlsProps.playback.state).toBe('paused')
     expect(controlsProps.volumeControls.state).toBe('audible')
     expect(controlsProps.volumeControls.level).toBe(0.8)
@@ -310,7 +310,7 @@ describe('Player controls wiring', () => {
     renderPlayer()
 
     const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
-    const controlsProps = surfaceProps.controls.props
+    const controlsProps = surfaceProps.controlsProps
 
     expect(controlsProps.trackControls?.availability).toBe('available')
 
@@ -338,7 +338,9 @@ describe('Player controls wiring', () => {
 
     act(() => {
       const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
-      surfaceProps.video.onTimeUpdate()
+      surfaceProps.video.onTimeUpdate({
+        currentTarget: mocks.videoElement,
+      } as SyntheticEvent<HTMLVideoElement>)
     })
 
     let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps

@@ -80,7 +80,8 @@ interface SurfacePropOverrides {
   video?: Partial<SurfaceProps['video']>
   playback?: Partial<SurfaceProps['playback']>
   segmentSkip?: Partial<NonNullable<SurfaceProps['segmentSkip']>> | null
-  controls?: Partial<SurfaceProps['controls']>
+  controlsProps?: SurfaceProps['controlsProps']
+  timelineScrubber?: SurfaceProps['timelineScrubber']
 }
 
 function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
@@ -138,11 +139,10 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
             onSkipSegment: vi.fn(),
             ...overrides.segmentSkip,
           },
-    controls: {
-      props: playerControlsProps,
-      timelineScrubber: <div data-testid="timeline-scrubber" />,
-      ...overrides.controls,
-    },
+    controlsProps: overrides.controlsProps ?? playerControlsProps,
+    timelineScrubber: overrides.timelineScrubber ?? (
+      <div data-testid="timeline-scrubber" />
+    ),
   }
 }
 

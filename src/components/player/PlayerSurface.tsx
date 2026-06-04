@@ -1,6 +1,7 @@
 import type {
   KeyboardEvent,
   MouseEvent,
+  ReactEventHandler,
   ReactNode,
   RefObject,
   TouchEvent,
@@ -40,11 +41,11 @@ interface PlayerSurfaceVideoState {
   captionTracks: Array<NativeCaptionTrack>
   onInteraction: VideoInteractionHandler
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
-  onTimeUpdate: () => void
-  onDurationChange: () => void
-  onProgress: () => void
-  onPlay: () => void
-  onPause: () => void
+  onTimeUpdate: ReactEventHandler<HTMLVideoElement>
+  onDurationChange: ReactEventHandler<HTMLVideoElement>
+  onProgress: ReactEventHandler<HTMLVideoElement>
+  onPlay: ReactEventHandler<HTMLVideoElement>
+  onPause: ReactEventHandler<HTMLVideoElement>
 }
 
 interface PlayerSurfacePlaybackState {
@@ -60,11 +61,6 @@ interface PlayerSurfaceSegmentSkipAction {
   onSkipSegment: (segment: MediaSegmentDto) => void
 }
 
-interface PlayerSurfaceControlsState {
-  props: PlayerControlsProps
-  timelineScrubber: ReactNode
-}
-
 interface PlayerSurfaceProps {
   className?: string
   containerRef: RefObject<HTMLDivElement | null>
@@ -73,7 +69,8 @@ interface PlayerSurfaceProps {
   video: PlayerSurfaceVideoState
   playback: PlayerSurfacePlaybackState
   segmentSkip: PlayerSurfaceSegmentSkipAction | null
-  controls: PlayerSurfaceControlsState
+  controlsProps: PlayerControlsProps
+  timelineScrubber: ReactNode
 }
 
 interface PlayerVideoButtonProps {
@@ -242,12 +239,14 @@ function SegmentSkipOverlay({
 
 interface FullscreenControlsOverlayProps {
   fullscreen: PlayerSurfaceFullscreenState
-  controls: PlayerSurfaceControlsState
+  controlsProps: PlayerControlsProps
+  timelineScrubber: ReactNode
 }
 
 function FullscreenControlsOverlay({
   fullscreen,
-  controls,
+  controlsProps,
+  timelineScrubber,
 }: FullscreenControlsOverlayProps) {
   const { t } = useTranslation()
   const { showControls, videoFitMode, onToggleVideoFitMode } = fullscreen
@@ -288,9 +287,9 @@ function FullscreenControlsOverlay({
           </Button>
         </div>
 
-        <div className="mb-4">{controls.timelineScrubber}</div>
+        <div className="mb-4">{timelineScrubber}</div>
 
-        <PlayerControls {...controls.props} />
+        <PlayerControls {...controlsProps} />
       </div>
     </div>
   )
@@ -304,7 +303,8 @@ export function PlayerSurface({
   video,
   playback,
   segmentSkip,
-  controls,
+  controlsProps,
+  timelineScrubber,
 }: PlayerSurfaceProps) {
   const { t } = useTranslation()
 
@@ -348,16 +348,17 @@ export function PlayerSurface({
         {fullscreen.isFullscreen ? (
           <FullscreenControlsOverlay
             fullscreen={fullscreen}
-            controls={controls}
+            controlsProps={controlsProps}
+            timelineScrubber={timelineScrubber}
           />
         ) : null}
       </section>
 
       {!fullscreen.isFullscreen ? (
         <>
-          {controls.timelineScrubber}
+          {timelineScrubber}
 
-          <PlayerControls {...controls.props} />
+          <PlayerControls {...controlsProps} />
         </>
       ) : null}
     </div>
