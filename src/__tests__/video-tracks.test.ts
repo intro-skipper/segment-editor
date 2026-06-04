@@ -56,7 +56,7 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
           ],
         },
       ],
-    })
+    } as unknown as Parameters<typeof extractTracks>[0])
 
     expect(result.audioTracks).toEqual([
       {

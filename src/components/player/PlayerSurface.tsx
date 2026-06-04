@@ -42,8 +42,7 @@ interface PlayerSurfaceFullscreenState {
 
 interface PlayerSurfaceVideoState {
   posterUrl: string | null
-  primaryCaptionTrack: NativeCaptionTrack | undefined
-  additionalCaptionTracks: Array<NativeCaptionTrack>
+  captionTracks: Array<NativeCaptionTrack>
   onInteraction: VideoInteractionHandler
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
   onTimeUpdate: () => void
@@ -61,16 +60,14 @@ interface PlayerSurfacePlaybackState {
   onRetry: () => void
 }
 
-interface PlayerSurfaceSegmentSkipState {
-  mode: string
-  activeSegment: MediaSegmentDto | null
+interface PlayerSurfaceSegmentSkipAction {
+  segment: MediaSegmentDto
   onSkipSegment: (segment: MediaSegmentDto) => void
 }
 
 interface PlayerSurfaceControlsState {
   props: PlayerControlsProps
-  fullscreenTimelineScrubber: ReactNode
-  inlineTimelineScrubber: ReactNode
+  timelineScrubber: ReactNode
 }
 
 interface PlayerSurfaceProps {
@@ -79,7 +76,7 @@ interface PlayerSurfaceProps {
   fullscreen: PlayerSurfaceFullscreenState
   video: PlayerSurfaceVideoState
   playback: PlayerSurfacePlaybackState
-  segmentSkip: PlayerSurfaceSegmentSkipState
+  segmentSkip: PlayerSurfaceSegmentSkipAction | null
   controls: PlayerSurfaceControlsState
 }
 
@@ -135,16 +132,7 @@ function PlayerVideoButton({
         onPlay={video.onPlay}
         onPause={video.onPause}
       >
-        {video.primaryCaptionTrack ? (
-          <track
-            key={video.primaryCaptionTrack.index}
-            kind="captions"
-            src={video.primaryCaptionTrack.src}
-            srcLang={video.primaryCaptionTrack.language}
-            label={video.primaryCaptionTrack.label}
-          />
-        ) : null}
-        {video.additionalCaptionTracks.map((track) => (
+        {video.captionTracks.map((track) => (
           <track
             key={track.index}
             kind="captions"
@@ -304,7 +292,7 @@ function FullscreenControlsOverlay({
           </Button>
         </div>
 
-        {controls.fullscreenTimelineScrubber}
+        <div className="mb-4">{controls.timelineScrubber}</div>
 
         <PlayerControls {...controls.props} />
       </div>
@@ -322,12 +310,6 @@ export function PlayerSurface({
   controls,
 }: PlayerSurfaceProps) {
   const { t } = useTranslation()
-  const activeSkipSegment =
-    segmentSkip.mode === 'button' &&
-    playback.error === null &&
-    !playback.isVideoLoading
-      ? segmentSkip.activeSegment
-      : null
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
@@ -359,9 +341,9 @@ export function PlayerSurface({
           <PlayerLoadingOverlay isRecovering={playback.isRecovering} />
         ) : null}
 
-        {activeSkipSegment ? (
+        {segmentSkip ? (
           <SegmentSkipOverlay
-            segment={activeSkipSegment}
+            segment={segmentSkip.segment}
             onSkipSegment={segmentSkip.onSkipSegment}
           />
         ) : null}
@@ -376,7 +358,7 @@ export function PlayerSurface({
 
       {!fullscreen.isFullscreen ? (
         <>
-          {controls.inlineTimelineScrubber}
+          {controls.timelineScrubber}
 
           <PlayerControls {...controls.props} />
         </>

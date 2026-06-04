@@ -6,6 +6,11 @@ export interface SegmentTimeRange {
   endSeconds: number
 }
 
+export interface SegmentTimeIndex {
+  ranges: Array<SegmentTimeRange>
+  rangeById: Map<string, SegmentTimeRange>
+}
+
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
@@ -19,12 +24,13 @@ const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
 const getSegmentEnd = (segment: MediaSegmentDto): number | undefined =>
   segment.EndTicks
 
-export function buildSegmentTimeRanges(
+export function buildSegmentTimeIndex(
   segments: ReadonlyArray<MediaSegmentDto> | undefined,
-): Array<SegmentTimeRange> {
-  if (!segments || segments.length === 0) return []
-
+): SegmentTimeIndex {
   const ranges: Array<SegmentTimeRange> = []
+  const rangeById = new Map<string, SegmentTimeRange>()
+  if (!segments || segments.length === 0) return { ranges, rangeById }
+
   for (const segment of segments) {
     const startSeconds = getSegmentStart(segment)
     const endSeconds = getSegmentEnd(segment)
@@ -32,23 +38,22 @@ export function buildSegmentTimeRanges(
       continue
     }
     if (endSeconds > startSeconds) {
-      ranges.push({ segment, startSeconds, endSeconds })
+      const range = { segment, startSeconds, endSeconds }
+      ranges.push(range)
+      if (segment.Id !== undefined) {
+        rangeById.set(segment.Id, range)
+      }
     }
   }
 
-  return ranges.sort((a, b) => a.startSeconds - b.startSeconds)
+  ranges.sort((a, b) => a.startSeconds - b.startSeconds)
+  return { ranges, rangeById }
 }
 
-export function buildSegmentTimeRangeById(
-  ranges: ReadonlyArray<SegmentTimeRange>,
-): Map<string, SegmentTimeRange> {
-  const map = new Map<string, SegmentTimeRange>()
-  for (const range of ranges) {
-    if (range.segment.Id !== undefined) {
-      map.set(range.segment.Id, range)
-    }
-  }
-  return map
+export function buildSegmentTimeRanges(
+  segments: ReadonlyArray<MediaSegmentDto> | undefined,
+): Array<SegmentTimeRange> {
+  return buildSegmentTimeIndex(segments).ranges
 }
 
 export function findActiveSegmentRange(

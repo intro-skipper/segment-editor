@@ -153,10 +153,8 @@ export function useFullscreenPlayerUi({
     // Schedule resize after browser paints new styles.
     // Double rAF pattern: outer frame waits for style recalc,
     // inner frame ensures layout is complete before measuring.
-    // We only track the outer frame ID - cancelling it prevents
-    // the inner frame from ever being scheduled.
     resizeRafRef.current = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+      resizeRafRef.current = requestAnimationFrame(() => {
         resizeRafRef.current = null
         onResizeSubtitleRenderer()
       })

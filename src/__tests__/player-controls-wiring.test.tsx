@@ -8,10 +8,11 @@ import type { ComponentProps } from 'react'
 
 import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
-import type { BaseItemDto } from '@/types/jellyfin'
+import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/hooks/use-video-player'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
+type PlayerProps = ComponentProps<typeof Player>
 
 const mocks = vi.hoisted(() => ({
   playerSurfaceProps: [] as Array<unknown>,
@@ -30,7 +31,12 @@ const mocks = vi.hoisted(() => ({
   resizeJassub: vi.fn(),
   setJassubUserOffset: vi.fn(),
   retry: vi.fn(),
+  videoElement: null as HTMLVideoElement | null,
+  videoPlayerIsLoading: true,
+  videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
+  segmentSkipMode: 'button' as 'button' | 'skip' | 'disabled',
+  segmentSkipModeRevision: 0,
   fullscreenUi: {
     isFullscreen: true,
     showFullscreenControls: false,
@@ -102,10 +108,10 @@ vi.mock('@/hooks/use-video-player', () => ({
   useVideoPlayer: (options: unknown) => {
     mocks.videoPlayerOptions = options as typeof mocks.videoPlayerOptions
     return {
-      videoRef: { current: null },
+      videoRef: mocks.videoRef ?? { current: mocks.videoElement },
       hlsRef: { current: null },
       strategy: 'direct',
-      isLoading: true,
+      isLoading: mocks.videoPlayerIsLoading,
       retry: mocks.retry,
       reloadHlsWithUrl: vi.fn(),
     }
@@ -159,8 +165,8 @@ vi.mock('@/services/video/api', async (importOriginal) => {
 vi.mock('@/stores/app-store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({
-      segmentSkipMode: 'button',
-      segmentSkipModeRevision: 0,
+      segmentSkipMode: mocks.segmentSkipMode,
+      segmentSkipModeRevision: mocks.segmentSkipModeRevision,
       jellyfinPlaybackSyncEnabled: false,
       trackPreferences: {
         preferredAudioLanguage: 'eng',
@@ -201,34 +207,46 @@ function createItem(): BaseItemDto {
   } as BaseItemDto
 }
 
+function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
+  return {
+    ItemId: 'item-1',
+    Type: 'Intro',
+    ...overrides,
+  } as MediaSegmentDto
+}
+
+function renderPlayer(overrides: Partial<PlayerProps> = {}) {
+  return render(
+    <Player
+      item={createItem()}
+      vibrantColors={null}
+      frameStepSeconds={1 / 24}
+      onCreateSegment={vi.fn()}
+      onUpdateSegmentTimestamp={vi.fn()}
+      {...overrides}
+    />,
+  )
+}
+
 describe('Player controls wiring', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mocks.playerSurfaceProps = []
+    mocks.videoElement = document.createElement('video')
+    mocks.videoRef = { current: mocks.videoElement }
     mocks.videoPlayerOptions = null
-    mocks.setShowVideoPlayer.mockClear()
-    mocks.setPreferredAudioLanguage.mockClear()
-    mocks.setPreferredSubtitleLanguage.mockClear()
-    mocks.setSubtitlesEnabled.mockClear()
-    mocks.selectAudioTrack.mockClear()
-    mocks.selectSubtitleTrack.mockClear()
-    mocks.retry.mockClear()
     mocks.trackManagerIsLoading = true
+    mocks.videoPlayerIsLoading = true
+    mocks.segmentSkipMode = 'button'
+    mocks.segmentSkipModeRevision = 0
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('passes Player state, handlers, and render groups through to PlayerSurface', async () => {
-    render(
-      <Player
-        item={createItem()}
-        vibrantColors={null}
-        frameStepSeconds={1 / 24}
-        onCreateSegment={vi.fn()}
-        onUpdateSegmentTimestamp={vi.fn()}
-      />,
-    )
+  it('passes Player state, handlers, and render groups through to PlayerSurface', () => {
+    renderPlayer()
 
     let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
     expect(surfaceProps.fullscreen).toMatchObject({
@@ -236,21 +254,21 @@ describe('Player controls wiring', () => {
       showControls: false,
       videoFitMode: 'cover',
     })
-    expect(surfaceProps.video.primaryCaptionTrack).toMatchObject({
-      index: 2,
-      language: 'spa',
-      label: 'Spanish - SRT',
-    })
+    expect(surfaceProps.video.captionTracks).toEqual([
+      expect.objectContaining({
+        index: 2,
+        language: 'spa',
+        label: 'Spanish - SRT',
+      }),
+    ])
     expect(surfaceProps.playback).toMatchObject({
       isVideoLoading: true,
       isRecovering: false,
       strategy: 'direct',
     })
     expect(surfaceProps.playback.error).toBe(null)
-    expect(surfaceProps.segmentSkip.mode).toBe('button')
-    expect(surfaceProps.segmentSkip.activeSegment).toBe(null)
-    expect(surfaceProps.controls.fullscreenTimelineScrubber).toBeTruthy()
-    expect(surfaceProps.controls.inlineTimelineScrubber).toBeTruthy()
+    expect(surfaceProps.segmentSkip).toBeNull()
+    expect(surfaceProps.controls.timelineScrubber).toBeTruthy()
 
     const controlsProps = surfaceProps.controls.props
     expect(controlsProps.playback.state).toBe('paused')
@@ -261,7 +279,6 @@ describe('Player controls wiring', () => {
     expect(controlsProps.trackControls?.state).toBe(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')
     expect(controlsProps.settings.subtitleState).toBe('active')
-
 
     act(() => {
       controlsProps.display.onMinimize?.()
@@ -290,15 +307,7 @@ describe('Player controls wiring', () => {
   it('enables track selection wiring after tracks load', async () => {
     mocks.trackManagerIsLoading = false
 
-    render(
-      <Player
-        item={createItem()}
-        vibrantColors={null}
-        frameStepSeconds={1 / 24}
-        onCreateSegment={vi.fn()}
-        onUpdateSegmentTimestamp={vi.fn()}
-      />,
-    )
+    renderPlayer()
 
     const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
     const controlsProps = surfaceProps.controls.props
@@ -316,5 +325,31 @@ describe('Player controls wiring', () => {
     })
     expect(mocks.selectSubtitleTrack).toHaveBeenCalledWith(null)
     expect(mocks.setSubtitlesEnabled).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps segment skip overlay state and seeking wired through Player', () => {
+    const intro = createSegment({ Id: 'intro', StartTicks: 10, EndTicks: 20 })
+
+    mocks.videoPlayerIsLoading = false
+    renderPlayer({ segments: [intro] })
+
+    expect(mocks.videoElement).not.toBeNull()
+    mocks.videoElement!.currentTime = 12
+
+    act(() => {
+      const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+      surfaceProps.video.onTimeUpdate()
+    })
+
+    let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    expect(surfaceProps.segmentSkip?.segment).toBe(intro)
+
+    act(() => {
+      surfaceProps.segmentSkip?.onSkipSegment(intro)
+    })
+
+    surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    expect(mocks.videoElement!.currentTime).toBe(20)
+    expect(surfaceProps.segmentSkip).toBeNull()
   })
 })

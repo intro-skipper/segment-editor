@@ -6,6 +6,7 @@
  */
 
 import { getLanguageName } from '@/lib/language-utils'
+import type { BaseItemDto } from '@/types/jellyfin'
 
 // ============================================================================
 // Types and Interfaces
@@ -148,35 +149,12 @@ interface TrackExtractionResult {
   subtitleTracks: Array<SubtitleTrackInfo>
 }
 
-/**
- * Jellyfin MediaStream type definition for track extraction.
- * Subset of fields used for audio and subtitle track parsing.
- */
-interface MediaStream {
-  Type?: string | null
-  Index?: number | null
-  Language?: string | null
-  DisplayTitle?: string | null
-  Codec?: string | null
-  Channels?: number | null
-  IsDefault?: boolean | null
-  IsExternal?: boolean | null
-  DeliveryUrl?: string | null
-}
-
-/**
- * Jellyfin MediaSourceInfo type definition.
- */
-interface MediaSourceInfo {
-  MediaStreams?: Array<MediaStream> | null
-}
-
-/**
- * Minimal BaseItemDto interface for track extraction.
- */
-interface ItemWithMediaSources {
-  MediaSources?: Array<MediaSourceInfo> | null
-}
+type JellyfinMediaSource = NonNullable<
+  NonNullable<BaseItemDto['MediaSources']>[number]
+>
+type JellyfinMediaStream = NonNullable<
+  NonNullable<JellyfinMediaSource['MediaStreams']>[number]
+>
 
 // ============================================================================
 // Track Extraction Functions
@@ -202,7 +180,7 @@ interface ItemWithMediaSources {
  * ```
  */
 export function extractTracks(
-  item: ItemWithMediaSources | null | undefined,
+  item: Pick<BaseItemDto, 'MediaSources'> | null | undefined,
 ): TrackExtractionResult {
   const emptyResult: TrackExtractionResult = {
     audioTracks: [],
@@ -244,7 +222,7 @@ export function extractTracks(
  * @param relativeIndex - The 0-based position within audio tracks
  */
 function extractAudioTrack(
-  stream: MediaStream,
+  stream: JellyfinMediaStream,
   relativeIndex: number,
 ): AudioTrackInfo {
   const language = stream.Language ?? null
@@ -271,7 +249,7 @@ function extractAudioTrack(
  * @param relativeIndex - The 0-based position within subtitle tracks
  */
 function extractSubtitleTrack(
-  stream: MediaStream,
+  stream: JellyfinMediaStream,
   relativeIndex: number,
 ): SubtitleTrackInfo {
   const language = stream.Language ?? null

@@ -22,7 +22,7 @@ interface RenderFullscreenUiOptions {
 
 let fullscreenElement: Element | null = null
 let originalFullscreenElementDescriptor: PropertyDescriptor | undefined
-let rafCallbacks: Array<FrameRequestCallback> = []
+let rafCallbacks: Array<{ id: number; callback: FrameRequestCallback }> = []
 let nextRafId = 1
 let cancelAnimationFrameMock: (handle: number) => void
 
@@ -50,11 +50,11 @@ function dispatchFullscreenChange(element: Element | null) {
 }
 
 function flushNextAnimationFrame() {
-  const callback = rafCallbacks.shift()
-  if (!callback) throw new Error('Expected queued animation frame')
+  const frame = rafCallbacks.shift()
+  if (!frame) throw new Error('Expected queued animation frame')
 
   act(() => {
-    callback(performance.now())
+    frame.callback(performance.now())
   })
 }
 
@@ -92,11 +92,14 @@ describe('useFullscreenPlayerUi', () => {
     vi.stubGlobal(
       'requestAnimationFrame',
       vi.fn((callback: FrameRequestCallback) => {
-        rafCallbacks.push(callback)
-        return nextRafId++
+        const id = nextRafId++
+        rafCallbacks.push({ id, callback })
+        return id
       }),
     )
-    cancelAnimationFrameMock = vi.fn()
+    cancelAnimationFrameMock = vi.fn((handle: number) => {
+      rafCallbacks = rafCallbacks.filter((frame) => frame.id !== handle)
+    })
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameMock)
   })
 
@@ -175,6 +178,25 @@ describe('useFullscreenPlayerUi', () => {
 
     flushNextAnimationFrame()
     expect(onResizeSubtitleRenderer).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels the nested subtitle resize animation frame on unmount', () => {
+    const onResizeSubtitleRenderer = vi.fn()
+    const { result, unmount } = renderFullscreenUi({
+      onResizeSubtitleRenderer,
+    })
+
+    act(() => {
+      result.current.toggleVideoFitMode()
+    })
+
+    flushNextAnimationFrame()
+    expect(onResizeSubtitleRenderer).not.toHaveBeenCalled()
+
+    unmount()
+
+    expect(cancelAnimationFrameMock).toHaveBeenCalled()
+    expect(rafCallbacks).toHaveLength(0)
   })
 
   it('turns a non-fullscreen single click into a delayed play toggle', () => {
@@ -325,7 +347,6 @@ describe('useFullscreenPlayerUi', () => {
   })
 
   it('cleans up pending timers and animation frames on unmount', () => {
-    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout')
     const { result, unmount } = renderFullscreenUi()
 
     dispatchFullscreenChange(document.createElement('section'))
@@ -335,7 +356,8 @@ describe('useFullscreenPlayerUi', () => {
 
     unmount()
 
-    expect(clearTimeoutSpy).toHaveBeenCalled()
-    expect(cancelAnimationFrameMock).toHaveBeenCalledWith(1)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(cancelAnimationFrameMock).toHaveBeenCalled()
+    expect(rafCallbacks).toHaveLength(0)
   })
 })

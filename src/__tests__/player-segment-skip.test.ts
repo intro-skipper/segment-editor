@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildSegmentTimeRangeById,
+  buildSegmentTimeIndex,
   buildSegmentTimeRanges,
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
@@ -22,7 +22,7 @@ describe('player segment skip helpers', () => {
     const intro = segment({ Id: 'intro', StartTicks: 30, EndTicks: 40 })
     const recap = segment({ Id: 'recap', StartTicks: 10, EndTicks: 20 })
 
-    const ranges = buildSegmentTimeRanges([
+    const { ranges, rangeById } = buildSegmentTimeIndex([
       intro,
       segment({ Id: 'missing-start', EndTicks: 50 }),
       segment({ Id: 'equal-boundary', StartTicks: 50, EndTicks: 50 }),
@@ -38,7 +38,6 @@ describe('player segment skip helpers', () => {
       [30, 40],
     ])
 
-    const rangeById = buildSegmentTimeRangeById(ranges)
     expect(rangeById.get('recap')?.segment).toBe(recap)
     expect(rangeById.get('intro')?.segment).toBe(intro)
     expect(rangeById.has('missing-start')).toBe(false)

@@ -14,8 +14,7 @@ import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
 import {
-  buildSegmentTimeRangeById,
-  buildSegmentTimeRanges,
+  buildSegmentTimeIndex,
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
   getSegmentTimeRangeId,
@@ -273,16 +272,15 @@ function useRenderPlayer({
     (s) => s.jellyfinPlaybackSyncEnabled,
   )
 
-  const segmentTimeRanges = buildSegmentTimeRanges(segments)
-  const segmentTimeRangeById = buildSegmentTimeRangeById(segmentTimeRanges)
-  const segmentTimeRangesRef = useRef(segmentTimeRanges)
+  const segmentTimeIndex = buildSegmentTimeIndex(segments)
+  const segmentTimeRangesRef = useRef(segmentTimeIndex.ranges)
   useLayoutEffect(() => {
-    segmentTimeRangesRef.current = segmentTimeRanges
-  }, [segmentTimeRanges])
-  const segmentTimeRangeByIdRef = useRef(segmentTimeRangeById)
+    segmentTimeRangesRef.current = segmentTimeIndex.ranges
+  }, [segmentTimeIndex.ranges])
+  const segmentTimeRangeByIdRef = useRef(segmentTimeIndex.rangeById)
   useLayoutEffect(() => {
-    segmentTimeRangeByIdRef.current = segmentTimeRangeById
-  }, [segmentTimeRangeById])
+    segmentTimeRangeByIdRef.current = segmentTimeIndex.rangeById
+  }, [segmentTimeIndex.rangeById])
 
   const [activeSkipSegmentState, setActiveSkipSegmentState] =
     useState<ActiveSkipSegmentState | null>(null)
@@ -431,8 +429,6 @@ function useRenderPlayer({
     item.Id,
     trackState.subtitleTracks,
   )
-  const primaryCaptionTrack = nativeCaptionTracks.at(0)
-  const additionalCaptionTracks = nativeCaptionTracks.slice(1)
 
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
     useJassubRenderer({
@@ -932,8 +928,7 @@ function useRenderPlayer({
       }}
       video={{
         posterUrl,
-        primaryCaptionTrack,
-        additionalCaptionTracks,
+        captionTracks: nativeCaptionTracks,
         onInteraction: handleVideoInteraction,
         onKeyDown: handleVideoContainerKeyDown,
         onTimeUpdate: handleTimeUpdate,
@@ -949,24 +944,16 @@ function useRenderPlayer({
         isVideoLoading,
         onRetry: handleRetry,
       }}
-      segmentSkip={{
-        mode: segmentSkipMode,
-        activeSegment: activeSkipSegment,
-        onSkipSegment: handleSkipSegment,
-      }}
+      segmentSkip={
+        segmentSkipMode === 'button' && playerError === null && !isVideoLoading
+          ? activeSkipSegment
+            ? { segment: activeSkipSegment, onSkipSegment: handleSkipSegment }
+            : null
+          : null
+      }
       controls={{
         props: playerControlsProps,
-        fullscreenTimelineScrubber: (
-          <TimelineScrubber
-            timelineStore={timelineStore}
-            item={item}
-            segments={segments}
-            vibrantColors={vibrantColors}
-            onSeek={handleSeek}
-            className="mb-4"
-          />
-        ),
-        inlineTimelineScrubber: (
+        timelineScrubber: (
           <TimelineScrubber
             timelineStore={timelineStore}
             item={item}

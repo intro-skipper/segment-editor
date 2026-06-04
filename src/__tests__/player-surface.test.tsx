@@ -78,7 +78,7 @@ interface SurfacePropOverrides {
   fullscreen?: Partial<SurfaceProps['fullscreen']>
   video?: Partial<SurfaceProps['video']>
   playback?: Partial<SurfaceProps['playback']>
-  segmentSkip?: Partial<SurfaceProps['segmentSkip']>
+  segmentSkip?: Partial<NonNullable<SurfaceProps['segmentSkip']>> | null
   controls?: Partial<SurfaceProps['controls']>
 }
 
@@ -101,13 +101,13 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
     },
     video: {
       posterUrl: null,
-      primaryCaptionTrack: {
-        index: 1,
-        language: 'eng',
-        label: 'English',
-        src: '/caption-1.vtt',
-      },
-      additionalCaptionTracks: [
+      captionTracks: [
+        {
+          index: 1,
+          language: 'eng',
+          label: 'English',
+          src: '/caption-1.vtt',
+        },
         {
           index: 2,
           language: 'spa',
@@ -132,16 +132,17 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
       onRetry: vi.fn(),
       ...overrides.playback,
     },
-    segmentSkip: {
-      mode: 'button',
-      activeSegment: skipSegment,
-      onSkipSegment: vi.fn(),
-      ...overrides.segmentSkip,
-    },
+    segmentSkip:
+      overrides.segmentSkip === null
+        ? null
+        : {
+            segment: skipSegment,
+            onSkipSegment: vi.fn(),
+            ...overrides.segmentSkip,
+          },
     controls: {
       props: playerControlsProps,
-      fullscreenTimelineScrubber: <div data-testid="fullscreen-scrubber" />,
-      inlineTimelineScrubber: <div data-testid="inline-scrubber" />,
+      timelineScrubber: <div data-testid="timeline-scrubber" />,
       ...overrides.controls,
     },
   }
@@ -167,7 +168,7 @@ describe('PlayerSurface', () => {
       '/caption-1.vtt',
       '/caption-2.vtt',
     ])
-    expect(screen.getByTestId('inline-scrubber')).toBeTruthy()
+    expect(screen.getByTestId('timeline-scrubber')).toBeTruthy()
     expect(screen.getByTestId('player-controls')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip type:Intro' }))
@@ -189,11 +190,10 @@ describe('PlayerSurface', () => {
       />,
     )
 
-    expect(screen.getByTestId('fullscreen-scrubber')).toBeTruthy()
-    expect(screen.queryByTestId('inline-scrubber')).toBe(null)
+    expect(screen.getByTestId('timeline-scrubber')).toBeTruthy()
 
     const overlay = screen
-      .getByTestId('fullscreen-scrubber')
+      .getByTestId('timeline-scrubber')
       .closest('[aria-hidden]')
     expect(overlay?.getAttribute('aria-hidden')).toBe('true')
     expect(overlay?.hasAttribute('inert')).toBe(true)
@@ -203,7 +203,6 @@ describe('PlayerSurface', () => {
     )
 
     expect(onToggleVideoFitMode).toHaveBeenCalledTimes(1)
-    expect(container.querySelector('section')?.className).toContain('fixed')
   })
 
   it('wires section, video interaction, keyboard, and media events', () => {
@@ -239,9 +238,8 @@ describe('PlayerSurface', () => {
     expect(props.video.onPause).toHaveBeenCalledTimes(1)
   })
 
-  it('renders recoverable direct-play errors and suppresses skip while errored', () => {
+  it('renders recoverable direct-play errors without the skip action', () => {
     const onRetry = vi.fn()
-    const onSkipSegment = vi.fn()
     render(
       <PlayerSurface
         {...createProps({
@@ -253,7 +251,7 @@ describe('PlayerSurface', () => {
               recoverable: true,
             },
           },
-          segmentSkip: { onSkipSegment },
+          segmentSkip: null,
         })}
       />,
     )
@@ -265,6 +263,5 @@ describe('PlayerSurface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'player.retry' }))
 
     expect(onRetry).toHaveBeenCalledTimes(1)
-    expect(onSkipSegment).not.toHaveBeenCalled()
   })
 })
