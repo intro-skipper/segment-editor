@@ -12,7 +12,6 @@ import { BaseItemKind } from '@/types/jellyfin'
  * Navigation route result type.
  */
 type NavigationRoute = NavigateOptions<RegisteredRouter>
-type RoutableItemKind = BaseItemKind | undefined
 
 const CONTAINER_ITEM_KINDS = [
   BaseItemKind.AggregateFolder,
@@ -27,10 +26,6 @@ const CONTAINER_ITEM_KINDS = [
 ] as const
 
 type ContainerItemKind = (typeof CONTAINER_ITEM_KINDS)[number]
-
-const CONTAINER_ITEM_KIND_SET: ReadonlySet<RoutableItemKind> = new Set(
-  CONTAINER_ITEM_KINDS,
-)
 
 const PLAYER_ITEM_KINDS = [
   undefined,
@@ -62,20 +57,16 @@ const PLAYER_ITEM_KINDS = [
 
 type PlayerItemKind = (typeof PLAYER_ITEM_KINDS)[number]
 
-const PLAYER_ITEM_KIND_SET: ReadonlySet<RoutableItemKind> = new Set(
-  PLAYER_ITEM_KINDS,
-)
-
 function isContainerItemKind(
-  itemType: RoutableItemKind,
+  itemType: BaseItemDto['Type'],
 ): itemType is ContainerItemKind {
-  return CONTAINER_ITEM_KIND_SET.has(itemType)
+  return CONTAINER_ITEM_KINDS.includes(itemType as ContainerItemKind)
 }
 
 function isPlayerItemKind(
-  itemType: RoutableItemKind,
+  itemType: BaseItemDto['Type'],
 ): itemType is PlayerItemKind {
-  return PLAYER_ITEM_KIND_SET.has(itemType)
+  return PLAYER_ITEM_KINDS.includes(itemType as PlayerItemKind)
 }
 
 function getPlayerNavigationRoute(itemId: string): NavigationRoute {

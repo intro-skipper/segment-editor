@@ -67,6 +67,13 @@
       "unlimited": "Illimitée"
     }
   },
+  "connection": {
+    "error": {
+      "authenticationFailed": "Échec de l'authentification",
+      "discoveryFailed": "Échec de la découverte du serveur",
+      "noServersFound": "Aucun serveur trouvé à cette adresse. Vérifiez l'adresse et réessayez."
+    }
+  },
   "items": {
     "select_collection": "Sélectionnez une collection à parcourir",
     "filter": {

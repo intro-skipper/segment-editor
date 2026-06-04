@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { useForm, useStore } from '@tanstack/react-form'
+import { useTranslation } from 'react-i18next'
 import { canGoBack, getPreviousStep } from './connection-wizard-flow'
 import type { WizardStep } from './connection-wizard-flow'
 
@@ -62,6 +63,7 @@ interface ConnectionWizardController {
 }
 
 export function useConnectionWizardController(): ConnectionWizardController {
+  const { t } = useTranslation()
   const { createController, abort } = useAbortController()
   const [step, setStep] = useState<WizardStep>('entry')
   const [servers, setServers] = useState<Array<RecommendedServerInfo>>([])
@@ -93,7 +95,9 @@ export function useConnectionWizardController(): ConnectionWizardController {
     } catch (error) {
       if (controller.signal.aborted) return
       failRequest(
-        error instanceof Error ? error.message : 'Server discovery failed',
+        error instanceof Error
+          ? error.message
+          : t('connection.error.discoveryFailed', 'Server discovery failed'),
       )
       return
     }
@@ -107,7 +111,10 @@ export function useConnectionWizardController(): ConnectionWizardController {
 
     if (result.servers.length === 0) {
       failRequest(
-        'No servers found at this address. Check the address and try again.',
+        t(
+          'connection.error.noServersFound',
+          'No servers found at this address. Check the address and try again.',
+        ),
       )
       return
     }
@@ -155,7 +162,9 @@ export function useConnectionWizardController(): ConnectionWizardController {
     } catch (error) {
       if (controller.signal.aborted) return
       failRequest(
-        error instanceof Error ? error.message : 'Authentication failed',
+        error instanceof Error
+          ? error.message
+          : t('connection.error.authenticationFailed', 'Authentication failed'),
       )
       return
     }
@@ -164,7 +173,9 @@ export function useConnectionWizardController(): ConnectionWizardController {
 
     if (!result.success) {
       failRequest(
-        result.error === undefined ? 'Authentication failed' : result.error,
+        result.error === undefined
+          ? t('connection.error.authenticationFailed', 'Authentication failed')
+          : result.error,
       )
       return
     }
@@ -173,7 +184,9 @@ export function useConnectionWizardController(): ConnectionWizardController {
       storeAuthResult(selectedServer.address, result, credentials.method)
     } catch (error) {
       failRequest(
-        error instanceof Error ? error.message : 'Authentication failed',
+        error instanceof Error
+          ? error.message
+          : t('connection.error.authenticationFailed', 'Authentication failed'),
       )
       return
     }

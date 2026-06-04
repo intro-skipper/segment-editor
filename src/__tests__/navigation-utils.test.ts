@@ -94,6 +94,26 @@ describe('navigation-utils', () => {
     )
   })
 
+  it('opens unknown item kinds using the unhandled item kind route', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const unknownType = 'SomeUnknownKind' as BaseItemKind
+
+    expectNavigationForItem(
+      { Id: itemId, Type: unknownType },
+      {
+        to: '/player/$itemId',
+        params: { itemId },
+        search: { fetchSegments: 'true' },
+      },
+    )
+
+    expect(warn).toHaveBeenCalledWith(
+      '[navigation-utils] Unhandled BaseItemKind; defaulting to player.',
+      unknownType,
+    )
+    warn.mockRestore()
+  })
+
   it.each([
     undefined,
     BaseItemKind.Audio,

@@ -320,6 +320,7 @@ export default function Header() {
   const { data: collections } = useCollections()
 
   const isDetailPage = location.pathname !== '/'
+  const isPlayerPage = location.pathname.startsWith('/player/')
 
   const { data: queriedItem } = useItem(itemId ?? '', {
     enabled: isDetailPage && !!itemId,
@@ -395,7 +396,7 @@ export default function Header() {
                 <DetailHeaderContent
                   {...detailInfo}
                   currentItem={currentItem}
-                  isPlayerPage={location.pathname.startsWith('/player/')}
+                  isPlayerPage={isPlayerPage}
                   vibrantColors={vibrantColors}
                   accentButtonStyle={accentButtonStyle}
                   onBack={handleBack}
