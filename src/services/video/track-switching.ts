@@ -200,6 +200,165 @@ function mapToRelativeIndex(
   return track?.relativeIndex ?? -1
 }
 
+function createTrackSwitchError(
+  type: TrackSwitchErrorType,
+  message: string,
+  trackIndex: number,
+): TrackSwitchResult {
+  return {
+    success: false,
+    error: {
+      type,
+      message,
+      trackIndex,
+    },
+  }
+}
+
+function findTrackByMediaStreamIndex<T extends { index: number }>(
+  tracks: Array<T> | undefined,
+  trackIndex: number,
+): T | undefined {
+  return tracks?.find((track) => track.index === trackIndex)
+}
+
+function findHlsAudioTrackIndex(
+  targetTrack: AudioTrackInfo | undefined,
+  trackPosition: number,
+  hlsAudioTracks: Array<{ lang?: string; name?: string }>,
+): number {
+  if (targetTrack?.language) {
+    const targetLang = targetTrack.language.toLowerCase()
+    const hlsTrackIndex = hlsAudioTracks.findIndex(
+      (hlsTrack) =>
+        hlsTrack.lang?.toLowerCase() === targetLang ||
+        (hlsTrack.name && hlsTrack.name.toLowerCase().includes(targetLang)),
+    )
+    if (hlsTrackIndex !== -1) return hlsTrackIndex
+  }
+
+  return trackPosition !== -1 && trackPosition < hlsAudioTracks.length
+    ? trackPosition
+    : -1
+}
+
+function isNativeAudioTrackIndex(
+  index: number,
+  nativeAudioTracks: AudioTrackList,
+): boolean {
+  return index >= 0 && index < nativeAudioTracks.length
+}
+
+function nativeAudioTrackLanguageMatches(
+  targetLanguage: string,
+  nativeLanguage: string,
+): boolean {
+  const targetLang = targetLanguage.toLowerCase()
+  const nativeLang = nativeLanguage.toLowerCase()
+  return (
+    nativeLang === targetLang ||
+    nativeLang.startsWith(targetLang.slice(0, 2)) ||
+    targetLang.startsWith(nativeLang.slice(0, 2))
+  )
+}
+
+function findNativeAudioTrackIndex(
+  trackIndex: number,
+  targetTrack: AudioTrackInfo,
+  nativeAudioTracks: AudioTrackList,
+  audioTracks: Array<AudioTrackInfo> | undefined,
+): number {
+  if (isNativeAudioTrackIndex(targetTrack.relativeIndex, nativeAudioTracks)) {
+    return targetTrack.relativeIndex
+  }
+
+  if (targetTrack.language) {
+    for (let i = 0; i < nativeAudioTracks.length; i++) {
+      if (
+        nativeAudioTrackLanguageMatches(
+          targetTrack.language,
+          nativeAudioTracks[i].language,
+        )
+      ) {
+        return i
+      }
+    }
+  }
+
+  const trackPosition =
+    audioTracks?.findIndex((track) => track.index === trackIndex) ?? -1
+  return isNativeAudioTrackIndex(trackPosition, nativeAudioTracks)
+    ? trackPosition
+    : -1
+}
+
+function enableOnlyNativeAudioTrack(
+  nativeAudioTracks: AudioTrackList,
+  enabledIndex: number,
+): void {
+  for (let i = 0; i < nativeAudioTracks.length; i++) {
+    nativeAudioTracks[i].enabled = i === enabledIndex
+  }
+}
+
+function hideTextTracks(textTracks: ArrayLike<TextTrack>): void {
+  Array.from(textTracks).forEach((track) => {
+    track.mode = 'hidden'
+  })
+}
+
+interface HlsReloadMessages {
+  missingItemId: string
+  missingReloadCallback: string
+  urlGenerationFailed: string
+  reloadFailed: string
+}
+
+async function reloadHlsAudioTrack(
+  trackIndex: number,
+  options: TrackSwitchOptions,
+  messages: HlsReloadMessages,
+): Promise<TrackSwitchResult> {
+  const { itemId, mediaSourceId, onReloadHls } = options
+
+  if (!itemId) {
+    return createTrackSwitchError(
+      'api_unsupported',
+      messages.missingItemId,
+      trackIndex,
+    )
+  }
+
+  if (!onReloadHls) {
+    return createTrackSwitchError(
+      'api_unsupported',
+      messages.missingReloadCallback,
+      trackIndex,
+    )
+  }
+
+  const reload = getHlsUrlWithAudioTrack(itemId, trackIndex, mediaSourceId)
+  if (!reload.url) {
+    return createTrackSwitchError(
+      'network_error',
+      messages.urlGenerationFailed,
+      trackIndex,
+    )
+  }
+
+  try {
+    await onReloadHls(reload)
+  } catch (err) {
+    return createTrackSwitchError(
+      'unknown_error',
+      err instanceof Error ? err.message : messages.reloadFailed,
+      trackIndex,
+    )
+  }
+
+  return { success: true, reloadRequired: true }
+}
+
 /**
  * Switches audio track in HLS mode.
  *
@@ -224,60 +383,33 @@ function switchHlsAudioTrack(
   audioTracks?: Array<AudioTrackInfo>,
 ): TrackSwitchResult {
   if (!hlsInstance) {
-    return {
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message: 'HLS instance not available',
-        trackIndex,
-      },
-    }
+    return createTrackSwitchError(
+      'api_unsupported',
+      'HLS instance not available',
+      trackIndex,
+    )
   }
 
-  if (audioTracks && audioTracks.length > 0) {
-    const targetTrack = audioTracks.find((t) => t.index === trackIndex)
-    if (!targetTrack) {
-      return {
-        success: false,
-        error: {
-          type: 'track_unavailable',
-          message: `Audio track with MediaStream index ${trackIndex} not found in track list`,
-          trackIndex,
-        },
-      }
-    }
+  const targetTrack = findTrackByMediaStreamIndex(audioTracks, trackIndex)
+  const trackPosition =
+    audioTracks?.findIndex((track) => track.index === trackIndex) ?? -1
+
+  if (audioTracks && audioTracks.length > 0 && !targetTrack) {
+    return createTrackSwitchError(
+      'track_unavailable',
+      `Audio track with MediaStream index ${trackIndex} not found in track list`,
+      trackIndex,
+    )
   }
 
   const hlsAudioTracks = hlsInstance.audioTracks
 
   if (hlsAudioTracks.length > 1) {
-    let relativeIndex = -1
-
-    if (audioTracks && audioTracks.length > 0) {
-      // Try to find matching track by language
-      const targetTrack = audioTracks.find((t) => t.index === trackIndex)
-      if (targetTrack?.language) {
-        const targetLang = targetTrack.language.toLowerCase()
-        const hlsTrackIndex = hlsAudioTracks.findIndex(
-          (hlsTrack) =>
-            hlsTrack.lang?.toLowerCase() === targetLang ||
-            (hlsTrack.name && hlsTrack.name.toLowerCase().includes(targetLang)),
-        )
-        if (hlsTrackIndex !== -1) {
-          relativeIndex = hlsTrackIndex
-        }
-      }
-
-      // Fallback to position-based matching
-      if (relativeIndex === -1) {
-        const trackPosition = audioTracks.findIndex(
-          (t) => t.index === trackIndex,
-        )
-        if (trackPosition !== -1 && trackPosition < hlsAudioTracks.length) {
-          relativeIndex = trackPosition
-        }
-      }
-    }
+    const relativeIndex = findHlsAudioTrackIndex(
+      targetTrack,
+      trackPosition,
+      hlsAudioTracks,
+    )
 
     if (relativeIndex >= 0 && relativeIndex < hlsAudioTracks.length) {
       try {
@@ -312,124 +444,45 @@ async function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  const { videoElement, audioTracks, itemId, mediaSourceId, onReloadHls } =
-    options
+  const { videoElement, audioTracks } = options
 
-  const videoWithTracks = videoElement as HTMLVideoElementWithAudioTracks
-  const nativeAudioTracks = videoWithTracks.audioTracks
-
-  const targetTrack = audioTracks?.find((t) => t.index === trackIndex)
+  const targetTrack = findTrackByMediaStreamIndex(audioTracks, trackIndex)
   if (!targetTrack) {
-    return {
-      success: false,
-      error: {
-        type: 'track_unavailable',
-        message: `Audio track with index ${trackIndex} not found`,
-        trackIndex,
-      },
-    }
+    return createTrackSwitchError(
+      'track_unavailable',
+      `Audio track with index ${trackIndex} not found`,
+      trackIndex,
+    )
   }
+
+  const nativeAudioTracks = (videoElement as HTMLVideoElementWithAudioTracks)
+    .audioTracks
 
   // Strategy 1: Try native AudioTrack API (Safari, some Chromium)
   if (nativeAudioTracks && nativeAudioTracks.length > 1) {
-    // Try relativeIndex first
-    if (
-      targetTrack.relativeIndex >= 0 &&
-      targetTrack.relativeIndex < nativeAudioTracks.length
-    ) {
-      for (let i = 0; i < nativeAudioTracks.length; i++) {
-        nativeAudioTracks[i].enabled = i === targetTrack.relativeIndex
-      }
-      return { success: true }
-    }
+    const nativeTrackIndex = findNativeAudioTrackIndex(
+      trackIndex,
+      targetTrack,
+      nativeAudioTracks,
+      audioTracks,
+    )
 
-    // Try language matching
-    if (targetTrack.language) {
-      const langLower = targetTrack.language.toLowerCase()
-      for (let i = 0; i < nativeAudioTracks.length; i++) {
-        const nativeTrack = nativeAudioTracks[i]
-        const nativeLang = nativeTrack.language.toLowerCase()
-        if (
-          nativeLang === langLower ||
-          nativeLang.startsWith(langLower.slice(0, 2)) ||
-          langLower.startsWith(nativeLang.slice(0, 2))
-        ) {
-          for (let j = 0; j < nativeAudioTracks.length; j++) {
-            nativeAudioTracks[j].enabled = j === i
-          }
-          return { success: true }
-        }
-      }
-    }
-
-    // Try position-based matching
-    const trackPosition =
-      audioTracks?.findIndex((t) => t.index === trackIndex) ?? -1
-    if (trackPosition >= 0 && trackPosition < nativeAudioTracks.length) {
-      for (let i = 0; i < nativeAudioTracks.length; i++) {
-        nativeAudioTracks[i].enabled = i === trackPosition
-      }
+    if (nativeTrackIndex !== -1) {
+      enableOnlyNativeAudioTrack(nativeAudioTracks, nativeTrackIndex)
       return { success: true }
     }
   }
 
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
-  if (!itemId) {
-    return {
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message:
-          'Audio track switching requires transcoding in this browser. Item ID not available.',
-        trackIndex,
-      },
-    }
-  }
-
-  if (!onReloadHls) {
-    return {
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message:
-          'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
-        trackIndex,
-      },
-    }
-  }
-
-  // Generate HLS URL with the selected audio track and trigger reload
-  const reload = getHlsUrlWithAudioTrack(itemId, trackIndex, mediaSourceId)
-  if (!reload.url) {
-    return {
-      success: false,
-      error: {
-        type: 'network_error',
-        message: 'Failed to generate HLS URL for audio track switching',
-        trackIndex,
-      },
-    }
-  }
-
-  // Trigger HLS reload - this will switch from direct play to HLS mode
-  try {
-    await onReloadHls(reload)
-  } catch (err) {
-    return {
-      success: false,
-      error: {
-        type: 'unknown_error',
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Failed to reload HLS stream for audio track switching',
-        trackIndex,
-      },
-    }
-  }
-
-  return { success: true, reloadRequired: true }
+  return reloadHlsAudioTrack(trackIndex, options, {
+    missingItemId:
+      'Audio track switching requires transcoding in this browser. Item ID not available.',
+    missingReloadCallback:
+      'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
+    urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
+    reloadFailed: 'Failed to reload HLS stream for audio track switching',
+  })
 }
 
 /**
@@ -533,9 +586,7 @@ async function switchDirectPlaySubtitleTrack(
 
   // Handle "Off" selection - hide all tracks
   if (trackIndex === null) {
-    Array.from(textTracks).forEach((track) => {
-      track.mode = 'hidden'
-    })
+    hideTextTracks(textTracks)
     removeManagedSubtitleTracks(videoElement)
     return { success: true }
   }
@@ -551,10 +602,7 @@ async function switchDirectPlaySubtitleTrack(
 
   // Check if track exists in TextTracks using relativeIndex
   if (relativeIndex >= 0 && relativeIndex < textTracks.length) {
-    // Hide all tracks first
-    Array.from(textTracks).forEach((track) => {
-      track.mode = 'hidden'
-    })
+    hideTextTracks(textTracks)
     // Show the selected track using relativeIndex
     textTracks[relativeIndex].mode = 'showing'
     return { success: true }
@@ -596,10 +644,7 @@ async function switchDirectPlaySubtitleTrack(
     trackElement.default = true
     trackElement.setAttribute(SUBTITLE_TRACK_MARKER_ATTR, 'true')
 
-    // Hide all existing tracks
-    Array.from(textTracks).forEach((existingTrack) => {
-      existingTrack.mode = 'hidden'
-    })
+    hideTextTracks(textTracks)
 
     // Add and show the new track
     videoElement.appendChild(trackElement)
@@ -684,66 +729,12 @@ export async function switchAudioTrack(
 
     // If HLS switching requires a reload, generate new URL and trigger reload
     if (result.success && result.reloadRequired) {
-      if (!options.itemId) {
-        return {
-          success: false,
-          error: {
-            type: 'api_unsupported',
-            message: 'Item ID required for HLS audio track switching',
-            trackIndex,
-          },
-        }
-      }
-
-      if (!options.onReloadHls) {
-        return {
-          success: false,
-          error: {
-            type: 'api_unsupported',
-            message: 'HLS reload callback not provided',
-            trackIndex,
-          },
-        }
-      }
-
-      // Generate new HLS URL with the selected audio track
-      // Note: We don't pass currentTime here because the HLS player hook
-      // will preserve and restore the playback position automatically
-      const reload = getHlsUrlWithAudioTrack(
-        options.itemId,
-        trackIndex,
-        options.mediaSourceId,
-      )
-
-      if (!reload.url) {
-        return {
-          success: false,
-          error: {
-            type: 'network_error',
-            message: 'Failed to generate HLS URL with audio track',
-            trackIndex,
-          },
-        }
-      }
-
-      // Trigger the reload
-      try {
-        await options.onReloadHls(reload)
-      } catch (err) {
-        return {
-          success: false,
-          error: {
-            type: 'unknown_error',
-            message:
-              err instanceof Error
-                ? err.message
-                : 'Failed to reload HLS stream with new audio track',
-            trackIndex,
-          },
-        }
-      }
-
-      return { success: true, reloadRequired: true }
+      return reloadHlsAudioTrack(trackIndex, options, {
+        missingItemId: 'Item ID required for HLS audio track switching',
+        missingReloadCallback: 'HLS reload callback not provided',
+        urlGenerationFailed: 'Failed to generate HLS URL with audio track',
+        reloadFailed: 'Failed to reload HLS stream with new audio track',
+      })
     }
 
     return result
@@ -765,11 +756,7 @@ export async function switchSubtitleTrack(
 ): Promise<TrackSwitchResult> {
   // Handle "off" selection - signal JASSUB to dispose if active
   if (trackIndex === null) {
-    // Hide all TextTracks (for non-ASS tracks that may be showing)
-    const textTracks = options.videoElement.textTracks
-    Array.from(textTracks).forEach((track) => {
-      track.mode = 'hidden'
-    })
+    hideTextTracks(options.videoElement.textTracks)
 
     // Also disable HLS subtitles if in HLS mode
     if (options.strategy === 'hls' && options.hlsInstance) {
@@ -794,11 +781,7 @@ export async function switchSubtitleTrack(
 
   // Check if ASS/SSA - delegate to JASSUB renderer
   if (requiresJassubRenderer(track)) {
-    // Hide any existing TextTracks before JASSUB takes over
-    const textTracks = options.videoElement.textTracks
-    Array.from(textTracks).forEach((existingTrack) => {
-      existingTrack.mode = 'hidden'
-    })
+    hideTextTracks(options.videoElement.textTracks)
 
     // Also disable HLS subtitles if in HLS mode
     if (options.strategy === 'hls' && options.hlsInstance) {
