@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useEffectEvent,
   useLayoutEffect,
   useReducer,
   useRef,
@@ -28,6 +27,8 @@ import {
   getSegmentSkipTargetEndSeconds,
   getSegmentTimeRangeId,
 } from './segment-skip'
+import { buildNativeCaptionTracks } from './caption-tracks'
+import { useFullscreenPlayerUi } from './use-fullscreen-player-ui'
 import type {
   BaseItemDto,
   MediaSegmentDto,
@@ -50,7 +51,6 @@ import { languagesMatch } from '@/lib/language-utils'
 import { Button } from '@/components/ui/button'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
-import { getSubtitleDeliveryUrl } from '@/services/video/track-switching'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
@@ -62,12 +62,6 @@ import {
 } from '@/lib/player-timing-utils'
 import { snapToFrame } from '@/lib/time-utils'
 import { extractTracks } from '@/services/video/tracks'
-
-const {
-  CONTROLS_HIDE_DELAY_MS,
-  MOUSE_MOVE_THROTTLE_MS,
-  DOUBLE_TAP_THRESHOLD_MS,
-} = PLAYER_CONFIG
 
 const PLAYBACK_UPDATE_INTERVAL_MS = 120
 
@@ -170,24 +164,13 @@ function TimelineScrubber({
   )
 }
 
-const selectPlayerState = (
-  state: ReturnType<typeof useSessionStore.getState>,
-) => ({
-  persistedVolume: state.playerVolume,
-  persistedMuted: state.playerMuted,
-  setPlayerVolume: state.setPlayerVolume,
-  setPlayerMuted: state.setPlayerMuted,
-})
 
 function findPreferredAudioStreamIndex(
   item: BaseItemDto,
   preferredLanguage: string | null,
 ): number | undefined {
   if (!preferredLanguage) return undefined
-
-  const { audioTracks } = extractTracks(
-    item as Parameters<typeof extractTracks>[0],
-  )
+  const { audioTracks } = extractTracks(item)
   if (audioTracks.length === 0) return undefined
 
   const matchingTrack = audioTracks.find((track) =>
@@ -208,62 +191,6 @@ function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
   }
 }
 
-interface FullscreenUiState {
-  isFullscreen: boolean
-  showFullscreenControls: boolean
-  videoFitMode: 'contain' | 'cover'
-}
-
-type FullscreenUiAction =
-  | { type: 'ENTER_FULLSCREEN' }
-  | { type: 'EXIT_FULLSCREEN' }
-  | { type: 'SHOW_CONTROLS' }
-  | { type: 'HIDE_CONTROLS' }
-  | { type: 'TOGGLE_FIT_MODE' }
-
-const initialFullscreenUiState: FullscreenUiState = {
-  isFullscreen: false,
-  showFullscreenControls: true,
-  videoFitMode: 'contain',
-}
-
-function fullscreenUiReducer(
-  state: FullscreenUiState,
-  action: FullscreenUiAction,
-): FullscreenUiState {
-  switch (action.type) {
-    case 'ENTER_FULLSCREEN':
-      return {
-        ...state,
-        isFullscreen: true,
-        showFullscreenControls: true,
-      }
-    case 'EXIT_FULLSCREEN':
-      return {
-        ...state,
-        isFullscreen: false,
-        showFullscreenControls: true,
-        videoFitMode: 'contain',
-      }
-    case 'SHOW_CONTROLS':
-      return {
-        ...state,
-        showFullscreenControls: true,
-      }
-    case 'HIDE_CONTROLS':
-      return {
-        ...state,
-        showFullscreenControls: false,
-      }
-    case 'TOGGLE_FIT_MODE':
-      return {
-        ...state,
-        videoFitMode: state.videoFitMode === 'contain' ? 'cover' : 'contain',
-      }
-    default:
-      return state
-  }
-}
 
 interface PlayerProps {
   item: BaseItemDto
@@ -315,7 +242,14 @@ function useRenderPlayer({
   const { t } = useTranslation()
 
   const { persistedVolume, persistedMuted, setPlayerVolume, setPlayerMuted } =
-    useSessionStore(useShallow(selectPlayerState))
+    useSessionStore(
+      useShallow((state) => ({
+        persistedVolume: state.playerVolume,
+        persistedMuted: state.playerMuted,
+        setPlayerVolume: state.setPlayerVolume,
+        setPlayerMuted: state.setPlayerMuted,
+      })),
+    )
 
   const { getButtonStyle, iconColor, hasColors } =
     useVibrantButtonStyle(vibrantColors)
@@ -384,21 +318,6 @@ function useRenderPlayer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [timelineStore] = useState(createPlaybackTimelineStore)
 
-  const [fullscreenUiState, dispatchFullscreenUi] = useReducer(
-    fullscreenUiReducer,
-    initialFullscreenUiState,
-  )
-  const { isFullscreen, showFullscreenControls, videoFitMode } =
-    fullscreenUiState
-
-  const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  )
-
-  const lastInteractionTimeRef = useRef(0)
-  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastMouseMoveRef = useRef(0)
-  const resizeRafRef = useRef<number | null>(null)
   const playbackUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   )
@@ -490,10 +409,10 @@ function useRenderPlayer({
     setPreferredSubtitleLanguage,
     setSubtitlesEnabled,
   } = useAppStore(
-    useShallow((s: ReturnType<typeof useAppStore.getState>) => ({
-      setPreferredAudioLanguage: s.setPreferredAudioLanguage,
-      setPreferredSubtitleLanguage: s.setPreferredSubtitleLanguage,
-      setSubtitlesEnabled: s.setSubtitlesEnabled,
+    useShallow((state) => ({
+      setPreferredAudioLanguage: state.setPreferredAudioLanguage,
+      setPreferredSubtitleLanguage: state.setPreferredSubtitleLanguage,
+      setSubtitlesEnabled: state.setSubtitlesEnabled,
     })),
   )
 
@@ -518,31 +437,11 @@ function useRenderPlayer({
           (track) => track.index === trackState.activeSubtitleIndex,
         ) ?? null)
 
-  const nativeCaptionTracks = (() => {
-    const itemId = item.Id
-    if (strategy !== 'direct' || !itemId) return []
-
-    const tracks: Array<{
-      index: number
-      language: string | undefined
-      label: string
-      src: string
-    }> = []
-
-    for (const track of trackState.subtitleTracks) {
-      const src = getSubtitleDeliveryUrl(itemId, track.index, 'vtt')
-      if (src === '') continue
-
-      tracks.push({
-        index: track.index,
-        language: track.language ?? undefined,
-        label: track.displayTitle,
-        src,
-      })
-    }
-
-    return tracks
-  })()
+  const nativeCaptionTracks = buildNativeCaptionTracks(
+    strategy,
+    item.Id,
+    trackState.subtitleTracks,
+  )
   const primaryCaptionTrack = nativeCaptionTracks.at(0)
   const additionalCaptionTracks = nativeCaptionTracks.slice(1)
 
@@ -555,6 +454,7 @@ function useRenderPlayer({
       userOffset: subtitleOffset,
       t,
     })
+
 
   const handleSubtitleOffsetChange = (offset: number) => {
     dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
@@ -879,6 +779,19 @@ function useRenderPlayer({
     }
   }
 
+  const {
+    isFullscreen,
+    showFullscreenControls,
+    videoFitMode,
+    toggleVideoFitMode,
+    handleVideoInteraction,
+    handleFullscreenMouseMove,
+    handleContainerMouseLeave,
+  } = useFullscreenPlayerUi({
+    onTogglePlay: togglePlay,
+    onResizeSubtitleRenderer: resizeJassub,
+  })
+
   usePlayerKeyboard({
     togglePlay,
     cycleSkipTimeUp,
@@ -896,171 +809,21 @@ function useRenderPlayer({
     decreaseSpeed,
   })
 
-  const clearHideControlsTimer = () => {
-    if (hideControlsTimeoutRef.current) {
-      clearTimeout(hideControlsTimeoutRef.current)
-      hideControlsTimeoutRef.current = null
-    }
-  }
-
-  const clearSingleTapTimer = () => {
-    if (singleTapTimerRef.current) {
-      clearTimeout(singleTapTimerRef.current)
-      singleTapTimerRef.current = null
-    }
-  }
-
-  const clearResizeFrame = () => {
-    if (resizeRafRef.current !== null) {
-      cancelAnimationFrame(resizeRafRef.current)
-      resizeRafRef.current = null
-    }
-  }
-
-  const handleFullscreenChange = useEffectEvent(() => {
-    const isFs = !!document.fullscreenElement
-
-    if (isFs) {
-      dispatchFullscreenUi({ type: 'ENTER_FULLSCREEN' })
-      clearHideControlsTimer()
-      hideControlsTimeoutRef.current = setTimeout(() => {
-        dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
-      }, CONTROLS_HIDE_DELAY_MS)
-    } else {
-      dispatchFullscreenUi({ type: 'EXIT_FULLSCREEN' })
-      clearHideControlsTimer()
-    }
-  })
-
   useEffect(() => {
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      clearPlaybackUpdateTimer()
     }
   }, [])
-
-  const toggleVideoFitMode = () => {
-    dispatchFullscreenUi({ type: 'TOGGLE_FIT_MODE' })
-
-    if (resizeRafRef.current !== null) {
-      cancelAnimationFrame(resizeRafRef.current)
-      resizeRafRef.current = null
-    }
-
-    // Schedule resize after browser paints new styles.
-    // Double rAF pattern: outer frame waits for style recalc,
-    // inner frame ensures layout is complete before measuring.
-    // We only track the outer frame ID - cancelling it prevents
-    // the inner frame from ever being scheduled.
-    resizeRafRef.current = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        resizeRafRef.current = null
-        resizeJassub()
-      })
-    })
-  }
-
-  const resetHideControlsTimer = () => {
-    clearHideControlsTimer()
-    dispatchFullscreenUi({ type: 'SHOW_CONTROLS' })
-    if (isFullscreen) {
-      hideControlsTimeoutRef.current = setTimeout(() => {
-        dispatchFullscreenUi({ type: 'HIDE_CONTROLS' })
-      }, CONTROLS_HIDE_DELAY_MS)
-    }
-  }
-
-  /**
-   * Handler for both mouse clicks and touch taps.
-   * Uses the same double-click/tap detection logic for consistency.
-   *
-   * Behavior:
-   * - Outside fullscreen: single tap/click toggles play, double tap/click toggles play
-   * - In fullscreen: single tap/click shows OSD, double tap/click toggles fit mode
-   */
-  const handleVideoInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-    const target = e.target as HTMLElement | null
-    if (target?.closest('[data-player-controls-overlay="true"]')) {
-      return
-    }
-
-    // For touch events, prevent the subsequent click event from firing
-    if ('changedTouches' in e) {
-      e.preventDefault()
-    } else {
-      // For mouse events, ignore synthetic clicks from touch (e.detail === 0)
-      if (e.detail === 0) return
-    }
-
-    const now = Date.now()
-    const timeSinceLastInteraction = now - lastInteractionTimeRef.current
-    lastInteractionTimeRef.current = now
-
-    clearSingleTapTimer()
-
-    if (timeSinceLastInteraction < DOUBLE_TAP_THRESHOLD_MS) {
-      if (isFullscreen) {
-        toggleVideoFitMode()
-        // Show controls/OSD after changing fit mode so user gets feedback
-        resetHideControlsTimer()
-      } else {
-        togglePlay()
-      }
-      // Set timestamp just before threshold window so the next tap
-      // won't be detected as another double-tap (prevents triple-tap)
-      lastInteractionTimeRef.current = now - (DOUBLE_TAP_THRESHOLD_MS + 1)
-    } else {
-      // Wait to see if this is a single tap/click or first of a double
-      singleTapTimerRef.current = setTimeout(() => {
-        singleTapTimerRef.current = null
-        if (isFullscreen) {
-          // In fullscreen: single tap/click shows controls
-          resetHideControlsTimer()
-        } else {
-          // Outside fullscreen: toggle play
-          togglePlay()
-        }
-      }, DOUBLE_TAP_THRESHOLD_MS)
-    }
-  }
 
   const handleVideoContainerKeyDown = (
     e: React.KeyboardEvent<HTMLButtonElement>,
   ) => {
-    // Only handle Enter here — Space is handled globally by usePlayerKeyboard
+    // Only handle Enter here — Space is handled globally by usePlayerKeyboard.
     if (e.key === 'Enter') {
       e.preventDefault()
       togglePlay()
     }
   }
-
-  const handleFullscreenMouseMove = () => {
-    if (!isFullscreen) return
-
-    const now = Date.now()
-    if (
-      !showFullscreenControls ||
-      now - lastMouseMoveRef.current > MOUSE_MOVE_THROTTLE_MS
-    ) {
-      lastMouseMoveRef.current = now
-      resetHideControlsTimer()
-    }
-  }
-
-  const handleContainerMouseLeave = () => {
-    if (isFullscreen && showFullscreenControls) {
-      resetHideControlsTimer()
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      clearHideControlsTimer()
-      clearSingleTapTimer()
-      clearResizeFrame()
-      clearPlaybackUpdateTimer()
-    }
-  }, [])
 
   const handleSkipSegment = (segment: MediaSegmentDto) => {
     const range =

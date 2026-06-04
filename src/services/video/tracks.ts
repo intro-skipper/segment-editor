@@ -153,29 +153,29 @@ interface TrackExtractionResult {
  * Subset of fields used for audio and subtitle track parsing.
  */
 interface MediaStream {
-  Type?: string
-  Index?: number
-  Language?: string
-  DisplayTitle?: string
-  Codec?: string
-  Channels?: number
-  IsDefault?: boolean
-  IsExternal?: boolean
-  DeliveryUrl?: string
+  Type?: string | null
+  Index?: number | null
+  Language?: string | null
+  DisplayTitle?: string | null
+  Codec?: string | null
+  Channels?: number | null
+  IsDefault?: boolean | null
+  IsExternal?: boolean | null
+  DeliveryUrl?: string | null
 }
 
 /**
  * Jellyfin MediaSourceInfo type definition.
  */
 interface MediaSourceInfo {
-  MediaStreams?: Array<MediaStream>
+  MediaStreams?: Array<MediaStream> | null
 }
 
 /**
  * Minimal BaseItemDto interface for track extraction.
  */
 interface ItemWithMediaSources {
-  MediaSources?: Array<MediaSourceInfo>
+  MediaSources?: Array<MediaSourceInfo> | null
 }
 
 // ============================================================================
@@ -287,7 +287,7 @@ function extractSubtitleTrack(
     format,
     isExternal: stream.IsExternal ?? false,
     isDefault: stream.IsDefault ?? false,
-    deliveryUrl: stream.DeliveryUrl,
+    deliveryUrl: stream.DeliveryUrl ?? undefined,
   }
 }
 
