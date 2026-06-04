@@ -9,32 +9,15 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
-  Film,
-  Library,
   Loader2,
-  Mic2,
   RefreshCw,
   Search,
   Settings2,
-  Tv,
   Unplug,
 } from 'lucide-react'
-
-import type { ComponentProps } from 'react'
-import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
-import { BaseItemKind } from '@/types/jellyfin'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination'
 import {
   Empty,
   EmptyContent,
@@ -47,21 +30,18 @@ import { useCollections, useItems } from '@/services/items/queries'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
-import {
-  preloadVibrantColors,
-  useVibrantColor,
-} from '@/hooks/use-vibrant-color'
+import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { MediaCard } from '@/components/filter/MediaCard'
-import { LibraryCard } from '@/components/filter/LibraryCard'
+import { MediaListRow } from '@/components/filter/MediaListRow'
+import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
+import { LibraryPicker } from '@/components/filter/LibraryPicker'
+import { PaginationControls } from '@/components/filter/PaginationControls'
 import { useSessionStore } from '@/stores/session-store'
-import { ItemImage } from '@/components/media/ItemImage'
-import { InteractiveCard } from '@/components/ui/interactive-card'
 import { getBestImageUrl } from '@/services/video/api'
-import { cn } from '@/lib/utils'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
-import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
+import { getMediaItemLabel } from '@/components/filter/media-item-label'
 
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
   state.pageSize
@@ -73,154 +53,14 @@ const selectSetSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
 ) => state.setSettingsOpen
 
-const COLLECTION_ICON_PATTERNS: Array<
-  readonly [pattern: RegExp, icon: typeof Library]
-> = [
-  [/movie/, Film],
-  [/film/, Film],
-  [/series/, Tv],
-  [/tv/, Tv],
-  [/show/, Tv],
-  [/music/, Mic2],
-  [/artist/, Mic2],
-]
-
-const getCollectionIcon = (name: string) => {
-  const lower = name.toLowerCase()
-  for (const [pattern, icon] of COLLECTION_ICON_PATTERNS) {
-    if (pattern.test(lower)) return icon
-  }
-  return Library
-}
-
-const EMPTY_ITEMS: Array<BaseItemDto> = []
-
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
-const COLOR_PRELOAD_ROWS = 1
 const VIRTUALIZED_GRID_THRESHOLD = 180
 const GRID_ROW_ESTIMATE_PX = 360
 const GRID_OVERSCAN_ROWS = 3
 const LIST_CLASS = 'flex flex-col gap-3'
 
-const MEDIA_LABEL_KEY_MAP: Record<string, string> = {
-  [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
-  [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
-  [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
-  [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
-  [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
-}
-
-function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
-  const name = item.Name ?? 'Unknown'
-  const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
-  const labelKey =
-    MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
-
-  return t(labelKey, { name: `${name}${year}` })
-}
-
-function MediaListSkeleton({
-  count,
-  loadingLabel,
-}: {
-  count: number
-  loadingLabel: string
-}) {
-  return (
-    <output className={LIST_CLASS} aria-live="polite" aria-busy="true">
-      <span className="sr-only">{loadingLabel}</span>
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl bg-card/60 backdrop-blur-sm animate-in fade-in duration-300"
-          style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
-          aria-hidden="true"
-        >
-          <div className="w-16 md:w-20 aspect-[2/3] rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
-          <div className="flex-grow min-w-0 space-y-2">
-            <div className="h-5 md:h-6 w-2/3 rounded-md skeleton-shimmer" />
-            <div className="h-4 w-1/3 rounded-md skeleton-shimmer" />
-          </div>
-        </div>
-      ))}
-    </output>
-  )
-}
-
-interface MediaListRowProps {
-  item: BaseItemDto
-  index: number
-  label: string
-  interactiveProps?: ComponentProps<typeof InteractiveCard>
-  onActivate: () => void
-}
-
-function MediaListRow({
-  item,
-  index,
-  label,
-  interactiveProps,
-  onActivate,
-}: MediaListRowProps) {
-  const imageUrl = getBestImageUrl(item, 160, 240) ?? null
-  const vibrantColors = useVibrantColor(imageUrl)
-  const animationDelay = staggerDelay(index, STAGGER_FAST)
-  const secondaryParts = [item.ProductionYear, item.Type].filter(Boolean)
-  const cardStyle = vibrantColors
-    ? { backgroundColor: vibrantColors.primary }
-    : undefined
-  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
-
-  return (
-    <InteractiveCard
-      aria-label={label}
-      onClick={onActivate}
-      {...interactiveProps}
-      animate
-      animationDelay={animationDelay}
-      className={cn(
-        'group flex items-center gap-4 md:gap-5 p-3 md:p-4 rounded-2xl md:rounded-3xl',
-        !vibrantColors && 'bg-card/60 backdrop-blur-sm',
-        'hover:shadow-lg hover:shadow-black/10',
-      )}
-      style={cardStyle}
-    >
-      <div className="relative flex-shrink-0 w-16 md:w-20 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
-        <ItemImage
-          item={item}
-          maxWidth={160}
-          maxHeight={240}
-          aspectRatio="aspect-[2/3]"
-          className="w-full"
-        />
-      </div>
-      <div className="flex-grow min-w-0 py-0.5 md:py-1">
-        <p
-          className={cn(
-            'font-semibold line-clamp-2 leading-tight text-base md:text-lg min-h-[calc(2*1lh)]',
-            !vibrantColors && 'text-foreground',
-          )}
-          style={textStyle}
-          title={item.Name || undefined}
-        >
-          {item.Name || 'Unknown'}
-        </p>
-        {secondaryParts.length > 0 && (
-          <p
-            className={cn(
-              'text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80',
-              !vibrantColors && 'text-muted-foreground',
-            )}
-            style={textStyle}
-          >
-            {secondaryParts.join(' · ')}
-          </p>
-        )}
-      </div>
-    </InteractiveCard>
-  )
-}
+const EMPTY_ITEMS: Array<BaseItemDto> = []
 
 function subscribeToResize(callback: () => void) {
   let frameId: number | null = null
@@ -254,34 +94,6 @@ function useGridColumns(): number {
     getColumnsSnapshot,
     getServerColumnsSnapshot,
   )
-}
-
-function buildMiddlePages(
-  current: number,
-  total: number,
-): Array<number | 'ellipsis'> {
-  const pages: Array<number | 'ellipsis'> = []
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
-
-  if (current > 3) pages.push('ellipsis')
-  for (let i = start; i <= end; i++) pages.push(i)
-  if (current < total - 2) pages.push('ellipsis')
-
-  return pages
-}
-
-function getPageNumbers(
-  current: number,
-  total: number,
-): Array<number | 'ellipsis'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-
-  const pages: Array<number | 'ellipsis'> = [1]
-  pages.push(...buildMiddlePages(current, total))
-  if (total > 1) pages.push(total)
-
-  return pages
 }
 
 const routeApi = getRouteApi('/')
@@ -414,10 +226,7 @@ function useRenderFilterView() {
   useEffect(() => {
     if (paginatedItems.length === 0) return
 
-    const maxPreloadCount = Math.min(
-      paginatedItems.length,
-      Math.max(columns * COLOR_PRELOAD_ROWS, columns),
-    )
+    const maxPreloadCount = Math.min(paginatedItems.length, columns)
 
     const preloadVisibleColors = () => {
       const preloadedUrls = preloadedUrlsRef.current
@@ -431,11 +240,11 @@ function useRenderFilterView() {
         const url = getBestImageUrl(item, 200)
         if (!url || preloadedUrls.has(url)) continue
 
+        preloadedUrls.add(url)
         imageUrls.push(url)
       }
 
       if (imageUrls.length > 0) {
-        imageUrls.forEach((url) => preloadedUrls.add(url))
         preloadVibrantColors(imageUrls)
       }
     }
@@ -498,14 +307,13 @@ function useRenderFilterView() {
     else void refetchItems()
   }
 
-  const pageNumbers = getPageNumbers(validCurrentPage, totalPages)
-
   const showLoading =
     collectionsLoading ||
-    (selectedCollection && !itemsError && itemsLoading && !itemsData)
+    Boolean(selectedCollection && !itemsError && itemsLoading && !itemsData)
   const showError = collectionsError || itemsError
-  const showEmpty =
-    selectedCollection && !itemsLoading && !itemsError && totalItems === 0
+  const showEmpty = Boolean(
+    selectedCollection && !itemsLoading && !itemsError && totalItems === 0,
+  )
 
   const showNotConnected = !isPlugin && !hasCredentials && !isConnected
 
@@ -578,48 +386,10 @@ function useRenderFilterView() {
           !selectedCollection &&
           !collectionsLoading &&
           !collectionsError && (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-full max-w-6xl">
-                <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center size-16 rounded-full bg-primary/10 mb-4">
-                    <Library
-                      className="size-8 text-secondary"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <h2 className="text-2xl font-semibold mb-2">
-                    {t('items.selectLibrary', {
-                      defaultValue: 'Select a Library',
-                    })}
-                  </h2>
-                  <p className="text-base text-muted-foreground">
-                    {t('items.selectLibraryDescription', {
-                      defaultValue:
-                        'Choose a library to browse your media collection',
-                    })}
-                  </p>
-                </div>
-                <fieldset
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 border-0 p-0 m-0"
-                  aria-label={t('items.selectLibrary', {
-                    defaultValue: 'Select a Library',
-                  })}
-                >
-                  {collections?.map((collection, index) => {
-                    const Icon = getCollectionIcon(collection.Name || '')
-                    return (
-                      <LibraryCard
-                        key={collection.ItemId}
-                        collection={collection}
-                        Icon={Icon}
-                        onSelect={handleCollectionChange}
-                        index={index}
-                      />
-                    )
-                  })}
-                </fieldset>
-              </div>
-            </div>
+            <LibraryPicker
+              collections={collections}
+              onCollectionChange={handleCollectionChange}
+            />
           )}
 
         {showLoading && (
@@ -653,7 +423,10 @@ function useRenderFilterView() {
               />
             </div>
             <p className="text-destructive text-center text-lg">
-              {collectionsError?.message || itemsError?.message}
+              {showError?.message ??
+                t('items.loadError', {
+                  defaultValue: 'Unable to load media items',
+                })}
             </p>
             <Button
               variant="secondary"
@@ -806,89 +579,11 @@ function useRenderFilterView() {
               </div>
             )}
 
-            {totalPages > 1 && (
-              <div className="mt-10">
-                <Pagination>
-                  <PaginationContent className="gap-2">
-                    <PaginationItem>
-                      <PaginationPrevious
-                        onClick={
-                          validCurrentPage === 1
-                            ? undefined
-                            : () =>
-                                handlePageChange(
-                                  Math.max(1, validCurrentPage - 1),
-                                )
-                        }
-                        aria-disabled={validCurrentPage === 1}
-                        tabIndex={validCurrentPage === 1 ? -1 : undefined}
-                        aria-label={t('accessibility.pagination.previous')}
-                        className={cn(
-                          'rounded-full',
-                          validCurrentPage === 1
-                            ? 'pointer-events-none opacity-50'
-                            : 'cursor-pointer',
-                        )}
-                      />
-                    </PaginationItem>
-
-                    {pageNumbers.map((pageNum, idx) =>
-                      pageNum === 'ellipsis' ? (
-                        <PaginationItem
-                          key={`ellipsis-${String(pageNumbers[idx - 1] ?? 'start')}-${String(pageNumbers[idx + 1] ?? 'end')}`}
-                        >
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      ) : (
-                        <PaginationItem key={pageNum}>
-                          <PaginationLink
-                            onClick={() => handlePageChange(pageNum)}
-                            isActive={validCurrentPage === pageNum}
-                            aria-label={t('accessibility.pagination.page', {
-                              page: pageNum,
-                            })}
-                            aria-current={
-                              validCurrentPage === pageNum ? 'page' : undefined
-                            }
-                            className={cn(
-                              'cursor-pointer rounded-full',
-                              validCurrentPage === pageNum &&
-                                'bg-primary text-primary-foreground',
-                            )}
-                          >
-                            {pageNum}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ),
-                    )}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        onClick={
-                          validCurrentPage === totalPages
-                            ? undefined
-                            : () =>
-                                handlePageChange(
-                                  Math.min(totalPages, validCurrentPage + 1),
-                                )
-                        }
-                        aria-disabled={validCurrentPage === totalPages}
-                        tabIndex={
-                          validCurrentPage === totalPages ? -1 : undefined
-                        }
-                        aria-label={t('accessibility.pagination.next')}
-                        className={cn(
-                          'rounded-full',
-                          validCurrentPage === totalPages
-                            ? 'pointer-events-none opacity-50'
-                            : 'cursor-pointer',
-                        )}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
+            <PaginationControls
+              currentPage={validCurrentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
           </>
         )}
       </div>
