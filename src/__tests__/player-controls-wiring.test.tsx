@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   resizeJassub: vi.fn(),
   setJassubUserOffset: vi.fn(),
   retry: vi.fn(),
+  trackManagerIsLoading: true,
   fullscreenUi: {
     isFullscreen: true,
     showFullscreenControls: false,
@@ -120,7 +121,7 @@ vi.mock('@/hooks/use-track-manager', () => ({
     trackState,
     selectAudioTrack: mocks.selectAudioTrack,
     selectSubtitleTrack: mocks.selectSubtitleTrack,
-    isLoading: true,
+    isLoading: mocks.trackManagerIsLoading,
   }),
 }))
 
@@ -211,6 +212,7 @@ describe('Player controls wiring', () => {
     mocks.selectAudioTrack.mockClear()
     mocks.selectSubtitleTrack.mockClear()
     mocks.retry.mockClear()
+    mocks.trackManagerIsLoading = true
   })
 
   afterEach(() => {
@@ -260,17 +262,6 @@ describe('Player controls wiring', () => {
     expect(controlsProps.trackControls?.availability).toBe('disabled')
     expect(controlsProps.settings.subtitleState).toBe('active')
 
-    await act(async () => {
-      await controlsProps.trackControls?.onSelectAudio(1)
-    })
-    expect(mocks.selectAudioTrack).toHaveBeenCalledWith(1)
-    expect(mocks.setPreferredAudioLanguage).toHaveBeenCalledWith('eng')
-
-    await act(async () => {
-      await controlsProps.trackControls?.onSelectSubtitle(null)
-    })
-    expect(mocks.selectSubtitleTrack).toHaveBeenCalledWith(null)
-    expect(mocks.setSubtitlesEnabled).toHaveBeenCalledWith(false)
 
     act(() => {
       controlsProps.display.onMinimize?.()
@@ -294,5 +285,36 @@ describe('Player controls wiring', () => {
     })
     surfaceProps.playback.onRetry()
     expect(mocks.retry).toHaveBeenCalledTimes(1)
+  })
+
+  it('enables track selection wiring after tracks load', async () => {
+    mocks.trackManagerIsLoading = false
+
+    render(
+      <Player
+        item={createItem()}
+        vibrantColors={null}
+        frameStepSeconds={1 / 24}
+        onCreateSegment={vi.fn()}
+        onUpdateSegmentTimestamp={vi.fn()}
+      />,
+    )
+
+    const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    const controlsProps = surfaceProps.controls.props
+
+    expect(controlsProps.trackControls?.availability).toBe('available')
+
+    await act(async () => {
+      await controlsProps.trackControls?.onSelectAudio(1)
+    })
+    expect(mocks.selectAudioTrack).toHaveBeenCalledWith(1)
+    expect(mocks.setPreferredAudioLanguage).toHaveBeenCalledWith('eng')
+
+    await act(async () => {
+      await controlsProps.trackControls?.onSelectSubtitle(null)
+    })
+    expect(mocks.selectSubtitleTrack).toHaveBeenCalledWith(null)
+    expect(mocks.setSubtitlesEnabled).toHaveBeenCalledWith(false)
   })
 })
