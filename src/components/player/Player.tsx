@@ -21,6 +21,13 @@ import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerControls } from './PlayerControls'
 import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
+import {
+  buildSegmentTimeRangeById,
+  buildSegmentTimeRanges,
+  findActiveSegmentRange,
+  getSegmentSkipTargetEndSeconds,
+  getSegmentTimeRangeId,
+} from './segment-skip'
 import type {
   BaseItemDto,
   MediaSegmentDto,
@@ -80,29 +87,10 @@ interface PlaybackTimelineStore {
   setState: (partial: Partial<PlaybackTimelineState>) => void
 }
 
-interface SegmentTimeRange {
-  segment: MediaSegmentDto
-  startSeconds: number
-  endSeconds: number
-}
-
 interface ActiveSkipSegmentState {
   segment: MediaSegmentDto
   segmentSkipModeRevision: number
 }
-
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value)
-
-// NOTE: Segment query layer (`services/segments/api.ts`) maps server ticks to
-// UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).
-/** Returns UI-second start time stored in the DTO's StartTicks field. */
-const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
-  segment.StartTicks
-
-/** Returns UI-second end time stored in the DTO's EndTicks field. */
-const getSegmentEnd = (segment: MediaSegmentDto): number | undefined =>
-  segment.EndTicks
 
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
   let state: PlaybackTimelineState = {
@@ -362,28 +350,8 @@ function useRenderPlayer({
     (s) => s.jellyfinPlaybackSyncEnabled,
   )
 
-  const segmentTimeRanges: Array<SegmentTimeRange> = (segments ?? [])
-    .reduce<Array<SegmentTimeRange>>((acc, segment) => {
-      // API model keeps StartTicks/EndTicks field names, but values are
-      // normalized to UI seconds in this app path.
-      const startSeconds = getSegmentStart(segment)
-      const endSeconds = getSegmentEnd(segment)
-      if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
-        return acc
-      }
-      if (endSeconds > startSeconds) {
-        acc.push({ segment, startSeconds, endSeconds })
-      }
-      return acc
-    }, [])
-    .sort((a, b) => a.startSeconds - b.startSeconds)
-  const segmentTimeRangeById: Map<string, SegmentTimeRange> =
-    segmentTimeRanges.reduce((map, r) => {
-      if (r.segment.Id !== undefined) {
-        map.set(r.segment.Id, r)
-      }
-      return map
-    }, new Map<string, SegmentTimeRange>())
+  const segmentTimeRanges = buildSegmentTimeRanges(segments)
+  const segmentTimeRangeById = buildSegmentTimeRangeById(segmentTimeRanges)
   const segmentTimeRangesRef = useRef(segmentTimeRanges)
   useLayoutEffect(() => {
     segmentTimeRangesRef.current = segmentTimeRanges
@@ -636,31 +604,9 @@ function useRenderPlayer({
       return
     }
 
-    // Binary search: find the last range whose startSeconds ≤ currentTime,
-    // then verify currentTime falls before its end.
-    let lo = 0
-    let hi = segmentRanges.length - 1
-    let activeRange: SegmentTimeRange | null = null
-    while (lo <= hi) {
-      const mid = lo + Math.floor((hi - lo) / 2)
-      if (segmentRanges[mid].startSeconds <= currentTime) {
-        lo = mid + 1
-      } else {
-        hi = mid - 1
-      }
-    }
-    const candidate = hi >= 0 ? segmentRanges[hi] : null
-    if (candidate !== null && currentTime < candidate.endSeconds) {
-      activeRange = candidate
-    }
+    const activeRange = findActiveSegmentRange(segmentRanges, currentTime)
     const active = activeRange?.segment ?? null
-
-    const activeId =
-      active?.Id ??
-      (activeRange
-        ? `${activeRange.startSeconds}:${activeRange.endSeconds}:${active?.Type ?? ''}`
-        : null)
-
+    const activeId = activeRange ? getSegmentTimeRangeId(activeRange) : null
     if (activeId !== prevActiveSegmentIdRef.current) {
       prevActiveSegmentIdRef.current = activeId
       if (!active) {
@@ -1121,13 +1067,8 @@ function useRenderPlayer({
       segment.Id !== undefined
         ? segmentTimeRangeByIdRef.current.get(segment.Id)
         : undefined
-    const fallbackEndSeconds = getSegmentEnd(segment)
-    const targetEndSeconds = isFiniteNumber(range?.endSeconds)
-      ? range.endSeconds
-      : fallbackEndSeconds
-    if (!isFiniteNumber(targetEndSeconds)) {
-      return
-    }
+    const targetEndSeconds = getSegmentSkipTargetEndSeconds(segment, range)
+    if (targetEndSeconds === null) return
     handleSeek(targetEndSeconds)
     setActiveSkipSegmentState(null)
     prevActiveSegmentIdRef.current = null
