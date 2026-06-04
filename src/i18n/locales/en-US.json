@@ -116,7 +116,12 @@
     "notConnectedDescription": "Configure your Jellyfin server connection to get started",
     "openSettings": "Open Settings",
     "connecting": "Connecting...",
-    "connectingDescription": "Establishing connection to Jellyfin server"
+    "connectingDescription": "Establishing connection to Jellyfin server",
+    "error": {
+      "authenticationFailed": "Authentication failed",
+      "discoveryFailed": "Server discovery failed",
+      "noServersFound": "No servers found at this address. Check the address and try again."
+    }
   },
   "items": {
     "select_collection": "Select a collection to browse",

@@ -13,6 +13,62 @@ import { BaseItemKind } from '@/types/jellyfin'
  */
 type NavigationRoute = NavigateOptions<RegisteredRouter>
 
+const CONTAINER_ITEM_KINDS = [
+  BaseItemKind.AggregateFolder,
+  BaseItemKind.BoxSet,
+  BaseItemKind.CollectionFolder,
+  BaseItemKind.Folder,
+  BaseItemKind.ManualPlaylistsFolder,
+  BaseItemKind.PhotoAlbum,
+  BaseItemKind.Playlist,
+  BaseItemKind.PlaylistsFolder,
+  BaseItemKind.UserView,
+] as const
+
+type ContainerItemKind = (typeof CONTAINER_ITEM_KINDS)[number]
+
+const PLAYER_ITEM_KINDS = [
+  undefined,
+  BaseItemKind.Audio,
+  BaseItemKind.AudioBook,
+  BaseItemKind.BasePluginFolder,
+  BaseItemKind.Book,
+  BaseItemKind.Channel,
+  BaseItemKind.ChannelFolderItem,
+  BaseItemKind.Episode,
+  BaseItemKind.Genre,
+  BaseItemKind.Movie,
+  BaseItemKind.LiveTvChannel,
+  BaseItemKind.LiveTvProgram,
+  BaseItemKind.MusicGenre,
+  BaseItemKind.MusicVideo,
+  BaseItemKind.Person,
+  BaseItemKind.Photo,
+  BaseItemKind.Program,
+  BaseItemKind.Recording,
+  BaseItemKind.Studio,
+  BaseItemKind.Trailer,
+  BaseItemKind.TvChannel,
+  BaseItemKind.TvProgram,
+  BaseItemKind.UserRootFolder,
+  BaseItemKind.Video,
+  BaseItemKind.Year,
+] as const
+
+type PlayerItemKind = (typeof PLAYER_ITEM_KINDS)[number]
+
+function isContainerItemKind(
+  itemType: BaseItemDto['Type'],
+): itemType is ContainerItemKind {
+  return CONTAINER_ITEM_KINDS.includes(itemType as ContainerItemKind)
+}
+
+function isPlayerItemKind(
+  itemType: BaseItemDto['Type'],
+): itemType is PlayerItemKind {
+  return PLAYER_ITEM_KINDS.includes(itemType as PlayerItemKind)
+}
+
 function getPlayerNavigationRoute(itemId: string): NavigationRoute {
   return {
     to: '/player/$itemId',
@@ -62,21 +118,14 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
   const itemId = item.Id ?? ''
   const itemType = item.Type
 
-  switch (itemType) {
-    case BaseItemKind.AggregateFolder:
-    case BaseItemKind.BoxSet:
-    case BaseItemKind.CollectionFolder:
-    case BaseItemKind.Folder:
-    case BaseItemKind.ManualPlaylistsFolder:
-    case BaseItemKind.PhotoAlbum:
-    case BaseItemKind.Playlist:
-    case BaseItemKind.PlaylistsFolder:
-    case BaseItemKind.UserView:
-      return {
-        to: '/',
-        search: { collection: itemId, page: undefined, search: undefined },
-      }
+  if (isContainerItemKind(itemType)) {
+    return {
+      to: '/',
+      search: { collection: itemId, page: undefined, search: undefined },
+    }
+  }
 
+  switch (itemType) {
     case BaseItemKind.Season:
       if (!item.SeriesId) {
         console.warn(
@@ -96,34 +145,11 @@ function getNavigationRoute(item: BaseItemDto): NavigationRoute {
     case BaseItemKind.MusicAlbum:
       return { to: '/album/$itemId', params: { itemId } }
 
-    case undefined:
-    case BaseItemKind.Audio:
-    case BaseItemKind.AudioBook:
-    case BaseItemKind.BasePluginFolder:
-    case BaseItemKind.Book:
-    case BaseItemKind.Channel:
-    case BaseItemKind.ChannelFolderItem:
-    case BaseItemKind.Episode:
-    case BaseItemKind.Genre:
-    case BaseItemKind.Movie:
-    case BaseItemKind.LiveTvChannel:
-    case BaseItemKind.LiveTvProgram:
-    case BaseItemKind.MusicGenre:
-    case BaseItemKind.MusicVideo:
-    case BaseItemKind.Person:
-    case BaseItemKind.Photo:
-    case BaseItemKind.Program:
-    case BaseItemKind.Recording:
-    case BaseItemKind.Studio:
-    case BaseItemKind.Trailer:
-    case BaseItemKind.TvChannel:
-    case BaseItemKind.TvProgram:
-    case BaseItemKind.UserRootFolder:
-    case BaseItemKind.Video:
-    case BaseItemKind.Year:
-      return getPlayerNavigationRoute(itemId)
-
     default:
+      if (isPlayerItemKind(itemType)) {
+        return getPlayerNavigationRoute(itemId)
+      }
+
       return getUnhandledItemKindRoute(itemType, itemId)
   }
 }

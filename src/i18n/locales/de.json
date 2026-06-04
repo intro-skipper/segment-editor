@@ -116,7 +116,12 @@
     "notConnectedDescription": "Konfiguriere deine Jellyfin-Serververbindung, um zu starten",
     "openSettings": "Einstellungen öffnen",
     "connecting": "Verbinde...",
-    "connectingDescription": "Verbindung zum Jellyfin-Server wird hergestellt"
+    "connectingDescription": "Verbindung zum Jellyfin-Server wird hergestellt",
+    "error": {
+      "authenticationFailed": "Authentifizierung fehlgeschlagen",
+      "discoveryFailed": "Serversuche fehlgeschlagen",
+      "noServersFound": "Unter dieser Adresse wurden keine Server gefunden. Prüfe die Adresse und versuche es erneut."
+    }
   },
   "items": {
     "select_collection": "Wähle eine Sammlung zum Durchsuchen",
