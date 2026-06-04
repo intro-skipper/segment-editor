@@ -388,6 +388,25 @@ describe('FilterView', () => {
     expect(refetchCollectionsMock).not.toHaveBeenCalled()
   })
 
+  it('does not render pagination controls for a single page of results', () => {
+    routeSearchState.current = { collection: 'movies', page: 1 }
+    itemsQueryState.current = {
+      data: {
+        items: [mediaItem('movie-1', 'Single Page Result')],
+        totalCount: 1,
+      },
+      isLoading: false,
+      error: null,
+      refetch: refetchItemsMock,
+    }
+
+    render(<FilterView />)
+
+    expect(screen.queryByRole('button', { name: 'Previous page' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next page' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull()
+  })
+
   it('renders pagination ellipses and disables boundary controls', () => {
     routeSearchState.current = { collection: 'movies', page: 5 }
     itemsQueryState.current = {
