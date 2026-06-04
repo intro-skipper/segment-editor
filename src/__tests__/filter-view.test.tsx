@@ -146,6 +146,29 @@ function mediaItem(id: string, name: string): BaseItemDto {
   }
 }
 
+function setCollectionsQuery(
+  overrides: Partial<typeof collectionsQueryState.current>,
+) {
+  collectionsQueryState.current = {
+    data: [],
+    isLoading: false,
+    error: null,
+    refetch: refetchCollectionsMock,
+    ...overrides,
+  }
+}
+
+function setItemsQuery(overrides: Partial<typeof itemsQueryState.current>) {
+  itemsQueryState.current = {
+    data: undefined,
+    isLoading: false,
+    error: null,
+    refetch: refetchItemsMock,
+    ...overrides,
+  }
+}
+
+
 describe('FilterView', () => {
   beforeEach(() => {
     routeSearchState.current = {}
@@ -154,18 +177,8 @@ describe('FilterView', () => {
       hasCredentials: true,
       isConnected: true,
     }
-    collectionsQueryState.current = {
-      data: [],
-      isLoading: false,
-      error: null,
-      refetch: refetchCollectionsMock,
-    }
-    itemsQueryState.current = {
-      data: undefined,
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    setCollectionsQuery({})
+    setItemsQuery({})
     navigateMock.mockReset()
     refetchCollectionsMock.mockReset()
     refetchItemsMock.mockReset()
@@ -214,15 +227,12 @@ describe('FilterView', () => {
   })
 
   it('renders libraries and resets filter search when selecting one', () => {
-    collectionsQueryState.current = {
+    setCollectionsQuery({
       data: [
         makeCollection('movies', 'Movies'),
         makeCollection('series', 'Series'),
       ],
-      isLoading: false,
-      error: null,
-      refetch: refetchCollectionsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -246,23 +256,19 @@ describe('FilterView', () => {
   })
 
   it('renders loading and collection errors with retry', () => {
-    collectionsQueryState.current = {
+    setCollectionsQuery({
       data: undefined,
       isLoading: true,
-      error: null,
-      refetch: refetchCollectionsMock,
-    }
+    })
 
     const { rerender } = render(<FilterView />)
 
     expect(screen.getByText('Loading media items')).toBeTruthy()
 
-    collectionsQueryState.current = {
+    setCollectionsQuery({
       data: undefined,
-      isLoading: false,
       error: new Error('Collections failed'),
-      refetch: refetchCollectionsMock,
-    }
+    })
     rerender(<FilterView />)
 
     expect(screen.getByRole('alert').textContent).toContain(
@@ -276,12 +282,9 @@ describe('FilterView', () => {
 
   it('renders the empty selected-library state', () => {
     routeSearchState.current = { collection: 'movies' }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: { items: [], totalCount: 0 },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -302,15 +305,12 @@ describe('FilterView', () => {
       page: 1,
       search: 'alien',
     }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-1', 'Alien'), mediaItem('movie-2', 'Aliens')],
         totalCount: 48,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -341,15 +341,12 @@ describe('FilterView', () => {
   it('renders list-mode rows and navigates on activation', () => {
     useSessionStore.setState({ viewMode: 'list' })
     routeSearchState.current = { collection: 'movies' }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-1', 'Blade Runner')],
         totalCount: 1,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -372,7 +369,7 @@ describe('FilterView', () => {
   it('moves list focus with keyboard navigation and activates the focused row', () => {
     useSessionStore.setState({ viewMode: 'list' })
     routeSearchState.current = { collection: 'movies' }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [
           mediaItem('movie-1', 'First Movie'),
@@ -383,10 +380,7 @@ describe('FilterView', () => {
         ],
         totalCount: 2,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -418,12 +412,9 @@ describe('FilterView', () => {
 
   it('retries item errors through the items query', () => {
     routeSearchState.current = { collection: 'movies' }
-    itemsQueryState.current = {
-      data: undefined,
-      isLoading: false,
+    setItemsQuery({
       error: new Error('Items failed'),
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -437,15 +428,12 @@ describe('FilterView', () => {
 
   it('does not render pagination controls for a single page of results', () => {
     routeSearchState.current = { collection: 'movies', page: 1 }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-1', 'Single Page Result')],
         totalCount: 1,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     render(<FilterView />)
 
@@ -456,15 +444,12 @@ describe('FilterView', () => {
 
   it('renders pagination ellipses and disables boundary controls', () => {
     routeSearchState.current = { collection: 'movies', page: 5 }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-5', 'Middle Page')],
         totalCount: 240,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
 
     const { rerender } = render(<FilterView />)
 
@@ -485,15 +470,12 @@ describe('FilterView', () => {
     expect(window.scrollTo).not.toHaveBeenCalled()
 
     routeSearchState.current = { collection: 'movies', page: 1 }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-1', 'First Page')],
         totalCount: 48,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
     rerender(<FilterView />)
 
     expect(
@@ -503,15 +485,12 @@ describe('FilterView', () => {
     ).toBe('true')
 
     routeSearchState.current = { collection: 'movies', page: 2 }
-    itemsQueryState.current = {
+    setItemsQuery({
       data: {
         items: [mediaItem('movie-2', 'Last Page')],
         totalCount: 48,
       },
-      isLoading: false,
-      error: null,
-      refetch: refetchItemsMock,
-    }
+    })
     rerender(<FilterView />)
 
     expect(
