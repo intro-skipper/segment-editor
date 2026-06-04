@@ -914,10 +914,8 @@ function useRenderPlayer({
   return (
     <PlayerSurface
       className={className}
-      refs={{
-        container: containerRef,
-        video: videoRef,
-      }}
+      containerRef={containerRef}
+      videoRef={videoRef}
       fullscreen={{
         isFullscreen,
         showControls: showFullscreenControls,

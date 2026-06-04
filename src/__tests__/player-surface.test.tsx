@@ -74,7 +74,8 @@ type SurfaceProps = ComponentProps<typeof PlayerSurface>
 
 interface SurfacePropOverrides {
   className?: SurfaceProps['className']
-  refs?: Partial<SurfaceProps['refs']>
+  containerRef?: SurfaceProps['containerRef']
+  videoRef?: SurfaceProps['videoRef']
   fullscreen?: Partial<SurfaceProps['fullscreen']>
   video?: Partial<SurfaceProps['video']>
   playback?: Partial<SurfaceProps['playback']>
@@ -85,11 +86,8 @@ interface SurfacePropOverrides {
 function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
   return {
     className: overrides.className,
-    refs: {
-      container: createRef<HTMLDivElement>(),
-      video: createRef<HTMLVideoElement>(),
-      ...overrides.refs,
-    },
+    containerRef: overrides.containerRef ?? createRef<HTMLDivElement>(),
+    videoRef: overrides.videoRef ?? createRef<HTMLVideoElement>(),
     fullscreen: {
       isFullscreen: false,
       showControls: true,

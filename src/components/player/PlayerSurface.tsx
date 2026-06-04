@@ -26,11 +26,6 @@ import { Button } from '@/components/ui/button'
 type VideoFitMode = 'contain' | 'cover'
 type VideoInteractionHandler = (event: MouseEvent | TouchEvent) => void
 
-interface PlayerSurfaceRefs {
-  container: RefObject<HTMLDivElement | null>
-  video: RefObject<HTMLVideoElement | null>
-}
-
 interface PlayerSurfaceFullscreenState {
   isFullscreen: boolean
   showControls: boolean
@@ -72,7 +67,8 @@ interface PlayerSurfaceControlsState {
 
 interface PlayerSurfaceProps {
   className?: string
-  refs: PlayerSurfaceRefs
+  containerRef: RefObject<HTMLDivElement | null>
+  videoRef: RefObject<HTMLVideoElement | null>
   fullscreen: PlayerSurfaceFullscreenState
   video: PlayerSurfaceVideoState
   playback: PlayerSurfacePlaybackState
@@ -302,7 +298,8 @@ function FullscreenControlsOverlay({
 
 export function PlayerSurface({
   className,
-  refs,
+  containerRef,
+  videoRef,
   fullscreen,
   video,
   playback,
@@ -314,7 +311,7 @@ export function PlayerSurface({
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       <section
-        ref={refs.container}
+        ref={containerRef}
         aria-label={t('player.videoPlayer')}
         className={cn(
           'relative',
@@ -324,7 +321,7 @@ export function PlayerSurface({
         onMouseLeave={fullscreen.onMouseLeave}
       >
         <PlayerVideoButton
-          videoRef={refs.video}
+          videoRef={videoRef}
           fullscreen={fullscreen}
           video={video}
         />
