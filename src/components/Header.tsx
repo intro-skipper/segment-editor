@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
@@ -22,12 +23,15 @@ import {
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
 import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import { getBestImageUrl } from '@/services/video/api'
+import type { BaseItemDto } from '@/types/jellyfin'
 
+// React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
 const loadCommandPalette = () => import('@/components/header/CommandPalette')
 const loadEpisodeSwitcher = () => import('@/components/header/EpisodeSwitcher')
 const loadSettingsDialog = () => import('@/components/settings')
@@ -102,6 +106,178 @@ const iconButtonClass = cn(
 /** Pre-computed platform-aware shortcut display for search button title */
 const MOD_K_DISPLAY = formatForDisplay('Mod+K')
 
+type DetailRouteMatch = false | { itemId?: string }
+
+interface HeaderDetailInfo {
+  isEpisode: boolean
+  pageTitle: string
+  seriesId?: string
+}
+
+interface DetailHeaderContentProps extends HeaderDetailInfo {
+  currentItem: BaseItemDto | undefined
+  isPlayerPage: boolean
+  vibrantColors: VibrantColors | null
+  accentButtonStyle: CSSProperties | undefined
+  onBack: () => void
+}
+
+interface HeaderActionsProps {
+  accentButtonStyle: CSSProperties | undefined
+  isDetailPage: boolean
+  selectedCollection: string | undefined
+  vibrantColors: VibrantColors | null
+  onOpenSearch: () => void
+  onOpenSettings: () => void
+}
+
+function getMatchedRouteItemId(
+  albumMatch: DetailRouteMatch,
+  artistMatch: DetailRouteMatch,
+  playerMatch: DetailRouteMatch,
+  seriesMatch: DetailRouteMatch,
+): string | undefined {
+  if (albumMatch) return albumMatch.itemId
+  if (artistMatch) return artistMatch.itemId
+  if (playerMatch) return playerMatch.itemId
+  if (seriesMatch) return seriesMatch.itemId
+  return undefined
+}
+
+function getHeaderDetailInfo(
+  currentItem: BaseItemDto | undefined,
+): HeaderDetailInfo {
+  if (!currentItem) {
+    return { isEpisode: false, pageTitle: '' }
+  }
+
+  const isEpisode = currentItem.Type === 'Episode' || !!currentItem.SeriesId
+  return {
+    isEpisode,
+    pageTitle: isEpisode
+      ? (formatEpisodeLabel(currentItem) ?? currentItem.Name ?? '')
+      : (currentItem.Name ?? currentItem.SeriesName ?? ''),
+    seriesId: currentItem.SeriesId ?? undefined,
+  }
+}
+
+function DetailHeaderContent({
+  accentButtonStyle,
+  currentItem,
+  isEpisode,
+  isPlayerPage,
+  pageTitle,
+  vibrantColors,
+  onBack,
+}: DetailHeaderContentProps) {
+  const { t } = useTranslation()
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onBack}
+        className={cn(
+          iconButtonClass,
+          !vibrantColors && 'bg-secondary/80 hover:bg-secondary',
+          'active:scale-95',
+        )}
+        style={accentButtonStyle}
+        aria-label={t('navigation.back', 'Go back')}
+      >
+        <ChevronLeft className="size-5" aria-hidden />
+      </Button>
+      {isPlayerPage && isEpisode && currentItem ? (
+        <>
+          <h1 className="sr-only">{pageTitle}</h1>
+          <Suspense
+            fallback={
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+                {pageTitle}
+              </span>
+            }
+          >
+            <EpisodeSwitcher
+              currentEpisode={currentItem}
+              vibrantColors={vibrantColors}
+              className="flex-1 min-w-0"
+            />
+          </Suspense>
+        </>
+      ) : (
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
+          {pageTitle}
+        </h1>
+      )}
+    </>
+  )
+}
+
+function HeaderActions({
+  accentButtonStyle,
+  isDetailPage,
+  selectedCollection,
+  vibrantColors,
+  onOpenSearch,
+  onOpenSettings,
+}: HeaderActionsProps) {
+  const { t } = useTranslation()
+  const actionButtonClassName = cn(
+    iconButtonClass,
+    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+  )
+
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      {selectedCollection && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenSearch}
+          onPointerEnter={preloadCommandPalette}
+          onFocus={preloadCommandPalette}
+          className={actionButtonClassName}
+          style={accentButtonStyle}
+          aria-label={t('search.open', 'Open search')}
+          title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
+        >
+          <Search className="size-5" aria-hidden />
+        </Button>
+      )}
+      {isDetailPage && (
+        <Link
+          to="/"
+          search={
+            selectedCollection ? { collection: selectedCollection } : undefined
+          }
+          className={cn(
+            'touch-manipulation',
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            actionButtonClassName,
+          )}
+          style={accentButtonStyle}
+          aria-label={t('navigation.home', 'Go to library')}
+        >
+          <Home className="size-5" aria-hidden />
+        </Link>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onOpenSettings}
+        onPointerEnter={preloadSettingsDialog}
+        onFocus={preloadSettingsDialog}
+        className={actionButtonClassName}
+        style={accentButtonStyle}
+        aria-label={t('settings.open', 'Open settings')}
+      >
+        <Settings className="size-5" aria-hidden />
+      </Button>
+    </div>
+  )
+}
+
 export default function Header() {
   const { t } = useTranslation()
   const location = useLocation()
@@ -113,12 +289,12 @@ export default function Header() {
   const artistMatch = matchRoute({ to: '/artist/$itemId' })
   const playerMatch = matchRoute({ to: '/player/$itemId' })
   const seriesMatch = matchRoute({ to: '/series/$itemId' })
-  const itemId =
-    (albumMatch && albumMatch.itemId) ||
-    (artistMatch && artistMatch.itemId) ||
-    (playerMatch && playerMatch.itemId) ||
-    (seriesMatch && seriesMatch.itemId) ||
-    undefined
+  const itemId = getMatchedRouteItemId(
+    albumMatch,
+    artistMatch,
+    playerMatch,
+    seriesMatch,
+  )
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
@@ -145,29 +321,17 @@ export default function Header() {
 
   const isDetailPage = location.pathname !== '/'
 
-  const { data: currentItem } = useItem(itemId ?? '', {
+  const { data: queriedItem } = useItem(itemId ?? '', {
     enabled: isDetailPage && !!itemId,
   })
+  const currentItem = queriedItem ?? undefined
 
   const headerImageUrl = currentItem ? getBestImageUrl(currentItem, 300) : null
   const vibrantColors = useVibrantColor(headerImageUrl || null, {
     enabled: isDetailPage && !!headerImageUrl,
   })
+  const detailInfo = getHeaderDetailInfo(currentItem)
 
-  const isPlayerPage = location.pathname.startsWith('/player/')
-  let pageTitle = ''
-  let isEpisode = false
-  let seriesId: string | undefined
-
-  if (currentItem) {
-    isEpisode = currentItem.Type === 'Episode' || !!currentItem.SeriesId
-    pageTitle = isEpisode
-      ? (formatEpisodeLabel(currentItem) ?? currentItem.Name ?? '')
-      : (currentItem.Name ?? currentItem.SeriesName ?? '')
-    seriesId = currentItem.SeriesId ?? undefined
-  }
-
-  // Keyboard shortcuts for command palette
   const openCommandPalette = () => {
     preloadCommandPalette()
     setCommandPaletteOpen(true)
@@ -178,7 +342,6 @@ export default function Header() {
   // "/" key — ignored in inputs by default (single-key smart default)
   useHotkey('/', openCommandPalette)
 
-  // Home navigation - always goes to root library view with collection preserved
   const handleGoHome = () => {
     void navigate({
       to: '/',
@@ -188,16 +351,15 @@ export default function Header() {
     })
   }
 
-  // Back navigation - go to series page if viewing episode, otherwise home with collection preserved
   const handleBack = () => {
     if (canGoBack) {
       router.history.back()
       return
     }
 
-    if (isEpisode && seriesId) {
+    if (detailInfo.isEpisode && detailInfo.seriesId) {
       void navigate({
-        ...getSeriesNavigationRoute(seriesId, currentItem?.SeasonId),
+        ...getSeriesNavigationRoute(detailInfo.seriesId, currentItem?.SeasonId),
         replace: true,
       })
       return
@@ -206,7 +368,7 @@ export default function Header() {
     handleGoHome()
   }
 
-  const headerStyle: React.CSSProperties | undefined = vibrantColors
+  const headerStyle: CSSProperties | undefined = vibrantColors
     ? { backgroundColor: `${vibrantColors.background}00` }
     : undefined
 
@@ -230,45 +392,14 @@ export default function Header() {
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {isDetailPage ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleBack}
-                    className={cn(
-                      iconButtonClass,
-                      !vibrantColors && 'bg-secondary/80 hover:bg-secondary',
-                      'active:scale-95',
-                    )}
-                    style={accentButtonStyle}
-                    aria-label={t('navigation.back', 'Go back')}
-                  >
-                    <ChevronLeft className="size-5" aria-hidden />
-                  </Button>
-                  {/* Episode switcher replaces title for episodes on player page */}
-                  {isPlayerPage && isEpisode && currentItem ? (
-                    <>
-                      <h1 className="sr-only">{pageTitle}</h1>
-                      <Suspense
-                        fallback={
-                          <span className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
-                            {pageTitle}
-                          </span>
-                        }
-                      >
-                        <EpisodeSwitcher
-                          currentEpisode={currentItem}
-                          vibrantColors={vibrantColors}
-                          className="flex-1 min-w-0"
-                        />
-                      </Suspense>
-                    </>
-                  ) : (
-                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
-                      {pageTitle}
-                    </h1>
-                  )}
-                </>
+                <DetailHeaderContent
+                  {...detailInfo}
+                  currentItem={currentItem}
+                  isPlayerPage={location.pathname.startsWith('/player/')}
+                  vibrantColors={vibrantColors}
+                  accentButtonStyle={accentButtonStyle}
+                  onBack={handleBack}
+                />
               ) : (
                 collections?.length && (
                   <CollectionSelector
@@ -280,61 +411,14 @@ export default function Header() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {selectedCollection && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setCommandPaletteOpen(true)}
-                  onPointerEnter={preloadCommandPalette}
-                  onFocus={preloadCommandPalette}
-                  className={cn(
-                    iconButtonClass,
-                    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
-                  )}
-                  style={accentButtonStyle}
-                  aria-label={t('search.open', 'Open search')}
-                  title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
-                >
-                  <Search className="size-5" aria-hidden />
-                </Button>
-              )}
-              {isDetailPage && (
-                <Link
-                  to="/"
-                  search={
-                    selectedCollection
-                      ? { collection: selectedCollection }
-                      : undefined
-                  }
-                  className={cn(
-                    'touch-manipulation',
-                    buttonVariants({ variant: 'ghost', size: 'icon' }),
-                    iconButtonClass,
-                    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
-                  )}
-                  style={accentButtonStyle}
-                  aria-label={t('navigation.home', 'Go to library')}
-                >
-                  <Home className="size-5" aria-hidden />
-                </Link>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleSettingsClick}
-                onPointerEnter={preloadSettingsDialog}
-                onFocus={preloadSettingsDialog}
-                className={cn(
-                  iconButtonClass,
-                  !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
-                )}
-                style={accentButtonStyle}
-                aria-label={t('settings.open', 'Open settings')}
-              >
-                <Settings className="size-5" aria-hidden />
-              </Button>
-            </div>
+            <HeaderActions
+              selectedCollection={selectedCollection}
+              isDetailPage={isDetailPage}
+              vibrantColors={vibrantColors}
+              accentButtonStyle={accentButtonStyle}
+              onOpenSearch={openCommandPalette}
+              onOpenSettings={handleSettingsClick}
+            />
           </div>
         </nav>
       </header>

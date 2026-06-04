@@ -70,66 +70,70 @@ export function useConnectionWizardController(): ConnectionWizardController {
 
   const formRef = useRef<ConnectionWizardFormApi | null>(null)
 
-  const handleFormSubmit = async (value: ConnectionWizardFormValues) => {
-    if (step === 'entry') {
-      const controller = createController()
-      setIsRequestPending(true)
-      setRequestError(null)
+  const failRequest = (message: string) => {
+    setIsRequestPending(false)
+    setRequestError(message)
+  }
 
-      let result: Awaited<ReturnType<typeof discoverServers>>
-      try {
-        result = await discoverServers(value.address, {
-          signal: controller.signal,
-        })
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setIsRequestPending(false)
-        setRequestError(
-          error instanceof Error ? error.message : 'Server discovery failed',
-        )
-        return
-      }
+  const beginRequest = () => {
+    const controller = createController()
+    setIsRequestPending(true)
+    setRequestError(null)
+    return controller
+  }
 
+  const submitDiscovery = async (value: ConnectionWizardFormValues) => {
+    const controller = beginRequest()
+
+    let result: Awaited<ReturnType<typeof discoverServers>>
+    try {
+      result = await discoverServers(value.address, {
+        signal: controller.signal,
+      })
+    } catch (error) {
       if (controller.signal.aborted) return
-
-      if (result.error) {
-        setIsRequestPending(false)
-        setRequestError(result.error)
-        return
-      }
-
-      if (result.servers.length === 0) {
-        setIsRequestPending(false)
-        setRequestError(
-          'No servers found at this address. Check the address and try again.',
-        )
-        return
-      }
-
-      const matchingServer = result.servers.find(
-        (server) => server.address === value.selectedServerAddress,
-      )
-      const nextSelectedServer =
-        matchingServer === undefined
-          ? findBestServer(result.servers)
-          : matchingServer
-
-      setServers(result.servers)
-      setRequestError(null)
-      setIsRequestPending(false)
-      setStep('select')
-      formRef.current?.setFieldValue(
-        'selectedServerAddress',
-        nextSelectedServer?.address ?? '',
-        {
-          dontValidate: true,
-        },
+      failRequest(
+        error instanceof Error ? error.message : 'Server discovery failed',
       )
       return
     }
 
-    if (step !== 'auth') return
+    if (controller.signal.aborted) return
 
+    if (result.error) {
+      failRequest(result.error)
+      return
+    }
+
+    if (result.servers.length === 0) {
+      failRequest(
+        'No servers found at this address. Check the address and try again.',
+      )
+      return
+    }
+
+    const matchingServer = result.servers.find(
+      (server) => server.address === value.selectedServerAddress,
+    )
+    const nextSelectedServer =
+      matchingServer === undefined
+        ? findBestServer(result.servers)
+        : matchingServer
+
+    setServers(result.servers)
+    setRequestError(null)
+    setIsRequestPending(false)
+    setStep('select')
+    formRef.current?.setFieldValue(
+      'selectedServerAddress',
+      nextSelectedServer?.address ?? '',
+      {
+        dontValidate: true,
+      },
+    )
+  }
+
+  const submitAuth = async (value: ConnectionWizardFormValues) => {
     const selectedServer =
       servers.find(
         (server) => server.address === value.selectedServerAddress,
@@ -140,11 +144,9 @@ export function useConnectionWizardController(): ConnectionWizardController {
       return
     }
 
-    const controller = createController()
-    setIsRequestPending(true)
-    setRequestError(null)
-
+    const controller = beginRequest()
     const credentials = buildCredentialsFromForm(value)
+
     let result: Awaited<ReturnType<typeof authenticate>>
     try {
       result = await authenticate(selectedServer.address, credentials, {
@@ -152,8 +154,7 @@ export function useConnectionWizardController(): ConnectionWizardController {
       })
     } catch (error) {
       if (controller.signal.aborted) return
-      setIsRequestPending(false)
-      setRequestError(
+      failRequest(
         error instanceof Error ? error.message : 'Authentication failed',
       )
       return
@@ -162,18 +163,16 @@ export function useConnectionWizardController(): ConnectionWizardController {
     if (controller.signal.aborted) return
 
     if (!result.success) {
-      setIsRequestPending(false)
-      const errorMessage =
-        result.error === undefined ? 'Authentication failed' : result.error
-      setRequestError(errorMessage)
+      failRequest(
+        result.error === undefined ? 'Authentication failed' : result.error,
+      )
       return
     }
 
     try {
       storeAuthResult(selectedServer.address, result, credentials.method)
     } catch (error) {
-      setIsRequestPending(false)
-      setRequestError(
+      failRequest(
         error instanceof Error ? error.message : 'Authentication failed',
       )
       return
@@ -182,6 +181,17 @@ export function useConnectionWizardController(): ConnectionWizardController {
     setIsRequestPending(false)
     setRequestError(null)
     setStep('success')
+  }
+
+  const handleFormSubmit = async (value: ConnectionWizardFormValues) => {
+    if (step === 'entry') {
+      await submitDiscovery(value)
+      return
+    }
+
+    if (step === 'auth') {
+      await submitAuth(value)
+    }
   }
 
   const form = useConnectionWizardForm(step, handleFormSubmit)
