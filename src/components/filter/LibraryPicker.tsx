@@ -1,4 +1,4 @@
-import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import type { VirtualFolderInfo } from '@/types/jellyfin'
 import { Film, Library, Mic2, Tv } from 'lucide-react'
 import { LibraryCard } from '@/components/filter/LibraryCard'
@@ -24,16 +24,15 @@ const getCollectionIcon = (name: string) => {
 }
 
 interface LibraryPickerProps {
-  t: TFunction
   collections: Array<VirtualFolderInfo> | undefined
   onCollectionChange: (value: string | null) => void
 }
 
 export function LibraryPicker({
-  t,
   collections,
   onCollectionChange,
 }: LibraryPickerProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-center py-8">
       <div className="w-full max-w-6xl">

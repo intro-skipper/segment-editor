@@ -1,4 +1,4 @@
-import type { FocusEvent } from 'react'
+import type { ComponentProps } from 'react'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
@@ -7,12 +7,11 @@ import { getBestImageUrl } from '@/services/video/api'
 import { cn } from '@/lib/utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
-interface MediaListRowInteractiveProps {
-  role?: 'gridcell'
-  tabIndex?: number
+type MediaListRowInteractiveProps = Pick<
+  ComponentProps<typeof InteractiveCard>,
+  'role' | 'tabIndex' | 'aria-selected' | 'onFocus'
+> & {
   'data-grid-index'?: number
-  'aria-selected'?: boolean
-  onFocus?: (event: FocusEvent<HTMLElement>) => void
 }
 
 interface MediaListRowProps {
@@ -25,8 +24,8 @@ interface MediaListRowProps {
 
 export function MediaListRow({
   item,
-  index,
   label,
+  index,
   interactiveProps,
   onActivate,
 }: MediaListRowProps) {

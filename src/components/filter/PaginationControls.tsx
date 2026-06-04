@@ -1,4 +1,4 @@
-import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import {
   Pagination,
   PaginationContent,
@@ -33,26 +33,25 @@ function getPageNumbers(
 
   const pages: Array<number | 'ellipsis'> = [1]
   pages.push(...buildMiddlePages(current, total))
-  if (total > 1) pages.push(total)
+  pages.push(total)
 
   return pages
 }
 
 interface PaginationControlsProps {
-  t: TFunction
   currentPage: number
   totalPages: number
   onPageChange: (page: number) => void
 }
 
 export function PaginationControls({
-  t,
   currentPage,
   totalPages,
   onPageChange,
 }: PaginationControlsProps) {
-  const pageNumbers = getPageNumbers(currentPage, totalPages)
+  const { t } = useTranslation()
   if (totalPages <= 1) return null
+  const pageNumbers = getPageNumbers(currentPage, totalPages)
 
   return (
     <div className="mt-10">
@@ -87,14 +86,19 @@ export function PaginationControls({
             ) : (
               <PaginationItem key={pageNum}>
                 <PaginationLink
-                  onClick={() => onPageChange(pageNum)}
+                  onClick={
+                    currentPage === pageNum
+                      ? undefined
+                      : () => onPageChange(pageNum)
+                  }
                   isActive={currentPage === pageNum}
                   aria-label={t('accessibility.pagination.page', {
                     page: pageNum,
                   })}
                   aria-current={currentPage === pageNum ? 'page' : undefined}
                   className={cn(
-                    'cursor-pointer rounded-full',
+                    'rounded-full',
+                    currentPage !== pageNum && 'cursor-pointer',
                     currentPage === pageNum &&
                       'bg-primary text-primary-foreground',
                   )}

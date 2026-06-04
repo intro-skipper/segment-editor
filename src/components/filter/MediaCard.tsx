@@ -3,13 +3,13 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { BaseItemKind } from '@/types/jellyfin'
 import { ItemImage } from '@/components/media/ItemImage'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
+import { getMediaItemLabel } from '@/components/filter/media-item-label'
 
 interface MediaCardProps {
   item: BaseItemDto
@@ -79,14 +79,6 @@ function observeCardInView(element: Element, onVisible: () => void) {
   }
 }
 
-const LABEL_KEY_MAP: Record<string, string> = {
-  [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
-  [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
-  [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
-  [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
-  [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
-}
-
 export const MediaCard = function MediaCardComponent({
   item,
   className,
@@ -134,13 +126,7 @@ export const MediaCard = function MediaCardComponent({
     navigateToMediaItem(navigate, item)
   }
 
-  const accessibleLabel = (() => {
-    const name = item.Name ?? 'Unknown'
-    const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
-    const labelKey =
-      LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
-    return t(labelKey, { name: `${name}${year}` })
-  })()
+  const accessibleLabel = getMediaItemLabel(t, item)
 
   // Derived values - no useMemo needed for simple computations
   const animationDelay = staggerDelay(index, STAGGER_FAST)

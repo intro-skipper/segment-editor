@@ -369,6 +369,53 @@ describe('FilterView', () => {
     })
   })
 
+  it('moves list focus with keyboard navigation and activates the focused row', () => {
+    useSessionStore.setState({ viewMode: 'list' })
+    routeSearchState.current = { collection: 'movies' }
+    itemsQueryState.current = {
+      data: {
+        items: [
+          mediaItem('movie-1', 'First Movie'),
+          {
+            ...mediaItem('episode-1', 'Second Episode'),
+            Type: BaseItemKind.Episode,
+          },
+        ],
+        totalCount: 2,
+      },
+      isLoading: false,
+      error: null,
+      refetch: refetchItemsMock,
+    }
+
+    render(<FilterView />)
+
+    const grid = screen.getByRole('grid', { name: 'Media items' })
+    const firstRow = screen.getByRole('gridcell', {
+      name: 'accessibility.mediaCard.playMovie',
+    })
+    const secondRow = screen.getByRole('gridcell', {
+      name: 'accessibility.mediaCard.playEpisode',
+    })
+
+    fireEvent.focus(grid)
+
+    expect(document.activeElement).toBe(firstRow)
+
+    fireEvent.keyDown(grid, { key: 'ArrowDown' })
+
+    expect(document.activeElement).toBe(secondRow)
+
+    fireEvent.keyDown(grid, { key: 'Enter' })
+
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/player/$itemId',
+      params: { itemId: 'episode-1' },
+      search: { fetchSegments: 'true' },
+    })
+  })
+
+
   it('retries item errors through the items query', () => {
     routeSearchState.current = { collection: 'movies' }
     itemsQueryState.current = {
@@ -431,6 +478,11 @@ describe('FilterView', () => {
     expect(screen.getByRole('button', { name: 'Page 6' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Page 10' })).toBeTruthy()
     expect(screen.getAllByText('More pages')).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 5' }))
+
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(window.scrollTo).not.toHaveBeenCalled()
 
     routeSearchState.current = { collection: 'movies', page: 1 }
     itemsQueryState.current = {

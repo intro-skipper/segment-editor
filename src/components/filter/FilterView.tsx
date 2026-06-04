@@ -15,9 +15,7 @@ import {
   Settings2,
   Unplug,
 } from 'lucide-react'
-import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
-import { BaseItemKind } from '@/types/jellyfin'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +33,7 @@ import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { MediaListRow } from '@/components/filter/MediaListRow'
+import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
 import { LibraryPicker } from '@/components/filter/LibraryPicker'
 import { PaginationControls } from '@/components/filter/PaginationControls'
 import { useSessionStore } from '@/stores/session-store'
@@ -42,7 +41,7 @@ import { getBestImageUrl } from '@/services/video/api'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
-import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
+import { getMediaItemLabel } from '@/components/filter/media-item-label'
 
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
   state.pageSize
@@ -56,29 +55,12 @@ const selectSetSettingsOpen = (
 
 const GRID_CLASS =
   'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
-const COLOR_PRELOAD_ROWS = 1
 const VIRTUALIZED_GRID_THRESHOLD = 180
 const GRID_ROW_ESTIMATE_PX = 360
 const GRID_OVERSCAN_ROWS = 3
 const LIST_CLASS = 'flex flex-col gap-3'
 
 const EMPTY_ITEMS: Array<BaseItemDto> = []
-const MEDIA_LABEL_KEY_MAP: Record<string, string> = {
-  [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
-  [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
-  [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
-  [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
-  [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
-}
-
-function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
-  const name = item.Name ?? 'Unknown'
-  const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
-  const labelKey =
-    MEDIA_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
-
-  return t(labelKey, { name: `${name}${year}` })
-}
 
 function subscribeToResize(callback: () => void) {
   let frameId: number | null = null
@@ -244,10 +226,7 @@ function useRenderFilterView() {
   useEffect(() => {
     if (paginatedItems.length === 0) return
 
-    const maxPreloadCount = Math.min(
-      paginatedItems.length,
-      Math.max(columns * COLOR_PRELOAD_ROWS, columns),
-    )
+    const maxPreloadCount = Math.min(paginatedItems.length, columns)
 
     const preloadVisibleColors = () => {
       const preloadedUrls = preloadedUrlsRef.current
@@ -261,11 +240,11 @@ function useRenderFilterView() {
         const url = getBestImageUrl(item, 200)
         if (!url || preloadedUrls.has(url)) continue
 
+        preloadedUrls.add(url)
         imageUrls.push(url)
       }
 
       if (imageUrls.length > 0) {
-        imageUrls.forEach((url) => preloadedUrls.add(url))
         preloadVibrantColors(imageUrls)
       }
     }
@@ -408,7 +387,6 @@ function useRenderFilterView() {
           !collectionsLoading &&
           !collectionsError && (
             <LibraryPicker
-              t={t}
               collections={collections}
               onCollectionChange={handleCollectionChange}
             />
@@ -417,33 +395,12 @@ function useRenderFilterView() {
         {showLoading && (
           <div className="animate-in fade-in duration-200">
             {viewMode === 'list' ? (
-              <output
-                className={LIST_CLASS}
-                aria-live="polite"
-                aria-busy="true"
-              >
-                <span className="sr-only">
-                  {t('items.loadingMediaItems', {
-                    defaultValue: 'Loading media items',
-                  })}
-                </span>
-                {Array.from({ length: Math.min(effectivePageSize, 12) }).map(
-                  (_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl bg-card/60 backdrop-blur-sm animate-in fade-in duration-300"
-                      style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
-                      aria-hidden="true"
-                    >
-                      <div className="w-16 md:w-20 aspect-[2/3] rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
-                      <div className="flex-grow min-w-0 space-y-2">
-                        <div className="h-5 md:h-6 w-2/3 rounded-md skeleton-shimmer" />
-                        <div className="h-4 w-1/3 rounded-md skeleton-shimmer" />
-                      </div>
-                    </div>
-                  ),
-                )}
-              </output>
+              <MediaListSkeleton
+                count={Math.min(effectivePageSize, 12)}
+                loadingLabel={t('items.loadingMediaItems', {
+                  defaultValue: 'Loading media items',
+                })}
+              />
             ) : (
               <MediaGridSkeleton
                 count={Math.min(effectivePageSize, 24)}
@@ -620,7 +577,6 @@ function useRenderFilterView() {
             )}
 
             <PaginationControls
-              t={t}
               currentPage={validCurrentPage}
               totalPages={totalPages}
               onPageChange={handlePageChange}
