@@ -32,6 +32,16 @@ const loadCommandPalette = () => import('@/components/header/CommandPalette')
 const loadEpisodeSwitcher = () => import('@/components/header/EpisodeSwitcher')
 const loadSettingsDialog = () => import('@/components/settings')
 
+const ignorePreloadError = () => undefined
+
+const preloadCommandPalette = () => {
+  void loadCommandPalette().catch(ignorePreloadError)
+}
+
+const preloadSettingsDialog = () => {
+  void loadSettingsDialog().catch(ignorePreloadError)
+}
+
 const CommandPalette = lazy(() =>
   loadCommandPalette().then((module) => ({
     default: module.CommandPalette,
@@ -122,6 +132,11 @@ export default function Header() {
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
+  const handleSettingsClick = () => {
+    preloadSettingsDialog()
+    toggleSettings()
+  }
+
   const handleCollectionSelect = (collectionId: string | null) => {
     void navigate({
       to: '/',
@@ -162,7 +177,7 @@ export default function Header() {
 
   // Keyboard shortcuts for command palette
   const openCommandPalette = () => {
-    void loadCommandPalette()
+    preloadCommandPalette()
     setCommandPaletteOpen(true)
   }
 
@@ -279,12 +294,8 @@ export default function Header() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setCommandPaletteOpen(true)}
-                  onPointerEnter={() => {
-                    void loadCommandPalette()
-                  }}
-                  onFocus={() => {
-                    void loadCommandPalette()
-                  }}
+                  onPointerEnter={preloadCommandPalette}
+                  onFocus={preloadCommandPalette}
                   className={cn(
                     iconButtonClass,
                     !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
@@ -319,13 +330,9 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={toggleSettings}
-                onPointerEnter={() => {
-                  void loadSettingsDialog()
-                }}
-                onFocus={() => {
-                  void loadSettingsDialog()
-                }}
+                onClick={handleSettingsClick}
+                onPointerEnter={preloadSettingsDialog}
+                onFocus={preloadSettingsDialog}
                 className={cn(
                   iconButtonClass,
                   !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
