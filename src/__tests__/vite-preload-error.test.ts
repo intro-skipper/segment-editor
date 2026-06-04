@@ -154,13 +154,15 @@ describe('vite preload error handling', () => {
     reload.mockClear()
 
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+    const addEventListener = vi.fn()
+    const removeEventListener = vi.fn()
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         location: { href, reload },
         sessionStorage: storage,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
+        addEventListener,
+        removeEventListener,
         setTimeout: globalThis.setTimeout,
         clearTimeout: globalThis.clearTimeout,
       },
@@ -168,6 +170,12 @@ describe('vite preload error handling', () => {
 
     try {
       const uninstall = installVitePreloadErrorHandler()
+      expect(addEventListener).toHaveBeenCalledTimes(1)
+      expect(addEventListener).toHaveBeenCalledWith(
+        'vite:preloadError',
+        expect.any(Function),
+      )
+      const registeredHandler = addEventListener.mock.calls[0]?.[1]
 
       vi.advanceTimersByTime(5_000)
 
@@ -182,6 +190,11 @@ describe('vite preload error handling', () => {
       expect(reload).toHaveBeenCalledTimes(1)
 
       uninstall()
+      expect(removeEventListener).toHaveBeenCalledTimes(1)
+      expect(removeEventListener).toHaveBeenCalledWith(
+        'vite:preloadError',
+        registeredHandler,
+      )
     } finally {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
@@ -209,13 +222,15 @@ describe('vite preload error handling', () => {
 
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
     const location = { href: recoveredHref, reload }
+    const addEventListener = vi.fn()
+    const removeEventListener = vi.fn()
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         location,
         sessionStorage: storage,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
+        addEventListener,
+        removeEventListener,
         setTimeout: globalThis.setTimeout,
         clearTimeout: globalThis.clearTimeout,
       },
@@ -223,6 +238,13 @@ describe('vite preload error handling', () => {
 
     try {
       const uninstall = installVitePreloadErrorHandler()
+      expect(addEventListener).toHaveBeenCalledTimes(1)
+      expect(addEventListener).toHaveBeenCalledWith(
+        'vite:preloadError',
+        expect.any(Function),
+      )
+      const registeredHandler = addEventListener.mock.calls[0]?.[1]
+
       location.href = navigatedHref
 
       vi.advanceTimersByTime(5_000)
@@ -238,6 +260,11 @@ describe('vite preload error handling', () => {
       expect(reload).toHaveBeenCalledTimes(1)
 
       uninstall()
+      expect(removeEventListener).toHaveBeenCalledTimes(1)
+      expect(removeEventListener).toHaveBeenCalledWith(
+        'vite:preloadError',
+        registeredHandler,
+      )
     } finally {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
