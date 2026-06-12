@@ -33,6 +33,13 @@ import './styles.css'
 
 installVitePreloadErrorHandler()
 
+if (import.meta.env.DEV) {
+  const { applyDevMockServerLogin } = await import(
+    './lib/dev-mock-server-login'
+  )
+  applyDevMockServerLogin()
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

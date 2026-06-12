@@ -8,6 +8,7 @@
     "build:plugin": "vite build --config vite.config.plugin.ts && tsc",
     "preview": "vite preview",
     "test": "vitest run",
+    "dev:mock": "node tools/start-test-server.mjs",
     "lint": "oxlint",
     "format": "prettier",
     "check": "prettier --write . && oxlint --fix",
