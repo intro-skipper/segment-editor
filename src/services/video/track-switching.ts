@@ -259,8 +259,9 @@ function nativeAudioTrackLanguageMatches(
   // A track whose language is unknown (the HTML AudioTrack API reports an empty
   // string) must not match every requested language. Bail out before the prefix
   // comparisons below, where slicing "" produces a wildcard prefix that
-  // startsWith() always matches.
-  if (!targetLang || !nativeLang) {
+  // startsWith() always matches. An empty target language is already rejected by
+  // the prefix-length guard further down, so only the native side needs this.
+  if (!nativeLang) {
     return false
   }
 
