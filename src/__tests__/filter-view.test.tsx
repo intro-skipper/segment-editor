@@ -168,7 +168,6 @@ function setItemsQuery(overrides: Partial<typeof itemsQueryState.current>) {
   }
 }
 
-
 describe('FilterView', () => {
   beforeEach(() => {
     routeSearchState.current = {}
@@ -408,7 +407,6 @@ describe('FilterView', () => {
       search: { fetchSegments: 'true' },
     })
   })
-
 
   it('retries item errors through the items query', () => {
     routeSearchState.current = { collection: 'movies' }

@@ -168,7 +168,10 @@ describe('switchAudioTrack native and HLS runtime selection', () => {
       switchAudioTrack(7, {
         strategy: 'direct',
         videoElement: video,
-        audioTracks: [createAudioTrack(5, 0, 'eng'), createAudioTrack(7, 99, 'jpn')],
+        audioTracks: [
+          createAudioTrack(5, 0, 'eng'),
+          createAudioTrack(7, 99, 'jpn'),
+        ],
         itemId: 'item-native',
         onReloadHls,
       }),
