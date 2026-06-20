@@ -153,6 +153,31 @@ describe('switchAudioTrack native and HLS runtime selection', () => {
     expect(onReloadHls).not.toHaveBeenCalled()
   })
 
+  it('skips a native audio track with unknown language when matching by language', async () => {
+    const video = document.createElement('video')
+    // The HTML AudioTrack API reports an empty language string when unknown; it
+    // must not match every requested language and shadow the real match.
+    const { list, tracks } = createNativeAudioTracks(['', 'jpn'])
+    Object.defineProperty(video, 'audioTracks', {
+      configurable: true,
+      value: list,
+    })
+    const onReloadHls = vi.fn<() => Promise<void>>()
+
+    await expect(
+      switchAudioTrack(7, {
+        strategy: 'direct',
+        videoElement: video,
+        audioTracks: [createAudioTrack(5, 0, 'eng'), createAudioTrack(7, 99, 'jpn')],
+        itemId: 'item-native',
+        onReloadHls,
+      }),
+    ).resolves.toEqual({ success: true })
+
+    expect(tracks.map((track) => track.enabled)).toEqual([false, true])
+    expect(onReloadHls).not.toHaveBeenCalled()
+  })
+
   it('falls back to HLS reload when no native audio track matches', async () => {
     createPlaySessionIdMock.mockReturnValue('play-session-1')
     getVideoStreamUrlMock.mockReturnValue('https://example.com/hls.m3u8')
