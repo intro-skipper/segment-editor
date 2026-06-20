@@ -28,7 +28,7 @@ describe('dev mock server login', () => {
 
     expect(useApiStore.getState()).toMatchObject({
       serverAddress: 'http://localhost:8096',
-      apiKey: 'mock-access-token',
+      apiKey: 'mock-auth-value',
       authMethod: 'userPass',
       userId: 'fffffffffffffffffffffffffffffff0',
       username: 'demo',
@@ -44,7 +44,7 @@ describe('dev mock server login', () => {
         DEV: true,
         VITE_MOCK_SERVER_AUTO_LOGIN: 'true',
         VITE_MOCK_SERVER_ADDRESS: 'http://localhost:9000',
-        VITE_MOCK_SERVER_ACCESS_TOKEN: 'custom-token',
+        VITE_MOCK_SERVER_AUTH_VALUE: 'custom-auth-value',
         VITE_MOCK_SERVER_VERSION: '10.11.0',
         VITE_MOCK_SERVER_USERNAME: 'custom-user',
         VITE_MOCK_SERVER_USER_ID: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -53,7 +53,7 @@ describe('dev mock server login', () => {
 
     expect(useApiStore.getState()).toMatchObject({
       serverAddress: 'http://localhost:9000',
-      apiKey: 'custom-token',
+      apiKey: 'custom-auth-value',
       userId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       username: 'custom-user',
       serverVersion: '10.11.0',
@@ -109,7 +109,7 @@ describe('dev mock server login', () => {
 
     expect(useApiStore.getState()).toMatchObject({
       serverAddress: 'http://localhost:8096',
-      apiKey: 'mock-access-token',
+      apiKey: 'mock-auth-value',
       authMethod: 'userPass',
       userId: 'fffffffffffffffffffffffffffffff0',
       username: 'demo',

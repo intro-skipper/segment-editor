@@ -4,9 +4,10 @@ import http from 'node:http'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+export const MOCK_SERVER_SCRIPT_PATH = fileURLToPath(import.meta.url)
 const IMG_DIR = path.join(__dirname, 'images')
 const VIDEO_PATH = path.join(__dirname, 'video.mp4')
 fs.mkdirSync(IMG_DIR, { recursive: true })
@@ -18,7 +19,7 @@ const MOCK_SERVER_PORT = Number(process.env.MOCK_SERVER_PORT ?? '8096')
 const MOCK_SERVER_ADDRESS =
   process.env.MOCK_SERVER_ADDRESS ?? `http://localhost:${MOCK_SERVER_PORT}`
 const MOCK_SERVER_VERSION = process.env.MOCK_SERVER_VERSION ?? '10.10.7'
-const MOCK_ACCESS_TOKEN = process.env.MOCK_SERVER_ACCESS_TOKEN ?? 'mock-access-token'
+const MOCK_AUTH_VALUE = process.env.MOCK_SERVER_AUTH_VALUE ?? 'mock-auth-value'
 const MOCK_USER_ID =
   process.env.MOCK_SERVER_USER_ID ?? 'fffffffffffffffffffffffffffffff0'
 const MOCK_USERNAME = process.env.MOCK_SERVER_USERNAME ?? 'demo'
@@ -330,7 +331,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/Users/AuthenticateByName') {
     return json(res, {
       User: { Id: MOCK_USER_ID, Name: MOCK_USERNAME, ServerId: SERVER_ID },
-      AccessToken: MOCK_ACCESS_TOKEN,
+      AccessToken: MOCK_AUTH_VALUE,
       ServerId: SERVER_ID,
     })
   }
@@ -481,15 +482,21 @@ const server = http.createServer(async (req, res) => {
   notFound(res)
 })
 
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`mockfin failed: port ${MOCK_SERVER_PORT} is already in use`)
-  } else {
-    console.error(`mockfin failed: ${error.message}`)
-  }
-  process.exit(1)
-})
+export function startMockServer() {
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`mockfin failed: port ${MOCK_SERVER_PORT} is already in use`)
+    } else {
+      console.error(`mockfin failed: ${error.message}`)
+    }
+    process.exit(1)
+  })
 
-server.listen(MOCK_SERVER_PORT, () =>
-  console.log(`mockfin listening on ${MOCK_SERVER_ADDRESS}`),
-)
+  server.listen(MOCK_SERVER_PORT, () =>
+    console.log(`mockfin listening on ${MOCK_SERVER_ADDRESS}`),
+  )
+}
+
+if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+  startMockServer()
+}

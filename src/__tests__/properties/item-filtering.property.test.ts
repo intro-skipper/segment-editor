@@ -61,7 +61,7 @@ describe('Item Filtering by Name', () => {
         fc.string({ minLength: 1, maxLength: 20 }),
         (items, filter) => {
           // Deep copy the original items for comparison
-          const originalItems = JSON.parse(JSON.stringify(items))
+          const originalItems = structuredClone(items)
           const originalLength = items.length
 
           // Perform filtering

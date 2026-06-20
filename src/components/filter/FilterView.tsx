@@ -423,10 +423,7 @@ function useRenderFilterView() {
               />
             </div>
             <p className="text-destructive text-center text-lg">
-              {showError?.message ??
-                t('items.loadError', {
-                  defaultValue: 'Unable to load media items',
-                })}
+              {showError.message}
             </p>
             <Button
               variant="secondary"

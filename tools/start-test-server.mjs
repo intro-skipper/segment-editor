@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { MOCK_SERVER_SCRIPT_PATH } from './server.mjs'
 
 const isWindows = process.platform === 'win32'
 const pnpmCommand = isWindows ? 'cmd.exe' : 'pnpm'
@@ -6,8 +7,7 @@ const pnpmArgs = isWindows ? ['/d', '/s', '/c', 'pnpm', 'dev'] : ['dev']
 const mockServerPort = process.env.MOCK_SERVER_PORT ?? '8096'
 const mockServerAddress =
   process.env.MOCK_SERVER_ADDRESS ?? `http://localhost:${mockServerPort}`
-const mockAccessToken =
-  process.env.MOCK_SERVER_ACCESS_TOKEN ?? 'mock-access-token'
+const mockAuthValue = process.env.MOCK_SERVER_AUTH_VALUE ?? 'mock-auth-value'
 const mockServerVersion = process.env.MOCK_SERVER_VERSION ?? '10.10.7'
 const mockUsername = process.env.MOCK_SERVER_USERNAME ?? 'demo'
 const mockUserId =
@@ -16,7 +16,7 @@ const mockAutoLogin = process.env.VITE_MOCK_SERVER_AUTO_LOGIN ?? 'true'
 const mockServerEnv = {
   MOCK_SERVER_PORT: mockServerPort,
   MOCK_SERVER_ADDRESS: mockServerAddress,
-  MOCK_SERVER_ACCESS_TOKEN: mockAccessToken,
+  MOCK_SERVER_AUTH_VALUE: mockAuthValue,
   MOCK_SERVER_VERSION: mockServerVersion,
   MOCK_SERVER_USERNAME: mockUsername,
   MOCK_SERVER_USER_ID: mockUserId,
@@ -24,7 +24,7 @@ const mockServerEnv = {
 const viteMockServerEnv = {
   VITE_MOCK_SERVER_AUTO_LOGIN: mockAutoLogin,
   VITE_MOCK_SERVER_ADDRESS: mockServerAddress,
-  VITE_MOCK_SERVER_ACCESS_TOKEN: mockAccessToken,
+  VITE_MOCK_SERVER_AUTH_VALUE: mockAuthValue,
   VITE_MOCK_SERVER_VERSION: mockServerVersion,
   VITE_MOCK_SERVER_USERNAME: mockUsername,
   VITE_MOCK_SERVER_USER_ID: mockUserId,
@@ -120,5 +120,5 @@ process.on('uncaughtException', (error) => {
   stopAll(1)
 })
 
-start('mock', process.execPath, ['tools/server.mjs'], mockServerEnv)
+start('mock', process.execPath, [MOCK_SERVER_SCRIPT_PATH], mockServerEnv)
 start('app', pnpmCommand, pnpmArgs, viteMockServerEnv)
