@@ -255,10 +255,29 @@ function nativeAudioTrackLanguageMatches(
 ): boolean {
   const targetLang = targetLanguage.toLowerCase()
   const nativeLang = nativeLanguage.toLowerCase()
+
+  // A track whose language is unknown (the HTML AudioTrack API reports an empty
+  // string) must not match every requested language. Bail out before the prefix
+  // comparisons below, where slicing "" produces a wildcard prefix that
+  // startsWith() always matches.
+  if (!targetLang || !nativeLang) {
+    return false
+  }
+
+  if (nativeLang === targetLang) {
+    return true
+  }
+
+  // Compare ISO language prefixes, but only when both prefixes are at least two
+  // characters so a one-character code cannot collapse into a wildcard prefix.
+  const targetPrefix = targetLang.slice(0, 2)
+  const nativePrefix = nativeLang.slice(0, 2)
+  if (targetPrefix.length < 2 || nativePrefix.length < 2) {
+    return false
+  }
+
   return (
-    nativeLang === targetLang ||
-    nativeLang.startsWith(targetLang.slice(0, 2)) ||
-    targetLang.startsWith(nativeLang.slice(0, 2))
+    nativeLang.startsWith(targetPrefix) || targetLang.startsWith(nativePrefix)
   )
 }
 
