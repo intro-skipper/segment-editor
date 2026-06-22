@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { getRouteApi, useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Film, Loader2, Mic2, Play, Search, Tv, X } from 'lucide-react'
 
@@ -18,11 +18,12 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useItems } from '@/services/items/queries'
-import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { BaseItemKind } from '@/types/jellyfin'
+
+const rootRouteApi = getRouteApi('__root__')
 
 const ITEM_HEIGHT = 64
 const MAX_VISIBLE_ITEMS = 8
@@ -182,7 +183,9 @@ export default function CommandPalette({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const router = useRouter()
-  const selectedCollection = useSelectedCollectionSearch()
+  const selectedCollection = rootRouteApi.useSearch({
+    select: (search) => search.collection,
+  })
   const prefetchedItemIdsRef = useRef<Set<string> | null>(null)
   if (prefetchedItemIdsRef.current === null) {
     prefetchedItemIdsRef.current = new Set<string>()

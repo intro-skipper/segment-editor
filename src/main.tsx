@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
   createBrowserHistory,
@@ -8,7 +8,6 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 
-import { Provider as TanStackQueryProvider } from './integrations/tanstack-query/root-provider.tsx'
 import {
   QUERY_GC_TIMES,
   QUERY_STALE_TIMES,
@@ -122,17 +121,17 @@ if (rootElement) {
   if (pluginMode && isJellyfinDesktopClient()) {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
           <DesktopFallback />
-        </TanStackQueryProvider>
+        </QueryClientProvider>
       </StrictMode>,
     )
   } else {
     root.render(
       <StrictMode>
-        <TanStackQueryProvider queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />
-        </TanStackQueryProvider>
+        </QueryClientProvider>
       </StrictMode>,
     )
   }

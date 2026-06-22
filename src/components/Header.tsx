@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
+  getRouteApi,
   useCanGoBack,
   useLocation,
   useMatchRoute,
@@ -27,12 +28,12 @@ import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
-import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import { getBestImageUrl } from '@/services/video/api'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
 const loadCommandPalette = () => import('@/components/header/CommandPalette')
+const rootRouteApi = getRouteApi('__root__')
 const loadEpisodeSwitcher = () => import('@/components/header/EpisodeSwitcher')
 const loadSettingsDialog = () => import('@/components/settings')
 
@@ -295,7 +296,9 @@ export default function Header() {
     playerMatch,
     seriesMatch,
   )
-  const selectedCollection = useSelectedCollectionSearch()
+  const selectedCollection = rootRouteApi.useSearch({
+    select: (search) => search.collection,
+  })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)

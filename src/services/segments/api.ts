@@ -26,7 +26,6 @@ import {
 } from '@/lib/schemas'
 import { logValidationWarning } from '@/lib/unified-error'
 
-type SegmentApiOptions = ApiOptions
 const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,12 +92,12 @@ const buildSegmentEndpoint = (path: string): string =>
 /** Executes segment mutation with retry logic */
 const withSegmentRetry = <T>(
   fn: () => Promise<T>,
-  options?: SegmentApiOptions,
+  options?: ApiOptions,
 ): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
 export async function getSegmentsById(
   itemId: string,
-  options?: SegmentApiOptions,
+  options?: ApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
   if (!itemId) return []
 
@@ -122,7 +121,7 @@ export async function getSegmentsById(
 
 async function createSegment(
   segment: MediaSegmentDto,
-  options?: SegmentApiOptions,
+  options?: ApiOptions,
 ): Promise<MediaSegmentDto | false> {
   if (!validateForCreate(segment)) return false
 
@@ -156,7 +155,7 @@ async function createSegment(
 
 export async function deleteSegment(
   segment: MediaSegmentDto,
-  options?: SegmentApiOptions,
+  options?: ApiOptions,
 ): Promise<boolean> {
   if (!validateForDelete(segment)) return false
 
@@ -196,7 +195,7 @@ export async function batchSaveSegments(
   itemId: string,
   existingSegments: Array<MediaSegmentDto>,
   newSegments: Array<MediaSegmentDto>,
-  options?: SegmentApiOptions,
+  options?: ApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
   if (options?.signal?.aborted) return []
 
