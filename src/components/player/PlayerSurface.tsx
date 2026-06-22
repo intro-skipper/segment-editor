@@ -24,6 +24,7 @@ import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+
 type VideoInteractionHandler = (event: MouseEvent | TouchEvent) => void
 
 interface PlayerSurfaceFullscreenState {

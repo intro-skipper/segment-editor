@@ -75,7 +75,9 @@ function start(name, command, args, extraEnv = {}) {
 
     if (!stopping) {
       const status = signal ? `signal ${signal}` : `code ${code ?? 1}`
-      process.stderr.write(`[${name}] exited with ${status}; stopping all processes\n`)
+      process.stderr.write(
+        `[${name}] exited with ${status}; stopping all processes\n`,
+      )
       stopAll(code ?? 1)
       return
     }

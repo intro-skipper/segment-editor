@@ -4,6 +4,7 @@ import {
   getDeviceId,
   withApi,
 } from '@/services/jellyfin'
+
 interface ActiveEncodingOptions {
   playSessionId: string | null | undefined
 }

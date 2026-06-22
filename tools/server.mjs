@@ -37,7 +37,7 @@ if (
 let idCounter = 0
 function nextId(label) {
   idCounter += 1
-  const hex = (idCounter).toString(16).padStart(12, '0')
+  const hex = idCounter.toString(16).padStart(12, '0')
   return `00000000000000000000${hex}`.slice(-32)
 }
 
@@ -59,8 +59,18 @@ const PALETTES = [
 
 // ── catalogue ────────────────────────────────────────────────────────
 const libraries = [
-  { Name: 'TV Shows', ItemId: nextId(), CollectionType: 'tvshows', Locations: ['/media/tv'] },
-  { Name: 'Movies', ItemId: nextId(), CollectionType: 'movies', Locations: ['/media/movies'] },
+  {
+    Name: 'TV Shows',
+    ItemId: nextId(),
+    CollectionType: 'tvshows',
+    Locations: ['/media/tv'],
+  },
+  {
+    Name: 'Movies',
+    ItemId: nextId(),
+    CollectionType: 'movies',
+    Locations: ['/media/movies'],
+  },
 ]
 const [TV_LIB, MOVIE_LIB] = libraries
 
@@ -76,21 +86,49 @@ const SERIES_DEFS = [
 ]
 
 const MOVIE_DEFS = [
-  ['The Glass Estuary', 2020], ['Afterimage', 2023], ['Driftwood', 2018],
-  ['Coldwater Lane', 2021], ['The Last Projectionist', 2019], ['Meridian Zero', 2024],
-  ['Sleepwalker City', 2022], ['A Quiet Avalanche', 2016], ['The Orchard Thief', 2023],
-  ['Solar Winds', 2025], ['Night Ferry', 2017], ['Lemon Tree Boulevard', 2021],
-  ['Borrowed Light', 2019], ['The Winter Cartograph', 2022], ['Static Bloom', 2024],
-  ['Hollow Tide', 2018], ['Pale Meridian', 2023], ['The Glass Aviary', 2020],
-  ['Copper Season', 2017], ['Lantern Faces', 2025], ['The Echo Garden', 2021],
-  ['Smoke Over Brigantine', 2016], ['Velvet Antenna', 2022], ['Half-Life Holiday', 2024],
-  ['The Paper Sea', 2019], ['Ultramarine', 2023], ['Dust & Daylight', 2018],
-  ['The Quiet Engine', 2021], ['Stray Satellites', 2025], ['Honeycomb Palace', 2020],
+  ['The Glass Estuary', 2020],
+  ['Afterimage', 2023],
+  ['Driftwood', 2018],
+  ['Coldwater Lane', 2021],
+  ['The Last Projectionist', 2019],
+  ['Meridian Zero', 2024],
+  ['Sleepwalker City', 2022],
+  ['A Quiet Avalanche', 2016],
+  ['The Orchard Thief', 2023],
+  ['Solar Winds', 2025],
+  ['Night Ferry', 2017],
+  ['Lemon Tree Boulevard', 2021],
+  ['Borrowed Light', 2019],
+  ['The Winter Cartograph', 2022],
+  ['Static Bloom', 2024],
+  ['Hollow Tide', 2018],
+  ['Pale Meridian', 2023],
+  ['The Glass Aviary', 2020],
+  ['Copper Season', 2017],
+  ['Lantern Faces', 2025],
+  ['The Echo Garden', 2021],
+  ['Smoke Over Brigantine', 2016],
+  ['Velvet Antenna', 2022],
+  ['Half-Life Holiday', 2024],
+  ['The Paper Sea', 2019],
+  ['Ultramarine', 2023],
+  ['Dust & Daylight', 2018],
+  ['The Quiet Engine', 2021],
+  ['Stray Satellites', 2025],
+  ['Honeycomb Palace', 2020],
 ]
 
 const EPISODE_TITLES = [
-  'Pilot', 'The Arrival', 'Crossed Wires', 'Low Tide', 'Signal Fire',
-  'The Long Way Home', 'Glass Houses', 'Undertow', 'Cold Open', 'Terminus',
+  'Pilot',
+  'The Arrival',
+  'Crossed Wires',
+  'Low Tide',
+  'Signal Fire',
+  'The Long Way Home',
+  'Glass Houses',
+  'Undertow',
+  'Cold Open',
+  'Terminus',
 ]
 
 function makeMediaSource(id) {
@@ -102,14 +140,31 @@ function makeMediaSource(id) {
     Protocol: 'File',
     MediaStreams: [
       {
-        Type: 'Video', Codec: 'h264', Index: 0, Width: 1280, Height: 720,
-        Profile: 'High', Level: 40, BitRate: 1000000, IsDefault: true,
-        AverageFrameRate: 25, RealFrameRate: 25, DisplayTitle: '720p H264',
-        VideoRange: 'SDR', VideoRangeType: 'SDR',
+        Type: 'Video',
+        Codec: 'h264',
+        Index: 0,
+        Width: 1280,
+        Height: 720,
+        Profile: 'High',
+        Level: 40,
+        BitRate: 1000000,
+        IsDefault: true,
+        AverageFrameRate: 25,
+        RealFrameRate: 25,
+        DisplayTitle: '720p H264',
+        VideoRange: 'SDR',
+        VideoRangeType: 'SDR',
       },
       {
-        Type: 'Audio', Codec: 'aac', Index: 1, Language: 'eng', ChannelLayout: 'stereo',
-        Channels: 2, SampleRate: 48000, IsDefault: true, DisplayTitle: 'English - AAC - Stereo',
+        Type: 'Audio',
+        Codec: 'aac',
+        Index: 1,
+        Language: 'eng',
+        ChannelLayout: 'stereo',
+        Channels: 2,
+        SampleRate: 48000,
+        IsDefault: true,
+        DisplayTitle: 'English - AAC - Stereo',
       },
     ],
   }
@@ -132,44 +187,118 @@ function addItem(item, parentId, art) {
 
 // libraries as items (for /Items/{id}/Images)
 libraries.forEach((lib, i) => {
-  artOf.set(lib.ItemId, { bg: PALETTES[i + 4][0], fg: PALETTES[i + 4][1], label: lib.Name, kind: 'wide' })
+  artOf.set(lib.ItemId, {
+    bg: PALETTES[i + 4][0],
+    fg: PALETTES[i + 4][1],
+    label: lib.Name,
+    kind: 'wide',
+  })
 })
 
 let seriesIdx = 0
 for (const [name, year, seasonCount] of SERIES_DEFS) {
   const pal = PALETTES[seriesIdx % PALETTES.length]
   const seriesId = nextId()
-  addItem({
-    Id: seriesId, Name: name, Type: 'Series', IsFolder: true, ProductionYear: year,
-    ImageTags: { Primary: 'p1' }, ServerId: SERVER_ID,
-  }, TV_LIB.ItemId, { bg: pal[0], fg: pal[1], label: name, kind: 'poster' })
+  addItem(
+    {
+      Id: seriesId,
+      Name: name,
+      Type: 'Series',
+      IsFolder: true,
+      ProductionYear: year,
+      ImageTags: { Primary: 'p1' },
+      ServerId: SERVER_ID,
+    },
+    TV_LIB.ItemId,
+    { bg: pal[0], fg: pal[1], label: name, kind: 'poster' },
+  )
 
   for (let s = 1; s <= seasonCount; s++) {
     const seasonId = nextId()
-    addItem({
-      Id: seasonId, Name: `Season ${s}`, Type: 'Season', IsFolder: true, IndexNumber: s,
-      SeriesId: seriesId, SeriesName: name, ImageTags: { Primary: 'p1' }, ServerId: SERVER_ID,
-    }, seriesId, { bg: pal[0], fg: pal[1], label: `${name}\nSeason ${s}`, kind: 'poster' })
+    addItem(
+      {
+        Id: seasonId,
+        Name: `Season ${s}`,
+        Type: 'Season',
+        IsFolder: true,
+        IndexNumber: s,
+        SeriesId: seriesId,
+        SeriesName: name,
+        ImageTags: { Primary: 'p1' },
+        ServerId: SERVER_ID,
+      },
+      seriesId,
+      { bg: pal[0], fg: pal[1], label: `${name}\nSeason ${s}`, kind: 'poster' },
+    )
 
     const episodeCount = 8
     for (let e = 1; e <= episodeCount; e++) {
       const epId = nextId()
       const title = EPISODE_TITLES[(e - 1) % EPISODE_TITLES.length]
-      addItem({
-        Id: epId, Name: title, Type: 'Episode', IndexNumber: e, ParentIndexNumber: s,
-        SeriesId: seriesId, SeasonId: seasonId, SeriesName: name,
-        RunTimeTicks: RUNTIME_SECONDS * TICKS, ImageTags: { Primary: 'p1' },
-        MediaSources: [makeMediaSource(epId)], ServerId: SERVER_ID,
-        SeriesPrimaryImageTag: 'p1',
-      }, seasonId, { bg: pal[0], fg: pal[1], label: `${name}\nS${s}E${e} ${title}`, kind: 'wide' })
+      addItem(
+        {
+          Id: epId,
+          Name: title,
+          Type: 'Episode',
+          IndexNumber: e,
+          ParentIndexNumber: s,
+          SeriesId: seriesId,
+          SeasonId: seasonId,
+          SeriesName: name,
+          RunTimeTicks: RUNTIME_SECONDS * TICKS,
+          ImageTags: { Primary: 'p1' },
+          MediaSources: [makeMediaSource(epId)],
+          ServerId: SERVER_ID,
+          SeriesPrimaryImageTag: 'p1',
+        },
+        seasonId,
+        {
+          bg: pal[0],
+          fg: pal[1],
+          label: `${name}\nS${s}E${e} ${title}`,
+          kind: 'wide',
+        },
+      )
 
       // seed segments on most episodes; leave some empty to test empty state
       if (e % 4 !== 3) {
         segmentsByItem.set(epId, [
-          { Id: nextId(), ItemId: epId, Type: 'Intro', StartTicks: 12 * TICKS, EndTicks: 48 * TICKS },
-          ...(e % 2 === 0 ? [{ Id: nextId(), ItemId: epId, Type: 'Recap', StartTicks: 2 * TICKS, EndTicks: 11 * TICKS }] : []),
-          { Id: nextId(), ItemId: epId, Type: 'Outro', StartTicks: 270 * TICKS, EndTicks: 296 * TICKS },
-          ...(e % 3 === 0 ? [{ Id: nextId(), ItemId: epId, Type: 'Preview', StartTicks: 296 * TICKS, EndTicks: 300 * TICKS }] : []),
+          {
+            Id: nextId(),
+            ItemId: epId,
+            Type: 'Intro',
+            StartTicks: 12 * TICKS,
+            EndTicks: 48 * TICKS,
+          },
+          ...(e % 2 === 0
+            ? [
+                {
+                  Id: nextId(),
+                  ItemId: epId,
+                  Type: 'Recap',
+                  StartTicks: 2 * TICKS,
+                  EndTicks: 11 * TICKS,
+                },
+              ]
+            : []),
+          {
+            Id: nextId(),
+            ItemId: epId,
+            Type: 'Outro',
+            StartTicks: 270 * TICKS,
+            EndTicks: 296 * TICKS,
+          },
+          ...(e % 3 === 0
+            ? [
+                {
+                  Id: nextId(),
+                  ItemId: epId,
+                  Type: 'Preview',
+                  StartTicks: 296 * TICKS,
+                  EndTicks: 300 * TICKS,
+                },
+              ]
+            : []),
         ])
       }
     }
@@ -181,26 +310,55 @@ let movieIdx = 0
 for (const [name, year] of MOVIE_DEFS) {
   const pal = PALETTES[(movieIdx + 5) % PALETTES.length]
   const movieId = nextId()
-  addItem({
-    Id: movieId, Name: name, Type: 'Movie', ProductionYear: year,
-    RunTimeTicks: RUNTIME_SECONDS * TICKS, ImageTags: { Primary: 'p1' },
-    MediaSources: [makeMediaSource(movieId)], ServerId: SERVER_ID,
-  }, MOVIE_LIB.ItemId, { bg: pal[0], fg: pal[1], label: name, kind: 'poster' })
+  addItem(
+    {
+      Id: movieId,
+      Name: name,
+      Type: 'Movie',
+      ProductionYear: year,
+      RunTimeTicks: RUNTIME_SECONDS * TICKS,
+      ImageTags: { Primary: 'p1' },
+      MediaSources: [makeMediaSource(movieId)],
+      ServerId: SERVER_ID,
+    },
+    MOVIE_LIB.ItemId,
+    { bg: pal[0], fg: pal[1], label: name, kind: 'poster' },
+  )
   if (movieIdx % 2 === 0) {
     segmentsByItem.set(movieId, [
-      { Id: nextId(), ItemId: movieId, Type: 'Commercial', StartTicks: 100 * TICKS, EndTicks: 130 * TICKS },
-      { Id: nextId(), ItemId: movieId, Type: 'Outro', StartTicks: 280 * TICKS, EndTicks: 300 * TICKS },
+      {
+        Id: nextId(),
+        ItemId: movieId,
+        Type: 'Commercial',
+        StartTicks: 100 * TICKS,
+        EndTicks: 130 * TICKS,
+      },
+      {
+        Id: nextId(),
+        ItemId: movieId,
+        Type: 'Outro',
+        StartTicks: 280 * TICKS,
+        EndTicks: 300 * TICKS,
+      },
     ])
   }
   movieIdx += 1
 }
 
 // ── image generation (ffmpeg, cached) ────────────────────────────────
-const FONT = path.join(__dirname, 'dejavu-sans-bold.ttf').replace(/\\/g, '/').replace(/:/g, '\\:')
+const FONT = path
+  .join(__dirname, 'dejavu-sans-bold.ttf')
+  .replace(/\\/g, '/')
+  .replace(/:/g, '\\:')
 const inflight = new Map()
 
 function genImage(id) {
-  const art = artOf.get(id) ?? { bg: '#333344', fg: '#aab', label: 'Unknown', kind: 'poster' }
+  const art = artOf.get(id) ?? {
+    bg: '#333344',
+    fg: '#aab',
+    label: 'Unknown',
+    kind: 'poster',
+  }
   const file = path.join(IMG_DIR, `${id}-${art.kind}.png`)
   if (fs.existsSync(file)) return Promise.resolve(file)
   if (inflight.has(file)) return inflight.get(file)
@@ -209,18 +367,38 @@ function genImage(id) {
   const size = `${w}x${h}`
   const fontsize = art.kind === 'poster' ? 34 : 24
   const lines = art.label.split('\n')
-  const drawtexts = lines.map((line, i) => {
-    const esc = line.replace(/[\\:'%]/g, '')
-    const y = art.kind === 'poster' ? `(h*0.72)+${i * (fontsize + 10)}` : `(h*0.62)+${i * (fontsize + 8)}`
-    return `drawtext=fontfile=${FONT}:text='${esc}':fontcolor=${art.fg}:fontsize=${fontsize}:x=24:y=${y}`
-  }).join(',')
+  const drawtexts = lines
+    .map((line, i) => {
+      const esc = line.replace(/[\\:'%]/g, '')
+      const y =
+        art.kind === 'poster'
+          ? `(h*0.72)+${i * (fontsize + 10)}`
+          : `(h*0.62)+${i * (fontsize + 8)}`
+      return `drawtext=fontfile=${FONT}:text='${esc}':fontcolor=${art.fg}:fontsize=${fontsize}:x=24:y=${y}`
+    })
+    .join(',')
   const gradient = `gradients=s=${size}:c0=${art.bg}:c1=${shade(art.bg, -28)}:x0=0:y0=0:x1=${w}:y1=${h}:d=1`
   const filter = `${gradient},${drawtexts},drawbox=x=0:y=0:w=iw:h=12:color=${art.fg}@0.9:t=fill`
 
   const p = new Promise((resolve, reject) => {
-    const ff = spawn(FFMPEG_PATH, ['-v', 'error', '-f', 'lavfi', '-i', filter, '-frames:v', '1', '-y', file])
-    ff.on('error', (error) => reject(new Error(`${FFMPEG_PATH}: ${error.message}`)))
-    ff.on('exit', (code) => (code === 0 ? resolve(file) : reject(new Error(`${FFMPEG_PATH} ${code}`))))
+    const ff = spawn(FFMPEG_PATH, [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      filter,
+      '-frames:v',
+      '1',
+      '-y',
+      file,
+    ])
+    ff.on('error', (error) =>
+      reject(new Error(`${FFMPEG_PATH}: ${error.message}`)),
+    )
+    ff.on('exit', (code) =>
+      code === 0 ? resolve(file) : reject(new Error(`${FFMPEG_PATH} ${code}`)),
+    )
   }).finally(() => inflight.delete(file))
   inflight.set(file, p)
   return p
@@ -301,7 +479,10 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] ?? '*')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    req.headers['access-control-request-headers'] ?? '*',
+  )
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   res.setHeader('Timing-Allow-Origin', '*')
 
@@ -316,13 +497,20 @@ const server = http.createServer(async (req, res) => {
   // System info
   if (p === '/System/Info/Public') {
     return json(res, {
-      Id: SERVER_ID, LocalAddress: MOCK_SERVER_ADDRESS, ProductName: 'Jellyfin Server',
-      ServerName: 'Mockfin', Version: MOCK_SERVER_VERSION, StartupWizardCompleted: true,
+      Id: SERVER_ID,
+      LocalAddress: MOCK_SERVER_ADDRESS,
+      ProductName: 'Jellyfin Server',
+      ServerName: 'Mockfin',
+      Version: MOCK_SERVER_VERSION,
+      StartupWizardCompleted: true,
     })
   }
   if (p === '/System/Info') {
     return json(res, {
-      Id: SERVER_ID, ServerName: 'Mockfin', Version: MOCK_SERVER_VERSION, OperatingSystem: 'Linux',
+      Id: SERVER_ID,
+      ServerName: 'Mockfin',
+      Version: MOCK_SERVER_VERSION,
+      OperatingSystem: 'Linux',
       LocalAddress: MOCK_SERVER_ADDRESS,
     })
   }
@@ -344,7 +532,12 @@ const server = http.createServer(async (req, res) => {
   // Plugins list (segment provider detection)
   if (p === '/Plugins') {
     return json(res, [
-      { Id: 'c83d86bb-a1e0-4c35-a113-e2101cf4ee6b', Name: 'Intro Skipper', Version: '1.0.0', Status: 'Active' },
+      {
+        Id: 'c83d86bb-a1e0-4c35-a113-e2101cf4ee6b',
+        Name: 'Intro Skipper',
+        Version: '1.0.0',
+        Status: 'Active',
+      },
     ])
   }
 
@@ -352,8 +545,15 @@ const server = http.createServer(async (req, res) => {
   if (p === '/Items' && req.method === 'GET') {
     const ids = url.searchParams.get('ids')
     if (ids) {
-      const found = ids.split(',').map((id) => items.get(id)).filter(Boolean)
-      return json(res, { Items: found, TotalRecordCount: found.length, StartIndex: 0 })
+      const found = ids
+        .split(',')
+        .map((id) => items.get(id))
+        .filter(Boolean)
+      return json(res, {
+        Items: found,
+        TotalRecordCount: found.length,
+        StartIndex: 0,
+      })
     }
     const parentId = url.searchParams.get('parentId')
     const searchTerm = (url.searchParams.get('searchTerm') ?? '').toLowerCase()
@@ -364,17 +564,28 @@ const server = http.createServer(async (req, res) => {
     let list = []
     if (parentId) {
       if (recursive || searchTerm) {
-        list = collectDescendants(parentId, (it) => ['Series', 'Movie', 'Episode'].includes(it.Type))
-        if (searchTerm) list = list.filter((it) => (it.Name ?? '').toLowerCase().includes(searchTerm))
+        list = collectDescendants(parentId, (it) =>
+          ['Series', 'Movie', 'Episode'].includes(it.Type),
+        )
+        if (searchTerm)
+          list = list.filter((it) =>
+            (it.Name ?? '').toLowerCase().includes(searchTerm),
+          )
         // de-prioritize episodes in search results
-        list = sortByName(list.filter((x) => x.Type !== 'Episode')).concat(sortByName(list.filter((x) => x.Type === 'Episode')))
+        list = sortByName(list.filter((x) => x.Type !== 'Episode')).concat(
+          sortByName(list.filter((x) => x.Type === 'Episode')),
+        )
       } else {
         list = (childrenOf.get(parentId) ?? []).map((id) => items.get(id))
         list = sortByName(list)
       }
     }
     const page = list.slice(startIndex, startIndex + limit)
-    return json(res, { Items: page, TotalRecordCount: list.length, StartIndex: startIndex })
+    return json(res, {
+      Items: page,
+      TotalRecordCount: list.length,
+      StartIndex: startIndex,
+    })
   }
 
   // Single item
@@ -391,7 +602,11 @@ const server = http.createServer(async (req, res) => {
     try {
       const file = await genImage(id)
       const buf = fs.readFileSync(file)
-      res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=3600' })
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': buf.length,
+        'Cache-Control': 'public, max-age=3600',
+      })
       return res.end(buf)
     } catch (e) {
       console.error('image gen failed', e.message)
@@ -403,13 +618,17 @@ const server = http.createServer(async (req, res) => {
   m = /^\/Shows\/([0-9a-f-]+)\/Seasons$/i.exec(p)
   if (m) {
     const seriesId = m[1].replace(/-/g, '')
-    const seasons = (childrenOf.get(seriesId) ?? []).map((id) => items.get(id)).filter((x) => x.Type === 'Season')
+    const seasons = (childrenOf.get(seriesId) ?? [])
+      .map((id) => items.get(id))
+      .filter((x) => x.Type === 'Season')
     return json(res, { Items: seasons, TotalRecordCount: seasons.length })
   }
   m = /^\/Shows\/([0-9a-f-]+)\/Episodes$/i.exec(p)
   if (m) {
     const seasonId = url.searchParams.get('seasonId')
-    const eps = (childrenOf.get(seasonId ?? '') ?? []).map((id) => items.get(id)).filter((x) => x.Type === 'Episode')
+    const eps = (childrenOf.get(seasonId ?? '') ?? [])
+      .map((id) => items.get(id))
+      .filter((x) => x.Type === 'Episode')
     return json(res, { Items: eps, TotalRecordCount: eps.length })
   }
 
@@ -429,7 +648,11 @@ const server = http.createServer(async (req, res) => {
       try {
         const seg = JSON.parse(body)
         const itemId = (seg.ItemId ?? m[1]).replace(/-/g, '')
-        const stored = { ...seg, Id: (seg.Id ?? nextId()).replace(/-/g, ''), ItemId: itemId }
+        const stored = {
+          ...seg,
+          Id: (seg.Id ?? nextId()).replace(/-/g, ''),
+          ItemId: itemId,
+        }
         if (!segmentsByItem.has(itemId)) segmentsByItem.set(itemId, [])
         segmentsByItem.get(itemId).push(stored)
         json(res, stored)
@@ -442,7 +665,9 @@ const server = http.createServer(async (req, res) => {
   if (m && req.method === 'DELETE') {
     const segId = m[1].replace(/-/g, '')
     for (const [itemId, segs] of segmentsByItem) {
-      const idx = segs.findIndex((s) => (s.Id ?? '').replace(/-/g, '') === segId)
+      const idx = segs.findIndex(
+        (s) => (s.Id ?? '').replace(/-/g, '') === segId,
+      )
       if (idx !== -1) {
         segs.splice(idx, 1)
         break
@@ -463,7 +688,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Playstate / sessions reporting
-  if (p.startsWith('/Sessions') || p.startsWith('/PlayingItems') || p.startsWith('/UserPlayedItems')) {
+  if (
+    p.startsWith('/Sessions') ||
+    p.startsWith('/PlayingItems') ||
+    p.startsWith('/UserPlayedItems')
+  ) {
     res.writeHead(204)
     return res.end()
   }
@@ -471,9 +700,21 @@ const server = http.createServer(async (req, res) => {
   // Search hints
   if (p === '/Search/Hints') {
     const q = (url.searchParams.get('searchTerm') ?? '').toLowerCase()
-    const hits = [...items.values()].filter((it) => ['Series', 'Movie'].includes(it.Type) && (it.Name ?? '').toLowerCase().includes(q)).slice(0, 20)
+    const hits = [...items.values()]
+      .filter(
+        (it) =>
+          ['Series', 'Movie'].includes(it.Type) &&
+          (it.Name ?? '').toLowerCase().includes(q),
+      )
+      .slice(0, 20)
     return json(res, {
-      SearchHints: hits.map((it) => ({ Id: it.Id, ItemId: it.Id, Name: it.Name, Type: it.Type, ProductionYear: it.ProductionYear })),
+      SearchHints: hits.map((it) => ({
+        Id: it.Id,
+        ItemId: it.Id,
+        Name: it.Name,
+        Type: it.Type,
+        ProductionYear: it.ProductionYear,
+      })),
       TotalRecordCount: hits.length,
     })
   }
@@ -485,7 +726,9 @@ const server = http.createServer(async (req, res) => {
 export function startMockServer() {
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
-      console.error(`mockfin failed: port ${MOCK_SERVER_PORT} is already in use`)
+      console.error(
+        `mockfin failed: port ${MOCK_SERVER_PORT} is already in use`,
+      )
     } else {
       console.error(`mockfin failed: ${error.message}`)
     }
@@ -497,6 +740,9 @@ export function startMockServer() {
   )
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+if (
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+) {
   startMockServer()
 }

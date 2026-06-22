@@ -15,7 +15,6 @@ interface MockServerLoginConfig {
   readonly userId: string
 }
 
-
 interface DevMockServerEnv {
   readonly DEV?: boolean
   readonly VITE_MOCK_SERVER_AUTO_LOGIN?: string
@@ -26,13 +25,13 @@ interface DevMockServerEnv {
   readonly VITE_MOCK_SERVER_USER_ID?: string
 }
 
-function getMockServerLoginConfig(env: DevMockServerEnv): MockServerLoginConfig {
+function getMockServerLoginConfig(
+  env: DevMockServerEnv,
+): MockServerLoginConfig {
   return {
-    serverAddress:
-      env.VITE_MOCK_SERVER_ADDRESS ?? DEFAULT_MOCK_SERVER_ADDRESS,
+    serverAddress: env.VITE_MOCK_SERVER_ADDRESS ?? DEFAULT_MOCK_SERVER_ADDRESS,
     authValue: env.VITE_MOCK_SERVER_AUTH_VALUE ?? DEFAULT_MOCK_AUTH_VALUE,
-    serverVersion:
-      env.VITE_MOCK_SERVER_VERSION ?? DEFAULT_MOCK_SERVER_VERSION,
+    serverVersion: env.VITE_MOCK_SERVER_VERSION ?? DEFAULT_MOCK_SERVER_VERSION,
     username: env.VITE_MOCK_SERVER_USERNAME ?? DEFAULT_MOCK_USERNAME,
     userId: env.VITE_MOCK_SERVER_USER_ID ?? DEFAULT_MOCK_USER_ID,
   }
