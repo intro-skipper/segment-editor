@@ -104,21 +104,16 @@ export function ItemImage({
     }
 
     let cancelled = false
-    const idleCallbackId = window.requestIdleCallback(
-      () => {
-        const decoded = decodeBlurhashToDataUrl(blurhash)
-        if (!cancelled) {
-          setDecodedBlurhashState({ blurhash, dataUrl: decoded })
-        }
-      },
-      {
-        timeout: 180,
-      },
-    )
+    const timeoutId = setTimeout(() => {
+      const decoded = decodeBlurhashToDataUrl(blurhash)
+      if (!cancelled) {
+        setDecodedBlurhashState({ blurhash, dataUrl: decoded })
+      }
+    }, 180)
 
     return () => {
       cancelled = true
-      window.cancelIdleCallback(idleCallbackId)
+      clearTimeout(timeoutId)
     }
   }, [blurhash, cachedBlurhashDataUrl])
 

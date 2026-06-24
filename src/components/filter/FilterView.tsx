@@ -249,24 +249,10 @@ function useRenderFilterView() {
       }
     }
 
-    let timeoutId: number | null = null
-    let idleId: number | null = null
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(preloadVisibleColors, {
-        timeout: 250,
-      })
-    } else {
-      timeoutId = window.setTimeout(preloadVisibleColors, 100)
-    }
+    const timeoutId = setTimeout(preloadVisibleColors, 250)
 
     return () => {
-      if (idleId !== null && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleId)
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
+      clearTimeout(timeoutId)
     }
   }, [paginatedItems, columns])
 
