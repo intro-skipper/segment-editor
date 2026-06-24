@@ -4,6 +4,7 @@ import { decode } from 'blurhash'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { getBestImageUrl, getImageBlurhash } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
+import { scheduleIdleTask } from '@/lib/idle-task'
 import { cn } from '@/lib/utils'
 
 interface ItemImageProps {
@@ -103,37 +104,16 @@ export function ItemImage({
       return
     }
 
-    let cancelled = false
-    let idleCallbackId: number | null = null
-    let timeoutId: number | null = null
-
-    const decodeBlurhash = () => {
-      const decoded = decodeBlurhashToDataUrl(blurhash)
-      if (!cancelled) {
+    return scheduleIdleTask(
+      () => {
+        const decoded = decodeBlurhashToDataUrl(blurhash)
         setDecodedBlurhashState({ blurhash, dataUrl: decoded })
-      }
-    }
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleCallbackId = window.requestIdleCallback(decodeBlurhash, {
+      },
+      {
         timeout: 180,
-      })
-    } else {
-      timeoutId = window.setTimeout(decodeBlurhash, 100)
-    }
-
-    return () => {
-      cancelled = true
-      if (
-        idleCallbackId !== null &&
-        typeof window.cancelIdleCallback === 'function'
-      ) {
-        window.cancelIdleCallback(idleCallbackId)
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
+        fallbackDelay: 100,
+      },
+    )
   }, [blurhash, cachedBlurhashDataUrl])
 
   const imageKey = imageUrl || rawImageUrl || item.Id

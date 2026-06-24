@@ -31,6 +31,7 @@ import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
+import { scheduleIdleTask } from '@/lib/idle-task'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { MediaListRow } from '@/components/filter/MediaListRow'
 import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
@@ -249,25 +250,10 @@ function useRenderFilterView() {
       }
     }
 
-    let timeoutId: number | null = null
-    let idleId: number | null = null
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(preloadVisibleColors, {
-        timeout: 250,
-      })
-    } else {
-      timeoutId = window.setTimeout(preloadVisibleColors, 100)
-    }
-
-    return () => {
-      if (idleId !== null && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleId)
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
+    return scheduleIdleTask(preloadVisibleColors, {
+      timeout: 250,
+      fallbackDelay: 100,
+    })
   }, [paginatedItems, columns])
 
   const handleCollectionChange = (value: string | null) => {
