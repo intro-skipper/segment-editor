@@ -103,18 +103,8 @@ export function ItemImage({
       return
     }
 
-    let cancelled = false
-    const timeoutId = setTimeout(() => {
-      const decoded = decodeBlurhashToDataUrl(blurhash)
-      if (!cancelled) {
-        setDecodedBlurhashState({ blurhash, dataUrl: decoded })
-      }
-    }, 180)
-
-    return () => {
-      cancelled = true
-      clearTimeout(timeoutId)
-    }
+    const decoded = decodeBlurhashToDataUrl(blurhash)
+    setDecodedBlurhashState({ blurhash, dataUrl: decoded })
   }, [blurhash, cachedBlurhashDataUrl])
 
   const imageKey = imageUrl || rawImageUrl || item.Id
