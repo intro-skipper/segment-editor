@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { decode } from 'blurhash'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -76,10 +76,6 @@ export function ItemImage({
     null,
   )
   const imgRef = useRef<HTMLImageElement>(null)
-  const [decodedBlurhashState, setDecodedBlurhashState] = useState<{
-    blurhash: string
-    dataUrl: string | null
-  } | null>(null)
 
   const rawImageUrl = getBestImageUrl(item, maxWidth, maxHeight) ?? null
   const useBlobFallback =
@@ -88,24 +84,7 @@ export function ItemImage({
   const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
 
   const blurhash = getImageBlurhash(item) ?? null
-  const cachedBlurhashDataUrl = blurhash
-    ? (blurhashCache.get(`${blurhash}-32-32`) ?? null)
-    : null
-
-  const blurhashDataUrl =
-    cachedBlurhashDataUrl ??
-    (decodedBlurhashState?.blurhash === blurhash
-      ? decodedBlurhashState.dataUrl
-      : null)
-
-  useEffect(() => {
-    if (!blurhash || cachedBlurhashDataUrl) {
-      return
-    }
-
-    const decoded = decodeBlurhashToDataUrl(blurhash)
-    setDecodedBlurhashState({ blurhash, dataUrl: decoded })
-  }, [blurhash, cachedBlurhashDataUrl])
+  const blurhashDataUrl = blurhash ? decodeBlurhashToDataUrl(blurhash) : null
 
   const imageKey = imageUrl || rawImageUrl || item.Id
   const isLoaded = imageUrl !== null && loadedSource === imageUrl
