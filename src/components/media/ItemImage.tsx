@@ -104,21 +104,35 @@ export function ItemImage({
     }
 
     let cancelled = false
-    const idleCallbackId = window.requestIdleCallback(
-      () => {
-        const decoded = decodeBlurhashToDataUrl(blurhash)
-        if (!cancelled) {
-          setDecodedBlurhashState({ blurhash, dataUrl: decoded })
-        }
-      },
-      {
+    let idleCallbackId: number | null = null
+    let timeoutId: number | null = null
+
+    const decodeBlurhash = () => {
+      const decoded = decodeBlurhashToDataUrl(blurhash)
+      if (!cancelled) {
+        setDecodedBlurhashState({ blurhash, dataUrl: decoded })
+      }
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleCallbackId = window.requestIdleCallback(decodeBlurhash, {
         timeout: 180,
-      },
-    )
+      })
+    } else {
+      timeoutId = window.setTimeout(decodeBlurhash, 100)
+    }
 
     return () => {
       cancelled = true
-      window.cancelIdleCallback(idleCallbackId)
+      if (
+        idleCallbackId !== null &&
+        typeof window.cancelIdleCallback === 'function'
+      ) {
+        window.cancelIdleCallback(idleCallbackId)
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
     }
   }, [blurhash, cachedBlurhashDataUrl])
 
