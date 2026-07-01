@@ -87,7 +87,9 @@
       "title": "Stil",
       "system": "System",
       "dark": "Dunkel",
-      "light": "Hell"
+      "light": "Hell",
+      "monochrome": "Monochrom",
+      "monochromeDescription": "Artwork- und Akzentfarben deaktivieren"
     },
     "locale": {
       "auto": "Auto",

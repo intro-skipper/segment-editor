@@ -6,7 +6,7 @@ import type { Theme } from '@/stores/app-store'
 import type { VibrantColors } from '@/lib/cache-manager'
 import { LRUCache, blobCache, fetchBlobUrl } from '@/lib/cache-manager'
 import { CACHE_CONFIG } from '@/lib/constants'
-import { selectTheme, useAppStore } from '@/stores/app-store'
+import { selectMonochrome, selectTheme, useAppStore } from '@/stores/app-store'
 
 export type { VibrantColors } from '@/lib/cache-manager'
 
@@ -384,6 +384,8 @@ export const preloadVibrantColors = (
   urls: ReadonlyArray<string>,
   theme: Theme = 'auto',
 ): void => {
+  if (useAppStore.getState().monochrome) return
+
   const resolved = resolveTheme(theme)
   const cache = getCache(resolved)
   for (const url of urls) {
@@ -399,7 +401,8 @@ export function useVibrantColor(
   imageUrl: string | null,
   options?: UseVibrantColorOptions,
 ): VibrantColors | null {
-  const enabled = options?.enabled ?? true
+  const monochrome = useAppStore(selectMonochrome)
+  const enabled = (options?.enabled ?? true) && !monochrome
   const theme = useAppStore(selectTheme)
   const resolvedTheme = resolveTheme(theme)
   const cachedColors = useSyncExternalStore(
