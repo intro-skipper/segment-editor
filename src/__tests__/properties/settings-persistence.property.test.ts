@@ -343,18 +343,25 @@ describe('Settings Persistence Round-Trip', () => {
 
   it('persists monochrome setter updates immediately', () => {
     localStorage.removeItem(APP_STORAGE_KEY)
+    document.documentElement.classList.remove('monochrome')
 
-    useAppStore.getState().setMonochrome(true)
+    const { setMonochrome } = useAppStore.getState()
 
-    let stored = localStorage.getItem(APP_STORAGE_KEY)
-    expect(stored).not.toBeNull()
-    expect(JSON.parse(stored!).state.monochrome).toBe(true)
+    setMonochrome(true)
 
-    useAppStore.getState().setMonochrome(false)
+    const storedAfterEnable = localStorage.getItem(APP_STORAGE_KEY)
+    expect(storedAfterEnable).not.toBeNull()
+    expect(JSON.parse(storedAfterEnable!).state.monochrome).toBe(true)
+    expect(document.documentElement.classList.contains('monochrome')).toBe(true)
 
-    stored = localStorage.getItem(APP_STORAGE_KEY)
-    expect(stored).not.toBeNull()
-    expect(JSON.parse(stored!).state.monochrome).toBe(false)
+    setMonochrome(false)
+
+    const storedAfterDisable = localStorage.getItem(APP_STORAGE_KEY)
+    expect(storedAfterDisable).not.toBeNull()
+    expect(JSON.parse(storedAfterDisable!).state.monochrome).toBe(false)
+    expect(document.documentElement.classList.contains('monochrome')).toBe(
+      false,
+    )
   })
 
   it('persists server address and API key together', () => {
