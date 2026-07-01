@@ -20,6 +20,7 @@ type Locale = 'en-US' | 'de' | 'fr' | 'auto'
 
 interface AppSettings {
   theme: Theme
+  monochrome: boolean
   locale: Locale
   showVideoPlayer: boolean
   enableEdl: boolean
@@ -48,6 +49,7 @@ const apiKeyArb = fc.option(
 
 const appSettingsArb = fc.record<AppSettings>({
   theme: themeArb,
+  monochrome: booleanArb,
   locale: localeArb,
   showVideoPlayer: booleanArb,
   enableEdl: booleanArb,
@@ -98,6 +100,7 @@ describe('Settings Persistence Round-Trip', () => {
         const restored = parsed.state as AppSettings
 
         expect(restored.theme).toBe(settings.theme)
+        expect(restored.monochrome).toBe(settings.monochrome)
         expect(restored.locale).toBe(settings.locale)
         expect(restored.showVideoPlayer).toBe(settings.showVideoPlayer)
         expect(restored.enableEdl).toBe(settings.enableEdl)
@@ -144,6 +147,7 @@ describe('Settings Persistence Round-Trip', () => {
         const initialState = {
           state: {
             theme: 'auto' as Theme,
+            monochrome: false,
             locale: 'en-US' as Locale,
             showVideoPlayer: true,
             enableEdl: false,
@@ -176,6 +180,7 @@ describe('Settings Persistence Round-Trip', () => {
         const initialState = {
           state: {
             theme: 'auto' as Theme,
+            monochrome: false,
             locale: 'en-US' as Locale,
             showVideoPlayer: true,
             enableEdl: false,
@@ -224,6 +229,7 @@ describe('Settings Persistence Round-Trip', () => {
           const restored = parsed.state as AppSettings
 
           expect(restored.theme).toBe(finalSettings.theme)
+          expect(restored.monochrome).toBe(finalSettings.monochrome)
           expect(restored.locale).toBe(finalSettings.locale)
           expect(restored.showVideoPlayer).toBe(finalSettings.showVideoPlayer)
           expect(restored.enableEdl).toBe(finalSettings.enableEdl)
@@ -256,6 +262,47 @@ describe('Settings Persistence Round-Trip', () => {
     await useAppStore.persist.rehydrate()
 
     expect(useAppStore.getState().jellyfinPlaybackSyncEnabled).toBe(false)
+  })
+
+  it('defaults monochrome to disabled during app settings migration', async () => {
+    const previousState = {
+      theme: 'auto' as Theme,
+      locale: 'en-US' as Locale,
+      showVideoPlayer: true,
+      enableEdl: false,
+      enableChapter: false,
+      jellyfinPlaybackSyncEnabled: false,
+    }
+
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: previousState, version: 2 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().monochrome).toBe(false)
+  })
+
+  it('preserves enabled monochrome during app settings migration', async () => {
+    const previousState = {
+      theme: 'auto' as Theme,
+      monochrome: true,
+      locale: 'en-US' as Locale,
+      showVideoPlayer: true,
+      enableEdl: false,
+      enableChapter: false,
+      jellyfinPlaybackSyncEnabled: false,
+    }
+
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: previousState, version: 2 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().monochrome).toBe(true)
   })
 
   it('preserves enabled playback sync during app settings migration', async () => {
@@ -292,6 +339,22 @@ describe('Settings Persistence Round-Trip', () => {
     stored = localStorage.getItem(APP_STORAGE_KEY)
     expect(stored).not.toBeNull()
     expect(JSON.parse(stored!).state.jellyfinPlaybackSyncEnabled).toBe(false)
+  })
+
+  it('persists monochrome setter updates immediately', () => {
+    localStorage.removeItem(APP_STORAGE_KEY)
+
+    useAppStore.getState().setMonochrome(true)
+
+    let stored = localStorage.getItem(APP_STORAGE_KEY)
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).state.monochrome).toBe(true)
+
+    useAppStore.getState().setMonochrome(false)
+
+    stored = localStorage.getItem(APP_STORAGE_KEY)
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).state.monochrome).toBe(false)
   })
 
   it('persists server address and API key together', () => {
