@@ -24,6 +24,7 @@ import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import {
   areSegmentListsEqual,
   generateUUID,
+  resolveSegmentIndex,
   sortSegmentsByStart,
 } from '@/lib/segment-utils'
 import {
@@ -215,9 +216,26 @@ function useRenderPlayerEditor({
 
   const [importDialogOpen, setImportDialogOpen] = React.useState(false)
   const pendingImportRef = React.useRef<ParsedImportResult | null>(null)
-  const [pendingDeleteIndex, setPendingDeleteIndex] = React.useState<
-    number | null
-  >(null)
+  const [pendingDelete, setPendingDelete] = React.useState<{
+    id?: MediaSegmentDto['Id']
+    type?: MediaSegmentDto['Type']
+    index: number
+  } | null>(null)
+
+  // Reset editor-local state when the edited item changes while this
+  // component stays mounted (e.g. switching episodes from the header),
+  // so edits and open dialogs never leak across items.
+  const [renderedItemId, setRenderedItemId] = React.useState(item.Id)
+  if (renderedItemId !== item.Id) {
+    setRenderedItemId(item.Id)
+    setLocalEditingSegments(null)
+    setActiveIndex(0)
+    setEditDialogOpen(false)
+    setEditingSegmentIndex(null)
+    setImportDialogOpen(false)
+    setPendingDelete(null)
+    pendingImportRef.current = null
+  }
 
   const isSaving = batchSaveMutation.isPending
 
@@ -338,16 +356,23 @@ function useRenderPlayerEditor({
   }
 
   const handleRequestDeleteSegment = (index: number) => {
-    setPendingDeleteIndex(index)
+    const segment = editingSegments[index] as MediaSegmentDto | undefined
+    if (segment === undefined) return
+    setPendingDelete({ id: segment.Id, type: segment.Type, index })
   }
 
   const handleConfirmDeleteSegment = () => {
-    if (pendingDeleteIndex !== null) handleDeleteSegment(pendingDeleteIndex)
-    setPendingDeleteIndex(null)
+    if (pendingDelete !== null) {
+      // Resolve by Id at confirmation time: edits made while the dialog is
+      // open can re-sort the list, so the captured index may be stale.
+      const currentIndex = resolveSegmentIndex(editingSegments, pendingDelete)
+      if (currentIndex !== -1) handleDeleteSegment(currentIndex)
+    }
+    setPendingDelete(null)
   }
 
   const handleCancelDeleteSegment = () => {
-    setPendingDeleteIndex(null)
+    setPendingDelete(null)
   }
 
   const handlePlayerTimestamp = (timestamp: number) => {
@@ -699,9 +724,9 @@ function useRenderPlayerEditor({
       </AlertDialog>
 
       <AlertDialog
-        open={pendingDeleteIndex !== null}
+        open={pendingDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingDeleteIndex(null)
+          if (!open) setPendingDelete(null)
         }}
       >
         <AlertDialogContent>
@@ -709,10 +734,7 @@ function useRenderPlayerEditor({
             <AlertDialogTitle>{t('editor.deleteSureTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('editor.deleteSure', {
-                Type:
-                  pendingDeleteIndex !== null
-                    ? editingSegments[pendingDeleteIndex]?.Type
-                    : undefined,
+                Type: pendingDelete?.type,
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -751,7 +773,12 @@ function useRenderPlayerEditor({
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => blocker.proceed?.()}
+              onClick={() => {
+                // Match the dialog copy: discard local edits before leaving
+                // so they cannot leak back in if this editor stays mounted.
+                handleDiscardEdits()
+                blocker.proceed?.()
+              }}
             >
               {t('editor.discardAndLeave', 'Discard & leave')}
             </AlertDialogAction>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { areSegmentListsEqual } from '@/lib/segment-utils'
+import { areSegmentListsEqual, resolveSegmentIndex } from '@/lib/segment-utils'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 
 function segment(overrides: Partial<MediaSegmentDto> = {}): MediaSegmentDto {
@@ -63,5 +63,47 @@ describe('areSegmentListsEqual', () => {
     expect(
       areSegmentListsEqual([segment()], [segment({ ItemId: 'item-2' })]),
     ).toBe(true)
+  })
+
+  it('treats missing elements as unequal instead of throwing', () => {
+    const withUndefined = [
+      segment(),
+      undefined,
+    ] as unknown as Array<MediaSegmentDto>
+    const complete = [segment(), segment({ Id: 'segment-2' })]
+
+    expect(areSegmentListsEqual(withUndefined, complete)).toBe(false)
+    expect(areSegmentListsEqual(complete, withUndefined)).toBe(false)
+
+    const sparse = new Array<MediaSegmentDto>(2)
+    sparse[0] = segment()
+    expect(areSegmentListsEqual(sparse, complete)).toBe(false)
+  })
+})
+
+describe('resolveSegmentIndex', () => {
+  const segments = [
+    segment({ Id: 'segment-1' }),
+    segment({ Id: 'segment-2', StartTicks: 30, EndTicks: 40 }),
+    segment({ Id: 'segment-3', StartTicks: 50, EndTicks: 60 }),
+  ]
+
+  it('resolves by Id even when the captured index is stale', () => {
+    expect(resolveSegmentIndex(segments, { id: 'segment-3', index: 0 })).toBe(2)
+  })
+
+  it('returns -1 when the referenced Id no longer exists', () => {
+    expect(resolveSegmentIndex(segments, { id: 'segment-9', index: 1 })).toBe(
+      -1,
+    )
+  })
+
+  it('falls back to the captured index when no Id is available', () => {
+    expect(resolveSegmentIndex(segments, { index: 1 })).toBe(1)
+  })
+
+  it('returns -1 for an out-of-bounds fallback index', () => {
+    expect(resolveSegmentIndex(segments, { index: 3 })).toBe(-1)
+    expect(resolveSegmentIndex(segments, { index: -1 })).toBe(-1)
   })
 })
