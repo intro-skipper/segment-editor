@@ -23,6 +23,11 @@ const itemsById: Record<string, BaseItemDto> = {
     Name: 'Inception',
     Type: BaseItemKind.Movie,
   },
+  'album-1': {
+    Id: 'album-1',
+    Name: 'Random Access Memories',
+    Type: BaseItemKind.MusicAlbum,
+  },
   'episode-1': {
     Id: 'episode-1',
     Name: 'Pilot',
@@ -56,8 +61,12 @@ vi.mock('@tanstack/react-hotkeys', () => ({
   useHotkey: vi.fn(),
 }))
 
+const collectionsRef: {
+  current: Array<{ ItemId?: string | null; Name?: string | null }>
+} = { current: [] }
+
 vi.mock('@/services/items/queries', () => ({
-  useCollections: () => ({ data: [] }),
+  useCollections: () => ({ data: collectionsRef.current }),
   useItem: (itemId: string, opts?: { enabled?: boolean }) => ({
     data: (opts?.enabled ?? true) ? itemsById[itemId] : undefined,
   }),
@@ -101,9 +110,19 @@ function renderHeaderAt(initialPath: string) {
     path: '/series/$itemId',
     component: () => null,
   })
+  const albumRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/album/$itemId',
+    component: () => null,
+  })
 
   const router = createRouter({
-    routeTree: rootRoute.addChildren([indexRoute, playerRoute, seriesRoute]),
+    routeTree: rootRoute.addChildren([
+      indexRoute,
+      playerRoute,
+      seriesRoute,
+      albumRoute,
+    ]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
   })
 
@@ -115,6 +134,7 @@ function renderHeaderAt(initialPath: string) {
 describe('Header on detail routes', () => {
   afterEach(() => {
     cleanup()
+    collectionsRef.current = []
   })
 
   it('renders the movie name as the title on a player route', async () => {
@@ -139,5 +159,35 @@ describe('Header on detail routes', () => {
 
     const heading = await screen.findByRole('heading', { level: 1 })
     expect(heading.textContent).toBe('The Expanse')
+  })
+
+  it('renders the album name as the title on an album route', async () => {
+    renderHeaderAt('/album/album-1')
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    expect(heading.textContent).toBe('Random Access Memories')
+  })
+
+  it('renders the collection selector without a detail title when no itemId param is present', async () => {
+    collectionsRef.current = [{ ItemId: 'lib-1', Name: 'TV Shows' }]
+    renderHeaderAt('/')
+
+    // Index route: the header falls back to the collection selector heading
+    const heading = await screen.findByRole('heading', { level: 1 })
+    expect(heading.textContent).toBe('All Libraries')
+    expect(screen.queryByTestId('episode-switcher')).toBeNull()
+    // Settings action still renders, so the header is fully functional
+    expect(screen.getByLabelText('Open settings')).toBeTruthy()
+  })
+
+  it('fails gracefully when the item is unknown on a detail route', async () => {
+    renderHeaderAt('/player/unknown-item')
+
+    // Back button renders, no crash
+    expect(await screen.findByLabelText('Go back')).toBeTruthy()
+    // Title falls back to empty until the item resolves; switcher stays absent
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.textContent).toBe('')
+    expect(screen.queryByTestId('episode-switcher')).toBeNull()
   })
 })
