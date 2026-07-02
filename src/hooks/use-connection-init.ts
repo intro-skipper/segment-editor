@@ -154,7 +154,15 @@ export function useConnectionInit(): ConnectionState {
     }
 
     void init()
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      // Allow a remount to retry an attempt that was aborted mid-flight
+      // (e.g. StrictMode double-mount); otherwise the dedup key would leave
+      // the app stuck in the connecting state with no completed validation.
+      if (lastAttemptKeyRef.current === attemptKey) {
+        lastAttemptKeyRef.current = null
+      }
+    }
   }, [isPlugin, validAuth, serverAddress, apiKey])
 
   // Derive hasCredentials after effect to ensure consistency
