@@ -44,7 +44,9 @@
       "title": "Thème",
       "system": "Système",
       "dark": "Sombre",
-      "light": "Clair"
+      "light": "Clair",
+      "monochrome": "Monochrome",
+      "monochromeDescription": "Désactiver les couleurs d'illustration et d'accentuation"
     },
     "locale": {
       "auto": "Auto",
