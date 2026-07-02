@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Copy,
   Crosshair,
-  GripVertical,
   Pencil,
   Play,
   SkipBack,
@@ -744,10 +743,6 @@ export function SegmentSlider({
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <GripVertical
-            className="size-4 text-muted-foreground/50 cursor-grab hidden sm:block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-            aria-hidden="true"
-          />
           <Badge
             variant="outline"
             className={cn(
@@ -761,7 +756,7 @@ export function SegmentSlider({
             {formatTime(duration)}
           </span>
         </div>
-        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {/* Copy dropdown menu */}
           <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
             <DropdownMenuTrigger

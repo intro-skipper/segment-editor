@@ -154,15 +154,26 @@ export function RootComponent() {
   const settingsOpen = useSessionStore(selectSettingsOpen)
 
   const [wizardDismissed, setWizardDismissed] = useState(false)
+  // Latch the wizard open: showWizard flips false as soon as auth succeeds,
+  // but the wizard must stay mounted through its success step.
+  const [wizardActive, setWizardActive] = useState(false)
 
-  const wizardOpen = showWizard && !wizardDismissed
+  useEffect(() => {
+    if (showWizard) setWizardActive(true)
+  }, [showWizard])
+
+  const wizardOpen = wizardActive && !wizardDismissed
 
   const handleWizardOpenChange = (open: boolean) => {
-    if (!open) setWizardDismissed(true)
+    if (!open) {
+      setWizardDismissed(true)
+      setWizardActive(false)
+    }
   }
 
   const handleWizardComplete = () => {
     setWizardDismissed(true)
+    setWizardActive(false)
   }
 
   return (

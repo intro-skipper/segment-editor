@@ -5,8 +5,8 @@ import {
   Link,
   useCanGoBack,
   useLocation,
-  useMatchRoute,
   useNavigate,
+  useParams,
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -106,8 +106,6 @@ const iconButtonClass = cn(
 /** Pre-computed platform-aware shortcut display for search button title */
 const MOD_K_DISPLAY = formatForDisplay('Mod+K')
 
-type DetailRouteMatch = false | { itemId?: string }
-
 interface HeaderDetailInfo {
   isEpisode: boolean
   pageTitle: string
@@ -129,19 +127,6 @@ interface HeaderActionsProps {
   vibrantColors: VibrantColors | null
   onOpenSearch: () => void
   onOpenSettings: () => void
-}
-
-function getMatchedRouteItemId(
-  albumMatch: DetailRouteMatch,
-  artistMatch: DetailRouteMatch,
-  playerMatch: DetailRouteMatch,
-  seriesMatch: DetailRouteMatch,
-): string | undefined {
-  if (albumMatch) return albumMatch.itemId
-  if (artistMatch) return artistMatch.itemId
-  if (playerMatch) return playerMatch.itemId
-  if (seriesMatch) return seriesMatch.itemId
-  return undefined
 }
 
 function getHeaderDetailInfo(
@@ -284,17 +269,7 @@ export default function Header() {
   const navigate = useNavigate()
   const router = useRouter()
   const canGoBack = useCanGoBack()
-  const matchRoute = useMatchRoute()
-  const albumMatch = matchRoute({ to: '/album/$itemId' })
-  const artistMatch = matchRoute({ to: '/artist/$itemId' })
-  const playerMatch = matchRoute({ to: '/player/$itemId' })
-  const seriesMatch = matchRoute({ to: '/series/$itemId' })
-  const itemId = getMatchedRouteItemId(
-    albumMatch,
-    artistMatch,
-    playerMatch,
-    seriesMatch,
-  )
+  const { itemId } = useParams({ strict: false })
   const selectedCollection = useSelectedCollectionSearch()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 

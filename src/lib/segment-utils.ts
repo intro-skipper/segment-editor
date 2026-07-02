@@ -11,6 +11,25 @@ export const sortSegmentsByStart = (
   b: MediaSegmentDto,
 ): number => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)
 
+/**
+ * Compares two segment lists for equality by length and per-segment
+ * Id/Type/StartTicks/EndTicks in order.
+ */
+export const areSegmentListsEqual = (
+  a: ReadonlyArray<MediaSegmentDto>,
+  b: ReadonlyArray<MediaSegmentDto>,
+): boolean =>
+  a.length === b.length &&
+  a.every((segment, index) => {
+    const other = b[index]
+    return (
+      segment.Id === other.Id &&
+      segment.Type === other.Type &&
+      segment.StartTicks === other.StartTicks &&
+      segment.EndTicks === other.EndTicks
+    )
+  })
+
 export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
   (type && SEGMENT_COLORS[type].bg) ?? DEFAULT_SEGMENT_COLOR.bg
 

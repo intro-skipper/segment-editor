@@ -168,7 +168,6 @@ function setItemsQuery(overrides: Partial<typeof itemsQueryState.current>) {
   }
 }
 
-
 describe('FilterView', () => {
   beforeEach(() => {
     routeSearchState.current = {}
@@ -224,6 +223,25 @@ describe('FilterView', () => {
     expect(
       screen.getByText('Establishing connection to Jellyfin server'),
     ).toBeTruthy()
+  })
+
+  it('renders the connecting state for standalone with stored credentials', () => {
+    pluginModeState.current = {
+      isPlugin: false,
+      hasCredentials: true,
+      isConnected: false,
+    }
+    setCollectionsQuery({
+      data: [makeCollection('movies', 'Movies')],
+    })
+
+    render(<FilterView />)
+
+    expect(screen.getByText('Connecting…')).toBeTruthy()
+    expect(screen.queryByText('Not Connected')).toBeNull()
+    expect(
+      screen.queryByRole('heading', { name: 'Select a Library' }),
+    ).toBeNull()
   })
 
   it('renders libraries and resets filter search when selecting one', () => {
@@ -408,7 +426,6 @@ describe('FilterView', () => {
       search: { fetchSegments: 'true' },
     })
   })
-
 
   it('retries item errors through the items query', () => {
     routeSearchState.current = { collection: 'movies' }

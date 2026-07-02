@@ -96,6 +96,13 @@
       "title": "Éditeur de Slider"
     },
     "noSegments": "Aucun segment disponible, créez-en un avec '+'",
+    "noSegmentsTitle": "Aucun segment pour l'instant",
+    "noSegmentsHint": "Créez un segment ou collez-en un depuis votre presse-papiers.",
+    "unsavedChanges": "Modifications non enregistrées",
+    "unsavedTitle": "Abandonner les modifications non enregistrées ?",
+    "unsavedDescription": "Vous avez des modifications de segments non enregistrées. Elles seront perdues si vous quittez.",
+    "discardAndLeave": "Abandonner et quitter",
+    "discard": "Abandonner",
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
     "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
     "setStartToBeginning": "Définir le début à zéro",
@@ -140,6 +147,7 @@
     "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée."
   },
   "common": {
+    "cancel": "Annuler",
     "go_back": "Retour",
     "goBack": "Retour",
     "home": "Accueil",

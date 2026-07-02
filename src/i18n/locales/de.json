@@ -153,6 +153,13 @@
       "title": "Slider Editor"
     },
     "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
+    "noSegmentsTitle": "Noch keine Segmente",
+    "noSegmentsHint": "Erstelle ein Segment oder füge eines aus der Zwischenablage ein.",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "unsavedTitle": "Ungespeicherte Änderungen verwerfen?",
+    "unsavedDescription": "Du hast ungespeicherte Segmentänderungen. Sie gehen verloren, wenn du die Seite verlässt.",
+    "discardAndLeave": "Verwerfen & verlassen",
+    "discard": "Verwerfen",
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
     "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
     "setStartToBeginning": "Start auf Anfang setzen",
@@ -201,6 +208,7 @@
     "feature_description": "Diese Funktion hat einen Fehler verursacht. Du kannst es erneut versuchen oder woanders hin navigieren."
   },
   "common": {
+    "cancel": "Abbrechen",
     "go_back": "Zurück",
     "goBack": "Zurück",
     "home": "Startseite",

@@ -153,6 +153,13 @@
       "title": "Slider Editor"
     },
     "noSegments": "No Segments available, create one with '+'",
+    "noSegmentsTitle": "No segments yet",
+    "noSegmentsHint": "Create a segment or paste one from your clipboard.",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedTitle": "Discard unsaved changes?",
+    "unsavedDescription": "You have unsaved segment edits. They will be lost if you leave.",
+    "discardAndLeave": "Discard & leave",
+    "discard": "Discard",
     "noSegmentInClipboard": "No segment in clipboard",
     "segmentCopiedToClipboard": "Segment copied to clipboard",
     "setStartToBeginning": "Set start to beginning",
@@ -201,6 +208,7 @@
     "feature_description": "This feature encountered an error. You can try again or navigate elsewhere."
   },
   "common": {
+    "cancel": "Cancel",
     "go_back": "Go Back",
     "goBack": "Go back",
     "home": "Home",

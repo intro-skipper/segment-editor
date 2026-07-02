@@ -27,13 +27,12 @@ import type { MediaSegmentType } from '@/types/jellyfin'
 import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrackState } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
-import { SEGMENT_TYPES } from '@/lib/segment-utils'
+import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
@@ -265,35 +264,26 @@ export function PlayerControls({
         )}
 
         {/* Create segment */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="outline"
-                aria-label={t('editor.newSegment')}
-                style={applyButtonStyle()}
-                className={getButtonClass(false, hasColors)}
-              />
-            }
-          >
-            <Plus
-              className={ICON_CLASS}
-              strokeWidth={3}
-              aria-hidden="true"
-              style={getIconStyle(iconColor)}
+        <SegmentTypeMenu
+          onSelect={segmentCreation.onCreate}
+          align="start"
+          container={portalContainer}
+          render={
+            <Button
+              variant="outline"
+              aria-label={t('editor.newSegment')}
+              style={applyButtonStyle()}
+              className={getButtonClass(false, hasColors)}
             />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" container={portalContainer}>
-            {SEGMENT_TYPES.map((type) => (
-              <DropdownMenuItem
-                key={type}
-                onClick={() => segmentCreation.onCreate(type)}
-              >
-                {t(`segmentType.${type}`)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+        >
+          <Plus
+            className={ICON_CLASS}
+            strokeWidth={3}
+            aria-hidden="true"
+            style={getIconStyle(iconColor)}
+          />
+        </SegmentTypeMenu>
       </div>
 
       <div className="flex-1" />

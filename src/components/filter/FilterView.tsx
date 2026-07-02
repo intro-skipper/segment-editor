@@ -317,7 +317,7 @@ function useRenderFilterView() {
 
   const showNotConnected = !isPlugin && !hasCredentials && !isConnected
 
-  const showConnecting = isPlugin && !isConnected
+  const showConnecting = !isConnected && (isPlugin || hasCredentials)
 
   return (
     <div className="relative px-4 pb-8 sm:px-6">
@@ -423,7 +423,7 @@ function useRenderFilterView() {
               />
             </div>
             <p className="text-destructive text-center text-lg">
-              {showError?.message ??
+              {showError.message ||
                 t('items.loadError', {
                   defaultValue: 'Unable to load media items',
                 })}

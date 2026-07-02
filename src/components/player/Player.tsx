@@ -294,10 +294,17 @@ function useRenderPlayer({
     lastAutoSkippedSegmentIdRef.current = null
   }, [segmentSkipMode, segmentSkipModeRevision])
 
-  const activeSkipSegment =
+  const trackedSkipSegment =
     activeSkipSegmentState?.segmentSkipModeRevision === segmentSkipModeRevision
       ? activeSkipSegmentState.segment
       : null
+
+  // Resolve against the current segments prop so edits (e.g. a Type change)
+  // are reflected immediately instead of showing the cached segment.
+  const activeSkipSegment =
+    trackedSkipSegment?.Id !== undefined
+      ? (segmentTimeIndex.rangeById.get(trackedSkipSegment.Id)?.segment ?? null)
+      : trackedSkipSegment
 
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
