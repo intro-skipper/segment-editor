@@ -41,12 +41,6 @@ const playerControlsProps: PlayerControlsProps = {
     onToggleMute: vi.fn(),
     onChange: vi.fn(),
   },
-  appearance: {
-    colorMode: 'default',
-    vibrantColors: null,
-    iconColor: undefined,
-    getButtonStyle: vi.fn(),
-  },
   segmentCreation: {
     onCreate: vi.fn(),
   },

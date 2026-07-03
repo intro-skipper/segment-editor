@@ -92,7 +92,6 @@ interface EpisodeCardProps {
   episodeId: string
   index: number
   onEpisodeClick: (episodeId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const EpisodeCard = function EpisodeCardComponent({
@@ -100,7 +99,6 @@ const EpisodeCard = function EpisodeCardComponent({
   episodeId,
   index,
   onEpisodeClick,
-  vibrantColors,
 }: EpisodeCardProps) {
   const { t } = useTranslation()
 
@@ -109,11 +107,6 @@ const EpisodeCard = function EpisodeCardComponent({
     ? Math.round(episode.RunTimeTicks / 600_000_000)
     : null
   const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
-
-  const cardStyle = vibrantColors
-    ? { backgroundColor: vibrantColors.primary }
-    : undefined
-  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
 
   const episodeName = episode.Name || episodeLabel
   const ariaLabel = runtime
@@ -129,11 +122,9 @@ const EpisodeCard = function EpisodeCardComponent({
       animate
       animationDelay={animationDelay}
       className={cn(
-        'group flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl',
-        !vibrantColors && 'bg-card/60 backdrop-blur-sm',
+        'group flex items-center gap-4 p-3 md:p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50',
         'hover:shadow-lg hover:shadow-black/10',
       )}
-      style={cardStyle}
       aria-label={ariaLabel}
     >
       <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
@@ -155,16 +146,10 @@ const EpisodeCard = function EpisodeCardComponent({
       </div>
 
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
-        <p
-          className="font-semibold truncate leading-tight text-base md:text-lg"
-          style={textStyle}
-        >
+        <p className="font-semibold truncate leading-tight text-base md:text-lg text-foreground">
           {episode.Name || episodeLabel}
         </p>
-        <p
-          className="text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80"
-          style={textStyle}
-        >
+        <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 text-muted-foreground">
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
@@ -176,14 +161,9 @@ const EpisodeCard = function EpisodeCardComponent({
 interface SeasonEpisodesProps {
   seriesId: string
   season: BaseItemDto
-  vibrantColors?: VibrantColors | null
 }
 
-function SeasonEpisodes({
-  seriesId,
-  season,
-  vibrantColors,
-}: SeasonEpisodesProps) {
+function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
   const { t } = useTranslation()
   const navigate = useNavigate({ from: '/series/$itemId' })
 
@@ -245,7 +225,6 @@ function SeasonEpisodes({
             episodeId={episode.Id ?? ''}
             index={index}
             onEpisodeClick={handleEpisodeClick}
-            vibrantColors={vibrantColors}
           />
         </div>
       ))}
@@ -307,7 +286,6 @@ export function SeriesView({
             key={selectedSeason.Id}
             seriesId={series.Id}
             season={selectedSeason}
-            vibrantColors={vibrantColors}
           />
         )}
       </div>

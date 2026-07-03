@@ -116,10 +116,13 @@ export const LibraryCard = function LibraryCardComponent({
       </div>
 
       {/* Library Name and Icon */}
-      <div className="px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 bg-secondary">
-        <Icon className="size-5 flex-shrink-0" aria-hidden="true" />
+      <div className="px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 bg-card border-t border-border/50">
+        <Icon
+          className="size-5 flex-shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
         <p
-          className="min-w-0 text-sm md:text-base font-semibold line-clamp-1 leading-snug group-hover:text-primary"
+          className="min-w-0 text-sm md:text-base font-semibold line-clamp-1 leading-snug text-foreground group-hover:text-primary"
           title={collection.Name || undefined}
         >
           {collection.Name || 'Unknown'}

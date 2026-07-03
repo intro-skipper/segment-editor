@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   startTransition,
   useState,
   useSyncExternalStore,
@@ -30,14 +29,12 @@ import { useCollections, useItems } from '@/services/items/queries'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
-import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { MediaListRow } from '@/components/filter/MediaListRow'
 import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
 import { LibraryPicker } from '@/components/filter/LibraryPicker'
 import { PaginationControls } from '@/components/filter/PaginationControls'
 import { useSessionStore } from '@/stores/session-store'
-import { getBestImageUrl } from '@/services/video/api'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
@@ -214,62 +211,6 @@ function useRenderFilterView() {
     gridRef.current = node
   }
 
-  const preloadedUrlsRef = useRef<Set<string> | null>(null)
-  if (preloadedUrlsRef.current === null) {
-    preloadedUrlsRef.current = new Set<string>()
-  }
-
-  useEffect(() => {
-    preloadedUrlsRef.current?.clear()
-  }, [selectedCollection])
-
-  useEffect(() => {
-    if (paginatedItems.length === 0) return
-
-    const maxPreloadCount = Math.min(paginatedItems.length, columns)
-
-    const preloadVisibleColors = () => {
-      const preloadedUrls = preloadedUrlsRef.current
-      if (preloadedUrls === null) return
-
-      const imageUrls: Array<string> = []
-
-      for (let index = 0; index < maxPreloadCount; index++) {
-        const item = paginatedItems[index]
-
-        const url = getBestImageUrl(item, 200)
-        if (!url || preloadedUrls.has(url)) continue
-
-        preloadedUrls.add(url)
-        imageUrls.push(url)
-      }
-
-      if (imageUrls.length > 0) {
-        preloadVibrantColors(imageUrls)
-      }
-    }
-
-    let timeoutId: number | null = null
-    let idleId: number | null = null
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(preloadVisibleColors, {
-        timeout: 250,
-      })
-    } else {
-      timeoutId = window.setTimeout(preloadVisibleColors, 100)
-    }
-
-    return () => {
-      if (idleId !== null && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleId)
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }, [paginatedItems, columns])
-
   const handleCollectionChange = (value: string | null) => {
     setFocusedIndex(-1)
     startTransition(() => {
@@ -423,7 +364,7 @@ function useRenderFilterView() {
               />
             </div>
             <p className="text-destructive text-center text-lg">
-              {showError?.message ||
+              {showError.message ||
                 t('items.loadError', {
                   defaultValue: 'Unable to load media items',
                 })}

@@ -136,10 +136,18 @@ function ScrubberTrack({
         className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full"
         style={bufferedStyle}
       />
+      <div
+        className={cn(
+          'absolute inset-y-0 left-0 rounded-full',
+          !vibrantColors && 'bg-primary',
+        )}
+        style={progressStyle}
+      />
+      {/* Segment overlays render above the progress fill so the played portion never splits them */}
       {segmentRegions.map((region) => (
         <div
           key={region.id}
-          className="absolute inset-y-0 opacity-70"
+          className="absolute inset-y-0 opacity-80"
           style={{
             left: `${region.start}%`,
             width: `${region.width}%`,
@@ -148,13 +156,6 @@ function ScrubberTrack({
           title={region.type}
         />
       ))}
-      <div
-        className={cn(
-          'absolute inset-y-0 left-0 rounded-full',
-          !vibrantColors && 'bg-primary',
-        )}
-        style={progressStyle}
-      />
     </div>
   )
 }
@@ -247,7 +248,7 @@ function ScrubberThumb({
   return (
     <div
       className={cn(
-        'absolute top-1/2 w-4 h-4 rounded-full shadow-md transition-transform group-hover:scale-110',
+        'absolute top-1/2 size-4 rounded-full shadow-md ring-2 ring-background transition-transform group-hover:scale-110',
         !vibrantColors && 'bg-primary',
       )}
       style={thumbStyle}
@@ -585,7 +586,7 @@ export function PlayerScrubber({
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)]">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)]">
         {formatTime(safeCurrentTime)}
       </span>
 
@@ -644,7 +645,7 @@ export function PlayerScrubber({
         />
       </div>
 
-      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)] text-right">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)] text-right">
         {formatTime(safeDuration)}
       </span>
     </div>

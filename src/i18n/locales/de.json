@@ -97,7 +97,7 @@
       "title": "Sprache"
     },
     "viewMode": {
-      "title": "Ansicht beim Durchsuchen",
+      "title": "Ansicht",
       "card": "Karten",
       "list": "Liste"
     },
@@ -137,7 +137,8 @@
     "selectLibraryDescription": "Wähle eine Bibliothek, um deine Mediensammlung zu durchsuchen",
     "selectLibraryButton": "{{name}}-Bibliothek durchsuchen",
     "showing": "Zeige {{start}}–{{end}} von {{total}}",
-    "noItems": "Keine Elemente gefunden"
+    "noItems": "Keine Elemente gefunden",
+    "perPage": "Elemente pro Seite"
   },
   "editor": {
     "saveSegment": "Speichern",
@@ -163,7 +164,9 @@
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
     "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
     "setStartToBeginning": "Start auf Anfang setzen",
-    "setEndToDuration": "Ende auf Dauer setzen"
+    "setEndToDuration": "Ende auf Dauer setzen",
+    "segmentCount_one": "{{count}} Segment",
+    "segmentCount_other": "{{count}} Segmente"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -341,10 +344,10 @@
   "settings": {
     "open": "Einstellungen öffnen",
     "segmentSkipMode": {
-      "title": "Segmentaktionen",
+      "title": "Segmente überspringen",
       "button": "Überspringen-Schaltfläche anzeigen",
       "skip": "Automatisch überspringen",
-      "disabled": "Nur Standard-Wiedergabe"
+      "disabled": "Aus"
     },
     "jellyfinPlaybackSync": {
       "title": "Wiedergabe an Jellyfin melden",

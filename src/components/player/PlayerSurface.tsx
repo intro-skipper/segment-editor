@@ -94,24 +94,33 @@ function PlayerVideoButton({
         'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
         isFullscreen
           ? cn('w-full h-full', showControls ? 'cursor-default' : 'cursor-none')
-          : 'aspect-video cursor-pointer',
+          : 'aspect-video cursor-pointer overflow-hidden rounded-2xl bg-black',
       )}
       onClick={video.onInteraction}
       onTouchEnd={video.onInteraction}
       onKeyDown={video.onKeyDown}
       aria-label={t('player.videoPlayer')}
     >
+      {/* Blurred cover backdrop keeps portrait posters looking intentional inside the 16:9 box */}
+      {!isFullscreen && video.posterUrl ? (
+        <img
+          src={video.posterUrl}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover blur-2xl scale-110 opacity-40"
+        />
+      ) : null}
       {/* Captions are data-dependent: native VTT tracks are rendered when Jellyfin exposes them; ASS/SSA subtitles are rendered by JASSUB. */}
       {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
       <video
         ref={videoRef}
         className={cn(
-          'w-full h-full',
           isFullscreen
-            ? videoFitMode === 'contain'
-              ? 'object-contain'
-              : 'object-cover'
-            : 'object-contain',
+            ? cn(
+                'w-full h-full',
+                videoFitMode === 'contain' ? 'object-contain' : 'object-cover',
+              )
+            : 'absolute inset-0 h-full w-full object-contain',
         )}
         poster={video.posterUrl ?? undefined}
         crossOrigin="anonymous"
@@ -152,7 +161,7 @@ function PlayerErrorOverlay({
   const { t } = useTranslation()
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
+    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/80 text-white">
       <AlertTriangle className="size-12 text-destructive mb-4" />
       <p className="text-lg font-medium mb-2">{error.message}</p>
       {strategy === 'direct' && error.type === 'media' ? (
@@ -187,7 +196,7 @@ function PlayerLoadingOverlay({ isRecovering }: PlayerLoadingOverlayProps) {
 
   return (
     <output
-      className="absolute inset-0 flex items-center justify-center bg-black/60"
+      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60"
       aria-live="polite"
       aria-busy="true"
     >
@@ -286,7 +295,7 @@ function FullscreenControlsOverlay({
           </Button>
         </div>
 
-        <div className="mb-4">{timelineScrubber}</div>
+        <div className="mb-4 text-white">{timelineScrubber}</div>
 
         <PlayerControls {...controlsProps} />
       </div>

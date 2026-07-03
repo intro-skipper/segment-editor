@@ -5,6 +5,7 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { AmbientGradient } from '@/components/ui/ambient-gradient'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -87,12 +88,7 @@ export function SeriesPage() {
 
   return (
     <>
-      {vibrantColors && (
-        <div
-          className="fixed inset-0 z-0 transition-colors duration-700"
-          style={{ backgroundColor: vibrantColors.background }}
-        />
-      )}
+      <AmbientGradient colors={vibrantColors} />
       <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
         <FeatureErrorBoundary
           featureName="Series"

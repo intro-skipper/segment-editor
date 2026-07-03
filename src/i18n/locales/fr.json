@@ -51,10 +51,10 @@
       "en-US": "Anglais",
       "de": "Allemand",
       "fr": "Français",
-      "title": "Langues"
+      "title": "Langue"
     },
     "viewMode": {
-      "title": "Vue de navigation",
+      "title": "Affichage",
       "card": "Carte",
       "list": "Liste"
     },
@@ -82,7 +82,8 @@
     },
     "mediaGrid": "Éléments multimédias",
     "mediaList": "Éléments multimédias",
-    "loadingMediaItems": "Chargement des éléments multimédias"
+    "loadingMediaItems": "Chargement des éléments multimédias",
+    "perPage": "Éléments par page"
   },
   "editor": {
     "saveSegment": "Sauvegarder",
@@ -106,7 +107,9 @@
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
     "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
     "setStartToBeginning": "Définir le début à zéro",
-    "setEndToDuration": "Définir la fin à la durée"
+    "setEndToDuration": "Définir la fin à la durée",
+    "segmentCount_one": "{{count}} segment",
+    "segmentCount_other": "{{count}} segments"
   },
   "yes": "Oui",
   "no": "Non",
@@ -263,10 +266,10 @@
   "settings": {
     "open": "Ouvrir les paramètres",
     "segmentSkipMode": {
-      "title": "Actions de segment",
+      "title": "Saut de segments",
       "button": "Afficher le bouton de saut",
       "skip": "Passer automatiquement",
-      "disabled": "Lecture par défaut uniquement"
+      "disabled": "Désactivé"
     },
     "jellyfinPlaybackSync": {
       "title": "Signaler la lecture à Jellyfin",
