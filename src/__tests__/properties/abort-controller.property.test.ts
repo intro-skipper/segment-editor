@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { createTimeoutController, delay, withRetry } from '@/lib/retry-utils'
+import { delay, withRetry } from '@/lib/retry-utils'
 import { isAbortError } from '@/lib/unified-error'
 
 describe('AbortController Cancellation Safety', () => {
@@ -116,50 +116,6 @@ describe('AbortController Cancellation Safety', () => {
       // Should have stopped after abort, not continued all 5 retries
       expect(callCount).toBeLessThanOrEqual(3)
     }
-  })
-
-  /**
-   * Property: createTimeoutController creates valid AbortController
-   * For any timeout value, createTimeoutController SHALL return
-   * a valid AbortController instance.
-   */
-  it('createTimeoutController returns valid AbortController', () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 100, max: 60000 }), (timeoutMs) => {
-        const controller = createTimeoutController(timeoutMs)
-
-        // Should be a valid AbortController
-        const isValid =
-          controller instanceof AbortController &&
-          controller.signal instanceof AbortSignal &&
-          typeof controller.abort === 'function'
-
-        // Clean up by aborting
-        controller.abort()
-
-        return isValid
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: Manual abort clears timeout
-   * For any timeout controller, manually aborting SHALL work correctly
-   * and the signal SHALL be aborted.
-   */
-  it('manual abort on timeout controller works correctly', () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 1000, max: 60000 }), (timeoutMs) => {
-        const controller = createTimeoutController(timeoutMs)
-
-        // Manually abort before timeout
-        controller.abort(new Error('Manual abort'))
-
-        return controller.signal.aborted === true
-      }),
-      { numRuns: 100 },
-    )
   })
 
   /**

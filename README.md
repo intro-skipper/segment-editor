@@ -77,6 +77,7 @@ pnpm dev
 - Tests: `pnpm test`
 - Lint: `pnpm lint`
 - Format/fix: `pnpm check`
+- Mock dev server: `pnpm dev:mock` starts Vite with a mock Jellyfin server and auto-login when no non-mock login is cached. Set `VITE_MOCK_SERVER_AUTO_LOGIN=force` to overwrite cached credentials. Use `FFMPEG_PATH=/path/to/ffmpeg` when ffmpeg is not on `PATH`.
 
 ## Build
 

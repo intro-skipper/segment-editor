@@ -228,45 +228,23 @@ function useRenderFilterView() {
 
     const maxPreloadCount = Math.min(paginatedItems.length, columns)
 
-    const preloadVisibleColors = () => {
-      const preloadedUrls = preloadedUrlsRef.current
-      if (preloadedUrls === null) return
+    const preloadedUrls = preloadedUrlsRef.current
+    if (preloadedUrls === null) return
 
-      const imageUrls: Array<string> = []
+    const imageUrls: Array<string> = []
 
-      for (let index = 0; index < maxPreloadCount; index++) {
-        const item = paginatedItems[index]
+    for (let index = 0; index < maxPreloadCount; index++) {
+      const item = paginatedItems[index]
 
-        const url = getBestImageUrl(item, 200)
-        if (!url || preloadedUrls.has(url)) continue
+      const url = getBestImageUrl(item, 200)
+      if (!url || preloadedUrls.has(url)) continue
 
-        preloadedUrls.add(url)
-        imageUrls.push(url)
-      }
-
-      if (imageUrls.length > 0) {
-        preloadVibrantColors(imageUrls)
-      }
+      preloadedUrls.add(url)
+      imageUrls.push(url)
     }
 
-    let timeoutId: number | null = null
-    let idleId: number | null = null
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(preloadVisibleColors, {
-        timeout: 250,
-      })
-    } else {
-      timeoutId = window.setTimeout(preloadVisibleColors, 100)
-    }
-
-    return () => {
-      if (idleId !== null && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleId)
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
+    if (imageUrls.length > 0) {
+      preloadVibrantColors(imageUrls)
     }
   }, [paginatedItems, columns])
 
