@@ -214,8 +214,8 @@ function useRenderPlayerEditor({
 
   const getCurrentTimeRef = React.useRef<(() => number) | null>(null)
 
-  const [importDialogOpen, setImportDialogOpen] = React.useState(false)
-  const pendingImportRef = React.useRef<ParsedImportResult | null>(null)
+  const [pendingImport, setPendingImport] =
+    React.useState<ParsedImportResult | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<{
     id?: MediaSegmentDto['Id']
     type?: MediaSegmentDto['Type']
@@ -232,9 +232,8 @@ function useRenderPlayerEditor({
     setActiveIndex(0)
     setEditDialogOpen(false)
     setEditingSegmentIndex(null)
-    setImportDialogOpen(false)
+    setPendingImport(null)
     setPendingDelete(null)
-    pendingImportRef.current = null
   }
 
   const isSaving = batchSaveMutation.isPending
@@ -446,8 +445,7 @@ function useRenderPlayerEditor({
         }
 
         if (editingSegmentsRef.current.length > 0) {
-          pendingImportRef.current = result
-          setImportDialogOpen(true)
+          setPendingImport(result)
           return
         }
 
@@ -536,12 +534,11 @@ function useRenderPlayerEditor({
   }
 
   const dismissImportDialog = () => {
-    pendingImportRef.current = null
-    setImportDialogOpen(false)
+    setPendingImport(null)
   }
 
   const handleImportReplace = () => {
-    const pending = pendingImportRef.current
+    const pending = pendingImport
     if (!pending) return
 
     updateEditingSegments(() => {
@@ -560,7 +557,7 @@ function useRenderPlayerEditor({
   }
 
   const handleImportMerge = () => {
-    const pending = pendingImportRef.current
+    const pending = pendingImport
     if (!pending) return
 
     updateEditingSegments((prev) => {
@@ -711,7 +708,12 @@ function useRenderPlayerEditor({
         />
       )}
 
-      <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+      <AlertDialog
+        open={pendingImport !== null}
+        onOpenChange={(open) => {
+          if (!open) dismissImportDialog()
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>

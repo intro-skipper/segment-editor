@@ -155,12 +155,13 @@ export function RootComponent() {
 
   const [wizardDismissed, setWizardDismissed] = useState(false)
   // Latch the wizard open: showWizard flips false as soon as auth succeeds,
-  // but the wizard must stay mounted through its success step.
+  // but the wizard must stay mounted through its success step. Render-time
+  // state adjustment keeps the latch compiler-friendly (no effect cascade).
   const [wizardActive, setWizardActive] = useState(false)
 
-  useEffect(() => {
-    if (showWizard) setWizardActive(true)
-  }, [showWizard])
+  if (showWizard && !wizardActive) {
+    setWizardActive(true)
+  }
 
   const wizardOpen = wizardActive && !wizardDismissed
 
