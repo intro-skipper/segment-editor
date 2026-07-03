@@ -13,22 +13,50 @@ export const sortSegmentsByStart = (
 
 /**
  * Compares two segment lists for equality by length and per-segment
- * Id/Type/StartTicks/EndTicks in order.
+ * Id/Type/StartTicks/EndTicks in order. Missing elements (sparse arrays or
+ * explicit undefined entries) are treated as unequal.
  */
 export const areSegmentListsEqual = (
   a: ReadonlyArray<MediaSegmentDto>,
   b: ReadonlyArray<MediaSegmentDto>,
 ): boolean =>
   a.length === b.length &&
-  a.every((segment, index) => {
-    const other = b[index]
+  Array.from(a, (segment, index) => {
+    const other = b[index] as MediaSegmentDto | undefined
     return (
+      segment !== undefined &&
+      other !== undefined &&
       segment.Id === other.Id &&
       segment.Type === other.Type &&
       segment.StartTicks === other.StartTicks &&
       segment.EndTicks === other.EndTicks
     )
-  })
+  }).every(Boolean)
+
+/**
+ * Reference to a segment captured at interaction time (e.g. when a delete
+ * confirmation opens). `id` is preferred for resolution because the list can
+ * re-sort between capture and confirmation; `index` is the fallback for
+ * segments without an Id.
+ */
+export interface SegmentRef {
+  id?: MediaSegmentDto['Id']
+  index: number
+}
+
+/**
+ * Resolves a captured SegmentRef against the current list. Returns the
+ * current index of the referenced segment, or -1 when it no longer exists.
+ */
+export const resolveSegmentIndex = (
+  segments: ReadonlyArray<MediaSegmentDto>,
+  ref: SegmentRef,
+): number => {
+  if (ref.id) {
+    return segments.findIndex((segment) => segment.Id === ref.id)
+  }
+  return ref.index >= 0 && ref.index < segments.length ? ref.index : -1
+}
 
 export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
   (type && SEGMENT_COLORS[type].bg) ?? DEFAULT_SEGMENT_COLOR.bg

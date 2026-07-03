@@ -22,6 +22,7 @@ interface TrackPreferences {
 
 interface AppState {
   theme: Theme
+  monochrome: boolean
   locale: Locale
   showVideoPlayer: boolean
   enableEdl: boolean
@@ -36,6 +37,7 @@ interface AppState {
 
 interface AppActions {
   setTheme: (theme: Theme) => void
+  setMonochrome: (monochrome: boolean) => void
   setLocale: (locale: Locale) => void
   setShowVideoPlayer: (show: boolean) => void
   setEnableEdl: (enable: boolean) => void
@@ -69,6 +71,15 @@ const applyTheme = (theme: Theme): void => {
   }
 }
 
+const applyMonochrome = (monochrome: boolean): void => {
+  if (typeof document === 'undefined') return
+  try {
+    document.documentElement.classList.toggle('monochrome', monochrome)
+  } catch {
+    /* ignore in test/SSR */
+  }
+}
+
 const detectBrowserLocale = (): ResolvedLocale => {
   if (typeof navigator === 'undefined') return 'en-US'
   const lang = navigator.language
@@ -79,6 +90,7 @@ const detectBrowserLocale = (): ResolvedLocale => {
 
 const initialState: AppState = {
   theme: 'auto',
+  monochrome: false,
   locale: 'auto',
   showVideoPlayer: true,
   enableEdl: false,
@@ -100,6 +112,10 @@ export const useAppStore = create<AppStore>()(
       setTheme: (theme) => {
         applyTheme(theme)
         set({ theme })
+      },
+      setMonochrome: (monochrome) => {
+        applyMonochrome(monochrome)
+        set({ monochrome })
       },
       setLocale: (locale) => set({ locale }),
       setShowVideoPlayer: (showVideoPlayer) => set({ showVideoPlayer }),
@@ -140,7 +156,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'segment-editor-app',
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown, version: number) => {
         if (typeof persistedState !== 'object' || persistedState === null) {
           return persistedState
@@ -152,10 +168,16 @@ export const useAppStore = create<AppStore>()(
         if (version < 2 && !('jellyfinPlaybackSyncEnabled' in state)) {
           state = { ...state, jellyfinPlaybackSyncEnabled: false }
         }
+        if (version < 3 && !('monochrome' in state)) {
+          state = { ...state, monochrome: false }
+        }
         return state
       },
       onRehydrateStorage: () => (state) => {
-        if (state) applyTheme(state.theme)
+        if (state) {
+          applyTheme(state.theme)
+          applyMonochrome(state.monochrome)
+        }
       },
     },
   ),
@@ -165,3 +187,4 @@ export const getEffectiveLocale = (locale: Locale): ResolvedLocale =>
   locale === 'auto' ? detectBrowserLocale() : locale
 
 export const selectTheme = (state: AppStore): Theme => state.theme
+export const selectMonochrome = (state: AppStore): boolean => state.monochrome

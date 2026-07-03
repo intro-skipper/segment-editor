@@ -3,7 +3,6 @@ import type { BaseItemKind } from '@/types/jellyfin'
 
 // Query Keys
 export const itemsKeys = {
-  all: createQueryKey('items'),
   list: (
     parentId: string,
     options?: {
@@ -18,19 +17,16 @@ export const itemsKeys = {
 } as const
 
 export const seriesKeys = {
-  all: createQueryKey('series'),
   seasons: (seriesId: string) => createQueryKey('series', 'seasons', seriesId),
   episodes: (seriesId: string, seasonId: string) =>
     createQueryKey('series', 'episodes', seriesId, seasonId),
 } as const
 
 export const albumKeys = {
-  all: createQueryKey('album'),
   tracks: (albumId: string) => createQueryKey('album', 'tracks', albumId),
 } as const
 
 export const artistKeys = {
-  all: createQueryKey('artist'),
   albums: (artistId: string) => createQueryKey('artist', 'albums', artistId),
 } as const
 
@@ -38,6 +34,5 @@ export const artistKeys = {
  * Type-safe query key factory for collections.
  */
 export const collectionsKeys = {
-  all: createQueryKey('collections'),
   list: () => createQueryKey('collections', 'list'),
 } as const

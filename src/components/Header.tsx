@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
+  getRouteApi,
   useCanGoBack,
   useLocation,
   useNavigate,
@@ -24,11 +25,11 @@ import { useCollections, useItem } from '@/services/items/queries'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
-import { useSelectedCollectionSearch } from '@/hooks/use-selected-collection-search'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
 const loadCommandPalette = () => import('@/components/header/CommandPalette')
+const rootRouteApi = getRouteApi('__root__')
 const loadEpisodeSwitcher = () => import('@/components/header/EpisodeSwitcher')
 const loadSettingsDialog = () => import('@/components/settings')
 
@@ -253,7 +254,9 @@ export default function Header() {
   const router = useRouter()
   const canGoBack = useCanGoBack()
   const { itemId } = useParams({ strict: false })
-  const selectedCollection = useSelectedCollectionSearch()
+  const selectedCollection = rootRouteApi.useSearch({
+    select: (search) => search.collection,
+  })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)

@@ -86,24 +86,6 @@ export async function withRetry<T>(
   return attempt(maxRetries, 0)
 }
 
-/** Creates an AbortController with automatic timeout */
-export function createTimeoutController(timeoutMs = 30000): AbortController {
-  const controller = new AbortController()
-  const id = setTimeout(
-    () => controller.abort(new DOMException('Timeout', 'TimeoutError')),
-    timeoutMs,
-  )
-
-  // Patch abort to clear timeout and forward reason
-  const originalAbort = controller.abort.bind(controller)
-  controller.abort = (reason?: unknown) => {
-    clearTimeout(id)
-    originalAbort(reason)
-  }
-
-  return controller
-}
-
 /**
  * Executes an async function with retry logic, returning false on failure.
  * Useful for operations where failure should be handled gracefully.

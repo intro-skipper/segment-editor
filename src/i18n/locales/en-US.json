@@ -87,7 +87,9 @@
       "title": "Theme",
       "system": "System",
       "dark": "Dark",
-      "light": "Light"
+      "light": "Light",
+      "monochrome": "Monochrome",
+      "monochromeDescription": "Disable artwork and accent colors"
     },
     "locale": {
       "auto": "Auto",
