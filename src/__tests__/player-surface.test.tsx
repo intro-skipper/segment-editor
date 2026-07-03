@@ -230,6 +230,102 @@ describe('PlayerSurface', () => {
     expect(props.video.onPause).toHaveBeenCalledTimes(1)
   })
 
+  it('rounds the windowed surface and layers the blurred poster backdrop', () => {
+    const { container } = render(
+      <PlayerSurface
+        {...createProps({
+          video: { posterUrl: '/poster.jpg' },
+        })}
+      />,
+    )
+
+    const videoButton = screen.getByRole('button', {
+      name: 'player.videoPlayer',
+    })
+    expect(videoButton.classList.contains('rounded-2xl')).toBe(true)
+    expect(videoButton.classList.contains('overflow-hidden')).toBe(true)
+    expect(videoButton.classList.contains('aspect-video')).toBe(true)
+
+    const backdrop = container.querySelector('img')
+    if (!backdrop) throw new Error('Expected blurred poster backdrop')
+    expect(backdrop.getAttribute('src')).toBe('/poster.jpg')
+    expect(backdrop.getAttribute('aria-hidden')).toBe('true')
+    expect(backdrop.classList.contains('blur-2xl')).toBe(true)
+  })
+
+  it('drops the rounded frame and poster backdrop in fullscreen', () => {
+    const { container } = render(
+      <PlayerSurface
+        {...createProps({
+          video: { posterUrl: '/poster.jpg' },
+          fullscreen: { isFullscreen: true },
+        })}
+      />,
+    )
+
+    const videoButton = screen.getByRole('button', {
+      name: 'player.videoPlayer',
+    })
+    expect(videoButton.classList.contains('rounded-2xl')).toBe(false)
+    expect(videoButton.classList.contains('overflow-hidden')).toBe(false)
+
+    expect(container.querySelector('img')).toBe(null)
+  })
+
+  it('rounds the error overlay only in windowed mode', () => {
+    const error = {
+      type: 'media',
+      message: 'Playback failed',
+      recoverable: false,
+    } as const
+
+    const { rerender } = render(
+      <PlayerSurface {...createProps({ playback: { error } })} />,
+    )
+
+    const windowedOverlay = screen.getByText('Playback failed').parentElement
+    if (!windowedOverlay) throw new Error('Expected error overlay')
+    expect(windowedOverlay.classList.contains('rounded-2xl')).toBe(true)
+
+    rerender(
+      <PlayerSurface
+        {...createProps({
+          playback: { error },
+          fullscreen: { isFullscreen: true },
+        })}
+      />,
+    )
+
+    const fullscreenOverlay = screen.getByText('Playback failed').parentElement
+    if (!fullscreenOverlay) throw new Error('Expected error overlay')
+    expect(fullscreenOverlay.classList.contains('rounded-2xl')).toBe(false)
+  })
+
+  it('rounds the loading overlay only in windowed mode', () => {
+    const { container, rerender } = render(
+      <PlayerSurface
+        {...createProps({ playback: { isVideoLoading: true } })}
+      />,
+    )
+
+    const windowedOverlay = container.querySelector('output')
+    if (!windowedOverlay) throw new Error('Expected loading overlay')
+    expect(windowedOverlay.classList.contains('rounded-2xl')).toBe(true)
+
+    rerender(
+      <PlayerSurface
+        {...createProps({
+          playback: { isVideoLoading: true },
+          fullscreen: { isFullscreen: true },
+        })}
+      />,
+    )
+
+    const fullscreenOverlay = container.querySelector('output')
+    if (!fullscreenOverlay) throw new Error('Expected loading overlay')
+    expect(fullscreenOverlay.classList.contains('rounded-2xl')).toBe(false)
+  })
+
   it('renders recoverable direct-play errors without the skip action', () => {
     const onRetry = vi.fn()
     render(
