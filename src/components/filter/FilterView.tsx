@@ -467,7 +467,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <MediaListRow
-                    key={item.Id}
+                    key={item.Id ?? `media-item-${index}`}
                     item={item}
                     index={index}
                     label={getMediaItemLabel(t, item)}
@@ -517,7 +517,7 @@ function useRenderFilterView() {
                             const index = rowStartIndex + columnIndex
                             return (
                               <MediaCard
-                                key={item.Id}
+                                key={item.Id ?? `media-item-${index}`}
                                 item={item}
                                 index={index}
                                 {...getItemProps(index)}
@@ -541,7 +541,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <div
-                    key={item.Id}
+                    key={item.Id ?? `media-item-${index}`}
                     style={{
                       contentVisibility: 'auto',
                       containIntrinsicSize: '0 320px',
