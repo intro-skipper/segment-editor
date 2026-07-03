@@ -151,18 +151,25 @@ function PlayerVideoButton({
 interface PlayerErrorOverlayProps {
   error: HlsPlayerError
   strategy: PlaybackStrategy
+  isFullscreen: boolean
   onRetry: () => void
 }
 
 function PlayerErrorOverlay({
   error,
   strategy,
+  isFullscreen,
   onRetry,
 }: PlayerErrorOverlayProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/80 text-white">
+    <div
+      className={cn(
+        'absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white',
+        !isFullscreen && 'rounded-2xl',
+      )}
+    >
       <AlertTriangle className="size-12 text-destructive mb-4" />
       <p className="text-lg font-medium mb-2">{error.message}</p>
       {strategy === 'direct' && error.type === 'media' ? (
@@ -190,14 +197,21 @@ function PlayerErrorOverlay({
 
 interface PlayerLoadingOverlayProps {
   isRecovering: boolean
+  isFullscreen: boolean
 }
 
-function PlayerLoadingOverlay({ isRecovering }: PlayerLoadingOverlayProps) {
+function PlayerLoadingOverlay({
+  isRecovering,
+  isFullscreen,
+}: PlayerLoadingOverlayProps) {
   const { t } = useTranslation()
 
   return (
     <output
-      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60"
+      className={cn(
+        'absolute inset-0 flex items-center justify-center bg-black/60',
+        !isFullscreen && 'rounded-2xl',
+      )}
       aria-live="polite"
       aria-busy="true"
     >
@@ -339,12 +353,16 @@ export function PlayerSurface({
           <PlayerErrorOverlay
             error={playback.error}
             strategy={playback.strategy}
+            isFullscreen={fullscreen.isFullscreen}
             onRetry={playback.onRetry}
           />
         ) : null}
 
         {playback.isVideoLoading || playback.isRecovering ? (
-          <PlayerLoadingOverlay isRecovering={playback.isRecovering} />
+          <PlayerLoadingOverlay
+            isRecovering={playback.isRecovering}
+            isFullscreen={fullscreen.isFullscreen}
+          />
         ) : null}
 
         {segmentSkip ? (
