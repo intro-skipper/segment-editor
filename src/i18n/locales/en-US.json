@@ -96,10 +96,10 @@
       "en-US": "English",
       "de": "German",
       "fr": "French",
-      "title": "Locale"
+      "title": "Language"
     },
     "viewMode": {
-      "title": "Browse view",
+      "title": "Browse layout",
       "card": "Card",
       "list": "List"
     },
@@ -139,7 +139,8 @@
     "selectLibraryDescription": "Choose a library to browse your media collection",
     "selectLibraryButton": "Browse {{name}} library",
     "showing": "Showing {{start}}-{{end}} of {{total}}",
-    "noItems": "No items found"
+    "noItems": "No items found",
+    "perPage": "Items per page"
   },
   "editor": {
     "saveSegment": "Save",
@@ -165,7 +166,9 @@
     "noSegmentInClipboard": "No segment in clipboard",
     "segmentCopiedToClipboard": "Segment copied to clipboard",
     "setStartToBeginning": "Set start to beginning",
-    "setEndToDuration": "Set end to duration"
+    "setEndToDuration": "Set end to duration",
+    "segmentCount_one": "{{count}} segment",
+    "segmentCount_other": "{{count}} segments"
   },
   "yes": "Yes",
   "no": "No",
@@ -343,10 +346,10 @@
   "settings": {
     "open": "Open settings",
     "segmentSkipMode": {
-      "title": "Segment Actions",
-      "button": "Display skip button",
-      "skip": "Automatically skip",
-      "disabled": "Default playback only"
+      "title": "Segment skip behavior",
+      "button": "Show skip button",
+      "skip": "Skip automatically",
+      "disabled": "Off"
     },
     "jellyfinPlaybackSync": {
       "title": "Report playback to Jellyfin",

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes, useSeasons } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
@@ -21,7 +20,6 @@ import { staggerDelay } from '@/lib/animation-utils'
 
 interface EpisodeSwitcherProps {
   currentEpisode: BaseItemDto
-  vibrantColors?: VibrantColors | null
   className?: string
 }
 
@@ -56,7 +54,6 @@ interface EpisodeItemProps {
   index: number
   onSelect: (episodeId: string) => void
   onIntent: (episodeId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const EpisodeItem = function EpisodeItemComponent({
@@ -65,7 +62,6 @@ const EpisodeItem = function EpisodeItemComponent({
   index,
   onSelect,
   onIntent,
-  vibrantColors,
 }: EpisodeItemProps) {
   const episodeNum = episode.IndexNumber ?? index + 1
   const runtime = episode.RunTimeTicks
@@ -76,21 +72,6 @@ const EpisodeItem = function EpisodeItemComponent({
   const selectEpisode = () => {
     if (episode.Id) onSelect(episode.Id)
   }
-
-  const accentStyle =
-    isActive && vibrantColors
-      ? {
-          backgroundColor: `${vibrantColors.accent}20`,
-          color: vibrantColors.accent,
-        }
-      : undefined
-  const badgeStyle =
-    isActive && vibrantColors
-      ? {
-          backgroundColor: `${vibrantColors.accent}30`,
-          color: vibrantColors.accent,
-        }
-      : undefined
 
   return (
     <button
@@ -103,7 +84,6 @@ const EpisodeItem = function EpisodeItemComponent({
           ? 'bg-primary/15 text-primary'
           : 'hover:bg-muted/80 text-foreground',
       )}
-      style={accentStyle}
       onPointerEnter={() => {
         if (episode.Id) onIntent(episode.Id)
       }}
@@ -120,7 +100,6 @@ const EpisodeItem = function EpisodeItemComponent({
             ? 'bg-primary/20 text-primary'
             : 'bg-muted/60 text-muted-foreground group-hover:bg-muted group-hover:text-foreground',
         )}
-        style={badgeStyle}
         aria-hidden="true"
       >
         {isActive ? <Check className="size-4" strokeWidth={3} /> : episodeNum}
@@ -159,14 +138,12 @@ interface SeasonButtonProps {
   season: BaseItemDto
   isSelected: boolean
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const SeasonButton = function SeasonButtonComponent({
   season,
   isSelected,
   onSeasonSelect,
-  vibrantColors,
 }: SeasonButtonProps) {
   const selectSeason = () => {
     if (season.Id) onSeasonSelect(season.Id)
@@ -190,14 +167,6 @@ const SeasonButton = function SeasonButtonComponent({
           ? 'bg-primary text-primary-foreground shadow-sm'
           : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
-      style={
-        isSelected && vibrantColors
-          ? {
-              backgroundColor: vibrantColors.accent,
-              color: vibrantColors.accentText,
-            }
-          : undefined
-      }
       role="tab"
       aria-selected={isSelected}
       aria-label={fullLabel}
@@ -211,14 +180,12 @@ interface SeasonSelectorProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId: string | null
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const SeasonSelector = function SeasonSelectorComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
-  vibrantColors,
 }: SeasonSelectorProps) {
   if (seasons.length <= 1) return null
 
@@ -236,7 +203,6 @@ const SeasonSelector = function SeasonSelectorComponent({
             season={season}
             isSelected={isSelected}
             onSeasonSelect={onSeasonSelect}
-            vibrantColors={vibrantColors}
           />
         )
       })}
@@ -251,7 +217,6 @@ const EpisodeListContent = function EpisodeListContentComponent({
   isError,
   onSelect,
   onIntent,
-  vibrantColors,
   scrollElement,
 }: {
   episodes: Array<BaseItemDto>
@@ -260,7 +225,6 @@ const EpisodeListContent = function EpisodeListContentComponent({
   isError: boolean
   onSelect: (id: string) => void
   onIntent: (id: string) => void
-  vibrantColors?: VibrantColors | null
   scrollElement: HTMLDivElement | null
 }) {
   const { t } = useTranslation()
@@ -346,7 +310,6 @@ const EpisodeListContent = function EpisodeListContentComponent({
                   index={episodeIndex}
                   onSelect={onSelect}
                   onIntent={onIntent}
-                  vibrantColors={vibrantColors}
                 />
               </div>
             )
@@ -365,7 +328,6 @@ const EpisodeListContent = function EpisodeListContentComponent({
           index={index}
           onSelect={onSelect}
           onIntent={onIntent}
-          vibrantColors={vibrantColors}
         />
       ))}
     </div>
@@ -374,7 +336,6 @@ const EpisodeListContent = function EpisodeListContentComponent({
 
 export default function EpisodeSwitcher({
   currentEpisode,
-  vibrantColors,
   className,
 }: EpisodeSwitcherProps) {
   const { t } = useTranslation()
@@ -446,10 +407,7 @@ export default function EpisodeSwitcher({
         )}
         aria-label={t('player.selectEpisode', 'Select episode')}
       >
-        <span
-          className="text-2xl sm:text-3xl font-semibold tracking-tight truncate"
-          style={vibrantColors ? { color: vibrantColors.text } : undefined}
-        >
+        <span className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
           {displayTitle}
         </span>
         <ChevronDown
@@ -470,7 +428,6 @@ export default function EpisodeSwitcher({
                 seasons={seasons}
                 selectedSeasonId={selectedSeasonId}
                 onSeasonSelect={setOverrideSeasonId}
-                vibrantColors={vibrantColors}
               />
             </div>
             <DropdownMenuSeparator className="my-0" />
@@ -498,7 +455,6 @@ export default function EpisodeSwitcher({
             isError={isError}
             onSelect={handleEpisodeSelect}
             onIntent={prefetchEpisodeRoute}
-            vibrantColors={vibrantColors}
             scrollElement={episodeListElement}
           />
         </div>

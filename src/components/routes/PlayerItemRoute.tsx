@@ -5,6 +5,7 @@ import { getRouteApi } from '@tanstack/react-router'
 import { itemsQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
 import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { AmbientGradient } from '@/components/ui/ambient-gradient'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -66,13 +67,8 @@ export function PlayerPage() {
 
   return (
     <>
-      {vibrantColors && (
-        <div
-          className="fixed inset-0 z-0 transition-colors duration-700"
-          style={{ backgroundColor: vibrantColors.background }}
-        />
-      )}
-      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
+      <AmbientGradient colors={vibrantColors} />
+      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 relative z-10">
         <FeatureErrorBoundary
           featureName="Player"
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"

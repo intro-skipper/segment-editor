@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useHotkey } from '@tanstack/react-hotkeys'
+import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import { useBlocker } from '@tanstack/react-router'
 import { ClipboardPaste, Eye, Loader2, Plus, Save, Undo2 } from 'lucide-react'
 
@@ -33,7 +33,6 @@ import {
 } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
-import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +60,9 @@ const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',
   containIntrinsicSize: '0 280px',
 }
+
+/** Pre-computed platform-aware shortcut display for the save button title */
+const MOD_S_DISPLAY = formatForDisplay('Mod+S')
 
 interface PlayerEditorProps {
   item: BaseItemDto
@@ -191,8 +193,6 @@ function useRenderPlayerEditor({
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
   const setShowVideoPlayer = useAppStore((state) => state.setShowVideoPlayer)
 
-  const { getButtonStyle, iconColor, hasColors } =
-    useVibrantButtonStyle(vibrantColors)
   const batchSaveMutation = useBatchSaveSegments()
 
   const { data: serverSegments = [], isLoading: isLoadingSegments } =
@@ -332,6 +332,21 @@ function useRenderPlayerEditor({
         StartTicks: data.start,
         EndTicks: data.end,
       })
+
+      return nextSegments
+    })
+  }
+
+  const handleChangeSegmentType = (index: number, type: MediaSegmentType) => {
+    updateEditingSegments((prev) => {
+      const segment = prev[index] as MediaSegmentDto | undefined
+      if (!segment || segment.Type === type) return prev
+
+      const { nextSegments, insertedIndex } = replaceSegmentSorted(prev, {
+        ...segment,
+        Type: type,
+      })
+      setActiveIndex(insertedIndex)
 
       return nextSegments
     })
@@ -654,7 +669,7 @@ function useRenderPlayerEditor({
             </EmptyContent>
           </Empty>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-2">
             {editingSegments.map((segment, index) => (
               <div
                 key={segment.Id ?? `segment-${index}`}
@@ -669,11 +684,11 @@ function useRenderPlayerEditor({
                   onUpdate={handleUpdateSegment}
                   onDelete={handleRequestDeleteSegment}
                   onEdit={handleOpenEditDialog}
+                  onChangeType={handleChangeSegmentType}
                   onPlayerTimestamp={handlePlayerTimestamp}
                   onSetActive={setActiveIndex}
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
-                  vibrantColors={vibrantColors}
                 />
               </div>
             ))}
@@ -788,99 +803,77 @@ function useRenderPlayerEditor({
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex flex-col gap-3">
-        {isDirty && (
-          <p
-            className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-            role="status"
-          >
-            <span
-              className="size-2 rounded-full bg-amber-500"
-              aria-hidden="true"
-            />
-            {t('editor.unsavedChanges', 'Unsaved changes')}
-          </p>
-        )}
-        <fieldset
-          className="flex flex-row justify-center gap-4 border-0 p-0 m-0"
+      <div className="sticky bottom-0 z-20 bg-background/85 backdrop-blur-md border-t border-border/40 pb-safe">
+        <div
+          className="flex items-center justify-between gap-3 py-3"
+          role="toolbar"
           aria-label={t('editor.actions', 'Segment actions')}
         >
-          <button
-            type="button"
-            data-interactive-transition="true"
-            onClick={handlePasteFromClipboard}
-            aria-label={t('editor.paste', 'Paste segment from clipboard')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-              'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-              'transition-[transform,box-shadow,background-color,color,border-color] duration-200 ease-out border-2',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              !hasColors &&
-                'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
-            )}
-            style={getButtonStyle(false)}
-          >
-            <ClipboardPaste
-              className="size-4 sm:size-5"
-              aria-hidden="true"
-              style={iconColor ? { color: iconColor } : undefined}
-            />
-            {t('editor.paste', 'Paste')}
-          </button>
-          {isDirty && (
-            <button
-              type="button"
-              data-interactive-transition="true"
-              onClick={handleDiscardEdits}
-              aria-label={t('editor.discard', 'Discard unsaved edits')}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-                'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-                'transition-[transform,box-shadow,background-color,color,border-color] duration-200 ease-out border-2',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                !hasColors &&
-                  'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
-              )}
-              style={getButtonStyle(false)}
-            >
-              <Undo2
-                className="size-4 sm:size-5"
-                aria-hidden="true"
-                style={iconColor ? { color: iconColor } : undefined}
-              />
-              {t('editor.discard', 'Discard')}
-            </button>
-          )}
-          <button
-            type="button"
-            data-interactive-transition="true"
-            onClick={() => void handleSaveAll()}
-            disabled={isSaving || !isDirty}
-            aria-label={t('editor.saveSegment', 'Save all segments')}
-            aria-busy={isSaving}
+          <p
+            className="flex items-center gap-2 text-sm text-muted-foreground min-w-0"
+            role="status"
             aria-live="polite"
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-              'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-              'transition-[transform,box-shadow,background-color,color,border-color,opacity] duration-200 ease-out border-2',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
-              !hasColors &&
-                'bg-primary/20 text-primary border-primary/40 hover:bg-primary/30',
-            )}
-            style={getButtonStyle(true)}
           >
-            {isSaving ? (
-              <div className="animate-spin" aria-hidden="true">
-                <Loader2 className="size-4 sm:size-5" />
-              </div>
+            {isDirty ? (
+              <>
+                <span
+                  className="size-2 rounded-full bg-amber-500 shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="truncate">
+                  {t('editor.unsavedChanges', 'Unsaved changes')}
+                </span>
+              </>
             ) : (
-              <Save className="size-4 sm:size-5" aria-hidden="true" />
+              <span className="truncate tabular-nums">
+                {t('editor.segmentCount', {
+                  count: editingSegments.length,
+                  defaultValue: '{{count}} segments',
+                })}
+              </span>
             )}
-            {isSaving && <span className="sr-only">Saving segments</span>}
-            {t('editor.saveSegment')}
-          </button>
-        </fieldset>
+          </p>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isDirty && (
+              <Button
+                variant="ghost"
+                onClick={handleDiscardEdits}
+                aria-label={t('editor.discard', 'Discard unsaved edits')}
+              >
+                <Undo2 className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {t('editor.discard', 'Discard')}
+                </span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handlePasteFromClipboard}
+              aria-label={t('editor.paste', 'Paste segment from clipboard')}
+            >
+              <ClipboardPaste className="size-4" aria-hidden="true" />
+              {t('editor.paste', 'Paste')}
+            </Button>
+            <Button
+              onClick={() => void handleSaveAll()}
+              disabled={isSaving || !isDirty}
+              aria-label={t('editor.saveSegment', 'Save all segments')}
+              aria-busy={isSaving}
+              title={`${t('editor.saveSegment', 'Save')} (${MOD_S_DISPLAY})`}
+            >
+              {isSaving ? (
+                <div className="animate-spin" aria-hidden="true">
+                  <Loader2 className="size-4" />
+                </div>
+              ) : (
+                <Save className="size-4" aria-hidden="true" />
+              )}
+              {isSaving && <span className="sr-only">Saving segments</span>}
+              {t('editor.saveSegment')}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

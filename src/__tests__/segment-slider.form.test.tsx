@@ -91,13 +91,41 @@ function renderSlider(
       onPlayerTimestamp={vi.fn()}
       onSetActive={vi.fn()}
       onUpdate={onUpdate}
-      vibrantColors={null}
       {...props}
     />,
   )
 
   return { ...result, onUpdate }
 }
+
+describe('SegmentSlider type menu', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('changes the segment type through the inline type menu', async () => {
+    const onChangeType = vi.fn()
+    renderSlider(createSegment(), { onChangeType })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Segment type' }))
+
+    const outroItem = await screen.findByRole('menuitem', {
+      name: /segmentType\.Outro/,
+    })
+    fireEvent.click(outroItem)
+
+    await waitFor(() => {
+      expect(onChangeType).toHaveBeenCalledWith(0, 'Outro')
+    })
+  })
+
+  it('renders a static type label without onChangeType', () => {
+    renderSlider()
+
+    expect(screen.queryByRole('button', { name: 'Segment type' })).toBeNull()
+    expect(screen.getByText('Intro')).toBeTruthy()
+  })
+})
 
 describe('SegmentSlider TanStack Form migration', () => {
   afterEach(() => {
@@ -232,7 +260,6 @@ describe('SegmentSlider TanStack Form migration', () => {
         onPlayerTimestamp={vi.fn()}
         onSetActive={vi.fn()}
         onUpdate={onUpdate}
-        vibrantColors={null}
       />,
     )
 
@@ -254,7 +281,6 @@ describe('SegmentSlider TanStack Form migration', () => {
         onPlayerTimestamp={vi.fn()}
         onSetActive={vi.fn()}
         onUpdate={onUpdate}
-        vibrantColors={null}
       />,
     )
 

@@ -17,14 +17,8 @@ import {
 
 import { TrackSelector } from './TrackSelector'
 import { PlayerSettingsMenu } from './PlayerSettingsMenu'
-import {
-  ICON_CLASS,
-  applyAlphaToColor,
-  getButtonClass,
-  getIconStyle,
-} from './player-ui-constants'
+import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { MediaSegmentType } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrackState } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
@@ -46,14 +40,6 @@ export interface PlayerControlsProps {
     level: number
     onToggleMute: () => void
     onChange: (volume: number) => void
-  }
-  appearance: {
-    colorMode: 'vibrant' | 'default'
-    vibrantColors: VibrantColors | null
-    iconColor: string | undefined
-    getButtonStyle: (active?: boolean) => React.CSSProperties | undefined
-    /** Optional opacity for button backgrounds (0-1), useful for fullscreen overlay */
-    buttonOpacity?: number
   }
   segmentCreation: {
     onCreate: (type: MediaSegmentType) => void
@@ -93,7 +79,6 @@ export interface PlayerControlsProps {
 export function PlayerControls({
   playback,
   volumeControls,
-  appearance,
   segmentCreation,
   skipControls,
   trackControls,
@@ -103,41 +88,10 @@ export function PlayerControls({
   const { t } = useTranslation()
   const isPlaying = playback.state === 'playing'
   const isMuted = volumeControls.state === 'muted'
-  const hasColors = appearance.colorMode === 'vibrant'
   const isFullscreen = display.mode === 'fullscreen'
   const hasActiveSubtitle = settings.subtitleState === 'active'
-  const { vibrantColors, iconColor, getButtonStyle, buttonOpacity } = appearance
   const { level: volume } = volumeControls
   const { portalContainer } = display
-
-  // Wrap getButtonStyle to apply background opacity if provided
-  // Active buttons (like pause) get higher opacity for better visibility
-  const applyButtonStyle = (
-    active?: boolean,
-  ): React.CSSProperties | undefined => {
-    const baseStyle = getButtonStyle(active)
-    if (!baseStyle || buttonOpacity === undefined) return baseStyle
-    // Only apply alpha when a backgroundColor is present
-    if (!baseStyle.backgroundColor) {
-      return baseStyle
-    }
-    // Active state gets higher opacity (closer to 1)
-    const effectiveOpacity = active
-      ? Math.min(buttonOpacity + 0.3, 1)
-      : buttonOpacity
-    const newBackgroundColor = applyAlphaToColor(
-      baseStyle.backgroundColor,
-      effectiveOpacity,
-    )
-    // applyAlphaToColor may return undefined for unsupported color formats
-    // Fall back to base style if alpha cannot be applied
-    return newBackgroundColor === undefined
-      ? baseStyle
-      : {
-          ...baseStyle,
-          backgroundColor: newBackgroundColor,
-        }
-  }
 
   const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     volumeControls.onChange(parseFloat(e.target.value))
@@ -160,26 +114,24 @@ export function PlayerControls({
               : t('accessibility.playPause', 'Play video')
           }
           aria-pressed={isPlaying}
-          style={applyButtonStyle(isPlaying)}
           className={cn(
-            getButtonClass(isPlaying, hasColors),
+            getButtonClass(isPlaying),
             !isPlaying && 'rounded-full',
           )}
         >
           {isPlaying ? (
             <Pause
               className={ICON_CLASS}
-              fill={vibrantColors?.accentText ?? 'currentColor'}
+              fill="currentColor"
               strokeWidth={0}
               aria-hidden="true"
             />
           ) : (
             <Play
               className={ICON_CLASS}
-              fill={iconColor ?? 'currentColor'}
+              fill="currentColor"
               strokeWidth={0}
               aria-hidden="true"
-              style={getIconStyle(iconColor)}
             />
           )}
         </Button>
@@ -195,8 +147,7 @@ export function PlayerControls({
                     ? t('accessibility.player.muted', 'Volume muted')
                     : t('player.volume', 'Volume')
                 }
-                style={applyButtonStyle()}
-                className={getButtonClass(false, hasColors)}
+                className={getButtonClass(false)}
               />
             }
           >
@@ -205,14 +156,12 @@ export function PlayerControls({
                 className={ICON_CLASS}
                 strokeWidth={2.5}
                 aria-hidden="true"
-                style={getIconStyle(iconColor)}
               />
             ) : (
               <Volume2
                 className={ICON_CLASS}
                 strokeWidth={2.5}
                 aria-hidden="true"
-                style={getIconStyle(iconColor)}
               />
             )}
           </DropdownMenuTrigger>
@@ -256,9 +205,6 @@ export function PlayerControls({
             onSelectSubtitle={trackControls.onSelectSubtitle}
             strategy={trackControls.strategy}
             disabled={trackControls.availability === 'disabled'}
-            getButtonStyle={applyButtonStyle}
-            iconColor={iconColor}
-            hasColors={hasColors}
             portalContainer={portalContainer}
           />
         )}
@@ -272,17 +218,11 @@ export function PlayerControls({
             <Button
               variant="outline"
               aria-label={t('editor.newSegment')}
-              style={applyButtonStyle()}
-              className={getButtonClass(false, hasColors)}
+              className={getButtonClass(false)}
             />
           }
         >
-          <Plus
-            className={ICON_CLASS}
-            strokeWidth={3}
-            aria-hidden="true"
-            style={getIconStyle(iconColor)}
-          />
+          <Plus className={ICON_CLASS} strokeWidth={3} aria-hidden="true" />
         </SegmentTypeMenu>
       </div>
 
@@ -294,15 +234,9 @@ export function PlayerControls({
           variant="outline"
           onClick={display.onMinimize}
           aria-label={t('player.minimize', 'Minimize player')}
-          style={applyButtonStyle()}
-          className={getButtonClass(false, hasColors)}
+          className={getButtonClass(false)}
         >
-          <EyeOff
-            className={ICON_CLASS}
-            strokeWidth={2.5}
-            aria-hidden="true"
-            style={getIconStyle(iconColor)}
-          />
+          <EyeOff className={ICON_CLASS} strokeWidth={2.5} aria-hidden="true" />
         </Button>
       )}
 
@@ -316,22 +250,19 @@ export function PlayerControls({
               ? t('player.exitFullscreen', 'Exit fullscreen')
               : t('player.fullscreen', 'Fullscreen')
           }
-          style={applyButtonStyle()}
-          className={getButtonClass(false, hasColors)}
+          className={getButtonClass(false)}
         >
           {isFullscreen ? (
             <Minimize
               className={ICON_CLASS}
               strokeWidth={2.5}
               aria-hidden="true"
-              style={getIconStyle(iconColor)}
             />
           ) : (
             <Maximize
               className={ICON_CLASS}
               strokeWidth={2.5}
               aria-hidden="true"
-              style={getIconStyle(iconColor)}
             />
           )}
         </Button>
@@ -340,9 +271,6 @@ export function PlayerControls({
       {/* Settings menu */}
       <PlayerSettingsMenu
         skipTimeIndex={skipControls.timeIndex}
-        hasColors={hasColors}
-        iconColor={iconColor}
-        applyButtonStyle={applyButtonStyle}
         onSkipTimeChange={skipControls.onTimeChange}
         subtitleOffset={settings.subtitleOffset}
         onSubtitleOffsetChange={settings.onSubtitleOffsetChange}

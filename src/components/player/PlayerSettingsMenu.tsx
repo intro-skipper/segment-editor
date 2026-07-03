@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MoreVertical } from 'lucide-react'
 
 import { formatForDisplay } from '@tanstack/react-hotkeys'
-import { ICON_CLASS, getButtonClass, getIconStyle } from './player-ui-constants'
+import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type React from 'react'
 import { cn } from '@/lib/utils'
 import { PLAYER_SHORTCUT_CHEATSHEET } from '@/lib/player-shortcuts'
@@ -28,9 +28,6 @@ const CHEATSHEET_DISPLAY = PLAYER_SHORTCUT_CHEATSHEET.map((entry) => ({
 
 interface PlayerSettingsMenuProps {
   skipTimeIndex: number
-  hasColors: boolean
-  iconColor: string | undefined
-  applyButtonStyle: (active?: boolean) => React.CSSProperties | undefined
   onSkipTimeChange: (index: number) => void
   subtitleOffset: number
   onSubtitleOffsetChange?: (offset: number) => void
@@ -42,9 +39,6 @@ interface PlayerSettingsMenuProps {
 
 export function PlayerSettingsMenu({
   skipTimeIndex,
-  hasColors,
-  iconColor,
-  applyButtonStyle,
   onSkipTimeChange,
   subtitleOffset,
   onSubtitleOffsetChange,
@@ -89,8 +83,7 @@ export function PlayerSettingsMenu({
           <Button
             variant="outline"
             aria-label={t('accessibility.playerSettings', 'Player settings')}
-            style={applyButtonStyle()}
-            className={getButtonClass(false, hasColors)}
+            className={getButtonClass(false)}
           />
         }
       >
@@ -98,7 +91,6 @@ export function PlayerSettingsMenu({
           className={ICON_CLASS}
           strokeWidth={3}
           aria-hidden="true"
-          style={getIconStyle(iconColor)}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent

@@ -44,7 +44,6 @@ import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
-import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import {
@@ -239,9 +238,6 @@ function useRenderPlayer({
         setPlayerMuted: state.setPlayerMuted,
       })),
     )
-
-  const { getButtonStyle, iconColor, hasColors } =
-    useVibrantButtonStyle(vibrantColors)
 
   const [state, dispatch] = useReducer(playerReducer, {
     ...initialPlayerState,
@@ -879,13 +875,6 @@ function useRenderPlayer({
       level: volume,
       onToggleMute: toggleMute,
       onChange: handleVolumeChange,
-    },
-    appearance: {
-      colorMode: hasColors ? 'vibrant' : 'default',
-      vibrantColors,
-      iconColor,
-      getButtonStyle,
-      buttonOpacity: isFullscreen ? 0.3 : undefined,
     },
     segmentCreation: {
       onCreate: handleCreateSegment,

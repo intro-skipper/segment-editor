@@ -1,5 +1,4 @@
 import { Suspense, lazy, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
@@ -23,12 +22,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
-import { useVibrantColor } from '@/hooks/use-vibrant-color'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
-import { getBestImageUrl } from '@/services/video/api'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
@@ -116,16 +112,12 @@ interface HeaderDetailInfo {
 interface DetailHeaderContentProps extends HeaderDetailInfo {
   currentItem: BaseItemDto | undefined
   isPlayerPage: boolean
-  vibrantColors: VibrantColors | null
-  accentButtonStyle: CSSProperties | undefined
   onBack: () => void
 }
 
 interface HeaderActionsProps {
-  accentButtonStyle: CSSProperties | undefined
   isDetailPage: boolean
   selectedCollection: string | undefined
-  vibrantColors: VibrantColors | null
   onOpenSearch: () => void
   onOpenSettings: () => void
 }
@@ -148,12 +140,10 @@ function getHeaderDetailInfo(
 }
 
 function DetailHeaderContent({
-  accentButtonStyle,
   currentItem,
   isEpisode,
   isPlayerPage,
   pageTitle,
-  vibrantColors,
   onBack,
 }: DetailHeaderContentProps) {
   const { t } = useTranslation()
@@ -166,10 +156,9 @@ function DetailHeaderContent({
         onClick={onBack}
         className={cn(
           iconButtonClass,
-          !vibrantColors && 'bg-secondary/80 hover:bg-secondary',
+          'bg-secondary/80 hover:bg-secondary',
           'active:scale-95',
         )}
-        style={accentButtonStyle}
         aria-label={t('navigation.back', 'Go back')}
       >
         <ChevronLeft className="size-5" aria-hidden />
@@ -186,7 +175,6 @@ function DetailHeaderContent({
           >
             <EpisodeSwitcher
               currentEpisode={currentItem}
-              vibrantColors={vibrantColors}
               className="flex-1 min-w-0"
             />
           </Suspense>
@@ -201,17 +189,15 @@ function DetailHeaderContent({
 }
 
 function HeaderActions({
-  accentButtonStyle,
   isDetailPage,
   selectedCollection,
-  vibrantColors,
   onOpenSearch,
   onOpenSettings,
 }: HeaderActionsProps) {
   const { t } = useTranslation()
   const actionButtonClassName = cn(
     iconButtonClass,
-    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+    'bg-secondary/60 hover:bg-secondary',
   )
 
   return (
@@ -224,7 +210,6 @@ function HeaderActions({
           onPointerEnter={preloadCommandPalette}
           onFocus={preloadCommandPalette}
           className={actionButtonClassName}
-          style={accentButtonStyle}
           aria-label={t('search.open', 'Open search')}
           title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
         >
@@ -242,7 +227,6 @@ function HeaderActions({
             buttonVariants({ variant: 'ghost', size: 'icon' }),
             actionButtonClassName,
           )}
-          style={accentButtonStyle}
           aria-label={t('navigation.home', 'Go to library')}
         >
           <Home className="size-5" aria-hidden />
@@ -255,7 +239,6 @@ function HeaderActions({
         onPointerEnter={preloadSettingsDialog}
         onFocus={preloadSettingsDialog}
         className={actionButtonClassName}
-        style={accentButtonStyle}
         aria-label={t('settings.open', 'Open settings')}
       >
         <Settings className="size-5" aria-hidden />
@@ -305,10 +288,6 @@ export default function Header() {
   })
   const currentItem = queriedItem ?? undefined
 
-  const headerImageUrl = currentItem ? getBestImageUrl(currentItem, 300) : null
-  const vibrantColors = useVibrantColor(headerImageUrl || null, {
-    enabled: isDetailPage && !!headerImageUrl,
-  })
   const detailInfo = getHeaderDetailInfo(currentItem)
 
   const openCommandPalette = () => {
@@ -347,23 +326,9 @@ export default function Header() {
     handleGoHome()
   }
 
-  const headerStyle: CSSProperties | undefined = vibrantColors
-    ? { backgroundColor: `${vibrantColors.background}00` }
-    : undefined
-
-  const accentButtonStyle = vibrantColors
-    ? {
-        backgroundColor: vibrantColors.accent,
-        color: vibrantColors.accentText,
-      }
-    : undefined
-
   return (
     <>
-      <header
-        className="sticky top-0 z-40 backdrop-blur-xl"
-        style={headerStyle}
-      >
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/40">
         <nav
           className="px-4 py-4 sm:px-6"
           aria-label={t('accessibility.navigation', 'Main navigation')}
@@ -375,8 +340,6 @@ export default function Header() {
                   {...detailInfo}
                   currentItem={currentItem}
                   isPlayerPage={isPlayerPage}
-                  vibrantColors={vibrantColors}
-                  accentButtonStyle={accentButtonStyle}
                   onBack={handleBack}
                 />
               ) : (
@@ -393,8 +356,6 @@ export default function Header() {
             <HeaderActions
               selectedCollection={selectedCollection}
               isDetailPage={isDetailPage}
-              vibrantColors={vibrantColors}
-              accentButtonStyle={accentButtonStyle}
               onOpenSearch={openCommandPalette}
               onOpenSettings={handleSettingsClick}
             />

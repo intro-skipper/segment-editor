@@ -27,7 +27,6 @@ const mocks = vi.hoisted(() => ({
   setPlayerMuted: vi.fn(),
   selectAudioTrack: vi.fn(() => Promise.resolve(undefined)),
   selectSubtitleTrack: vi.fn(() => Promise.resolve(undefined)),
-  getButtonStyle: vi.fn(() => ({ color: '#ffffff' })),
   resizeJassub: vi.fn(),
   setJassubUserOffset: vi.fn(),
   retry: vi.fn(),
@@ -94,14 +93,6 @@ vi.mock('@/components/player/PlayerScrubber', () => ({
 
 vi.mock('@/hooks/useBlobUrl', () => ({
   useBlobUrl: () => '',
-}))
-
-vi.mock('@/hooks/use-vibrant-button-style', () => ({
-  useVibrantButtonStyle: () => ({
-    getButtonStyle: mocks.getButtonStyle,
-    iconColor: '#ffffff',
-    hasColors: true,
-  }),
 }))
 
 vi.mock('@/hooks/use-video-player', () => ({
@@ -274,7 +265,6 @@ describe('Player controls wiring', () => {
     expect(controlsProps.playback.state).toBe('paused')
     expect(controlsProps.volumeControls.state).toBe('audible')
     expect(controlsProps.volumeControls.level).toBe(0.8)
-    expect(controlsProps.appearance.colorMode).toBe('vibrant')
     expect(controlsProps.display.mode).toBe('fullscreen')
     expect(controlsProps.trackControls?.state).toBe(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')
