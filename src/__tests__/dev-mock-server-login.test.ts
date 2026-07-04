@@ -89,6 +89,33 @@ describe('dev mock server login', () => {
     })
   })
 
+  it('treats credentials as non-mock when any field differs from the mock config', () => {
+    // Real dev credentials can share the mock default address
+    // (http://localhost:8096); a partial match must still count as non-mock.
+    useApiStore.setState({
+      serverAddress: 'http://localhost:8096',
+      apiKey: 'real-token',
+      authMethod: 'apiKey',
+      userId: 'real-user',
+      username: 'real-user',
+      validConnection: true,
+      validAuth: true,
+    })
+
+    expect(
+      applyDevMockServerLogin({
+        DEV: true,
+        VITE_MOCK_SERVER_AUTO_LOGIN: 'true',
+      }),
+    ).toBe(false)
+
+    expect(useApiStore.getState()).toMatchObject({
+      serverAddress: 'http://localhost:8096',
+      apiKey: 'real-token',
+      userId: 'real-user',
+    })
+  })
+
   it('force-overwrites existing credentials for explicit mock resets', () => {
     useApiStore.setState({
       serverAddress: 'https://jellyfin.example',

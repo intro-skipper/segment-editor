@@ -42,8 +42,8 @@ function hasExistingNonMockLogin(config: MockServerLoginConfig): boolean {
   if (!state.serverAddress && !state.apiKey && !state.userId) return false
 
   return (
-    state.serverAddress !== config.serverAddress &&
-    state.apiKey !== config.authValue &&
+    state.serverAddress !== config.serverAddress ||
+    state.apiKey !== config.authValue ||
     state.userId !== config.userId
   )
 }

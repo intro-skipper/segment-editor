@@ -588,6 +588,26 @@ body {
   touch-action: none;
 }
 
+/* The custom pill (.segment-handle-visual) is the only intended handle
+   visual; element-level appearance-none does not remove the native thumb,
+   so reset the pseudo-elements or the browser paints its default circular
+   thumb peeking out from behind the pill. */
+.segment-handle::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  height: 0;
+  border: 0;
+  background: transparent;
+}
+
+.segment-handle::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  border: 0;
+  background: transparent;
+}
+
 .segment-handle-hit-area {
   width: 0.875rem;
   height: 100%;
