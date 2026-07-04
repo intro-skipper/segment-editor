@@ -103,7 +103,6 @@ vi.mock('@/hooks/use-connection-init', () => ({
 }))
 
 vi.mock('@/hooks/use-vibrant-color', () => ({
-  preloadVibrantColors: vi.fn(),
   useVibrantColor: () => null,
 }))
 

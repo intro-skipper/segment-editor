@@ -266,12 +266,6 @@ function useRenderPlayerEditor({
     }
   }, [blockerStatus, blockerProceed, isDirty])
 
-  const saveAbortRef = React.useRef<AbortController | null>(null)
-
-  const updateEditingSegments = (updater: SegmentUpdater) => {
-    setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
-  }
-
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
     editingSegmentsRef.current = editingSegments
@@ -281,10 +275,13 @@ function useRenderPlayerEditor({
   React.useEffect(
     () => () => {
       if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
-      saveAbortRef.current?.abort()
     },
     [],
   )
+
+  const updateEditingSegments = (updater: SegmentUpdater) => {
+    setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
+  }
 
   const runtimeSeconds = ticksToSeconds(item.RunTimeTicks) || 0
 
@@ -489,23 +486,24 @@ function useRenderPlayerEditor({
   const handleSaveAll = async () => {
     if (!item.Id || isSaving || !isDirty) return
 
-    saveAbortRef.current?.abort()
-    const controller = new AbortController()
-    saveAbortRef.current = controller
-
-    const currentSegments = editingSegmentsRef.current
+    const savedSegments = editingSegmentsRef.current
 
     try {
       await batchSaveMutation.mutateAsync({
         itemId: item.Id,
         existingSegments: serverSegments,
-        newSegments: currentSegments,
+        newSegments: savedSegments,
       })
 
-      if (!controller.signal.aborted) {
-        setLocalEditingSegments(null)
-      }
-    } catch {}
+      // Clear only the exact edits this save persisted. If the item changed
+      // or the user kept editing while the save was in flight, the current
+      // edits are a different array and must survive.
+      setLocalEditingSegments((prev) =>
+        prev === savedSegments ? null : prev,
+      )
+    } catch {
+      // Errors surface via the mutation's onError toast; edits stay dirty.
+    }
   }
 
   const handleDiscardEdits = () => {

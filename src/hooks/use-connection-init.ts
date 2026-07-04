@@ -33,15 +33,6 @@ const setValidationStatus = (status: ValidationStatus): void => {
   useConnectionValidationStore.getState().setStatus(status)
 }
 
-const validationStateByStatus: Record<
-  ValidationStatus,
-  { isValidating: boolean; hasValidated: boolean }
-> = {
-  idle: { isValidating: false, hasValidated: false },
-  validating: { isValidating: true, hasValidated: false },
-  validated: { isValidating: false, hasValidated: true },
-}
-
 interface ConnectionState {
   isPlugin: boolean
   /** Whether credentials are available */
@@ -63,20 +54,15 @@ type ConnectionValidationResult = Awaited<
 function applyConnectionValidationResult(
   result: ConnectionValidationResult,
 ): void {
-  const store = useApiStore.getState()
-  if (result.valid) {
-    if (result.authenticated) {
-      useApiStore.setState({
-        serverVersion: result.serverVersion,
-        validConnection: true,
-        validAuth: true,
-      })
-    } else {
-      store.setConnectionStatus(false, false)
-    }
-  } else {
-    store.setConnectionStatus(false, false)
+  if (result.valid && result.authenticated) {
+    useApiStore.setState({
+      serverVersion: result.serverVersion,
+      validConnection: true,
+      validAuth: true,
+    })
+    return
   }
+  useApiStore.getState().setConnectionStatus(false, false)
 }
 
 function trySetInvalidConnectionStatus(): void {
@@ -87,14 +73,15 @@ function trySetInvalidConnectionStatus(): void {
   }
 }
 
-function isSignalActive(signal: AbortSignal): boolean {
-  return !signal.aborted
-}
+const resolveHasCredentials = (
+  isPlugin: boolean,
+  serverAddress: string,
+  apiKey: string | undefined,
+): boolean =>
+  isPlugin ? getPluginCredentials() !== null : !!(serverAddress && apiKey)
 
 export function useConnectionInit(): ConnectionState {
   const validationStatus = useConnectionValidationStore((s) => s.status)
-  const { isValidating, hasValidated: hasValidatedByStatus } =
-    validationStateByStatus[validationStatus]
   const lastAttemptKeyRef = useRef<string | null>(null)
 
   const { validAuth, serverAddress, apiKey } = useApiStore(
@@ -107,9 +94,10 @@ export function useConnectionInit(): ConnectionState {
 
   const isPlugin = isPluginMode()
 
-  // Derive hasValidated: also true when the store already has valid auth,
-  // so we don't need an explicit dispatch for the validAuth early-return path.
-  const hasValidated = hasValidatedByStatus || validAuth
+  // Validation success is recorded in the api store (validAuth), so a store
+  // that already has valid auth counts as validated without a dispatch.
+  const isValidating = validationStatus === 'validating'
+  const hasValidated = validationStatus === 'validated' || validAuth
 
   useEffect(() => {
     if (validAuth) {
@@ -159,7 +147,7 @@ export function useConnectionInit(): ConnectionState {
           signal: controller.signal,
         })
 
-        if (isSignalActive(controller.signal)) {
+        if (!controller.signal.aborted) {
           try {
             applyConnectionValidationResult(result)
           } catch {
@@ -171,7 +159,7 @@ export function useConnectionInit(): ConnectionState {
         trySetInvalidConnectionStatus()
       }
 
-      if (isSignalActive(controller.signal)) {
+      if (!controller.signal.aborted) {
         setValidationStatus('validated')
       }
     }
@@ -188,10 +176,7 @@ export function useConnectionInit(): ConnectionState {
     }
   }, [isPlugin, validAuth, serverAddress, apiKey])
 
-  // Derive hasCredentials after effect to ensure consistency
-  const hasCredentials = isPlugin
-    ? getPluginCredentials() !== null
-    : !!(serverAddress && apiKey)
+  const hasCredentials = resolveHasCredentials(isPlugin, serverAddress, apiKey)
 
   return {
     isPlugin,
@@ -217,9 +202,7 @@ export function usePluginMode() {
 
   return {
     isPlugin,
-    hasCredentials: isPlugin
-      ? getPluginCredentials() !== null
-      : !!(serverAddress && apiKey),
+    hasCredentials: resolveHasCredentials(isPlugin, serverAddress, apiKey),
     isConnected: validAuth,
     isValidating: validationStatus === 'validating',
     hasValidated: validationStatus === 'validated' || validAuth,

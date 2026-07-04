@@ -380,19 +380,6 @@ async function getColors(
   return colors
 }
 
-export const preloadVibrantColors = (
-  urls: ReadonlyArray<string>,
-  theme: Theme = 'auto',
-): void => {
-  if (useAppStore.getState().monochrome) return
-
-  const resolved = resolveTheme(theme)
-  const cache = getCache(resolved)
-  for (const url of urls) {
-    if (url && !cache.has(url)) void getColors(url, resolved)
-  }
-}
-
 interface UseVibrantColorOptions {
   enabled?: boolean
 }
