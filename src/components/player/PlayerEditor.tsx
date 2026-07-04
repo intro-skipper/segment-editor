@@ -255,6 +255,17 @@ function useRenderPlayerEditor({
     withResolver: true,
   })
 
+  // If the user tried to leave during an in-flight save and the save then
+  // completed (local edits cleared, nothing dirty anymore), let the pending
+  // navigation continue instead of leaving a stale "discard" prompt open.
+  const blockerStatus = blocker.status
+  const blockerProceed = blocker.proceed
+  React.useEffect(() => {
+    if (blockerStatus === 'blocked' && !isDirty) {
+      blockerProceed?.()
+    }
+  }, [blockerStatus, blockerProceed, isDirty])
+
   const saveAbortRef = React.useRef<AbortController | null>(null)
 
   const updateEditingSegments = (updater: SegmentUpdater) => {
@@ -781,30 +792,49 @@ function useRenderPlayerEditor({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t('editor.unsavedTitle', 'Discard unsaved changes?')}
+              {isSaving
+                ? t('editor.saveInProgressTitle', 'Save in progress')
+                : t('editor.unsavedTitle', 'Discard unsaved changes?')}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t(
-                'editor.unsavedDescription',
-                'You have unsaved segment edits. They will be lost if you leave.',
-              )}
+              {isSaving
+                ? t(
+                    'editor.saveInProgressDescription',
+                    'Your segment edits are still being saved. If you leave now, the save will finish in the background.',
+                  )
+                : t(
+                    'editor.unsavedDescription',
+                    'You have unsaved segment edits. They will be lost if you leave.',
+                  )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => blocker.reset?.()}>
-              {t('common.cancel', 'Cancel')}
+              {isSaving
+                ? t('editor.stay', 'Stay')
+                : t('common.cancel', 'Cancel')}
             </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                // Match the dialog copy: discard local edits before leaving
-                // so they cannot leak back in if this editor stays mounted.
-                handleDiscardEdits()
-                blocker.proceed?.()
-              }}
-            >
-              {t('editor.discardAndLeave', 'Discard & leave')}
-            </AlertDialogAction>
+            {isSaving ? (
+              // Cancelling the batch save is not safe: it deletes the
+              // existing segments before recreating them, so an abort between
+              // the two phases would wipe the item's segments remotely.
+              // Leaving lets the in-flight save finish in the background.
+              <AlertDialogAction onClick={() => blocker.proceed?.()}>
+                {t('editor.leave', 'Leave')}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  // Match the dialog copy: discard local edits before leaving
+                  // so they cannot leak back in if this editor stays mounted.
+                  handleDiscardEdits()
+                  blocker.proceed?.()
+                }}
+              >
+                {t('editor.discardAndLeave', 'Discard & leave')}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -827,7 +857,9 @@ function useRenderPlayerEditor({
                   aria-hidden="true"
                 />
                 <span className="truncate">
-                  {t('editor.unsavedChanges', 'Unsaved changes')}
+                  {isSaving
+                    ? t('editor.saving', 'Saving…')
+                    : t('editor.unsavedChanges', 'Unsaved changes')}
                 </span>
               </>
             ) : (
