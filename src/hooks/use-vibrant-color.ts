@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { formatHex, oklch, parse } from 'culori'
 import type * as VibrantWorkerRuntime from 'node-vibrant/worker'
 
@@ -398,6 +398,17 @@ export function useVibrantColor(
     () => getColorCacheSnapshot(resolvedTheme, imageUrl, enabled),
     () => null,
   )
+
+  // Recovery kick: extraction is otherwise only requested at subscribe time,
+  // which cannot restart it when a resubscribe is missed after `enabled`
+  // flips back (e.g. monochrome toggled off) or when the cache entry was
+  // evicted while mounted. Re-request whenever colors are needed but absent;
+  // the palette/color caches and pending-extraction dedup keep this cheap.
+  useEffect(() => {
+    if (imageUrl && enabled && !cachedColors) {
+      void getColors(imageUrl, resolvedTheme)
+    }
+  }, [imageUrl, enabled, resolvedTheme, cachedColors])
 
   return cachedColors
 }
