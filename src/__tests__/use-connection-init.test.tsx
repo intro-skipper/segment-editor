@@ -6,7 +6,11 @@ import { StrictMode } from 'react'
 import { cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useConnectionInit } from '@/hooks/use-connection-init'
+import {
+  useConnectionInit,
+  useConnectionValidationStore,
+  usePluginMode,
+} from '@/hooks/use-connection-init'
 import { useApiStore } from '@/stores/api-store'
 
 const testConnectionWithCredentials = vi.fn()
@@ -20,6 +24,7 @@ vi.mock('@/services/jellyfin', () => ({
 
 describe('useConnectionInit (standalone)', () => {
   beforeEach(() => {
+    useConnectionValidationStore.setState({ status: 'idle' })
     useApiStore.setState({
       serverAddress: 'http://localhost:8096',
       apiKey: 'test-key',
@@ -76,5 +81,30 @@ describe('useConnectionInit (standalone)', () => {
 
     expect(useApiStore.getState().validAuth).toBe(false)
     expect(result.current.showWizard).toBe(true)
+  })
+
+  it('exposes a completed failed validation through usePluginMode', async () => {
+    testConnectionWithCredentials.mockResolvedValue({
+      valid: false,
+      authenticated: false,
+      serverVersion: '',
+    })
+
+    const { result } = renderHook(
+      () => ({
+        init: useConnectionInit(),
+        mode: usePluginMode(),
+      }),
+      { wrapper: StrictMode },
+    )
+
+    await waitFor(() => {
+      expect(result.current.init.hasValidated).toBe(true)
+    })
+
+    expect(result.current.mode.hasCredentials).toBe(true)
+    expect(result.current.mode.isConnected).toBe(false)
+    expect(result.current.mode.isValidating).toBe(false)
+    expect(result.current.mode.hasValidated).toBe(true)
   })
 })

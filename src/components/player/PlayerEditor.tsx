@@ -238,9 +238,15 @@ function useRenderPlayerEditor({
 
   const isSaving = batchSaveMutation.isPending
 
+  // The batch save writes the new list into the query cache optimistically
+  // (onMutate), which would make the local/server comparison report "clean"
+  // while the request is still in flight. Treat the editor as dirty until the
+  // save is confirmed so navigation and tab-close stay guarded; on failure the
+  // cache rolls back and the comparison keeps the editor dirty.
   const isDirty =
     localEditingSegments !== null &&
-    !areSegmentListsEqual(localEditingSegments, sortedServerSegments)
+    (isSaving ||
+      !areSegmentListsEqual(localEditingSegments, sortedServerSegments))
 
   const blocker = useBlocker({
     shouldBlockFn: () => isDirty,
@@ -835,7 +841,7 @@ function useRenderPlayerEditor({
           </p>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isDirty && (
+            {isDirty && !isSaving && (
               <Button
                 variant="ghost"
                 onClick={handleDiscardEdits}

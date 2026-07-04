@@ -133,7 +133,8 @@ function useRenderFilterView() {
   const columns = useGridColumns()
   const navigationColumns = viewMode === 'list' ? 1 : columns
 
-  const { isPlugin, hasCredentials, isConnected } = usePluginMode()
+  const { isPlugin, hasCredentials, isConnected, isValidating, hasValidated } =
+    usePluginMode()
   const setSettingsOpen = useSessionStore(selectSetSettingsOpen)
 
   const {
@@ -256,9 +257,18 @@ function useRenderFilterView() {
     selectedCollection && !itemsLoading && !itemsError && totalItems === 0,
   )
 
-  const showNotConnected = !isPlugin && !hasCredentials && !isConnected
+  // Standalone sessions with stored credentials show "Connecting…" only while
+  // validation is pending; once validation completes without a connection the
+  // credentials are bad, so fall through to the actionable not-connected state
+  // instead of spinning forever with no attempt in flight.
+  const showNotConnected =
+    !isPlugin &&
+    !isConnected &&
+    (!hasCredentials || (hasValidated && !isValidating))
 
-  const showConnecting = !isConnected && (isPlugin || hasCredentials)
+  const showConnecting =
+    !isConnected &&
+    (isPlugin || (hasCredentials && (isValidating || !hasValidated)))
 
   return (
     <div className="relative px-4 pb-8 sm:px-6">

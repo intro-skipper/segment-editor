@@ -11,27 +11,59 @@ export const sortSegmentsByStart = (
   b: MediaSegmentDto,
 ): number => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)
 
+const compareStrings = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0
+
 /**
- * Compares two segment lists for equality by length and per-segment
- * Id/Type/StartTicks/EndTicks in order. Missing elements (sparse arrays or
+ * Total order over the fields compared by areSegmentListsEqual, used to
+ * normalize list order before comparing. Display order is derived state
+ * (sorted by start with insertion tie-breakers), so it must not affect the
+ * dirty check.
+ */
+const compareSegmentsCanonical = (
+  a: MediaSegmentDto,
+  b: MediaSegmentDto,
+): number =>
+  (a.StartTicks ?? 0) - (b.StartTicks ?? 0) ||
+  (a.EndTicks ?? 0) - (b.EndTicks ?? 0) ||
+  compareStrings(a.Id ?? '', b.Id ?? '') ||
+  compareStrings(a.Type ?? '', b.Type ?? '')
+
+/**
+ * Compares two segment lists as unordered collections by per-segment
+ * Id/Type/StartTicks/EndTicks. Same segments in a different order are equal;
+ * list order is presentation-only. Missing elements (sparse arrays or
  * explicit undefined entries) are treated as unequal.
  */
 export const areSegmentListsEqual = (
   a: ReadonlyArray<MediaSegmentDto>,
   b: ReadonlyArray<MediaSegmentDto>,
-): boolean =>
-  a.length === b.length &&
-  Array.from(a, (segment, index) => {
-    const other = b[index] as MediaSegmentDto | undefined
+): boolean => {
+  if (a.length !== b.length) return false
+
+  const listA = Array.from(a)
+  const listB = Array.from(b)
+  if (
+    listA.some((segment) => segment === undefined) ||
+    listB.some((segment) => segment === undefined)
+  ) {
+    return false
+  }
+
+  const sortedA = listA.toSorted(compareSegmentsCanonical)
+  const sortedB = listB.toSorted(compareSegmentsCanonical)
+
+  return sortedA.every((segment, index) => {
+    const other = sortedB[index] as MediaSegmentDto | undefined
     return (
-      segment !== undefined &&
       other !== undefined &&
       segment.Id === other.Id &&
       segment.Type === other.Type &&
       segment.StartTicks === other.StartTicks &&
       segment.EndTicks === other.EndTicks
     )
-  }).every(Boolean)
+  })
+}
 
 /**
  * Reference to a segment captured at interaction time (e.g. when a delete

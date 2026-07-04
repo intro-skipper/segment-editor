@@ -24,6 +24,8 @@ const pluginModeState = vi.hoisted(() => ({
     isPlugin: false,
     hasCredentials: true,
     isConnected: true,
+    isValidating: false,
+    hasValidated: true,
   },
 }))
 
@@ -175,6 +177,8 @@ describe('FilterView', () => {
       isPlugin: false,
       hasCredentials: true,
       isConnected: true,
+      isValidating: false,
+      hasValidated: true,
     }
     setCollectionsQuery({})
     setItemsQuery({})
@@ -199,6 +203,8 @@ describe('FilterView', () => {
       isPlugin: false,
       hasCredentials: false,
       isConnected: false,
+      isValidating: false,
+      hasValidated: false,
     }
 
     render(<FilterView />)
@@ -215,6 +221,8 @@ describe('FilterView', () => {
       isPlugin: true,
       hasCredentials: true,
       isConnected: false,
+      isValidating: false,
+      hasValidated: false,
     }
 
     render(<FilterView />)
@@ -225,11 +233,13 @@ describe('FilterView', () => {
     ).toBeTruthy()
   })
 
-  it('renders the connecting state for standalone with stored credentials', () => {
+  it('renders the connecting state while stored credentials are validating', () => {
     pluginModeState.current = {
       isPlugin: false,
       hasCredentials: true,
       isConnected: false,
+      isValidating: true,
+      hasValidated: false,
     }
     setCollectionsQuery({
       data: [makeCollection('movies', 'Movies')],
@@ -242,6 +252,46 @@ describe('FilterView', () => {
     expect(
       screen.queryByRole('heading', { name: 'Select a Library' }),
     ).toBeNull()
+  })
+
+  it('renders the connecting state before stored-credential validation starts', () => {
+    pluginModeState.current = {
+      isPlugin: false,
+      hasCredentials: true,
+      isConnected: false,
+      isValidating: false,
+      hasValidated: false,
+    }
+    setCollectionsQuery({
+      data: [makeCollection('movies', 'Movies')],
+    })
+
+    render(<FilterView />)
+
+    expect(screen.getByText('Connecting…')).toBeTruthy()
+    expect(screen.queryByText('Not Connected')).toBeNull()
+  })
+
+  it('renders the not-connected state when stored credentials failed validation', () => {
+    pluginModeState.current = {
+      isPlugin: false,
+      hasCredentials: true,
+      isConnected: false,
+      isValidating: false,
+      hasValidated: true,
+    }
+    setCollectionsQuery({
+      data: [makeCollection('movies', 'Movies')],
+    })
+
+    render(<FilterView />)
+
+    expect(screen.getByText('Not Connected')).toBeTruthy()
+    expect(screen.queryByText('Connecting…')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
+
+    expect(useSessionStore.getState().settingsOpen).toBe(true)
   })
 
   it('renders libraries and resets filter search when selecting one', () => {

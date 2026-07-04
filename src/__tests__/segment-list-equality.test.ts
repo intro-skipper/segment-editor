@@ -52,11 +52,47 @@ describe('areSegmentListsEqual', () => {
     )
   })
 
-  it('is order-sensitive', () => {
+  it('is order-insensitive for the same segments', () => {
     const first = segment()
     const second = segment({ Id: 'segment-2', StartTicks: 30, EndTicks: 40 })
 
-    expect(areSegmentListsEqual([first, second], [second, first])).toBe(false)
+    expect(areSegmentListsEqual([first, second], [second, first])).toBe(true)
+  })
+
+  it('is order-insensitive for same-start ties reordered by insertion tie-breakers', () => {
+    const intro = segment({ Id: 'segment-1', StartTicks: 0, EndTicks: 100 })
+    const recap = segment({
+      Id: 'segment-2',
+      Type: 'Recap',
+      StartTicks: 0,
+      EndTicks: 50,
+    })
+
+    expect(areSegmentListsEqual([intro, recap], [recap, intro])).toBe(true)
+  })
+
+  it('detects content changes among same-start ties', () => {
+    const intro = segment({ Id: 'segment-1', StartTicks: 0, EndTicks: 100 })
+    const recap = segment({
+      Id: 'segment-2',
+      Type: 'Recap',
+      StartTicks: 0,
+      EndTicks: 50,
+    })
+
+    expect(
+      areSegmentListsEqual(
+        [intro, recap],
+        [recap, segment({ ...intro, EndTicks: 101 })],
+      ),
+    ).toBe(false)
+  })
+
+  it('distinguishes duplicate counts', () => {
+    const first = segment()
+    const second = segment({ Id: 'segment-2', StartTicks: 30, EndTicks: 40 })
+
+    expect(areSegmentListsEqual([first, first], [first, second])).toBe(false)
   })
 
   it('ignores fields outside Id/Type/StartTicks/EndTicks', () => {

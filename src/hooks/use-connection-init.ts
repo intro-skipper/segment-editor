@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import {
   getPluginCredentials,
@@ -8,6 +9,29 @@ import {
 import { useApiStore } from '@/stores/api-store'
 
 type ValidationStatus = 'idle' | 'validating' | 'validated'
+
+interface ConnectionValidationStore {
+  status: ValidationStatus
+  setStatus: (status: ValidationStatus) => void
+}
+
+/**
+ * Validation progress is shared app-wide: useConnectionInit (mounted once at
+ * the root) drives it, while views like FilterView read it through
+ * usePluginMode to distinguish "validating stored credentials" from
+ * "stored credentials failed validation". Kept outside the persisted api
+ * store because it is per-session progress, not connection configuration.
+ */
+export const useConnectionValidationStore = create<ConnectionValidationStore>()(
+  (set) => ({
+    status: 'idle',
+    setStatus: (status) => set({ status }),
+  }),
+)
+
+const setValidationStatus = (status: ValidationStatus): void => {
+  useConnectionValidationStore.getState().setStatus(status)
+}
 
 const validationStateByStatus: Record<
   ValidationStatus,
@@ -68,8 +92,7 @@ function isSignalActive(signal: AbortSignal): boolean {
 }
 
 export function useConnectionInit(): ConnectionState {
-  const [validationStatus, setValidationStatus] =
-    useState<ValidationStatus>('idle')
+  const validationStatus = useConnectionValidationStore((s) => s.status)
   const { isValidating, hasValidated: hasValidatedByStatus } =
     validationStateByStatus[validationStatus]
   const lastAttemptKeyRef = useRef<string | null>(null)
@@ -188,6 +211,7 @@ export function usePluginMode() {
       apiKey: s.apiKey,
     })),
   )
+  const validationStatus = useConnectionValidationStore((s) => s.status)
 
   const isPlugin = isPluginMode()
 
@@ -197,5 +221,7 @@ export function usePluginMode() {
       ? getPluginCredentials() !== null
       : !!(serverAddress && apiKey),
     isConnected: validAuth,
+    isValidating: validationStatus === 'validating',
+    hasValidated: validationStatus === 'validated' || validAuth,
   }
 }
