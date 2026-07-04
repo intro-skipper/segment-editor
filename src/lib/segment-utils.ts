@@ -36,19 +36,18 @@ const compareSegmentsCanonical = (
  * explicit undefined entries) are treated as unequal.
  */
 export const areSegmentListsEqual = (
-  a: ReadonlyArray<MediaSegmentDto>,
-  b: ReadonlyArray<MediaSegmentDto>,
+  a: ReadonlyArray<MediaSegmentDto | undefined>,
+  b: ReadonlyArray<MediaSegmentDto | undefined>,
 ): boolean => {
   if (a.length !== b.length) return false
 
-  const listA = Array.from(a)
-  const listB = Array.from(b)
-  if (
-    listA.some((segment) => segment === undefined) ||
-    listB.some((segment) => segment === undefined)
-  ) {
-    return false
-  }
+  const listA = a.filter(
+    (segment): segment is MediaSegmentDto => segment !== undefined,
+  )
+  const listB = b.filter(
+    (segment): segment is MediaSegmentDto => segment !== undefined,
+  )
+  if (listA.length !== a.length || listB.length !== b.length) return false
 
   const sortedA = listA.toSorted(compareSegmentsCanonical)
   const sortedB = listB.toSorted(compareSegmentsCanonical)

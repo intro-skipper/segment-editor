@@ -142,26 +142,22 @@ export function useConnectionInit(): ConnectionState {
       setValidationStatus('validating')
 
       try {
-        if (controller.signal.aborted) return
         const result = await testConnectionWithCredentials(creds, {
           signal: controller.signal,
         })
 
-        if (!controller.signal.aborted) {
-          try {
-            applyConnectionValidationResult(result)
-          } catch {
-            trySetInvalidConnectionStatus()
-          }
+        if (controller.signal.aborted) return
+        try {
+          applyConnectionValidationResult(result)
+        } catch {
+          trySetInvalidConnectionStatus()
         }
       } catch {
         if (controller.signal.aborted) return
         trySetInvalidConnectionStatus()
       }
 
-      if (!controller.signal.aborted) {
-        setValidationStatus('validated')
-      }
+      setValidationStatus('validated')
     }
 
     void init()

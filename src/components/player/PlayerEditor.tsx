@@ -255,16 +255,18 @@ function useRenderPlayerEditor({
     withResolver: true,
   })
 
+  const proceedBlockedNavigation = React.useEffectEvent(() => {
+    blocker.proceed?.()
+  })
+
   // If the user tried to leave during an in-flight save and the save then
   // completed (local edits cleared, nothing dirty anymore), let the pending
   // navigation continue instead of leaving a stale "discard" prompt open.
-  const blockerStatus = blocker.status
-  const blockerProceed = blocker.proceed
-  React.useEffect(() => {
-    if (blockerStatus === 'blocked' && !isDirty) {
-      blockerProceed?.()
+  React.useLayoutEffect(() => {
+    if (blocker.status === 'blocked' && !isDirty) {
+      proceedBlockedNavigation()
     }
-  }, [blockerStatus, blockerProceed, isDirty])
+  }, [blocker.status, isDirty])
 
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
@@ -498,9 +500,7 @@ function useRenderPlayerEditor({
       // Clear only the exact edits this save persisted. If the item changed
       // or the user kept editing while the save was in flight, the current
       // edits are a different array and must survive.
-      setLocalEditingSegments((prev) =>
-        prev === savedSegments ? null : prev,
-      )
+      setLocalEditingSegments((prev) => (prev === savedSegments ? null : prev))
     } catch {
       // Errors surface via the mutation's onError toast; edits stay dirty.
     }
