@@ -1,13 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react'
 
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
-import { resolveTheme } from '@/hooks/use-vibrant-color'
+import { useResolvedTheme } from '@/hooks/use-artwork-color'
 import { buildDynamicThemeVars } from '@/lib/m3-dynamic-theme'
 import { cn } from '@/lib/utils'
-import { selectTheme, useAppStore } from '@/stores/app-store'
 
 interface DynamicThemeScopeProps {
-  colors: VibrantColors | null
+  seedColor: string | null
   className?: string
   children: ReactNode
 }
@@ -17,17 +15,16 @@ interface DynamicThemeScopeProps {
  * item artwork. Components inside consume the same shadcn tokens as
  * everywhere else, so the scheme reaches every primary, accent, surface,
  * border, and focus ring without per-component styling. Renders children on
- * the neutral base theme when colors are unavailable (loading, no artwork,
- * or monochrome mode).
+ * the neutral base theme when no seed color is available (loading, no
+ * artwork, or monochrome mode).
  */
 export function DynamicThemeScope({
-  colors,
+  seedColor,
   className,
   children,
 }: DynamicThemeScopeProps) {
-  const theme = useAppStore(selectTheme)
-  const isDark = resolveTheme(theme) === 'dark'
-  const vars = colors ? buildDynamicThemeVars(colors.accent, isDark) : null
+  const isDark = useResolvedTheme() === 'dark'
+  const vars = seedColor ? buildDynamicThemeVars(seedColor, isDark) : null
 
   return (
     <div

@@ -102,10 +102,6 @@ vi.mock('@/hooks/use-connection-init', () => ({
   usePluginMode: () => pluginModeState.current,
 }))
 
-vi.mock('@/hooks/use-vibrant-color', () => ({
-  useVibrantColor: () => null,
-}))
-
 vi.mock('@/components/filter/LibraryCard', () => ({
   LibraryCard: ({
     collection: library,

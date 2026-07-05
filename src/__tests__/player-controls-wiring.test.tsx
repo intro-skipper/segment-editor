@@ -210,7 +210,6 @@ function renderPlayer(overrides: Partial<PlayerProps> = {}) {
   return render(
     <Player
       item={createItem()}
-      vibrantColors={null}
       frameStepSeconds={1 / 24}
       onCreateSegment={vi.fn()}
       onUpdateSegmentTimestamp={vi.fn()}

@@ -25,7 +25,6 @@ describe('PlayerScrubber', () => {
         currentTime={66.2}
         duration={65}
         buffered={90}
-        vibrantColors={null}
         onSeek={vi.fn()}
       />,
     )
@@ -53,7 +52,6 @@ describe('PlayerScrubber', () => {
       <PlayerScrubber
         currentTime={Number.NaN}
         duration={Number.POSITIVE_INFINITY}
-        vibrantColors={null}
         onSeek={vi.fn()}
       />,
     )
@@ -74,7 +72,6 @@ describe('PlayerScrubber', () => {
       <PlayerScrubber
         currentTime={Number.NaN}
         duration={Number.POSITIVE_INFINITY}
-        vibrantColors={null}
         onSeek={onSeek}
       />,
     )

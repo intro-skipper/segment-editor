@@ -72,10 +72,6 @@ vi.mock('@/services/items/queries', () => ({
   }),
 }))
 
-vi.mock('@/hooks/use-vibrant-color', () => ({
-  useVibrantColor: () => null,
-}))
-
 vi.mock('@/services/video/api', () => ({
   getBestImageUrl: () => null,
 }))

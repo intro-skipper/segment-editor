@@ -15,7 +15,6 @@ import type {
   SegmentUpdate,
   TimestampUpdate,
 } from '@/types/segment'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useSegments } from '@/services/segments/queries'
 import { useBatchSaveSegments } from '@/services/segments/mutations'
 import { useAppStore } from '@/stores/app-store'
@@ -67,7 +66,6 @@ const MOD_S_DISPLAY = formatForDisplay('Mod+S')
 interface PlayerEditorProps {
   item: BaseItemDto
   fetchSegments?: boolean
-  vibrantColors: VibrantColors | null
   className?: string
 }
 
@@ -172,13 +170,11 @@ function replaceSegmentSorted(
 export function PlayerEditor({
   item,
   fetchSegments = true,
-  vibrantColors,
   className,
 }: PlayerEditorProps) {
   return useRenderPlayerEditor({
     item,
     fetchSegments,
-    vibrantColors,
     className,
   })
 }
@@ -186,7 +182,6 @@ export function PlayerEditor({
 function useRenderPlayerEditor({
   item,
   fetchSegments = true,
-  vibrantColors,
   className,
 }: PlayerEditorProps) {
   const { t } = useTranslation()
@@ -621,7 +616,6 @@ function useRenderPlayerEditor({
       {showVideoPlayer && (
         <Player
           item={item}
-          vibrantColors={vibrantColors}
           timestamp={playerTimestamp}
           segments={editingSegments}
           frameStepSeconds={frameStepSeconds}
