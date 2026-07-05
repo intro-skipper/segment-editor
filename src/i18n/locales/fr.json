@@ -82,6 +82,10 @@
       "name": "Recherche",
       "collection": "Collection"
     },
+    "seasonCount_one": "{{count}} saison",
+    "seasonCount_other": "{{count}} saisons",
+    "episodeCount_one": "{{count}} épisode",
+    "episodeCount_other": "{{count}} épisodes",
     "mediaGrid": "Éléments multimédias",
     "mediaList": "Éléments multimédias",
     "loadingMediaItems": "Chargement des éléments multimédias",

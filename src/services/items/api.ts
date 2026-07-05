@@ -131,8 +131,13 @@ export async function getItems(
         excludeItemTypes,
         recursive: !!searchTerm,
         fields: includeMediaStreams
-          ? [ItemFields.MediaStreams, ItemFields.MediaSources]
-          : undefined,
+          ? [
+              ItemFields.ChildCount,
+              ItemFields.RecursiveItemCount,
+              ItemFields.MediaStreams,
+              ItemFields.MediaSources,
+            ]
+          : [ItemFields.ChildCount, ItemFields.RecursiveItemCount],
         limit,
         startIndex,
       },

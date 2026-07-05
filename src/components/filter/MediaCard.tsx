@@ -7,7 +7,7 @@ import { ItemImage } from '@/components/media/ItemImage'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
-import { getMediaItemLabel } from '@/components/filter/media-item-label'
+import { getMediaItemLabel, getSeriesCountLabel } from '@/components/filter/media-item-label'
 
 interface MediaCardProps {
   item: BaseItemDto
@@ -52,6 +52,10 @@ export const MediaCard = function MediaCardComponent({
   }
 
   const accessibleLabel = getMediaItemLabel(t, item)
+  const countLabel = getSeriesCountLabel(t, item)
+  const metaText = [item.ProductionYear, countLabel]
+    .filter(Boolean)
+    .join(' \u00B7 ')
 
   // Derived values - no useMemo needed for simple computations
   const animationDelay = staggerDelay(index, STAGGER_FAST)
@@ -89,17 +93,16 @@ export const MediaCard = function MediaCardComponent({
         />
 
         <div className="px-3 py-2.5 md:px-4 md:py-3">
-          {/* Title - fixed height for 2 lines */}
           <p
-            className="text-sm md:text-base font-semibold line-clamp-2 leading-snug h-[2.5em] text-foreground"
+            className="text-sm md:text-base font-semibold truncate leading-snug text-foreground"
             title={item.Name || undefined}
           >
             {item.Name || 'Unknown'}
           </p>
 
-          {/* Year - always in third row */}
-          <p className="text-xs md:text-sm font-medium h-[1.25em] text-muted-foreground">
-            {item.ProductionYear ?? '\u00A0'}
+          {/* Year and series counts - fixed height keeps grid rows aligned */}
+          <p className="text-xs md:text-sm font-medium h-[1.25em] truncate text-muted-foreground">
+            {metaText || '\u00A0'}
           </p>
         </div>
       </button>

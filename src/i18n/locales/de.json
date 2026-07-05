@@ -132,6 +132,10 @@
       "collection": "Sammlung",
       "selectCollection": "Sammlung auswählen"
     },
+    "seasonCount_one": "{{count}} Staffel",
+    "seasonCount_other": "{{count}} Staffeln",
+    "episodeCount_one": "{{count}} Episode",
+    "episodeCount_other": "{{count}} Episoden",
     "mediaGrid": "Medienelemente",
     "mediaList": "Medienelemente",
     "loadingMediaItems": "Medienelemente werden geladen",
