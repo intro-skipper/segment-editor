@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
+import { getBestImageUrl } from '@/services/video/api'
+import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
@@ -156,7 +159,7 @@ function DetailHeaderContent({
         onClick={onBack}
         className={cn(
           iconButtonClass,
-          'bg-secondary/80 hover:bg-secondary',
+          'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
           'active:scale-95',
         )}
         aria-label={t('navigation.back', 'Go back')}
@@ -197,7 +200,7 @@ function HeaderActions({
   const { t } = useTranslation()
   const actionButtonClassName = cn(
     iconButtonClass,
-    'bg-secondary/60 hover:bg-secondary',
+    'bg-secondary/60 text-secondary-foreground hover:bg-secondary',
   )
 
   return (
@@ -288,6 +291,13 @@ export default function Header() {
   })
   const currentItem = queriedItem ?? undefined
 
+  // Same artwork URL as the detail routes, so the header shares the cached
+  // seed and renders the same M3 dynamic scheme as the page below it.
+  const imageUrl = currentItem ? getBestImageUrl(currentItem, 300) : null
+  const seedColor = useArtworkColor(imageUrl || null, {
+    enabled: !!imageUrl,
+  })
+
   const detailInfo = getHeaderDetailInfo(currentItem)
 
   const openCommandPalette = () => {
@@ -328,39 +338,44 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/40">
-        <nav
-          className="px-4 py-4 sm:px-6"
-          aria-label={t('accessibility.navigation', 'Main navigation')}
+      <header className="sticky top-0 z-40">
+        <DynamicThemeScope
+          seedColor={seedColor}
+          className="bg-background/80 backdrop-blur-xl border-b border-border/40"
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              {isDetailPage ? (
-                <DetailHeaderContent
-                  {...detailInfo}
-                  currentItem={currentItem}
-                  isPlayerPage={isPlayerPage}
-                  onBack={handleBack}
-                />
-              ) : (
-                collections?.length && (
-                  <CollectionSelector
-                    collections={collections}
-                    selectedId={selectedCollection ?? null}
-                    onSelect={handleCollectionSelect}
+          <nav
+            className="px-4 py-4 sm:px-6"
+            aria-label={t('accessibility.navigation', 'Main navigation')}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {isDetailPage ? (
+                  <DetailHeaderContent
+                    {...detailInfo}
+                    currentItem={currentItem}
+                    isPlayerPage={isPlayerPage}
+                    onBack={handleBack}
                   />
-                )
-              )}
-            </div>
+                ) : (
+                  collections?.length && (
+                    <CollectionSelector
+                      collections={collections}
+                      selectedId={selectedCollection ?? null}
+                      onSelect={handleCollectionSelect}
+                    />
+                  )
+                )}
+              </div>
 
-            <HeaderActions
-              selectedCollection={selectedCollection}
-              isDetailPage={isDetailPage}
-              onOpenSearch={openCommandPalette}
-              onOpenSettings={handleSettingsClick}
-            />
-          </div>
-        </nav>
+              <HeaderActions
+                selectedCollection={selectedCollection}
+                isDetailPage={isDetailPage}
+                onOpenSearch={openCommandPalette}
+                onOpenSettings={handleSettingsClick}
+              />
+            </div>
+          </nav>
+        </DynamicThemeScope>
       </header>
 
       {commandPaletteOpen ? (
