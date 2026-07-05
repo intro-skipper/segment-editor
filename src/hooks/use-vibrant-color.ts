@@ -75,7 +75,7 @@ darkModeQuery?.addEventListener('change', (e) => {
   prefersDark = e.matches
 })
 
-const resolveTheme = (theme: Theme): ResolvedTheme =>
+export const resolveTheme = (theme: Theme): ResolvedTheme =>
   theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
 
 const colorCacheListeners: Record<

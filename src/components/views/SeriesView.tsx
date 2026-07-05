@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/services/items/queries'
-import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
@@ -19,14 +17,12 @@ interface SeriesViewProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId?: string | null
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 interface SeasonTabsProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId: string | null
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const isSpecialSeason = (s: BaseItemDto) =>
@@ -36,9 +32,7 @@ const SeasonTabs = function SeasonTabsComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
-  vibrantColors,
 }: SeasonTabsProps) {
-  const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
 
   const orderedSeasons = (() => {
     const normal: typeof seasons = []
@@ -70,14 +64,12 @@ const SeasonTabs = function SeasonTabsComponent({
             onClick={() => season.Id && onSeasonSelect(season.Id)}
             className={cn(
               'flex-shrink-0 px-4 py-3 md:px-6 md:py-4 rounded-full text-base md:text-lg font-semibold whitespace-nowrap',
-              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2',
+              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2 border-transparent',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              !hasColors &&
-                (isSelected
-                  ? 'bg-primary/20 text-primary border-primary/40'
-                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent'),
+              isSelected
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
             )}
-            style={getTabStyle(isSelected)}
           >
             {label}
           </button>
@@ -237,7 +229,6 @@ export function SeriesView({
   seasons,
   selectedSeasonId: selectedSeasonIdProp,
   onSeasonSelect,
-  vibrantColors,
 }: SeriesViewProps) {
   const { t } = useTranslation()
 
@@ -277,7 +268,6 @@ export function SeriesView({
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
         onSeasonSelect={onSeasonSelect}
-        vibrantColors={vibrantColors}
       />
 
       <div className="mt-2 md:mt-4">
