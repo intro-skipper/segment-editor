@@ -59,7 +59,7 @@
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.1",
     "fast-check": "^4.8.0",
     "jsdom": "^29.1.1",
-    "oxfmt": "^0.56.0",
+    "oxfmt": "^0.58.0",
     "oxlint": "^1.72.0",
     "oxlint-tsgolint": "^0.23.0",
     "react-doctor": "0.5.8",
