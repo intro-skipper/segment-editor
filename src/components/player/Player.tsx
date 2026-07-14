@@ -54,6 +54,15 @@ import { extractTracks } from '@/services/video/tracks'
 
 const PLAYBACK_UPDATE_INTERVAL_MS = 120
 
+/**
+ * iPhone Safari exposes no element fullscreen API (`Element.requestFullscreen`
+ * exists on iPadOS/desktop but not iOS phones). The only fullscreen path there
+ * is the WebKit-prefixed native video fullscreen method on the video element.
+ */
+type WebkitFullscreenVideoElement = HTMLVideoElement & {
+  webkitEnterFullscreen?: () => void
+}
+
 function getPlaybackTimestampMs() {
   return performance.now()
 }
@@ -729,11 +738,28 @@ function useRenderPlayer({
         // Can fail if the document is not in fullscreen or element was removed.
         // The fullscreenchange listener will reconcile UI state regardless.
       })
-    } else {
+      return
+    }
+
+    if (typeof container.requestFullscreen === 'function') {
       container.requestFullscreen().catch(() => {
         // Can fail due to permissions policy, missing user gesture, or
         // element removal. UI state stays in sync via the fullscreenchange listener.
       })
+      return
+    }
+
+    // iPhone Safari: no element fullscreen API, so calling
+    // container.requestFullscreen() would throw synchronously. Fall back to
+    // the native video fullscreen player instead.
+    const video = videoRef.current as WebkitFullscreenVideoElement | null
+    if (typeof video?.webkitEnterFullscreen === 'function') {
+      try {
+        video.webkitEnterFullscreen()
+      } catch {
+        // Throws InvalidStateError when playback has not started yet;
+        // there is no fullscreen to enter in that case.
+      }
     }
   }
 

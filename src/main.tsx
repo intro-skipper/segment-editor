@@ -27,10 +27,12 @@ import {
 } from './services/jellyfin/core'
 import { DesktopFallback } from './components/DesktopFallback'
 import { installVitePreloadErrorHandler } from './lib/vite-preload-error'
+import { installViewTransitionAbortHandler } from './lib/view-transition-error'
 
 import './styles.css'
 
 installVitePreloadErrorHandler()
+installViewTransitionAbortHandler()
 
 if (import.meta.env.DEV) {
   const { applyDevMockServerLogin } =
@@ -80,6 +82,11 @@ const router = createRouter({
   defaultPreloadStaleTime: 0,
   defaultViewTransition: {
     types: ({ fromLocation, toLocation, pathChanged, hashChanged }) => {
+      // Skip the very first navigation (no previous location). Plugin mode
+      // redirects away from its entry URL during boot, and a transition
+      // started there is immediately aborted by the follow-up navigation.
+      if (!fromLocation) return false
+
       // Skip transition for hash-only changes (e.g., anchor links)
       if (!pathChanged && hashChanged) return ['instant']
 
