@@ -167,6 +167,15 @@ function makeMediaSource(id) {
         IsDefault: true,
         DisplayTitle: 'English - AAC - Stereo',
       },
+      {
+        Type: 'Subtitle',
+        Codec: 'ass',
+        Index: 2,
+        Language: 'eng',
+        IsDefault: false,
+        IsExternal: false,
+        DisplayTitle: 'English - ASS',
+      },
     ],
   }
 }
@@ -678,6 +687,15 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(204)
     return res.end()
+  }
+
+  // ASS subtitle stream (JASSUB)
+  m = /^\/Videos\/[0-9a-f-]+\/[0-9a-f-]+\/Subtitles\/\d+\/Stream\.(ass|ssa)$/i.exec(p)
+  if (m) {
+    const assPath = path.join(__dirname, 'sub.ass')
+    if (!fs.existsSync(assPath)) return notFound(res)
+    res.writeHead(200, { 'Content-Type': 'text/x-ssa; charset=utf-8' })
+    return res.end(fs.readFileSync(assPath))
   }
 
   // Video stream (direct play)
