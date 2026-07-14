@@ -84,6 +84,25 @@ type SegmentUpdater = (
   activeIndex: number,
 ) => EditingUpdate | null
 
+function removeSegmentAt(
+  segments: Array<MediaSegmentDto>,
+  index: number,
+  currentActiveIndex: number,
+): EditingUpdate | null {
+  if (index < 0 || index >= segments.length) return null
+
+  const updated = [...segments]
+  updated.splice(index, 1)
+
+  const nextActiveIndex =
+    updated.length === 0
+      ? 0
+      : currentActiveIndex > index
+        ? currentActiveIndex - 1
+        : Math.max(0, Math.min(currentActiveIndex, updated.length - 1))
+  return { segments: updated, activeIndex: nextActiveIndex }
+}
+
 interface ParsedImportResult {
   segments: Array<MediaSegmentDto>
   skipped: number
@@ -383,20 +402,9 @@ function useRenderPlayerEditor({
   }
 
   const handleDeleteSegment = (index: number) => {
-    updateEditingSegments((segments, currentActiveIndex) => {
-      if (index < 0 || index >= segments.length) return null
-
-      const updated = [...segments]
-      updated.splice(index, 1)
-
-      const nextActiveIndex =
-        updated.length === 0
-          ? 0
-          : currentActiveIndex > index
-            ? currentActiveIndex - 1
-            : Math.max(0, Math.min(currentActiveIndex, updated.length - 1))
-      return { segments: updated, activeIndex: nextActiveIndex }
-    })
+    updateEditingSegments((segments, currentActiveIndex) =>
+      removeSegmentAt(segments, index, currentActiveIndex),
+    )
   }
 
   const handleRequestDeleteSegment = (index: number) => {
@@ -449,10 +457,13 @@ function useRenderPlayerEditor({
   }
 
   const handleDeleteSegmentFromDialog = (segment: MediaSegmentDto) => {
-    updateEditingSegments((segments, currentActiveIndex) => ({
-      segments: segments.filter((seg) => seg.Id !== segment.Id),
-      activeIndex: Math.max(0, currentActiveIndex - 1),
-    }))
+    updateEditingSegments((segments, currentActiveIndex) =>
+      removeSegmentAt(
+        segments,
+        segments.findIndex((seg) => seg.Id === segment.Id),
+        currentActiveIndex,
+      ),
+    )
   }
 
   const handlePasteFromClipboard = () => {
