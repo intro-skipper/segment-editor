@@ -1,0 +1,113 @@
+/**
+ * SegmentTimeline component.
+ * Read-only miniature timeline showing which segments exist across an
+ * item's runtime, mirroring the segment colors used by the player scrubber
+ * and editor. Designed for list views (e.g. episode lists) so segment
+ * coverage is visible at a glance without opening the editor.
+ */
+
+import { useTranslation } from 'react-i18next'
+
+import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { SegmentRegion } from '@/lib/segment-utils'
+import { getSegmentRegions } from '@/lib/segment-utils'
+import { cn } from '@/lib/utils'
+
+/**
+ * Minimum rendered region width in percent. Keeps short segments (e.g. a
+ * few seconds of preview) visible on narrow tracks instead of dropping them.
+ */
+const MIN_VISIBLE_WIDTH_PERCENT = 0.8
+
+/** Formats seconds as m:ss or h:mm:ss for tooltips and accessible labels */
+export function formatTimelineTime(seconds: number): string {
+  const safe = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const secs = safe % 60
+  const ss = String(secs).padStart(2, '0')
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`
+  }
+  return `${minutes}:${ss}`
+}
+
+const formatRegionRange = (region: SegmentRegion): string =>
+  `${region.type ?? 'Unknown'} ${formatTimelineTime(region.startSeconds)} – ${formatTimelineTime(region.endSeconds)}`
+
+interface SegmentTimelineProps {
+  /** Segments with StartTicks/EndTicks in seconds (as returned by useSegments) */
+  segments: Array<MediaSegmentDto>
+  /** Total runtime of the item in seconds */
+  runtimeSeconds: number
+  /** Renders a pulsing placeholder track while segment data loads */
+  isLoading?: boolean
+  className?: string
+}
+
+export function SegmentTimeline({
+  segments,
+  runtimeSeconds,
+  isLoading = false,
+  className,
+}: SegmentTimelineProps) {
+  const { t } = useTranslation()
+
+  if (isLoading) {
+    return (
+      <div
+        className={cn(
+          'h-1.5 rounded-full bg-muted/70 animate-pulse',
+          className,
+        )}
+        aria-hidden="true"
+        data-testid="segment-timeline-loading"
+      />
+    )
+  }
+
+  // Fall back to the furthest segment end so existing segments still render
+  // (with correct relative placement) when the item has no known runtime.
+  const maxSegmentEnd = segments.reduce(
+    (max, segment) => Math.max(max, segment.EndTicks ?? 0),
+    0,
+  )
+  const duration = runtimeSeconds > 0 ? runtimeSeconds : maxSegmentEnd
+  const regions = getSegmentRegions(segments, duration, {
+    minVisibleWidthPercent: MIN_VISIBLE_WIDTH_PERCENT,
+  })
+
+  const label =
+    regions.length === 0
+      ? t('segment.timeline.empty', 'No segments')
+      : t('segment.timeline.label', {
+          defaultValue: 'Segments: {{list}}',
+          list: regions.map(formatRegionRange).join(', '),
+        })
+
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      data-testid="segment-timeline"
+      className={cn(
+        'relative h-1.5 rounded-full overflow-hidden bg-primary/15',
+        className,
+      )}
+    >
+      {regions.map((region) => (
+        <div
+          key={region.id}
+          className="absolute inset-y-0 opacity-90"
+          style={{
+            left: `${region.start}%`,
+            width: `${region.width}%`,
+            backgroundColor: region.color,
+          }}
+          title={formatRegionRange(region)}
+        />
+      ))}
+    </div>
+  )
+}

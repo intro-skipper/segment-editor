@@ -98,6 +98,85 @@ export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
 export const getSegmentCssVar = (type: MediaSegmentType | undefined): string =>
   (type && SEGMENT_COLORS[type].css) ?? DEFAULT_SEGMENT_COLOR.css
 
+/**
+ * A segment mapped to percent-based track coordinates for timeline rendering.
+ * Shared by the player scrubber and the read-only episode-list timeline.
+ */
+export interface SegmentRegion {
+  id: MediaSegmentDto['Id']
+  type: MediaSegmentDto['Type']
+  /** Left edge as percent of track width [0, 100] */
+  start: number
+  /** Width as percent of track width [0, 100] */
+  width: number
+  /** CSS color value for the segment type */
+  color: string
+  /** Segment start in seconds, clamped to [0, duration] */
+  startSeconds: number
+  /** Segment end in seconds, clamped to [0, duration] */
+  endSeconds: number
+}
+
+export interface SegmentRegionOptions {
+  /**
+   * Minimum rendered width in percent. Regions narrower than this are
+   * widened to stay visible (shifted left when they would overflow the
+   * track). Without this option, regions narrower than 0.1% are dropped,
+   * which matches the player scrubber's historical behavior.
+   */
+  minVisibleWidthPercent?: number
+}
+
+/**
+ * Maps segments (times in seconds) onto percent-based track regions.
+ * Segments outside [0, duration] are clamped; degenerate spans are dropped.
+ */
+export const getSegmentRegions = (
+  segments: Array<MediaSegmentDto> | undefined,
+  duration: number,
+  options?: SegmentRegionOptions,
+): Array<SegmentRegion> => {
+  if (!segments || segments.length === 0 || duration <= 0) return []
+
+  const minVisibleWidth = options?.minVisibleWidthPercent
+  const regions: Array<SegmentRegion> = []
+  for (const segment of segments) {
+    const startSeconds = segment.StartTicks ?? 0
+    const startPercent = (startSeconds / duration) * 100
+    if (startPercent >= 100) continue
+    const endSeconds = segment.EndTicks ?? 0
+    const endPercent = (endSeconds / duration) * 100
+    const clampedStart = Math.max(0, startPercent)
+    const clampedEnd = Math.min(100, endPercent)
+    let width = Math.max(0, clampedEnd - clampedStart)
+    let left = clampedStart
+
+    if (minVisibleWidth === undefined) {
+      if (width <= 0.1) continue
+    } else {
+      if (width <= 0) continue
+      if (width < minVisibleWidth) {
+        width = Math.min(minVisibleWidth, 100)
+        left = Math.min(clampedStart, 100 - width)
+      }
+    }
+
+    const colorConfig = segment.Type
+      ? SEGMENT_COLORS[segment.Type]
+      : DEFAULT_SEGMENT_COLOR
+    regions.push({
+      id: segment.Id,
+      type: segment.Type,
+      start: left,
+      width,
+      color: colorConfig.css,
+      startSeconds: Math.max(0, Math.min(startSeconds, duration)),
+      endSeconds: Math.max(0, Math.min(endSeconds, duration)),
+    })
+  }
+  return regions
+}
+
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

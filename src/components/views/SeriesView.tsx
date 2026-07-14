@@ -4,12 +4,15 @@ import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useEpisodes } from '@/services/items/queries'
+import { useSegments } from '@/services/segments/queries'
 import { ItemImage } from '@/components/media/ItemImage'
+import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { cn } from '@/lib/utils'
+import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
 interface SeriesViewProps {
@@ -75,6 +78,33 @@ const SeasonTabs = function SeasonTabsComponent({
         )
       })}
     </div>
+  )
+}
+
+interface EpisodeSegmentTimelineProps {
+  episodeId: string
+  runtimeSeconds: number
+}
+
+function EpisodeSegmentTimeline({
+  episodeId,
+  runtimeSeconds,
+}: EpisodeSegmentTimelineProps) {
+  const {
+    data: segments,
+    isPending,
+    isError,
+  } = useSegments(episodeId, { enabled: !!episodeId })
+
+  if (!episodeId || isError) return null
+
+  return (
+    <SegmentTimeline
+      segments={segments ?? []}
+      runtimeSeconds={runtimeSeconds}
+      isLoading={isPending}
+      className="mt-2 md:mt-2.5"
+    />
   )
 }
 
@@ -144,6 +174,10 @@ const EpisodeCard = function EpisodeCardComponent({
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
+        <EpisodeSegmentTimeline
+          episodeId={episodeId}
+          runtimeSeconds={ticksToSeconds(episode.RunTimeTicks)}
+        />
       </div>
     </InteractiveCard>
   )

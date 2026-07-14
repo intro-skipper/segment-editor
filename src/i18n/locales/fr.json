@@ -133,7 +133,11 @@
     "sliderGroup": "Curseur de plage du segment {{type}}",
     "sliderDescription": "Segment {{type}} de {{start}} à {{end}}, durée {{duration}}. Utilisez les touches fléchées pour ajuster.",
     "startHandle": "Poignée de début du segment {{type}}",
-    "endHandle": "Poignée de fin du segment {{type}}"
+    "endHandle": "Poignée de fin du segment {{type}}",
+    "timeline": {
+      "label": "Segments : {{list}}",
+      "empty": "Aucun segment"
+    }
   },
   "validation": {
     "StartEnd": "Le début est toujours avant la fin"
