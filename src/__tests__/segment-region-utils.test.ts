@@ -86,6 +86,39 @@ describe('getSegmentRegions', () => {
     ).toEqual([])
   })
 
+  it('treats missing ticks as 0 and clamps to the runtime', () => {
+    const noStart: MediaSegmentDto = {
+      Id: 'seg-no-start',
+      ItemId: 'item-1',
+      Type: MediaSegmentType.Intro,
+      EndTicks: 400,
+    }
+    const regions = getSegmentRegions([noStart], 300)
+
+    expect(regions).toHaveLength(1)
+    expect(regions[0].start).toBe(0)
+    expect(regions[0].width).toBe(100)
+    expect(regions[0].startSeconds).toBe(0)
+    expect(regions[0].endSeconds).toBe(300)
+  })
+
+  it('drops reversed spans (end before start) in both modes', () => {
+    const reversed = segment(90, 30)
+    const noEnd: MediaSegmentDto = {
+      Id: 'seg-no-end',
+      ItemId: 'item-1',
+      Type: MediaSegmentType.Intro,
+      StartTicks: 120,
+    }
+
+    expect(getSegmentRegions([reversed, noEnd], 300)).toEqual([])
+    expect(
+      getSegmentRegions([reversed, noEnd], 300, {
+        minVisibleWidthPercent: 0.8,
+      }),
+    ).toEqual([])
+  })
+
   it('falls back to the unknown color for untyped segments', () => {
     const untyped: MediaSegmentDto = {
       Id: 'seg-untyped',

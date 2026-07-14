@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { SegmentRegion } from '@/lib/segment-utils'
 import { getSegmentRegions } from '@/lib/segment-utils'
+import { formatCompactTime } from '@/lib/time-utils'
 import { cn } from '@/lib/utils'
 
 /**
@@ -19,22 +20,8 @@ import { cn } from '@/lib/utils'
  */
 const MIN_VISIBLE_WIDTH_PERCENT = 0.8
 
-/** Formats seconds as m:ss or h:mm:ss for tooltips and accessible labels */
-export function formatTimelineTime(seconds: number): string {
-  const safe = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0
-  const hours = Math.floor(safe / 3600)
-  const minutes = Math.floor((safe % 3600) / 60)
-  const secs = safe % 60
-  const ss = String(secs).padStart(2, '0')
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`
-  }
-  return `${minutes}:${ss}`
-}
-
 const formatRegionRange = (region: SegmentRegion): string =>
-  `${region.type ?? 'Unknown'} ${formatTimelineTime(region.startSeconds)} – ${formatTimelineTime(region.endSeconds)}`
+  `${region.type ?? 'Unknown'} ${formatCompactTime(region.startSeconds)} – ${formatCompactTime(region.endSeconds)}`
 
 interface SegmentTimelineProps {
   /** Segments with StartTicks/EndTicks in seconds (as returned by useSegments) */

@@ -90,12 +90,10 @@ function EpisodeSegmentTimeline({
   episodeId,
   runtimeSeconds,
 }: EpisodeSegmentTimelineProps) {
-  const {
-    data: segments,
-    isPending,
-    isError,
-  } = useSegments(episodeId, { enabled: !!episodeId })
+  const { data: segments, isPending, isError } = useSegments(episodeId)
 
+  // useSegments disables the query for an empty id; bail out so those
+  // episodes render nothing instead of a perpetual loading placeholder.
   if (!episodeId || isError) return null
 
   return (

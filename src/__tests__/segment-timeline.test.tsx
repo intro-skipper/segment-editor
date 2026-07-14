@@ -7,10 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { MediaSegmentType } from '@/types/jellyfin'
-import {
-  SegmentTimeline,
-  formatTimelineTime,
-} from '@/components/segment/SegmentTimeline'
+import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
+import { formatCompactTime } from '@/lib/time-utils'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -44,17 +42,17 @@ const segment = (
   EndTicks: end,
 })
 
-describe('formatTimelineTime', () => {
+describe('formatCompactTime', () => {
   it('formats minutes and hours without milliseconds', () => {
-    expect(formatTimelineTime(0)).toBe('0:00')
-    expect(formatTimelineTime(24.9)).toBe('0:24')
-    expect(formatTimelineTime(114)).toBe('1:54')
-    expect(formatTimelineTime(3665)).toBe('1:01:05')
+    expect(formatCompactTime(0)).toBe('0:00')
+    expect(formatCompactTime(24.9)).toBe('0:24')
+    expect(formatCompactTime(114)).toBe('1:54')
+    expect(formatCompactTime(3665)).toBe('1:01:05')
   })
 
   it('falls back to 0:00 for invalid values', () => {
-    expect(formatTimelineTime(Number.NaN)).toBe('0:00')
-    expect(formatTimelineTime(-5)).toBe('0:00')
+    expect(formatCompactTime(Number.NaN)).toBe('0:00')
+    expect(formatCompactTime(-5)).toBe('0:00')
   })
 })
 
