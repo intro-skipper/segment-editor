@@ -259,12 +259,16 @@ describe('PlayerSurface', () => {
     expect(backdropClip.getAttribute('aria-hidden')).toBe('true')
     expect(backdropClip.classList.contains('overflow-hidden')).toBe(true)
     expect(backdropClip.classList.contains('rounded-2xl')).toBe(true)
+    // The clipping wrapper must only ever contain the backdrop, never the
+    // video (see the JASSUB black-frame guard below).
+    expect(backdropClip.contains(video)).toBe(false)
   })
 
-  it('never clips the video behind an overflow-hidden ancestor (JASSUB black-frame guard)', () => {
+  it('never clips the video behind an overflow-clipping ancestor (JASSUB black-frame guard)', () => {
     // Chromium renders hardware-decoded video black when an ancestor
-    // border-radius + overflow clip has to mask the composited JASSUB
-    // subtitle canvas layered above the video.
+    // border-radius + overflow clip (hidden or clip, any axis) has to mask
+    // the composited JASSUB subtitle canvas layered above the video.
+    const overflowClipClass = /\boverflow-(?:x-|y-)?(?:hidden|clip)\b/
     const { container } = render(
       <PlayerSurface
         {...createProps({
@@ -277,7 +281,7 @@ describe('PlayerSurface', () => {
     if (!video) throw new Error('Expected video element')
 
     for (let node = video.parentElement; node; node = node.parentElement) {
-      expect(node.classList.contains('overflow-hidden')).toBe(false)
+      expect(node.getAttribute('class') ?? '').not.toMatch(overflowClipClass)
     }
   })
 
