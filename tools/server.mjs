@@ -690,7 +690,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ASS subtitle stream (JASSUB)
-  m = /^\/Videos\/[0-9a-f-]+\/[0-9a-f-]+\/Subtitles\/\d+\/Stream\.(ass|ssa)$/i.exec(p)
+  m =
+    /^\/Videos\/[0-9a-f-]+\/[0-9a-f-]+\/Subtitles\/\d+\/Stream\.(ass|ssa)$/i.exec(
+      p,
+    )
   if (m) {
     const assPath = path.join(__dirname, 'sub.ass')
     if (!fs.existsSync(assPath)) return notFound(res)

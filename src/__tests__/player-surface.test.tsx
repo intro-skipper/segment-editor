@@ -276,11 +276,7 @@ describe('PlayerSurface', () => {
     const video = container.querySelector('video')
     if (!video) throw new Error('Expected video element')
 
-    for (
-      let node = video.parentElement;
-      node;
-      node = node.parentElement
-    ) {
+    for (let node = video.parentElement; node; node = node.parentElement) {
       expect(node.classList.contains('overflow-hidden')).toBe(false)
     }
   })
