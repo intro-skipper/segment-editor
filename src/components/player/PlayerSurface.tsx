@@ -95,21 +95,31 @@ function PlayerVideoButton({
         'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
         isFullscreen
           ? cn('w-full h-full', showControls ? 'cursor-default' : 'cursor-none')
-          : 'aspect-video cursor-pointer overflow-hidden rounded-2xl bg-black',
+          : 'aspect-video cursor-pointer rounded-2xl bg-black',
       )}
       onClick={video.onInteraction}
       onTouchEnd={video.onInteraction}
       onKeyDown={video.onKeyDown}
       aria-label={t('player.videoPlayer')}
     >
+      {/* The rounded frame must NOT clip the video via an ancestor (overflow-hidden):
+          combining an ancestor border-radius clip with the composited JASSUB
+          subtitle canvas forces Chromium to mask the hardware video layer, which
+          renders the video black on some GPUs once the first subtitle paints.
+          Instead the button background and the video element are rounded
+          individually, and only the blurred backdrop gets its own clipping box. */}
       {/* Blurred cover backdrop keeps portrait posters looking intentional inside the 16:9 box */}
       {!isFullscreen && video.posterUrl ? (
-        <img
-          src={video.posterUrl}
-          alt=""
+        <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover blur-2xl scale-110 opacity-40"
-        />
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
+        >
+          <img
+            src={video.posterUrl}
+            alt=""
+            className="h-full w-full object-cover blur-2xl scale-110 opacity-40"
+          />
+        </div>
       ) : null}
       {/* Captions are data-dependent: native VTT tracks are rendered when Jellyfin exposes them; ASS/SSA subtitles are rendered by JASSUB. */}
       {/* react-doctor-disable-next-line react-doctor/media-has-caption */}
@@ -121,7 +131,7 @@ function PlayerVideoButton({
                 'w-full h-full',
                 videoFitMode === 'contain' ? 'object-contain' : 'object-cover',
               )
-            : 'absolute inset-0 h-full w-full object-contain',
+            : 'absolute inset-0 h-full w-full rounded-2xl object-contain',
         )}
         poster={video.posterUrl ?? undefined}
         crossOrigin="anonymous"

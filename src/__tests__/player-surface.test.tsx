@@ -243,14 +243,46 @@ describe('PlayerSurface', () => {
       name: 'player.videoPlayer',
     })
     expect(videoButton.classList.contains('rounded-2xl')).toBe(true)
-    expect(videoButton.classList.contains('overflow-hidden')).toBe(true)
     expect(videoButton.classList.contains('aspect-video')).toBe(true)
+
+    const video = container.querySelector('video')
+    if (!video) throw new Error('Expected video element')
+    expect(video.classList.contains('rounded-2xl')).toBe(true)
 
     const backdrop = container.querySelector('img')
     if (!backdrop) throw new Error('Expected blurred poster backdrop')
     expect(backdrop.getAttribute('src')).toBe('/poster.jpg')
-    expect(backdrop.getAttribute('aria-hidden')).toBe('true')
     expect(backdrop.classList.contains('blur-2xl')).toBe(true)
+
+    const backdropClip = backdrop.parentElement
+    if (!backdropClip) throw new Error('Expected backdrop clipping wrapper')
+    expect(backdropClip.getAttribute('aria-hidden')).toBe('true')
+    expect(backdropClip.classList.contains('overflow-hidden')).toBe(true)
+    expect(backdropClip.classList.contains('rounded-2xl')).toBe(true)
+    // The clipping wrapper must only ever contain the backdrop, never the
+    // video (see the JASSUB black-frame guard below).
+    expect(backdropClip.contains(video)).toBe(false)
+  })
+
+  it('never clips the video behind an overflow-clipping ancestor (JASSUB black-frame guard)', () => {
+    // Chromium renders hardware-decoded video black when an ancestor
+    // border-radius + overflow clip (hidden or clip, any axis) has to mask
+    // the composited JASSUB subtitle canvas layered above the video.
+    const overflowClipClass = /\boverflow-(?:x-|y-)?(?:hidden|clip)\b/
+    const { container } = render(
+      <PlayerSurface
+        {...createProps({
+          video: { posterUrl: '/poster.jpg' },
+        })}
+      />,
+    )
+
+    const video = container.querySelector('video')
+    if (!video) throw new Error('Expected video element')
+
+    for (let node = video.parentElement; node; node = node.parentElement) {
+      expect(node.getAttribute('class') ?? '').not.toMatch(overflowClipClass)
+    }
   })
 
   it('drops the rounded frame and poster backdrop in fullscreen', () => {
