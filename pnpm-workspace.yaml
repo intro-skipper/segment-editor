@@ -6,6 +6,7 @@ trustPolicyExclude:
   - 'effect@4.0.0-beta.70'
   - '@effect/platform-node-shared@4.0.0-beta.70'
 allowBuilds:
+  lfa-ponyfill: true
   msgpackr-extract: true
   msw: true
 minimumReleaseAgeExclude:
