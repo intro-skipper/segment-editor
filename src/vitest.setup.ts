@@ -135,7 +135,7 @@ Object.defineProperty(globalThis, 'crypto', {
     randomUUID: vi.fn(() => generateMockUUID()),
     getRandomValues: <T extends Uint8Array>(arr: T): T => {
       for (let i = 0; i < arr.length; i++) {
-        arr[i] = Math.floor(Math.random() * 256) as unknown as T[number]
+        arr[i] = Math.floor(Math.random() * 256)
       }
       return arr
     },

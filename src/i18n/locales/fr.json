@@ -53,10 +53,10 @@
       "en-US": "Anglais",
       "de": "Allemand",
       "fr": "Français",
-      "title": "Langues"
+      "title": "Langue"
     },
     "viewMode": {
-      "title": "Vue de navigation",
+      "title": "Affichage",
       "card": "Carte",
       "list": "Liste"
     },
@@ -82,9 +82,14 @@
       "name": "Recherche",
       "collection": "Collection"
     },
+    "seasonCount_one": "{{count}} saison",
+    "seasonCount_other": "{{count}} saisons",
+    "episodeCount_one": "{{count}} épisode",
+    "episodeCount_other": "{{count}} épisodes",
     "mediaGrid": "Éléments multimédias",
     "mediaList": "Éléments multimédias",
-    "loadingMediaItems": "Chargement des éléments multimédias"
+    "loadingMediaItems": "Chargement des éléments multimédias",
+    "perPage": "Éléments par page"
   },
   "editor": {
     "saveSegment": "Sauvegarder",
@@ -98,10 +103,24 @@
       "title": "Éditeur de Slider"
     },
     "noSegments": "Aucun segment disponible, créez-en un avec '+'",
+    "noSegmentsTitle": "Aucun segment pour l'instant",
+    "noSegmentsHint": "Créez un segment ou collez-en un depuis votre presse-papiers.",
+    "unsavedChanges": "Modifications non enregistrées",
+    "unsavedTitle": "Abandonner les modifications non enregistrées ?",
+    "unsavedDescription": "Vous avez des modifications de segments non enregistrées. Elles seront perdues si vous quittez.",
+    "discardAndLeave": "Abandonner et quitter",
+    "saving": "Enregistrement…",
+    "saveInProgressTitle": "Enregistrement en cours",
+    "saveInProgressDescription": "Vos modifications de segments sont encore en cours d'enregistrement. Si vous quittez maintenant, l'enregistrement se terminera en arrière-plan.",
+    "stay": "Rester",
+    "leave": "Quitter",
+    "discard": "Abandonner",
     "noSegmentInClipboard": "Aucun segment dans le presse-papiers",
     "segmentCopiedToClipboard": "Segment copié dans le presse-papiers",
     "setStartToBeginning": "Définir le début à zéro",
-    "setEndToDuration": "Définir la fin à la durée"
+    "setEndToDuration": "Définir la fin à la durée",
+    "segmentCount_one": "{{count}} segment",
+    "segmentCount_other": "{{count}} segments"
   },
   "yes": "Oui",
   "no": "Non",
@@ -142,6 +161,7 @@
     "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée."
   },
   "common": {
+    "cancel": "Annuler",
     "go_back": "Retour",
     "goBack": "Retour",
     "home": "Accueil",
@@ -257,10 +277,10 @@
   "settings": {
     "open": "Ouvrir les paramètres",
     "segmentSkipMode": {
-      "title": "Actions de segment",
+      "title": "Saut de segments",
       "button": "Afficher le bouton de saut",
       "skip": "Passer automatiquement",
-      "disabled": "Lecture par défaut uniquement"
+      "disabled": "Désactivé"
     },
     "jellyfinPlaybackSync": {
       "title": "Signaler la lecture à Jellyfin",

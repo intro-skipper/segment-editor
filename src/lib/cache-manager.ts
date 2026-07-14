@@ -172,17 +172,6 @@ export class LRUCache<TKey, TValue> {
   }
 }
 
-/**
- * VibrantColors type for color extraction results.
- */
-export interface VibrantColors {
-  background: string
-  primary: string
-  accent: string
-  text: string
-  accentText: string
-}
-
 const blobCacheListeners = new Map<string, Set<() => void>>()
 
 function notifyBlobCacheChange(url: string): void {
@@ -266,7 +255,7 @@ async function requestBlobUrl(
 
 /**
  * Fetches a URL and returns a blob URL, with caching and request deduplication.
- * Used by both useBlobUrl hook and useVibrantColor to share blob URLs.
+ * Used by both useBlobUrl hook and useArtworkColor to share blob URLs.
  *
  * @param url - The URL to fetch
  * @returns Promise resolving to blob URL or null on failure

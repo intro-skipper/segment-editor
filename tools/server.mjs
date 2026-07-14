@@ -14,6 +14,7 @@ fs.mkdirSync(IMG_DIR, { recursive: true })
 
 const TICKS = 10_000_000
 const RUNTIME_SECONDS = 300
+const EPISODES_PER_SEASON = 8
 const SERVER_ID = 'aaaabbbbccccddddeeeeffff00001111'
 const MOCK_SERVER_PORT = Number(process.env.MOCK_SERVER_PORT ?? '8096')
 const MOCK_SERVER_ADDRESS =
@@ -206,6 +207,8 @@ for (const [name, year, seasonCount] of SERIES_DEFS) {
       Type: 'Series',
       IsFolder: true,
       ProductionYear: year,
+      ChildCount: seasonCount,
+      RecursiveItemCount: seasonCount * EPISODES_PER_SEASON,
       ImageTags: { Primary: 'p1' },
       ServerId: SERVER_ID,
     },
@@ -231,7 +234,7 @@ for (const [name, year, seasonCount] of SERIES_DEFS) {
       { bg: pal[0], fg: pal[1], label: `${name}\nSeason ${s}`, kind: 'poster' },
     )
 
-    const episodeCount = 8
+    const episodeCount = EPISODES_PER_SEASON
     for (let e = 1; e <= episodeCount; e++) {
       const epId = nextId()
       const title = EPISODE_TITLES[(e - 1) % EPISODE_TITLES.length]

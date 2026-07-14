@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useHotkey } from '@tanstack/react-hotkeys'
-import { ClipboardPaste, Eye, Loader2, Save } from 'lucide-react'
+import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
+import { useBlocker } from '@tanstack/react-router'
+import { ClipboardPaste, Eye, Loader2, Plus, Save, Undo2 } from 'lucide-react'
 
 import { Player } from './Player'
 import type {
@@ -14,20 +15,23 @@ import type {
   SegmentUpdate,
   TimestampUpdate,
 } from '@/types/segment'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useSegments } from '@/services/segments/queries'
 import { useBatchSaveSegments } from '@/services/segments/mutations'
 import { useAppStore } from '@/stores/app-store'
 import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
-import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
+import {
+  areSegmentListsEqual,
+  generateUUID,
+  resolveSegmentIndex,
+  sortSegmentsByStart,
+} from '@/lib/segment-utils'
 import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
-import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,8 +43,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
+import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { SegmentLoadingState } from '@/components/ui/segment-loading-state'
 
 const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
@@ -48,14 +60,48 @@ const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
   containIntrinsicSize: '0 280px',
 }
 
+/** Pre-computed platform-aware shortcut display for the save button title */
+const MOD_S_DISPLAY = formatForDisplay('Mod+S')
+
 interface PlayerEditorProps {
   item: BaseItemDto
   fetchSegments?: boolean
-  vibrantColors: VibrantColors | null
   className?: string
 }
 
-type SegmentUpdater = (prev: Array<MediaSegmentDto>) => Array<MediaSegmentDto>
+interface EditingState {
+  localEditingSegments: Array<MediaSegmentDto> | null
+  activeIndex: number
+}
+
+interface EditingUpdate {
+  segments: Array<MediaSegmentDto>
+  activeIndex?: number
+}
+
+type SegmentUpdater = (
+  segments: Array<MediaSegmentDto>,
+  activeIndex: number,
+) => EditingUpdate | null
+
+function removeSegmentAt(
+  segments: Array<MediaSegmentDto>,
+  index: number,
+  currentActiveIndex: number,
+): EditingUpdate | null {
+  if (index < 0 || index >= segments.length) return null
+
+  const updated = [...segments]
+  updated.splice(index, 1)
+
+  const nextActiveIndex =
+    updated.length === 0
+      ? 0
+      : currentActiveIndex > index
+        ? currentActiveIndex - 1
+        : Math.max(0, Math.min(currentActiveIndex, updated.length - 1))
+  return { segments: updated, activeIndex: nextActiveIndex }
+}
 
 interface ParsedImportResult {
   segments: Array<MediaSegmentDto>
@@ -156,13 +202,11 @@ function replaceSegmentSorted(
 export function PlayerEditor({
   item,
   fetchSegments = true,
-  vibrantColors,
   className,
 }: PlayerEditorProps) {
   return useRenderPlayerEditor({
     item,
     fetchSegments,
-    vibrantColors,
     className,
   })
 }
@@ -170,15 +214,12 @@ export function PlayerEditor({
 function useRenderPlayerEditor({
   item,
   fetchSegments = true,
-  vibrantColors,
   className,
 }: PlayerEditorProps) {
   const { t } = useTranslation()
   const showVideoPlayer = useAppStore((state) => state.showVideoPlayer)
   const setShowVideoPlayer = useAppStore((state) => state.setShowVideoPlayer)
 
-  const { getButtonStyle, iconColor, hasColors } =
-    useVibrantButtonStyle(vibrantColors)
   const batchSaveMutation = useBatchSaveSegments()
 
   const { data: serverSegments = [], isLoading: isLoadingSegments } =
@@ -188,10 +229,12 @@ function useRenderPlayerEditor({
 
   const sortedServerSegments = serverSegments.toSorted(sortSegmentsByStart)
 
-  const [localEditingSegments, setLocalEditingSegments] =
-    React.useState<Array<MediaSegmentDto> | null>(null)
+  const [{ localEditingSegments, activeIndex }, setEditingState] =
+    React.useState<EditingState>({
+      localEditingSegments: null,
+      activeIndex: 0,
+    })
   const editingSegments = localEditingSegments ?? sortedServerSegments
-  const [activeIndex, setActiveIndex] = React.useState(0)
   const [playerTimestamp, setPlayerTimestamp] = React.useState<number>()
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
@@ -200,16 +243,58 @@ function useRenderPlayerEditor({
 
   const getCurrentTimeRef = React.useRef<(() => number) | null>(null)
 
-  const [importDialogOpen, setImportDialogOpen] = React.useState(false)
-  const pendingImportRef = React.useRef<ParsedImportResult | null>(null)
+  const [pendingImport, setPendingImport] =
+    React.useState<ParsedImportResult | null>(null)
+  const [pendingDelete, setPendingDelete] = React.useState<{
+    id?: MediaSegmentDto['Id']
+    type?: MediaSegmentDto['Type']
+    index: number
+  } | null>(null)
+
+  // Reset editor-local state when the edited item changes while this
+  // component stays mounted (e.g. switching episodes from the header),
+  // so edits and open dialogs never leak across items.
+  const [renderedItemId, setRenderedItemId] = React.useState(item.Id)
+  if (renderedItemId !== item.Id) {
+    setRenderedItemId(item.Id)
+    setEditingState({ localEditingSegments: null, activeIndex: 0 })
+    setEditDialogOpen(false)
+    setEditingSegmentIndex(null)
+    setPendingImport(null)
+    setPendingDelete(null)
+  }
 
   const isSaving = batchSaveMutation.isPending
 
-  const saveAbortRef = React.useRef<AbortController | null>(null)
+  // The batch save writes the new list into the query cache optimistically
+  // (onMutate), which would make the local/server comparison report "clean"
+  // while the request is still in flight. Treat the editor as dirty until the
+  // save is confirmed so navigation and tab-close stay guarded; on failure the
+  // cache rolls back and the comparison keeps the editor dirty.
+  const isDirty =
+    localEditingSegments !== null &&
+    (isSaving ||
+      !areSegmentListsEqual(localEditingSegments, sortedServerSegments))
 
-  const updateEditingSegments = (updater: SegmentUpdater) => {
-    setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
-  }
+  const blocker = useBlocker({
+    shouldBlockFn: () => isDirty,
+    enableBeforeUnload: () => isDirty,
+    disabled: !isDirty,
+    withResolver: true,
+  })
+
+  const proceedBlockedNavigation = React.useEffectEvent(() => {
+    blocker.proceed?.()
+  })
+
+  // If the user tried to leave during an in-flight save and the save then
+  // completed (local edits cleared, nothing dirty anymore), let the pending
+  // navigation continue instead of leaving a stale "discard" prompt open.
+  React.useLayoutEffect(() => {
+    if (blocker.status === 'blocked' && !isDirty) {
+      proceedBlockedNavigation()
+    }
+  }, [blocker.status, isDirty])
 
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
@@ -220,10 +305,24 @@ function useRenderPlayerEditor({
   React.useEffect(
     () => () => {
       if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
-      saveAbortRef.current?.abort()
     },
     [],
   )
+
+  const updateEditingSegments = (updater: SegmentUpdater): void => {
+    setEditingState((previous) => {
+      const update = updater(
+        previous.localEditingSegments ?? sortedServerSegments,
+        previous.activeIndex,
+      )
+      if (!update) return previous
+
+      return {
+        localEditingSegments: update.segments,
+        activeIndex: update.activeIndex ?? previous.activeIndex,
+      }
+    })
+  }
 
   const runtimeSeconds = ticksToSeconds(item.RunTimeTicks) || 0
 
@@ -238,23 +337,22 @@ function useRenderPlayerEditor({
       EndTicks: data.end ?? data.start + 1,
     }
 
-    updateEditingSegments((prev) => {
+    updateEditingSegments((segments) => {
       const { nextSegments, insertedIndex } = insertSegmentSorted(
-        prev,
+        segments,
         newSegment,
       )
-      setActiveIndex(insertedIndex)
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleUpdateSegmentTimestamp = (data: TimestampUpdate) => {
-    updateEditingSegments((prev) => {
-      if (prev.length === 0) return prev
+    updateEditingSegments((segments, currentActiveIndex) => {
+      if (segments.length === 0) return null
 
-      const targetIndex = data.index ?? activeIndex
-      const segment = prev[targetIndex] as MediaSegmentDto | undefined
-      if (segment === undefined) return prev
+      const targetIndex = data.index ?? currentActiveIndex
+      const segment = segments[targetIndex] as MediaSegmentDto | undefined
+      if (segment === undefined) return null
 
       const updatedSegment: MediaSegmentDto = {
         ...segment,
@@ -263,12 +361,10 @@ function useRenderPlayerEditor({
       }
 
       const { nextSegments, insertedIndex } = replaceSegmentSorted(
-        prev,
+        segments,
         updatedSegment,
       )
-      setActiveIndex(insertedIndex)
-
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
@@ -279,35 +375,56 @@ function useRenderPlayerEditor({
   }
 
   const handleUpdateSegment = (data: SegmentUpdate) => {
-    updateEditingSegments((prev) => {
-      const segmentToUpdate = prev.find((seg) => seg.Id === data.id)
-      if (!segmentToUpdate) return prev
+    updateEditingSegments((segments) => {
+      const segmentToUpdate = segments.find((seg) => seg.Id === data.id)
+      if (!segmentToUpdate) return null
 
-      const { nextSegments } = replaceSegmentSorted(prev, {
+      const { nextSegments } = replaceSegmentSorted(segments, {
         ...segmentToUpdate,
         StartTicks: data.start,
         EndTicks: data.end,
       })
+      return { segments: nextSegments }
+    })
+  }
 
-      return nextSegments
+  const handleChangeSegmentType = (index: number, type: MediaSegmentType) => {
+    updateEditingSegments((segments) => {
+      const segment = segments[index] as MediaSegmentDto | undefined
+      if (!segment || segment.Type === type) return null
+
+      const { nextSegments, insertedIndex } = replaceSegmentSorted(segments, {
+        ...segment,
+        Type: type,
+      })
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleDeleteSegment = (index: number) => {
-    updateEditingSegments((prev) => {
-      if (index < 0 || index >= prev.length) return prev
+    updateEditingSegments((segments, currentActiveIndex) =>
+      removeSegmentAt(segments, index, currentActiveIndex),
+    )
+  }
 
-      const updated = [...prev]
-      updated.splice(index, 1)
+  const handleRequestDeleteSegment = (index: number) => {
+    const segment = editingSegments[index] as MediaSegmentDto | undefined
+    if (segment === undefined) return
+    setPendingDelete({ id: segment.Id, type: segment.Type, index })
+  }
 
-      setActiveIndex((prevIndex) => {
-        if (updated.length === 0) return 0
-        if (prevIndex > index) return prevIndex - 1
-        return Math.max(0, Math.min(prevIndex, updated.length - 1))
-      })
+  const handleConfirmDeleteSegment = () => {
+    if (pendingDelete !== null) {
+      // Resolve by Id at confirmation time: edits made while the dialog is
+      // open can re-sort the list, so the captured index may be stale.
+      const currentIndex = resolveSegmentIndex(editingSegments, pendingDelete)
+      if (currentIndex !== -1) handleDeleteSegment(currentIndex)
+    }
+    setPendingDelete(null)
+  }
 
-      return updated
-    })
+  const handleCancelDeleteSegment = () => {
+    setPendingDelete(null)
   }
 
   const handlePlayerTimestamp = (timestamp: number) => {
@@ -330,19 +447,23 @@ function useRenderPlayerEditor({
   }
 
   const handleSaveSegmentFromDialog = (updatedSegment: MediaSegmentDto) => {
-    updateEditingSegments((prev) => {
+    updateEditingSegments((segments) => {
       const { nextSegments, insertedIndex } = replaceSegmentSorted(
-        prev,
+        segments,
         updatedSegment,
       )
-      setActiveIndex(insertedIndex)
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleDeleteSegmentFromDialog = (segment: MediaSegmentDto) => {
-    updateEditingSegments((prev) => prev.filter((seg) => seg.Id !== segment.Id))
-    setActiveIndex((prev) => Math.max(0, prev - 1))
+    updateEditingSegments((segments, currentActiveIndex) =>
+      removeSegmentAt(
+        segments,
+        segments.findIndex((seg) => seg.Id === segment.Id),
+        currentActiveIndex,
+      ),
+    )
   }
 
   const handlePasteFromClipboard = () => {
@@ -366,16 +487,14 @@ function useRenderPlayerEditor({
         }
 
         if (editingSegmentsRef.current.length > 0) {
-          pendingImportRef.current = result
-          setImportDialogOpen(true)
+          setPendingImport(result)
           return
         }
 
-        updateEditingSegments(() => {
-          const updated = result.segments.toSorted(sortSegmentsByStart)
-          setActiveIndex(0)
-          return updated
-        })
+        updateEditingSegments(() => ({
+          segments: result.segments.toSorted(sortSegmentsByStart),
+          activeIndex: 0,
+        }))
 
         const infoSuffix = buildImportInfoSuffix(result)
         showNotification({
@@ -392,29 +511,32 @@ function useRenderPlayerEditor({
   }
 
   const handleSaveAll = async () => {
-    if (!item.Id || isSaving) return
+    if (!item.Id || isSaving || !isDirty) return
 
-    saveAbortRef.current?.abort()
-    const controller = new AbortController()
-    saveAbortRef.current = controller
-
-    const currentSegments = editingSegmentsRef.current
+    const savedSegments = editingSegmentsRef.current
 
     try {
       await batchSaveMutation.mutateAsync({
         itemId: item.Id,
         existingSegments: serverSegments,
-        newSegments: currentSegments,
+        newSegments: savedSegments,
       })
 
-      if (!controller.signal.aborted) {
-        setLocalEditingSegments(null)
-        showNotification({
-          type: 'positive',
-          message: t('editor.saveSegment'),
-        })
-      }
-    } catch {}
+      // Clear only the exact edits this save persisted. If the item changed
+      // or the user kept editing while the save was in flight, the current
+      // edits are a different array and must survive.
+      setEditingState((previous) =>
+        previous.localEditingSegments === savedSegments
+          ? { ...previous, localEditingSegments: null }
+          : previous,
+      )
+    } catch {
+      // Errors surface via the mutation's onError toast; edits stay dirty.
+    }
+  }
+
+  const handleDiscardEdits = () => {
+    setEditingState({ localEditingSegments: null, activeIndex: 0 })
   }
 
   const handleCopyAllAsJson = async () => {
@@ -455,19 +577,17 @@ function useRenderPlayerEditor({
   }
 
   const dismissImportDialog = () => {
-    pendingImportRef.current = null
-    setImportDialogOpen(false)
+    setPendingImport(null)
   }
 
   const handleImportReplace = () => {
-    const pending = pendingImportRef.current
+    const pending = pendingImport
     if (!pending) return
 
-    updateEditingSegments(() => {
-      const updated = pending.segments.toSorted(sortSegmentsByStart)
-      setActiveIndex(0)
-      return updated
-    })
+    updateEditingSegments(() => ({
+      segments: pending.segments.toSorted(sortSegmentsByStart),
+      activeIndex: 0,
+    }))
 
     const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
@@ -479,13 +599,12 @@ function useRenderPlayerEditor({
   }
 
   const handleImportMerge = () => {
-    const pending = pendingImportRef.current
+    const pending = pendingImport
     if (!pending) return
 
-    updateEditingSegments((prev) => {
-      const merged = [...prev, ...pending.segments].sort(sortSegmentsByStart)
-      return merged
-    })
+    updateEditingSegments((segments) => ({
+      segments: [...segments, ...pending.segments].sort(sortSegmentsByStart),
+    }))
 
     const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
@@ -498,22 +617,36 @@ function useRenderPlayerEditor({
 
   const handleImportCancel = dismissImportDialog
 
+  const handleCreateSegmentOfType = (type: MediaSegmentType) => {
+    handleCreateSegment({
+      type,
+      start: getPlayerTime() ?? 0,
+    })
+  }
+
   useHotkey('Mod+S', () => {
     void handleSaveAll()
   })
 
   useHotkey('[', () => {
-    setActiveIndex((prev) =>
-      editingSegments.length === 0
-        ? 0
-        : (prev - 1 + editingSegments.length) % editingSegments.length,
-    )
+    setEditingState((previous) => ({
+      ...previous,
+      activeIndex:
+        editingSegments.length === 0
+          ? 0
+          : (previous.activeIndex - 1 + editingSegments.length) %
+            editingSegments.length,
+    }))
   })
 
   useHotkey(']', () => {
-    setActiveIndex((prev) =>
-      editingSegments.length === 0 ? 0 : (prev + 1) % editingSegments.length,
-    )
+    setEditingState((previous) => ({
+      ...previous,
+      activeIndex:
+        editingSegments.length === 0
+          ? 0
+          : (previous.activeIndex + 1) % editingSegments.length,
+    }))
   })
 
   return (
@@ -521,7 +654,6 @@ function useRenderPlayerEditor({
       {showVideoPlayer && (
         <Player
           item={item}
-          vibrantColors={vibrantColors}
           timestamp={playerTimestamp}
           segments={editingSegments}
           frameStepSeconds={frameStepSeconds}
@@ -541,17 +673,13 @@ function useRenderPlayerEditor({
             <Eye className="size-4 mr-2" aria-hidden="true" />
             {t('player.restore', 'Show player')}
           </Button>
-          <Button
-            variant="outline"
-            onClick={() =>
-              handleCreateSegment({
-                type: 'Intro' as MediaSegmentType,
-                start: 0,
-              })
-            }
+          <SegmentTypeMenu
+            onSelect={handleCreateSegmentOfType}
+            render={<Button variant="outline" />}
           >
+            <Plus className="size-4 mr-2" aria-hidden="true" />
             {t('editor.newSegment')}
-          </Button>
+          </SegmentTypeMenu>
         </div>
       )}
 
@@ -559,11 +687,36 @@ function useRenderPlayerEditor({
         {isLoadingSegments ? (
           <SegmentLoadingState count={2} />
         ) : editingSegments.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            {t('editor.noSegments')}
-          </p>
+          <Empty className="border-none bg-transparent py-8">
+            <EmptyHeader>
+              <EmptyTitle>
+                {t('editor.noSegmentsTitle', 'No segments yet')}
+              </EmptyTitle>
+              <EmptyDescription>
+                {t(
+                  'editor.noSegmentsHint',
+                  'Create a segment or paste one from your clipboard.',
+                )}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex flex-wrap justify-center gap-3">
+                <SegmentTypeMenu
+                  onSelect={handleCreateSegmentOfType}
+                  render={<Button variant="outline" />}
+                >
+                  <Plus className="size-4 mr-2" aria-hidden="true" />
+                  {t('editor.newSegment')}
+                </SegmentTypeMenu>
+                <Button variant="outline" onClick={handlePasteFromClipboard}>
+                  <ClipboardPaste className="size-4 mr-2" aria-hidden="true" />
+                  {t('editor.paste', 'Paste')}
+                </Button>
+              </div>
+            </EmptyContent>
+          </Empty>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-2">
             {editingSegments.map((segment, index) => (
               <div
                 key={segment.Id ?? `segment-${index}`}
@@ -576,13 +729,18 @@ function useRenderPlayerEditor({
                   runtimeSeconds={runtimeSeconds}
                   frameStepSeconds={frameStepSeconds}
                   onUpdate={handleUpdateSegment}
-                  onDelete={handleDeleteSegment}
+                  onDelete={handleRequestDeleteSegment}
                   onEdit={handleOpenEditDialog}
+                  onChangeType={handleChangeSegmentType}
                   onPlayerTimestamp={handlePlayerTimestamp}
-                  onSetActive={setActiveIndex}
+                  onSetActive={(nextActiveIndex) =>
+                    setEditingState((previous) => ({
+                      ...previous,
+                      activeIndex: nextActiveIndex,
+                    }))
+                  }
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
-                  vibrantColors={vibrantColors}
                 />
               </div>
             ))}
@@ -602,7 +760,12 @@ function useRenderPlayerEditor({
         />
       )}
 
-      <AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+      <AlertDialog
+        open={pendingImport !== null}
+        onOpenChange={(open) => {
+          if (!open) dismissImportDialog()
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -629,62 +792,162 @@ function useRenderPlayerEditor({
         </AlertDialogContent>
       </AlertDialog>
 
-      <fieldset
-        className="flex flex-row justify-center gap-4 border-0 p-0 m-0"
-        aria-label={t('editor.actions', 'Segment actions')}
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
       >
-        <button
-          type="button"
-          data-interactive-transition="true"
-          onClick={handlePasteFromClipboard}
-          aria-label={t('editor.paste', 'Paste segment from clipboard')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-            'transition-[transform,box-shadow,background-color,color,border-color] duration-200 ease-out border-2',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            !hasColors &&
-              'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent',
-          )}
-          style={getButtonStyle(false)}
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('editor.deleteSureTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('editor.deleteSure', {
+                Type: pendingDelete?.type,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDeleteSegment}>
+              {t('no')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteSegment}>
+              {t('yes')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={blocker.status === 'blocked'}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.()
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isSaving
+                ? t('editor.saveInProgressTitle', 'Save in progress')
+                : t('editor.unsavedTitle', 'Discard unsaved changes?')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isSaving
+                ? t(
+                    'editor.saveInProgressDescription',
+                    'Your segment edits are still being saved. If you leave now, the save will finish in the background.',
+                  )
+                : t(
+                    'editor.unsavedDescription',
+                    'You have unsaved segment edits. They will be lost if you leave.',
+                  )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              {isSaving
+                ? t('editor.stay', 'Stay')
+                : t('common.cancel', 'Cancel')}
+            </AlertDialogCancel>
+            {isSaving ? (
+              // Cancelling the batch save is not safe: it deletes the
+              // existing segments before recreating them, so an abort between
+              // the two phases would wipe the item's segments remotely.
+              // Leaving lets the in-flight save finish in the background.
+              <AlertDialogAction onClick={() => blocker.proceed?.()}>
+                {t('editor.leave', 'Leave')}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  // Match the dialog copy: discard local edits before leaving
+                  // so they cannot leak back in if this editor stays mounted.
+                  handleDiscardEdits()
+                  blocker.proceed?.()
+                }}
+              >
+                {t('editor.discardAndLeave', 'Discard & leave')}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="sticky bottom-0 z-20 bg-background/85 backdrop-blur-md border-t border-border/40 pb-safe">
+        <div
+          className="flex items-center justify-between gap-3 py-3"
+          role="toolbar"
+          aria-label={t('editor.actions', 'Segment actions')}
         >
-          <ClipboardPaste
-            className="size-4 sm:size-5"
-            aria-hidden="true"
-            style={iconColor ? { color: iconColor } : undefined}
-          />
-          {t('editor.paste', 'Paste')}
-        </button>
-        <button
-          type="button"
-          data-interactive-transition="true"
-          onClick={() => void handleSaveAll()}
-          disabled={isSaving}
-          aria-label={t('editor.saveSegment', 'Save all segments')}
-          aria-busy={isSaving}
-          aria-live="polite"
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-full text-base font-semibold',
-            'sm:flex-none sm:px-10 sm:py-4 sm:text-lg sm:min-w-[var(--spacing-button-min)]',
-            'transition-[transform,box-shadow,background-color,color,border-color,opacity] duration-200 ease-out border-2',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            !hasColors &&
-              'bg-primary/20 text-primary border-primary/40 hover:bg-primary/30',
-          )}
-          style={getButtonStyle(true)}
-        >
-          {isSaving ? (
-            <div className="animate-spin" aria-hidden="true">
-              <Loader2 className="size-4 sm:size-5" />
-            </div>
-          ) : (
-            <Save className="size-4 sm:size-5" aria-hidden="true" />
-          )}
-          {isSaving && <span className="sr-only">Saving segments</span>}
-          {t('editor.saveSegment')}
-        </button>
-      </fieldset>
+          <p
+            className="flex items-center gap-2 text-sm text-muted-foreground min-w-0"
+            role="status"
+            aria-live="polite"
+          >
+            {isDirty ? (
+              <>
+                <span
+                  className="size-2 rounded-full bg-amber-500 shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="truncate">
+                  {isSaving
+                    ? t('editor.saving', 'Saving…')
+                    : t('editor.unsavedChanges', 'Unsaved changes')}
+                </span>
+              </>
+            ) : (
+              <span className="truncate tabular-nums">
+                {t('editor.segmentCount', {
+                  count: editingSegments.length,
+                  defaultValue: '{{count}} segments',
+                })}
+              </span>
+            )}
+          </p>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isDirty && !isSaving && (
+              <Button
+                variant="ghost"
+                onClick={handleDiscardEdits}
+                aria-label={t('editor.discard', 'Discard unsaved edits')}
+              >
+                <Undo2 className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {t('editor.discard', 'Discard')}
+                </span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handlePasteFromClipboard}
+              aria-label={t('editor.paste', 'Paste segment from clipboard')}
+            >
+              <ClipboardPaste className="size-4" aria-hidden="true" />
+              {t('editor.paste', 'Paste')}
+            </Button>
+            <Button
+              onClick={() => void handleSaveAll()}
+              disabled={isSaving || !isDirty}
+              aria-label={t('editor.saveSegment', 'Save all segments')}
+              aria-busy={isSaving}
+              title={`${t('editor.saveSegment', 'Save')} (${MOD_S_DISPLAY})`}
+            >
+              {isSaving ? (
+                <div className="animate-spin" aria-hidden="true">
+                  <Loader2 className="size-4" />
+                </div>
+              ) : (
+                <Save className="size-4" aria-hidden="true" />
+              )}
+              {isSaving && <span className="sr-only">Saving segments</span>}
+              {t('editor.saveSegment')}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

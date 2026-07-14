@@ -1,13 +1,12 @@
 import { Suspense, lazy, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import {
   Link,
   getRouteApi,
   useCanGoBack,
   useLocation,
-  useMatchRoute,
   useNavigate,
+  useParams,
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -23,12 +22,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
-import { useVibrantColor } from '@/hooks/use-vibrant-color'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
+import { getBestImageUrl } from '@/services/video/api'
+import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
-import { getBestImageUrl } from '@/services/video/api'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
@@ -107,8 +106,6 @@ const iconButtonClass = cn(
 /** Pre-computed platform-aware shortcut display for search button title */
 const MOD_K_DISPLAY = formatForDisplay('Mod+K')
 
-type DetailRouteMatch = false | { itemId?: string }
-
 interface HeaderDetailInfo {
   isEpisode: boolean
   pageTitle: string
@@ -118,31 +115,14 @@ interface HeaderDetailInfo {
 interface DetailHeaderContentProps extends HeaderDetailInfo {
   currentItem: BaseItemDto | undefined
   isPlayerPage: boolean
-  vibrantColors: VibrantColors | null
-  accentButtonStyle: CSSProperties | undefined
   onBack: () => void
 }
 
 interface HeaderActionsProps {
-  accentButtonStyle: CSSProperties | undefined
   isDetailPage: boolean
   selectedCollection: string | undefined
-  vibrantColors: VibrantColors | null
   onOpenSearch: () => void
   onOpenSettings: () => void
-}
-
-function getMatchedRouteItemId(
-  albumMatch: DetailRouteMatch,
-  artistMatch: DetailRouteMatch,
-  playerMatch: DetailRouteMatch,
-  seriesMatch: DetailRouteMatch,
-): string | undefined {
-  if (albumMatch) return albumMatch.itemId
-  if (artistMatch) return artistMatch.itemId
-  if (playerMatch) return playerMatch.itemId
-  if (seriesMatch) return seriesMatch.itemId
-  return undefined
 }
 
 function getHeaderDetailInfo(
@@ -163,12 +143,10 @@ function getHeaderDetailInfo(
 }
 
 function DetailHeaderContent({
-  accentButtonStyle,
   currentItem,
   isEpisode,
   isPlayerPage,
   pageTitle,
-  vibrantColors,
   onBack,
 }: DetailHeaderContentProps) {
   const { t } = useTranslation()
@@ -181,10 +159,9 @@ function DetailHeaderContent({
         onClick={onBack}
         className={cn(
           iconButtonClass,
-          !vibrantColors && 'bg-secondary/80 hover:bg-secondary',
+          'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
           'active:scale-95',
         )}
-        style={accentButtonStyle}
         aria-label={t('navigation.back', 'Go back')}
       >
         <ChevronLeft className="size-5" aria-hidden />
@@ -201,7 +178,6 @@ function DetailHeaderContent({
           >
             <EpisodeSwitcher
               currentEpisode={currentItem}
-              vibrantColors={vibrantColors}
               className="flex-1 min-w-0"
             />
           </Suspense>
@@ -216,17 +192,15 @@ function DetailHeaderContent({
 }
 
 function HeaderActions({
-  accentButtonStyle,
   isDetailPage,
   selectedCollection,
-  vibrantColors,
   onOpenSearch,
   onOpenSettings,
 }: HeaderActionsProps) {
   const { t } = useTranslation()
   const actionButtonClassName = cn(
     iconButtonClass,
-    !vibrantColors && 'bg-secondary/60 hover:bg-secondary',
+    'bg-secondary/60 text-secondary-foreground hover:bg-secondary',
   )
 
   return (
@@ -239,7 +213,6 @@ function HeaderActions({
           onPointerEnter={preloadCommandPalette}
           onFocus={preloadCommandPalette}
           className={actionButtonClassName}
-          style={accentButtonStyle}
           aria-label={t('search.open', 'Open search')}
           title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
         >
@@ -257,7 +230,6 @@ function HeaderActions({
             buttonVariants({ variant: 'ghost', size: 'icon' }),
             actionButtonClassName,
           )}
-          style={accentButtonStyle}
           aria-label={t('navigation.home', 'Go to library')}
         >
           <Home className="size-5" aria-hidden />
@@ -270,7 +242,6 @@ function HeaderActions({
         onPointerEnter={preloadSettingsDialog}
         onFocus={preloadSettingsDialog}
         className={actionButtonClassName}
-        style={accentButtonStyle}
         aria-label={t('settings.open', 'Open settings')}
       >
         <Settings className="size-5" aria-hidden />
@@ -285,17 +256,7 @@ export default function Header() {
   const navigate = useNavigate()
   const router = useRouter()
   const canGoBack = useCanGoBack()
-  const matchRoute = useMatchRoute()
-  const albumMatch = matchRoute({ to: '/album/$itemId' })
-  const artistMatch = matchRoute({ to: '/artist/$itemId' })
-  const playerMatch = matchRoute({ to: '/player/$itemId' })
-  const seriesMatch = matchRoute({ to: '/series/$itemId' })
-  const itemId = getMatchedRouteItemId(
-    albumMatch,
-    artistMatch,
-    playerMatch,
-    seriesMatch,
-  )
+  const { itemId } = useParams({ strict: false })
   const selectedCollection = rootRouteApi.useSearch({
     select: (search) => search.collection,
   })
@@ -330,10 +291,13 @@ export default function Header() {
   })
   const currentItem = queriedItem ?? undefined
 
-  const headerImageUrl = currentItem ? getBestImageUrl(currentItem, 300) : null
-  const vibrantColors = useVibrantColor(headerImageUrl || null, {
-    enabled: isDetailPage && !!headerImageUrl,
+  // Same artwork URL as the detail routes, so the header shares the cached
+  // seed and renders the same M3 dynamic scheme as the page below it.
+  const imageUrl = currentItem ? getBestImageUrl(currentItem, 300) : null
+  const seedColor = useArtworkColor(imageUrl || null, {
+    enabled: !!imageUrl,
   })
+
   const detailInfo = getHeaderDetailInfo(currentItem)
 
   const openCommandPalette = () => {
@@ -372,59 +336,46 @@ export default function Header() {
     handleGoHome()
   }
 
-  const headerStyle: CSSProperties | undefined = vibrantColors
-    ? { backgroundColor: `${vibrantColors.background}00` }
-    : undefined
-
-  const accentButtonStyle = vibrantColors
-    ? {
-        backgroundColor: vibrantColors.accent,
-        color: vibrantColors.accentText,
-      }
-    : undefined
-
   return (
     <>
-      <header
-        className="sticky top-0 z-40 backdrop-blur-xl"
-        style={headerStyle}
-      >
-        <nav
-          className="px-4 py-4 sm:px-6"
-          aria-label={t('accessibility.navigation', 'Main navigation')}
+      <header className="sticky top-0 z-40">
+        <DynamicThemeScope
+          seedColor={seedColor}
+          className="bg-background/80 backdrop-blur-xl border-b border-border/40"
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              {isDetailPage ? (
-                <DetailHeaderContent
-                  {...detailInfo}
-                  currentItem={currentItem}
-                  isPlayerPage={isPlayerPage}
-                  vibrantColors={vibrantColors}
-                  accentButtonStyle={accentButtonStyle}
-                  onBack={handleBack}
-                />
-              ) : (
-                collections?.length && (
-                  <CollectionSelector
-                    collections={collections}
-                    selectedId={selectedCollection ?? null}
-                    onSelect={handleCollectionSelect}
+          <nav
+            className="px-4 py-4 sm:px-6"
+            aria-label={t('accessibility.navigation', 'Main navigation')}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {isDetailPage ? (
+                  <DetailHeaderContent
+                    {...detailInfo}
+                    currentItem={currentItem}
+                    isPlayerPage={isPlayerPage}
+                    onBack={handleBack}
                   />
-                )
-              )}
-            </div>
+                ) : (
+                  collections?.length && (
+                    <CollectionSelector
+                      collections={collections}
+                      selectedId={selectedCollection ?? null}
+                      onSelect={handleCollectionSelect}
+                    />
+                  )
+                )}
+              </div>
 
-            <HeaderActions
-              selectedCollection={selectedCollection}
-              isDetailPage={isDetailPage}
-              vibrantColors={vibrantColors}
-              accentButtonStyle={accentButtonStyle}
-              onOpenSearch={openCommandPalette}
-              onOpenSettings={handleSettingsClick}
-            />
-          </div>
-        </nav>
+              <HeaderActions
+                selectedCollection={selectedCollection}
+                isDetailPage={isDetailPage}
+                onOpenSearch={openCommandPalette}
+                onOpenSettings={handleSettingsClick}
+              />
+            </div>
+          </nav>
+        </DynamicThemeScope>
       </header>
 
       {commandPaletteOpen ? (

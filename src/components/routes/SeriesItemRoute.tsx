@@ -4,7 +4,8 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
-import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -55,7 +56,7 @@ export function SeriesPage() {
   const { data: seasons } = useSuspenseQuery(seriesQueryOptions.seasons(itemId))
 
   const imageUrl = series ? getBestImageUrl(series, 300) : null
-  const vibrantColors = useVibrantColor(imageUrl || null, {
+  const seedColor = useArtworkColor(imageUrl || null, {
     enabled: !!imageUrl,
   })
 
@@ -86,13 +87,7 @@ export function SeriesPage() {
   }
 
   return (
-    <>
-      {vibrantColors && (
-        <div
-          className="fixed inset-0 z-0 transition-colors duration-700"
-          style={{ backgroundColor: vibrantColors.background }}
-        />
-      )}
+    <DynamicThemeScope seedColor={seedColor}>
       <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
         <FeatureErrorBoundary
           featureName="Series"
@@ -104,11 +99,10 @@ export function SeriesPage() {
               seasons={seasons}
               selectedSeasonId={seasonId}
               onSeasonSelect={handleSeasonSelect}
-              vibrantColors={vibrantColors}
             />
           </Suspense>
         </FeatureErrorBoundary>
       </main>
-    </>
+    </DynamicThemeScope>
   )
 }

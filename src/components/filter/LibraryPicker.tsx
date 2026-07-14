@@ -52,7 +52,7 @@ export function LibraryPicker({
           </p>
         </div>
         <fieldset
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 border-0 p-0 m-0"
+          className="flex flex-wrap justify-center gap-4 sm:gap-6 border-0 p-0 m-0"
           aria-label={t('items.selectLibrary', {
             defaultValue: 'Select a Library',
           })}
@@ -66,6 +66,7 @@ export function LibraryPicker({
                 Icon={Icon}
                 onSelect={onCollectionChange}
                 index={index}
+                className="w-full sm:w-72 md:w-80"
               />
             )
           })}

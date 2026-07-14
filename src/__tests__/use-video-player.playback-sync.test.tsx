@@ -89,7 +89,7 @@ function createItem(id = 'item-1'): BaseItemDto {
     Name: 'Test Item',
     Type: 'Movie',
     MediaSources: [{ Id: `${id}-media-source` }],
-  } as BaseItemDto
+  }
 }
 
 type RenderVideoPlayerProps = {
@@ -1035,7 +1035,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       Id: 'item-no-src',
       Name: 'No Sources Item',
       Type: 'Movie',
-    } as BaseItemDto
+    }
 
     renderHook(() =>
       useVideoPlayer({

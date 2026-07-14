@@ -180,10 +180,10 @@ describe('Score Display Mapping Completeness', () => {
    */
   it('handles numeric enum values correctly', () => {
     // Test with numeric values directly
-    const greatDisplay = getScoreDisplay(2 as RecommendedServerInfoScore)
-    const goodDisplay = getScoreDisplay(1 as RecommendedServerInfoScore)
-    const okDisplay = getScoreDisplay(0 as RecommendedServerInfoScore)
-    const badDisplay = getScoreDisplay(-1 as RecommendedServerInfoScore)
+    const greatDisplay = getScoreDisplay(2)
+    const goodDisplay = getScoreDisplay(1)
+    const okDisplay = getScoreDisplay(0)
+    const badDisplay = getScoreDisplay(-1)
 
     expect(greatDisplay.label).toBeTruthy()
     expect(goodDisplay.label).toBeTruthy()

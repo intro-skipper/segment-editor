@@ -373,10 +373,12 @@ export function useJellyfinSession({
     }
   }, [session?.playSessionId, session?.strategy])
 
+  const getActiveVideoElementForEffect = useEffectEvent(getActiveVideoElement)
+
   useEffect(() => {
     if (!session?.syncEnabled) return
 
-    const video = getActiveVideoElement()
+    const video = getActiveVideoElementForEffect()
     if (!video) return
 
     const handlePlaying = () => {
@@ -403,7 +405,6 @@ export function useJellyfinSession({
       video.removeEventListener('seeked', handleSeeked)
     }
   }, [
-    getActiveVideoElement,
     session?.itemId,
     session?.mediaSourceId,
     session?.playSessionId,

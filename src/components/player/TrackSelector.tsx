@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
-import { ICON_CLASS, getButtonClass, getIconStyle } from './player-ui-constants'
+import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
 import { cn } from '@/lib/utils'
@@ -22,9 +22,6 @@ interface TrackSelectorProps {
   onSelectSubtitle: (index: number | null) => void
   strategy?: PlaybackStrategy
   disabled?: boolean
-  getButtonStyle?: (active?: boolean) => React.CSSProperties | undefined
-  iconColor?: string
-  hasColors?: boolean
   className?: string
   portalContainer?: React.RefObject<HTMLElement | null>
 }
@@ -35,9 +32,6 @@ export const TrackSelector = function TrackSelectorComponent({
   onSelectSubtitle,
   strategy,
   disabled = false,
-  getButtonStyle,
-  iconColor,
-  hasColors = false,
   className,
   portalContainer,
 }: TrackSelectorProps) {
@@ -64,8 +58,7 @@ export const TrackSelector = function TrackSelectorComponent({
               'Audio and subtitle tracks',
             )}
             disabled={disabled || !hasTracks}
-            style={getButtonStyle?.()}
-            className={cn(getButtonClass(false, hasColors), className)}
+            className={cn(getButtonClass(false), className)}
           />
         }
       >
@@ -73,7 +66,6 @@ export const TrackSelector = function TrackSelectorComponent({
           className={ICON_CLASS}
           strokeWidth={2.5}
           aria-hidden="true"
-          style={getIconStyle(iconColor)}
         />
       </DropdownMenuTrigger>
 

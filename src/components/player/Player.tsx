@@ -27,7 +27,6 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type {
   VideoPlayerError,
   VideoPlayerErrorType,
@@ -44,7 +43,6 @@ import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
-import { useVibrantButtonStyle } from '@/hooks/use-vibrant-button-style'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import {
@@ -120,7 +118,6 @@ interface TimelineScrubberProps {
   timelineStore: PlaybackTimelineStore
   item: BaseItemDto
   segments: Array<MediaSegmentDto> | undefined
-  vibrantColors: VibrantColors | null
   onSeek: (time: number) => void
   className?: string
 }
@@ -129,7 +126,6 @@ function TimelineScrubber({
   timelineStore,
   item,
   segments,
-  vibrantColors,
   onSeek,
   className,
 }: TimelineScrubberProps) {
@@ -146,7 +142,6 @@ function TimelineScrubber({
       buffered={buffered}
       chapters={item.Chapters}
       segments={segments}
-      vibrantColors={vibrantColors}
       onSeek={onSeek}
       itemId={item.Id}
       trickplay={item.Trickplay}
@@ -183,7 +178,6 @@ function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
 
 interface PlayerProps {
   item: BaseItemDto
-  vibrantColors: VibrantColors | null
   timestamp?: number
   segments?: Array<MediaSegmentDto>
   frameStepSeconds: number
@@ -195,7 +189,6 @@ interface PlayerProps {
 
 export function Player({
   item,
-  vibrantColors,
   timestamp,
   segments,
   frameStepSeconds,
@@ -206,7 +199,6 @@ export function Player({
 }: PlayerProps) {
   return useRenderPlayer({
     item,
-    vibrantColors,
     timestamp,
     segments,
     frameStepSeconds,
@@ -219,7 +211,6 @@ export function Player({
 
 function useRenderPlayer({
   item,
-  vibrantColors,
   timestamp,
   segments,
   frameStepSeconds: frameStep,
@@ -239,9 +230,6 @@ function useRenderPlayer({
         setPlayerMuted: state.setPlayerMuted,
       })),
     )
-
-  const { getButtonStyle, iconColor, hasColors } =
-    useVibrantButtonStyle(vibrantColors)
 
   const [state, dispatch] = useReducer(playerReducer, {
     ...initialPlayerState,
@@ -294,10 +282,17 @@ function useRenderPlayer({
     lastAutoSkippedSegmentIdRef.current = null
   }, [segmentSkipMode, segmentSkipModeRevision])
 
-  const activeSkipSegment =
+  const trackedSkipSegment =
     activeSkipSegmentState?.segmentSkipModeRevision === segmentSkipModeRevision
       ? activeSkipSegmentState.segment
       : null
+
+  // Resolve against the current segments prop so edits (e.g. a Type change)
+  // are reflected immediately instead of showing the cached segment.
+  const activeSkipSegment =
+    trackedSkipSegment?.Id !== undefined
+      ? (segmentTimeIndex.rangeById.get(trackedSkipSegment.Id)?.segment ?? null)
+      : trackedSkipSegment
 
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -873,13 +868,6 @@ function useRenderPlayer({
       onToggleMute: toggleMute,
       onChange: handleVolumeChange,
     },
-    appearance: {
-      colorMode: hasColors ? 'vibrant' : 'default',
-      vibrantColors,
-      iconColor,
-      getButtonStyle,
-      buttonOpacity: isFullscreen ? 0.3 : undefined,
-    },
     segmentCreation: {
       onCreate: handleCreateSegment,
     },
@@ -953,7 +941,6 @@ function useRenderPlayer({
           timelineStore={timelineStore}
           item={item}
           segments={segments}
-          vibrantColors={vibrantColors}
           onSeek={handleSeek}
         />
       }

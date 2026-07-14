@@ -22,7 +22,7 @@ export function ViewModeSection() {
     <SelectSettingsSection
       icon={LayoutList}
       titleKey="app.viewMode.title"
-      defaultTitle="Browse view"
+      defaultTitle="Browse layout"
       value={viewMode}
       onValueChange={setViewMode}
       options={options}

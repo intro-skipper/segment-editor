@@ -99,7 +99,7 @@
       "title": "Sprache"
     },
     "viewMode": {
-      "title": "Ansicht beim Durchsuchen",
+      "title": "Ansicht",
       "card": "Karten",
       "list": "Liste"
     },
@@ -132,6 +132,10 @@
       "collection": "Sammlung",
       "selectCollection": "Sammlung auswählen"
     },
+    "seasonCount_one": "{{count}} Staffel",
+    "seasonCount_other": "{{count}} Staffeln",
+    "episodeCount_one": "{{count}} Episode",
+    "episodeCount_other": "{{count}} Episoden",
     "mediaGrid": "Medienelemente",
     "mediaList": "Medienelemente",
     "loadingMediaItems": "Medienelemente werden geladen",
@@ -139,7 +143,8 @@
     "selectLibraryDescription": "Wähle eine Bibliothek, um deine Mediensammlung zu durchsuchen",
     "selectLibraryButton": "{{name}}-Bibliothek durchsuchen",
     "showing": "Zeige {{start}}–{{end}} von {{total}}",
-    "noItems": "Keine Elemente gefunden"
+    "noItems": "Keine Elemente gefunden",
+    "perPage": "Elemente pro Seite"
   },
   "editor": {
     "saveSegment": "Speichern",
@@ -155,10 +160,24 @@
       "title": "Slider Editor"
     },
     "noSegments": "Keine Segmente gefunden, erstelle eines mit '+'",
+    "noSegmentsTitle": "Noch keine Segmente",
+    "noSegmentsHint": "Erstelle ein Segment oder füge eines aus der Zwischenablage ein.",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "unsavedTitle": "Ungespeicherte Änderungen verwerfen?",
+    "unsavedDescription": "Du hast ungespeicherte Segmentänderungen. Sie gehen verloren, wenn du die Seite verlässt.",
+    "discardAndLeave": "Verwerfen & verlassen",
+    "saving": "Speichern…",
+    "saveInProgressTitle": "Speichern läuft",
+    "saveInProgressDescription": "Deine Segmentänderungen werden noch gespeichert. Wenn du jetzt verlässt, wird das Speichern im Hintergrund abgeschlossen.",
+    "stay": "Bleiben",
+    "leave": "Verlassen",
+    "discard": "Verwerfen",
     "noSegmentInClipboard": "Kein Segment in der Zwischenablage",
     "segmentCopiedToClipboard": "Segment in die Zwischenablage kopiert",
     "setStartToBeginning": "Start auf Anfang setzen",
-    "setEndToDuration": "Ende auf Dauer setzen"
+    "setEndToDuration": "Ende auf Dauer setzen",
+    "segmentCount_one": "{{count}} Segment",
+    "segmentCount_other": "{{count}} Segmente"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -203,6 +222,7 @@
     "feature_description": "Diese Funktion hat einen Fehler verursacht. Du kannst es erneut versuchen oder woanders hin navigieren."
   },
   "common": {
+    "cancel": "Abbrechen",
     "go_back": "Zurück",
     "goBack": "Zurück",
     "home": "Startseite",
@@ -335,10 +355,10 @@
   "settings": {
     "open": "Einstellungen öffnen",
     "segmentSkipMode": {
-      "title": "Segmentaktionen",
+      "title": "Segmente überspringen",
       "button": "Überspringen-Schaltfläche anzeigen",
       "skip": "Automatisch überspringen",
-      "disabled": "Nur Standard-Wiedergabe"
+      "disabled": "Aus"
     },
     "jellyfinPlaybackSync": {
       "title": "Wiedergabe an Jellyfin melden",

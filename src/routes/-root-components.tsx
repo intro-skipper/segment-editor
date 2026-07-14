@@ -153,16 +153,23 @@ export function RootComponent() {
   const { showWizard } = useConnectionInit()
   const settingsOpen = useSessionStore(selectSettingsOpen)
 
-  const [wizardDismissed, setWizardDismissed] = useState(false)
+  // Latch the wizard open the first time it is needed: showWizard flips
+  // false as soon as auth succeeds, but the wizard must stay mounted through
+  // its success step. 'closed' is sticky for the session; afterwards the
+  // not-connected empty state is the entry point back to configuration.
+  const [wizardState, setWizardState] = useState<'idle' | 'open' | 'closed'>(
+    'idle',
+  )
 
-  const wizardOpen = showWizard && !wizardDismissed
-
-  const handleWizardOpenChange = (open: boolean) => {
-    if (!open) setWizardDismissed(true)
+  if (showWizard && wizardState === 'idle') {
+    setWizardState('open')
   }
 
-  const handleWizardComplete = () => {
-    setWizardDismissed(true)
+  const wizardOpen = wizardState === 'open'
+  const closeWizard = () => setWizardState('closed')
+
+  const handleWizardOpenChange = (open: boolean) => {
+    if (!open) closeWizard()
   }
 
   return (
@@ -201,7 +208,7 @@ export function RootComponent() {
             <ConnectionWizard
               open={wizardOpen}
               onOpenChange={handleWizardOpenChange}
-              onComplete={handleWizardComplete}
+              onComplete={closeWizard}
             />
           </Suspense>
         ) : null}

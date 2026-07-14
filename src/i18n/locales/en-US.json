@@ -96,10 +96,10 @@
       "en-US": "English",
       "de": "German",
       "fr": "French",
-      "title": "Locale"
+      "title": "Language"
     },
     "viewMode": {
-      "title": "Browse view",
+      "title": "Browse layout",
       "card": "Card",
       "list": "List"
     },
@@ -132,6 +132,10 @@
       "collection": "Collection",
       "selectCollection": "Select collection"
     },
+    "seasonCount_one": "{{count}} Season",
+    "seasonCount_other": "{{count}} Seasons",
+    "episodeCount_one": "{{count}} Episode",
+    "episodeCount_other": "{{count}} Episodes",
     "mediaGrid": "Media items",
     "mediaList": "Media items",
     "loadingMediaItems": "Loading media items",
@@ -139,7 +143,8 @@
     "selectLibraryDescription": "Choose a library to browse your media collection",
     "selectLibraryButton": "Browse {{name}} library",
     "showing": "Showing {{start}}-{{end}} of {{total}}",
-    "noItems": "No items found"
+    "noItems": "No items found",
+    "perPage": "Items per page"
   },
   "editor": {
     "saveSegment": "Save",
@@ -155,10 +160,24 @@
       "title": "Slider Editor"
     },
     "noSegments": "No Segments available, create one with '+'",
+    "noSegmentsTitle": "No segments yet",
+    "noSegmentsHint": "Create a segment or paste one from your clipboard.",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedTitle": "Discard unsaved changes?",
+    "unsavedDescription": "You have unsaved segment edits. They will be lost if you leave.",
+    "discardAndLeave": "Discard & leave",
+    "saving": "Saving…",
+    "saveInProgressTitle": "Save in progress",
+    "saveInProgressDescription": "Your segment edits are still being saved. If you leave now, the save will finish in the background.",
+    "stay": "Stay",
+    "leave": "Leave",
+    "discard": "Discard",
     "noSegmentInClipboard": "No segment in clipboard",
     "segmentCopiedToClipboard": "Segment copied to clipboard",
     "setStartToBeginning": "Set start to beginning",
-    "setEndToDuration": "Set end to duration"
+    "setEndToDuration": "Set end to duration",
+    "segmentCount_one": "{{count}} segment",
+    "segmentCount_other": "{{count}} segments"
   },
   "yes": "Yes",
   "no": "No",
@@ -203,6 +222,7 @@
     "feature_description": "This feature encountered an error. You can try again or navigate elsewhere."
   },
   "common": {
+    "cancel": "Cancel",
     "go_back": "Go Back",
     "goBack": "Go back",
     "home": "Home",
@@ -335,10 +355,10 @@
   "settings": {
     "open": "Open settings",
     "segmentSkipMode": {
-      "title": "Segment Actions",
-      "button": "Display skip button",
-      "skip": "Automatically skip",
-      "disabled": "Default playback only"
+      "title": "Segment skip behavior",
+      "button": "Show skip button",
+      "skip": "Skip automatically",
+      "disabled": "Off"
     },
     "jellyfinPlaybackSync": {
       "title": "Report playback to Jellyfin",

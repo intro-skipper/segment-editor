@@ -11,6 +11,87 @@ export const sortSegmentsByStart = (
   b: MediaSegmentDto,
 ): number => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)
 
+const compareStrings = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0
+
+/**
+ * Total order over the fields compared by areSegmentListsEqual, used to
+ * normalize list order before comparing. Display order is derived state
+ * (sorted by start with insertion tie-breakers), so it must not affect the
+ * dirty check.
+ */
+const compareSegmentsCanonical = (
+  a: MediaSegmentDto,
+  b: MediaSegmentDto,
+): number =>
+  (a.StartTicks ?? 0) - (b.StartTicks ?? 0) ||
+  (a.EndTicks ?? 0) - (b.EndTicks ?? 0) ||
+  compareStrings(a.Id ?? '', b.Id ?? '') ||
+  compareStrings(a.Type ?? '', b.Type ?? '')
+
+/**
+ * Compares two segment lists as unordered collections by per-segment
+ * Id/Type/StartTicks/EndTicks. Same segments in a different order are equal;
+ * list order is presentation-only. Missing elements (sparse arrays or
+ * explicit undefined entries) are treated as unequal.
+ */
+export const areSegmentListsEqual = (
+  a: ReadonlyArray<MediaSegmentDto | undefined>,
+  b: ReadonlyArray<MediaSegmentDto | undefined>,
+): boolean => {
+  if (a.length !== b.length) return false
+
+  const listA = a.filter(
+    (segment): segment is MediaSegmentDto => segment !== undefined,
+  )
+  const listB = b.filter(
+    (segment): segment is MediaSegmentDto => segment !== undefined,
+  )
+  if (listA.length !== a.length || listB.length !== b.length) return false
+
+  const sortedA = listA.toSorted(compareSegmentsCanonical)
+  const sortedB = listB.toSorted(compareSegmentsCanonical)
+
+  return (
+    sortedA.length === sortedB.length &&
+    sortedA.every((segment, index) => {
+      const other = sortedB[index] as MediaSegmentDto | undefined
+      return (
+        other !== undefined &&
+        segment.Id === other.Id &&
+        segment.Type === other.Type &&
+        segment.StartTicks === other.StartTicks &&
+        segment.EndTicks === other.EndTicks
+      )
+    })
+  )
+}
+
+/**
+ * Reference to a segment captured at interaction time (e.g. when a delete
+ * confirmation opens). `id` is preferred for resolution because the list can
+ * re-sort between capture and confirmation; `index` is the fallback for
+ * segments without an Id.
+ */
+export interface SegmentRef {
+  id?: MediaSegmentDto['Id']
+  index: number
+}
+
+/**
+ * Resolves a captured SegmentRef against the current list. Returns the
+ * current index of the referenced segment, or -1 when it no longer exists.
+ */
+export const resolveSegmentIndex = (
+  segments: ReadonlyArray<MediaSegmentDto>,
+  ref: SegmentRef,
+): number => {
+  if (ref.id) {
+    return segments.findIndex((segment) => segment.Id === ref.id)
+  }
+  return ref.index >= 0 && ref.index < segments.length ? ref.index : -1
+}
+
 export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
   (type && SEGMENT_COLORS[type].bg) ?? DEFAULT_SEGMENT_COLOR.bg
 

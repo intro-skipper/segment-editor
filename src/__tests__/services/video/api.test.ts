@@ -38,7 +38,7 @@ function createPlayableItem(): BaseItemDto {
         ],
       },
     ],
-  } as BaseItemDto
+  }
 }
 
 describe('getVideoStreamUrl URL serialization', () => {

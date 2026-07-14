@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   startTransition,
   useState,
   useSyncExternalStore,
@@ -30,14 +29,12 @@ import { useCollections, useItems } from '@/services/items/queries'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
-import { preloadVibrantColors } from '@/hooks/use-vibrant-color'
 import { MediaCard } from '@/components/filter/MediaCard'
 import { MediaListRow } from '@/components/filter/MediaListRow'
 import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
 import { LibraryPicker } from '@/components/filter/LibraryPicker'
 import { PaginationControls } from '@/components/filter/PaginationControls'
 import { useSessionStore } from '@/stores/session-store'
-import { getBestImageUrl } from '@/services/video/api'
 import { getGridColumns } from '@/lib/responsive-utils'
 import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
@@ -136,7 +133,8 @@ function useRenderFilterView() {
   const columns = useGridColumns()
   const navigationColumns = viewMode === 'list' ? 1 : columns
 
-  const { isPlugin, hasCredentials, isConnected } = usePluginMode()
+  const { isPlugin, hasCredentials, isConnected, isValidating, hasValidated } =
+    usePluginMode()
   const setSettingsOpen = useSessionStore(selectSetSettingsOpen)
 
   const {
@@ -214,40 +212,6 @@ function useRenderFilterView() {
     gridRef.current = node
   }
 
-  const preloadedUrlsRef = useRef<Set<string> | null>(null)
-  if (preloadedUrlsRef.current === null) {
-    preloadedUrlsRef.current = new Set<string>()
-  }
-
-  useEffect(() => {
-    preloadedUrlsRef.current?.clear()
-  }, [selectedCollection])
-
-  useEffect(() => {
-    if (paginatedItems.length === 0) return
-
-    const maxPreloadCount = Math.min(paginatedItems.length, columns)
-
-    const preloadedUrls = preloadedUrlsRef.current
-    if (preloadedUrls === null) return
-
-    const imageUrls: Array<string> = []
-
-    for (let index = 0; index < maxPreloadCount; index++) {
-      const item = paginatedItems[index]
-
-      const url = getBestImageUrl(item, 200)
-      if (!url || preloadedUrls.has(url)) continue
-
-      preloadedUrls.add(url)
-      imageUrls.push(url)
-    }
-
-    if (imageUrls.length > 0) {
-      preloadVibrantColors(imageUrls)
-    }
-  }, [paginatedItems, columns])
-
   const handleCollectionChange = (value: string | null) => {
     setFocusedIndex(-1)
     startTransition(() => {
@@ -293,9 +257,18 @@ function useRenderFilterView() {
     selectedCollection && !itemsLoading && !itemsError && totalItems === 0,
   )
 
-  const showNotConnected = !isPlugin && !hasCredentials && !isConnected
+  // Standalone sessions with stored credentials show "Connecting…" only while
+  // validation is pending; once validation completes without a connection the
+  // credentials are bad, so fall through to the actionable not-connected state
+  // instead of spinning forever with no attempt in flight.
+  const showNotConnected =
+    !isPlugin &&
+    !isConnected &&
+    (!hasCredentials || (hasValidated && !isValidating))
 
-  const showConnecting = isPlugin && !isConnected
+  const showConnecting =
+    !isConnected &&
+    (isPlugin || (hasCredentials && (isValidating || !hasValidated)))
 
   return (
     <div className="relative px-4 pb-8 sm:px-6">
@@ -401,7 +374,10 @@ function useRenderFilterView() {
               />
             </div>
             <p className="text-destructive text-center text-lg">
-              {showError.message}
+              {showError.message ||
+                t('items.loadError', {
+                  defaultValue: 'Unable to load media items',
+                })}
             </p>
             <Button
               variant="secondary"
@@ -464,7 +440,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <MediaListRow
-                    key={item.Id}
+                    key={item.Id ?? `media-item-${index}`}
                     item={item}
                     index={index}
                     label={getMediaItemLabel(t, item)}
@@ -514,10 +490,10 @@ function useRenderFilterView() {
                             const index = rowStartIndex + columnIndex
                             return (
                               <MediaCard
-                                key={item.Id}
+                                key={item.Id ?? `media-item-${index}`}
+                                {...getItemProps(index)}
                                 item={item}
                                 index={index}
-                                {...getItemProps(index)}
                               />
                             )
                           })}
@@ -538,7 +514,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <div
-                    key={item.Id}
+                    key={item.Id ?? `media-item-${index}`}
                     style={{
                       contentVisibility: 'auto',
                       containIntrinsicSize: '0 320px',

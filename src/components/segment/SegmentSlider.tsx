@@ -6,9 +6,9 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ChevronDown,
   Copy,
   Crosshair,
-  GripVertical,
   Pencil,
   Play,
   SkipBack,
@@ -17,8 +17,7 @@ import {
 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
+import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import type { SegmentUpdate } from '@/types/segment'
 import { formatTime, snapToFrame } from '@/lib/time-utils'
 import {
@@ -34,7 +33,7 @@ import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,8 +166,8 @@ interface SegmentSliderProps {
   onCopyAllAsJson?: () => void
   /** Callback to open the segment edit dialog */
   onEdit?: (index: number) => void
-  /** Vibrant theme colors derived from the current item artwork */
-  vibrantColors: VibrantColors | null
+  /** Callback to change the segment type while preserving its times */
+  onChangeType?: (index: number, type: MediaSegmentType) => void
 }
 
 /**
@@ -189,7 +188,7 @@ export function SegmentSlider({
   getPlayerTime,
   onCopyAllAsJson,
   onEdit,
-  vibrantColors,
+  onChangeType,
 }: SegmentSliderProps) {
   'use memo'
   const { t } = useTranslation()
@@ -695,18 +694,12 @@ export function SegmentSlider({
     }
   }
 
-  const containerStyle = vibrantColors
-    ? {
-        borderColor: isActive
-          ? vibrantColors.primary
-          : vibrantColors.primary + '30',
-        boxShadow: isActive
-          ? `0 8px 32px ${vibrantColors.primary}15`
-          : undefined,
-      }
-    : undefined
-
-  const iconStyle = vibrantColors ? { color: vibrantColors.primary } : undefined
+  const containerClassName = cn(
+    'group relative rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-[transform,box-shadow,background-color,border-color] duration-200',
+    isActive
+      ? 'border-primary/60 bg-primary/5 shadow-lg shadow-primary/10'
+      : 'border-border/50 hover:border-primary/30 hover:bg-card',
+  )
 
   const segmentRangeStyle = {
     left: `${startPercent}%`,
@@ -729,39 +722,62 @@ export function SegmentSlider({
 
   const handleSetActiveClick = () => onSetActive(index)
 
+  const handleChangeType = (type: MediaSegmentType) => {
+    onChangeType?.(index, type)
+  }
+
+  const typeLabel = t(`segmentType.${formValues.type}`, formValues.type)
+
   return (
     <div
-      className={cn(
-        'group relative rounded-xl border bg-card/50 backdrop-blur-sm p-4 transition-[transform,box-shadow,background-color,border-color] duration-200',
-        isActive
-          ? 'border-primary/60 bg-primary/5 shadow-lg shadow-primary/10'
-          : 'border-border/50 hover:border-primary/30 hover:bg-card/80',
-      )}
-      style={containerStyle}
+      className={containerClassName}
       onPointerDownCapture={handleSetActiveClick}
       onFocusCapture={handleSetActiveClick}
     >
       {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <GripVertical
-            className="size-4 text-muted-foreground/50 cursor-grab hidden sm:block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-            aria-hidden="true"
-          />
-          <Badge
-            variant="outline"
-            className={cn(
-              'text-white border-0 font-medium px-3 py-1 shadow-sm',
-              segmentColor,
-            )}
-          >
-            {segment.Type}
-          </Badge>
-          <span className="text-sm text-muted-foreground font-medium tabular-nums">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {onChangeType ? (
+            <SegmentTypeMenu
+              onSelect={handleChangeType}
+              render={
+                <button
+                  type="button"
+                  aria-label={t('segment.type', 'Segment type')}
+                  title={t('segment.type', 'Segment type')}
+                  className={cn(
+                    'inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-3 text-xs font-medium text-white shadow-sm',
+                    'transition-opacity hover:opacity-90 aria-expanded:opacity-90',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    segmentColor,
+                  )}
+                />
+              }
+            >
+              {typeLabel}
+              <ChevronDown className="size-3 opacity-80" aria-hidden="true" />
+            </SegmentTypeMenu>
+          ) : (
+            <span
+              className={cn(
+                'inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-medium text-white shadow-sm',
+                segmentColor,
+              )}
+            >
+              {typeLabel}
+            </span>
+          )}
+          <span className="hidden sm:inline text-sm text-muted-foreground tabular-nums truncate">
+            {formatTime(localStart)} → {formatTime(localEnd)} ·{' '}
+            <span className="font-medium text-foreground">
+              {formatTime(duration)}
+            </span>
+          </span>
+          <span className="sm:hidden text-sm font-medium text-foreground tabular-nums">
             {formatTime(duration)}
           </span>
         </div>
-        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {/* Copy dropdown menu */}
           <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
             <DropdownMenuTrigger
@@ -774,7 +790,7 @@ export function SegmentSlider({
                 />
               }
             >
-              <Copy className="size-4" aria-hidden="true" style={iconStyle} />
+              <Copy className="size-4" aria-hidden="true" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleCopy}>
@@ -795,7 +811,7 @@ export function SegmentSlider({
               aria-label={t('segment.edit')}
               className="hover:bg-primary/10"
             >
-              <Pencil className="size-4" aria-hidden="true" style={iconStyle} />
+              <Pencil className="size-4" aria-hidden="true" />
             </Button>
           )}
           <Button
@@ -901,16 +917,16 @@ export function SegmentSlider({
       {/* Time inputs row */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6">
         {/* Start time */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-start sm:items-center gap-2 flex-1 min-w-0">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={handleSeekStart}
             aria-label={t('accessibility.seekToStart')}
             title={t('accessibility.seekToStart')}
-            className="shrink-0 hover:bg-primary/10"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
           >
-            <Play className="size-3" aria-hidden="true" style={iconStyle} />
+            <Play className="size-4" aria-hidden="true" />
           </Button>
           {getPlayerTime && (
             <Button
@@ -919,13 +935,9 @@ export function SegmentSlider({
               onClick={handleSetStartFromPlayer}
               aria-label={t('editor.setStartTime', 'Set start from player')}
               title={`${t('editor.setStartTime', 'Set start from player')} (E)`}
-              className="shrink-0 hover:bg-primary/10"
+              className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
             >
-              <Crosshair
-                className="size-3"
-                aria-hidden="true"
-                style={iconStyle}
-              />
+              <Crosshair className="size-4" aria-hidden="true" />
             </Button>
           )}
           <Button
@@ -937,39 +949,47 @@ export function SegmentSlider({
               'Set start to beginning',
             )}
             title={t('editor.setStartToBeginning', 'Set start to beginning')}
-            className="shrink-0 hover:bg-primary/10"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
           >
-            <SkipBack className="size-3" aria-hidden="true" style={iconStyle} />
+            <SkipBack className="size-4" aria-hidden="true" />
           </Button>
           <label
             htmlFor={`segment-${segment.Id}-start`}
-            className="text-sm text-muted-foreground whitespace-nowrap shrink-0"
+            className="text-sm text-muted-foreground whitespace-nowrap shrink-0 sm:self-center leading-8"
           >
             {t('segment.start')}:
           </label>
-          <form.Field name="startText">
-            {(field) => (
-              <Input
-                id={`segment-${segment.Id}-start`}
-                type="number"
-                step={inputStep}
-                min="0"
-                max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
-                value={String(field.state.value)}
-                onFocus={() => {
-                  activeInputRef.current = 'start'
-                  hasLocalRangeDirtyRef.current = false
-                }}
-                onChange={(e) => handleInputChange('start', e.target.value)}
-                onBlur={() => {
-                  field.handleBlur()
-                  handleInputBlur('start')
-                }}
-                className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
-                aria-describedby={`segment-${segment.Id}-start-formatted`}
-              />
-            )}
-          </form.Field>
+          <div className="flex flex-col flex-1 min-w-0 sm:flex-none sm:w-28">
+            <form.Field name="startText">
+              {(field) => (
+                <Input
+                  id={`segment-${segment.Id}-start`}
+                  type="number"
+                  step={inputStep}
+                  min="0"
+                  max={Math.max(0, localEnd - MIN_SEGMENT_GAP)}
+                  value={String(field.state.value)}
+                  onFocus={() => {
+                    activeInputRef.current = 'start'
+                    hasLocalRangeDirtyRef.current = false
+                  }}
+                  onChange={(e) => handleInputChange('start', e.target.value)}
+                  onBlur={() => {
+                    field.handleBlur()
+                    handleInputBlur('start')
+                  }}
+                  className="w-full h-8 text-sm font-mono bg-background/50"
+                  aria-describedby={`segment-${segment.Id}-start-formatted`}
+                />
+              )}
+            </form.Field>
+            <span
+              className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums"
+              aria-hidden="true"
+            >
+              {formatTime(localStart)}
+            </span>
+          </div>
           <span
             id={`segment-${segment.Id}-start-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"
@@ -979,16 +999,16 @@ export function SegmentSlider({
         </div>
 
         {/* End time */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-start sm:items-center gap-2 flex-1 min-w-0">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={handleSeekEnd}
             aria-label={t('accessibility.seekToEnd')}
             title={t('accessibility.seekToEnd')}
-            className="shrink-0 hover:bg-primary/10"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
           >
-            <Play className="size-3" aria-hidden="true" style={iconStyle} />
+            <Play className="size-4" aria-hidden="true" />
           </Button>
           {getPlayerTime && (
             <Button
@@ -997,13 +1017,9 @@ export function SegmentSlider({
               onClick={handleSetEndFromPlayer}
               aria-label={t('editor.setEndTime', 'Set end from player')}
               title={`${t('editor.setEndTime', 'Set end from player')} (F)`}
-              className="shrink-0 hover:bg-primary/10"
+              className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
             >
-              <Crosshair
-                className="size-3"
-                aria-hidden="true"
-                style={iconStyle}
-              />
+              <Crosshair className="size-4" aria-hidden="true" />
             </Button>
           )}
           <Button
@@ -1013,43 +1029,47 @@ export function SegmentSlider({
             disabled={!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0}
             aria-label={t('editor.setEndToDuration', 'Set end to duration')}
             title={t('editor.setEndToDuration', 'Set end to duration')}
-            className="shrink-0 hover:bg-primary/10"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
           >
-            <SkipForward
-              className="size-3"
-              aria-hidden="true"
-              style={iconStyle}
-            />
+            <SkipForward className="size-4" aria-hidden="true" />
           </Button>
           <label
             htmlFor={`segment-${segment.Id}-end`}
-            className="text-sm text-muted-foreground whitespace-nowrap shrink-0"
+            className="text-sm text-muted-foreground whitespace-nowrap shrink-0 sm:self-center leading-8"
           >
             {t('segment.end')}:
           </label>
-          <form.Field name="endText">
-            {(field) => (
-              <Input
-                id={`segment-${segment.Id}-end`}
-                type="number"
-                step={inputStep}
-                min={localStart + MIN_SEGMENT_GAP}
-                max={runtimeSeconds}
-                value={String(field.state.value)}
-                onFocus={() => {
-                  activeInputRef.current = 'end'
-                  hasLocalRangeDirtyRef.current = false
-                }}
-                onChange={(e) => handleInputChange('end', e.target.value)}
-                onBlur={() => {
-                  field.handleBlur()
-                  handleInputBlur('end')
-                }}
-                className="w-full sm:w-28 h-8 text-sm font-mono bg-background/50"
-                aria-describedby={`segment-${segment.Id}-end-formatted`}
-              />
-            )}
-          </form.Field>
+          <div className="flex flex-col flex-1 min-w-0 sm:flex-none sm:w-28">
+            <form.Field name="endText">
+              {(field) => (
+                <Input
+                  id={`segment-${segment.Id}-end`}
+                  type="number"
+                  step={inputStep}
+                  min={localStart + MIN_SEGMENT_GAP}
+                  max={runtimeSeconds}
+                  value={String(field.state.value)}
+                  onFocus={() => {
+                    activeInputRef.current = 'end'
+                    hasLocalRangeDirtyRef.current = false
+                  }}
+                  onChange={(e) => handleInputChange('end', e.target.value)}
+                  onBlur={() => {
+                    field.handleBlur()
+                    handleInputBlur('end')
+                  }}
+                  className="w-full h-8 text-sm font-mono bg-background/50"
+                  aria-describedby={`segment-${segment.Id}-end-formatted`}
+                />
+              )}
+            </form.Field>
+            <span
+              className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums"
+              aria-hidden="true"
+            >
+              {formatTime(localEnd)}
+            </span>
+          </div>
           <span
             id={`segment-${segment.Id}-end-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"

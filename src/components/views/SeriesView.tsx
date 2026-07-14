@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import { useEpisodes } from '@/services/items/queries'
-import { useVibrantTabStyle } from '@/hooks/use-vibrant-button-style'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
@@ -19,14 +17,12 @@ interface SeriesViewProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId?: string | null
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 interface SeasonTabsProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId: string | null
   onSeasonSelect: (seasonId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const isSpecialSeason = (s: BaseItemDto) =>
@@ -36,10 +32,7 @@ const SeasonTabs = function SeasonTabsComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
-  vibrantColors,
 }: SeasonTabsProps) {
-  const { getTabStyle, hasColors } = useVibrantTabStyle(vibrantColors ?? null)
-
   const orderedSeasons = (() => {
     const normal: typeof seasons = []
     const specials: typeof seasons = []
@@ -70,14 +63,12 @@ const SeasonTabs = function SeasonTabsComponent({
             onClick={() => season.Id && onSeasonSelect(season.Id)}
             className={cn(
               'flex-shrink-0 px-4 py-3 md:px-6 md:py-4 rounded-full text-base md:text-lg font-semibold whitespace-nowrap',
-              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2',
+              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2 border-transparent',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              !hasColors &&
-                (isSelected
-                  ? 'bg-primary/20 text-primary border-primary/40'
-                  : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent'),
+              isSelected
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
             )}
-            style={getTabStyle(isSelected)}
           >
             {label}
           </button>
@@ -92,7 +83,6 @@ interface EpisodeCardProps {
   episodeId: string
   index: number
   onEpisodeClick: (episodeId: string) => void
-  vibrantColors?: VibrantColors | null
 }
 
 const EpisodeCard = function EpisodeCardComponent({
@@ -100,7 +90,6 @@ const EpisodeCard = function EpisodeCardComponent({
   episodeId,
   index,
   onEpisodeClick,
-  vibrantColors,
 }: EpisodeCardProps) {
   const { t } = useTranslation()
 
@@ -109,11 +98,6 @@ const EpisodeCard = function EpisodeCardComponent({
     ? Math.round(episode.RunTimeTicks / 600_000_000)
     : null
   const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
-
-  const cardStyle = vibrantColors
-    ? { backgroundColor: vibrantColors.primary }
-    : undefined
-  const textStyle = vibrantColors ? { color: vibrantColors.text } : undefined
 
   const episodeName = episode.Name || episodeLabel
   const ariaLabel = runtime
@@ -129,11 +113,9 @@ const EpisodeCard = function EpisodeCardComponent({
       animate
       animationDelay={animationDelay}
       className={cn(
-        'group flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl',
-        !vibrantColors && 'bg-card/60 backdrop-blur-sm',
+        'group flex items-center gap-4 p-3 md:p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50',
         'hover:shadow-lg hover:shadow-black/10',
       )}
-      style={cardStyle}
       aria-label={ariaLabel}
     >
       <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
@@ -155,16 +137,10 @@ const EpisodeCard = function EpisodeCardComponent({
       </div>
 
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
-        <p
-          className="font-semibold truncate leading-tight text-base md:text-lg"
-          style={textStyle}
-        >
+        <p className="font-semibold truncate leading-tight text-base md:text-lg text-foreground">
           {episode.Name || episodeLabel}
         </p>
-        <p
-          className="text-sm md:text-base truncate mt-0.5 md:mt-1 opacity-80"
-          style={textStyle}
-        >
+        <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 text-muted-foreground">
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
@@ -176,14 +152,9 @@ const EpisodeCard = function EpisodeCardComponent({
 interface SeasonEpisodesProps {
   seriesId: string
   season: BaseItemDto
-  vibrantColors?: VibrantColors | null
 }
 
-function SeasonEpisodes({
-  seriesId,
-  season,
-  vibrantColors,
-}: SeasonEpisodesProps) {
+function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
   const { t } = useTranslation()
   const navigate = useNavigate({ from: '/series/$itemId' })
 
@@ -245,7 +216,6 @@ function SeasonEpisodes({
             episodeId={episode.Id ?? ''}
             index={index}
             onEpisodeClick={handleEpisodeClick}
-            vibrantColors={vibrantColors}
           />
         </div>
       ))}
@@ -258,7 +228,6 @@ export function SeriesView({
   seasons,
   selectedSeasonId: selectedSeasonIdProp,
   onSeasonSelect,
-  vibrantColors,
 }: SeriesViewProps) {
   const { t } = useTranslation()
 
@@ -298,7 +267,6 @@ export function SeriesView({
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
         onSeasonSelect={onSeasonSelect}
-        vibrantColors={vibrantColors}
       />
 
       <div className="mt-2 md:mt-4">
@@ -307,7 +275,6 @@ export function SeriesView({
             key={selectedSeason.Id}
             seriesId={series.Id}
             season={selectedSeason}
-            vibrantColors={vibrantColors}
           />
         )}
       </div>

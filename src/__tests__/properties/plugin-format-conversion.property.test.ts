@@ -7,8 +7,6 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import type { EdlEntry } from '@/services/plugins/edl'
-import type { ChapterMarker } from '@/services/plugins/chapter'
 import {
   EdlAction,
   edlEntryToSegment,
@@ -290,8 +288,8 @@ describe('Plugin Format Conversion', () => {
           (input, itemId) => {
             const segment =
               input.type === 'edl'
-                ? edlEntryToSegment(input.data as EdlEntry, itemId)
-                : chapterToSegment(input.data as ChapterMarker, itemId)
+                ? edlEntryToSegment(input.data, itemId)
+                : chapterToSegment(input.data, itemId)
 
             // All segments must have these fields
             expect(segment.Id).toBeTruthy()

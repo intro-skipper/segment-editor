@@ -28,7 +28,8 @@ function resolveTheme(theme: 'auto' | 'dark' | 'light'): 'light' | 'dark' {
 /**
  * Toast notification component using sonner.
  * Integrates with the app's theme system via Zustand store.
- * Displays notifications in the top-right corner with auto-dismiss.
+ * Displays notifications in the bottom-right corner with auto-dismiss,
+ * keeping them clear of the header actions.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const theme = useAppStore((state) => state.theme)
@@ -38,7 +39,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={resolvedTheme}
       className="toaster group"
-      position="top-right"
+      position="bottom-right"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

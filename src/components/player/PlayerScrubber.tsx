@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { ChapterInfo, MediaSegmentDto } from '@/types/jellyfin'
-import type { VibrantColors } from '@/hooks/use-vibrant-color'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import { cn } from '@/lib/utils'
 import { formatTime, ticksToSeconds } from '@/lib/time-utils'
@@ -112,34 +111,29 @@ function getSegmentRegions(
 }
 
 function ScrubberTrack({
-  vibrantColors,
-  trackStyle,
   bufferedStyle,
   progressStyle,
   segmentRegions,
 }: {
-  vibrantColors: VibrantColors | null
-  trackStyle: React.CSSProperties | undefined
   bufferedStyle: React.CSSProperties
   progressStyle: React.CSSProperties
   segmentRegions: Array<SegmentRegion>
 }) {
   return (
-    <div
-      className={cn(
-        'absolute inset-0 rounded-full overflow-hidden',
-        !vibrantColors && 'bg-muted',
-      )}
-      style={trackStyle}
-    >
+    <div className="absolute inset-0 rounded-full overflow-hidden bg-primary/20">
       <div
         className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full"
         style={bufferedStyle}
       />
+      <div
+        className="absolute inset-y-0 left-0 rounded-full bg-primary"
+        style={progressStyle}
+      />
+      {/* Segment overlays render above the progress fill so the played portion never splits them */}
       {segmentRegions.map((region) => (
         <div
           key={region.id}
-          className="absolute inset-y-0 opacity-70"
+          className="absolute inset-y-0 opacity-80"
           style={{
             left: `${region.start}%`,
             width: `${region.width}%`,
@@ -148,13 +142,6 @@ function ScrubberTrack({
           title={region.type}
         />
       ))}
-      <div
-        className={cn(
-          'absolute inset-y-0 left-0 rounded-full',
-          !vibrantColors && 'bg-primary',
-        )}
-        style={progressStyle}
-      />
     </div>
   )
 }
@@ -237,19 +224,10 @@ function HoverTimePreview({
   )
 }
 
-function ScrubberThumb({
-  vibrantColors,
-  thumbStyle,
-}: {
-  vibrantColors: VibrantColors | null
-  thumbStyle: React.CSSProperties
-}) {
+function ScrubberThumb({ thumbStyle }: { thumbStyle: React.CSSProperties }) {
   return (
     <div
-      className={cn(
-        'absolute top-1/2 w-4 h-4 rounded-full shadow-md transition-transform group-hover:scale-110',
-        !vibrantColors && 'bg-primary',
-      )}
+      className="absolute top-1/2 size-4 rounded-full shadow-md ring-2 ring-background transition-transform group-hover:scale-110 bg-primary"
       style={thumbStyle}
     />
   )
@@ -468,7 +446,6 @@ interface PlayerScrubberProps {
   buffered?: number
   chapters?: Array<ChapterInfo> | null
   segments?: Array<MediaSegmentDto>
-  vibrantColors: VibrantColors | null
   onSeek: (time: number) => void
   className?: string
   /** Item ID for trickplay URL construction */
@@ -486,7 +463,6 @@ export function PlayerScrubber({
   buffered = 0,
   chapters,
   segments,
-  vibrantColors,
   onSeek,
   className,
   itemId,
@@ -553,21 +529,12 @@ export function PlayerScrubber({
     setHoverTime(null)
   }
 
-  const trackStyle = vibrantColors
-    ? { backgroundColor: vibrantColors.primary + '30' }
-    : undefined
-
   const progressStyle = {
     width: `${progress}%`,
-    backgroundColor: vibrantColors?.accent,
   }
 
   const thumbStyle = {
     left: `${progress}%`,
-    backgroundColor: vibrantColors?.accent,
-    boxShadow: vibrantColors
-      ? `0 0 0 2px ${vibrantColors.primary}40, 0 4px 6px -1px rgba(0, 0, 0, 0.1)`
-      : undefined,
     transform: 'translate(-50%, -50%)',
   }
 
@@ -585,7 +552,7 @@ export function PlayerScrubber({
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)]">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)]">
         {formatTime(safeCurrentTime)}
       </span>
 
@@ -611,8 +578,6 @@ export function PlayerScrubber({
           aria-valuetext={`${formatTime(safeCurrentTime)} of ${formatTime(safeDuration)}`}
         />
         <ScrubberTrack
-          vibrantColors={vibrantColors}
-          trackStyle={trackStyle}
           bufferedStyle={bufferedStyle}
           progressStyle={progressStyle}
           segmentRegions={segmentRegions}
@@ -635,7 +600,7 @@ export function PlayerScrubber({
           style={hoverIndicatorStyle}
         />
 
-        <ScrubberThumb vibrantColors={vibrantColors} thumbStyle={thumbStyle} />
+        <ScrubberThumb thumbStyle={thumbStyle} />
 
         <HoverTimePreview
           hoverTime={hoverTime}
@@ -644,7 +609,7 @@ export function PlayerScrubber({
         />
       </div>
 
-      <span className="text-xs text-muted-foreground font-mono min-w-[var(--spacing-time-display)] text-right">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)] text-right">
         {formatTime(safeDuration)}
       </span>
     </div>

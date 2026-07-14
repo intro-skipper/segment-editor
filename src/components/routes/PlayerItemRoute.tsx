@@ -4,7 +4,8 @@ import { getRouteApi } from '@tanstack/react-router'
 
 import { itemsQueryOptions } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
-import { useVibrantColor } from '@/hooks/use-vibrant-color'
+import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -51,7 +52,7 @@ export function PlayerPage() {
   const { data: item } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
 
   const imageUrl = item ? getBestImageUrl(item, 300) : null
-  const vibrantColors = useVibrantColor(imageUrl || null, {
+  const seedColor = useArtworkColor(imageUrl || null, {
     enabled: !!imageUrl,
   })
 
@@ -65,29 +66,19 @@ export function PlayerPage() {
   }
 
   return (
-    <>
-      {vibrantColors && (
-        <div
-          className="fixed inset-0 z-0 transition-colors duration-700"
-          style={{ backgroundColor: vibrantColors.background }}
-        />
-      )}
-      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
+    <DynamicThemeScope seedColor={seedColor}>
+      <main className="min-h-[var(--spacing-page-min-height-lg)] px-4 py-6 sm:px-6 relative z-10">
         <FeatureErrorBoundary
           featureName="Player"
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
         >
           <Suspense fallback={<PlayerSkeleton />}>
             <div className="animate-in fade-in duration-300">
-              <PlayerEditor
-                item={item}
-                fetchSegments={fetchSegments}
-                vibrantColors={vibrantColors}
-              />
+              <PlayerEditor item={item} fetchSegments={fetchSegments} />
             </div>
           </Suspense>
         </FeatureErrorBoundary>
       </main>
-    </>
+    </DynamicThemeScope>
   )
 }

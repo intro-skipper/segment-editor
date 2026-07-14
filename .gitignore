@@ -12,3 +12,6 @@ count.txt
 .agents
 .omo
 package-lock.json
+
+# Generated mock-server poster cache
+tools/images/

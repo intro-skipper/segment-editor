@@ -3,7 +3,7 @@
  * This works around COEP restrictions when the server doesn't provide
  * Cross-Origin-Resource-Policy headers.
  *
- * Uses the shared blobCache and fetchBlobUrl for consistency with useVibrantColor.
+ * Uses the shared blobCache and fetchBlobUrl for consistency with useArtworkColor.
  */
 
 import { useSyncExternalStore } from 'react'

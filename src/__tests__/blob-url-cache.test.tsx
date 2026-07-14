@@ -51,9 +51,11 @@ describe('useBlobUrl', () => {
     )
     blobCache.set(cachedUrl, 'blob:cached')
 
+    const initialProps: { url: string | null } = { url: cachedUrl }
+
     const { result, rerender } = renderHook(
       ({ url }: { url: string | null }) => useBlobUrl(url),
-      { initialProps: { url: cachedUrl as string | null } },
+      { initialProps },
     )
 
     expect(result.current).toBe('blob:cached')

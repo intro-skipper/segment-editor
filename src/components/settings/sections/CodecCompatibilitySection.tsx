@@ -195,7 +195,7 @@ export function CodecCompatibilitySection() {
   }, [state.isExpanded, state.hasLoaded])
 
   return (
-    <SettingsSection icon={Monitor} title="Direct Play Compatibility">
+    <SettingsSection icon={Monitor} title="Direct play compatibility">
       <div className="space-y-4">
         <div className="text-xs text-muted-foreground mb-3">
           Browser codec support for direct video playback
@@ -208,13 +208,13 @@ export function CodecCompatibilitySection() {
             onClick={handleExpand}
             className="w-full"
           >
-            Check Compatibility
+            Check compatibility
           </Button>
         ) : (
           <>
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-foreground">
-                Supported Containers
+                Supported containers
               </h4>
               <div className="flex gap-2 flex-wrap">
                 {supportedContainers.map((container) => (
@@ -235,8 +235,8 @@ export function CodecCompatibilitySection() {
               </div>
             </div>
 
-            <CodecList title="Video Codecs" codecs={state.videoCodecs} />
-            <CodecList title="Audio Codecs" codecs={state.audioCodecs} />
+            <CodecList title="Video codecs" codecs={state.videoCodecs} />
+            <CodecList title="Audio codecs" codecs={state.audioCodecs} />
 
             <div className="pt-2 border-t border-border/50">
               <Button
@@ -254,7 +254,7 @@ export function CodecCompatibilitySection() {
                     Checking…
                   </>
                 ) : (
-                  'Refresh Compatibility'
+                  'Refresh compatibility'
                 )}
               </Button>
             </div>

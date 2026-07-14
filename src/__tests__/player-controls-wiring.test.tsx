@@ -27,7 +27,6 @@ const mocks = vi.hoisted(() => ({
   setPlayerMuted: vi.fn(),
   selectAudioTrack: vi.fn(() => Promise.resolve(undefined)),
   selectSubtitleTrack: vi.fn(() => Promise.resolve(undefined)),
-  getButtonStyle: vi.fn(() => ({ color: '#ffffff' })),
   resizeJassub: vi.fn(),
   setJassubUserOffset: vi.fn(),
   retry: vi.fn(),
@@ -35,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   videoPlayerIsLoading: true,
   videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
-  segmentSkipMode: 'button' as 'button' | 'skip' | 'disabled',
+  segmentSkipMode: 'button',
   segmentSkipModeRevision: 0,
   fullscreenUi: {
     isFullscreen: true,
@@ -94,14 +93,6 @@ vi.mock('@/components/player/PlayerScrubber', () => ({
 
 vi.mock('@/hooks/useBlobUrl', () => ({
   useBlobUrl: () => '',
-}))
-
-vi.mock('@/hooks/use-vibrant-button-style', () => ({
-  useVibrantButtonStyle: () => ({
-    getButtonStyle: mocks.getButtonStyle,
-    iconColor: '#ffffff',
-    hasColors: true,
-  }),
 }))
 
 vi.mock('@/hooks/use-video-player', () => ({
@@ -204,7 +195,7 @@ function createItem(): BaseItemDto {
         ],
       },
     ],
-  } as BaseItemDto
+  }
 }
 
 function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
@@ -212,14 +203,13 @@ function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
     ItemId: 'item-1',
     Type: 'Intro',
     ...overrides,
-  } as MediaSegmentDto
+  }
 }
 
 function renderPlayer(overrides: Partial<PlayerProps> = {}) {
   return render(
     <Player
       item={createItem()}
-      vibrantColors={null}
       frameStepSeconds={1 / 24}
       onCreateSegment={vi.fn()}
       onUpdateSegmentTimestamp={vi.fn()}
@@ -274,7 +264,6 @@ describe('Player controls wiring', () => {
     expect(controlsProps.playback.state).toBe('paused')
     expect(controlsProps.volumeControls.state).toBe('audible')
     expect(controlsProps.volumeControls.level).toBe(0.8)
-    expect(controlsProps.appearance.colorMode).toBe('vibrant')
     expect(controlsProps.display.mode).toBe('fullscreen')
     expect(controlsProps.trackControls?.state).toBe(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')

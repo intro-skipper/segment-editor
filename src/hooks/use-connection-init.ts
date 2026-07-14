@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import {
   getPluginCredentials,
@@ -9,13 +10,27 @@ import { useApiStore } from '@/stores/api-store'
 
 type ValidationStatus = 'idle' | 'validating' | 'validated'
 
-const validationStateByStatus: Record<
-  ValidationStatus,
-  { isValidating: boolean; hasValidated: boolean }
-> = {
-  idle: { isValidating: false, hasValidated: false },
-  validating: { isValidating: true, hasValidated: false },
-  validated: { isValidating: false, hasValidated: true },
+interface ConnectionValidationStore {
+  status: ValidationStatus
+  setStatus: (status: ValidationStatus) => void
+}
+
+/**
+ * Validation progress is shared app-wide: useConnectionInit (mounted once at
+ * the root) drives it, while views like FilterView read it through
+ * usePluginMode to distinguish "validating stored credentials" from
+ * "stored credentials failed validation". Kept outside the persisted api
+ * store because it is per-session progress, not connection configuration.
+ */
+export const useConnectionValidationStore = create<ConnectionValidationStore>()(
+  (set) => ({
+    status: 'idle',
+    setStatus: (status) => set({ status }),
+  }),
+)
+
+const setValidationStatus = (status: ValidationStatus): void => {
+  useConnectionValidationStore.getState().setStatus(status)
 }
 
 interface ConnectionState {
@@ -39,20 +54,15 @@ type ConnectionValidationResult = Awaited<
 function applyConnectionValidationResult(
   result: ConnectionValidationResult,
 ): void {
-  const store = useApiStore.getState()
-  if (result.valid) {
-    if (result.authenticated) {
-      useApiStore.setState({
-        serverVersion: result.serverVersion,
-        validConnection: true,
-        validAuth: true,
-      })
-    } else {
-      store.setConnectionStatus(false, false)
-    }
-  } else {
-    store.setConnectionStatus(false, false)
+  if (result.valid && result.authenticated) {
+    useApiStore.setState({
+      serverVersion: result.serverVersion,
+      validConnection: true,
+      validAuth: true,
+    })
+    return
   }
+  useApiStore.getState().setConnectionStatus(false, false)
 }
 
 function trySetInvalidConnectionStatus(): void {
@@ -63,15 +73,15 @@ function trySetInvalidConnectionStatus(): void {
   }
 }
 
-function isSignalActive(signal: AbortSignal): boolean {
-  return !signal.aborted
-}
+const resolveHasCredentials = (
+  isPlugin: boolean,
+  serverAddress: string,
+  apiKey: string | undefined,
+): boolean =>
+  isPlugin ? getPluginCredentials() !== null : !!(serverAddress && apiKey)
 
 export function useConnectionInit(): ConnectionState {
-  const [validationStatus, setValidationStatus] =
-    useState<ValidationStatus>('idle')
-  const { isValidating, hasValidated: hasValidatedByStatus } =
-    validationStateByStatus[validationStatus]
+  const validationStatus = useConnectionValidationStore((s) => s.status)
   const lastAttemptKeyRef = useRef<string | null>(null)
 
   const { validAuth, serverAddress, apiKey } = useApiStore(
@@ -84,9 +94,10 @@ export function useConnectionInit(): ConnectionState {
 
   const isPlugin = isPluginMode()
 
-  // Derive hasValidated: also true when the store already has valid auth,
-  // so we don't need an explicit dispatch for the validAuth early-return path.
-  const hasValidated = hasValidatedByStatus || validAuth
+  // Validation success is recorded in the api store (validAuth), so a store
+  // that already has valid auth counts as validated without a dispatch.
+  const isValidating = validationStatus === 'validating'
+  const hasValidated = validationStatus === 'validated' || validAuth
 
   useEffect(() => {
     if (validAuth) {
@@ -131,36 +142,37 @@ export function useConnectionInit(): ConnectionState {
       setValidationStatus('validating')
 
       try {
-        if (controller.signal.aborted) return
         const result = await testConnectionWithCredentials(creds, {
           signal: controller.signal,
         })
 
-        if (isSignalActive(controller.signal)) {
-          try {
-            applyConnectionValidationResult(result)
-          } catch {
-            trySetInvalidConnectionStatus()
-          }
+        if (controller.signal.aborted) return
+        try {
+          applyConnectionValidationResult(result)
+        } catch {
+          trySetInvalidConnectionStatus()
         }
       } catch {
         if (controller.signal.aborted) return
         trySetInvalidConnectionStatus()
       }
 
-      if (isSignalActive(controller.signal)) {
-        setValidationStatus('validated')
-      }
+      setValidationStatus('validated')
     }
 
     void init()
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      // Allow a remount to retry an attempt that was aborted mid-flight
+      // (e.g. StrictMode double-mount); otherwise the dedup key would leave
+      // the app stuck in the connecting state with no completed validation.
+      if (lastAttemptKeyRef.current === attemptKey) {
+        lastAttemptKeyRef.current = null
+      }
+    }
   }, [isPlugin, validAuth, serverAddress, apiKey])
 
-  // Derive hasCredentials after effect to ensure consistency
-  const hasCredentials = isPlugin
-    ? getPluginCredentials() !== null
-    : !!(serverAddress && apiKey)
+  const hasCredentials = resolveHasCredentials(isPlugin, serverAddress, apiKey)
 
   return {
     isPlugin,
@@ -180,14 +192,15 @@ export function usePluginMode() {
       apiKey: s.apiKey,
     })),
   )
+  const validationStatus = useConnectionValidationStore((s) => s.status)
 
   const isPlugin = isPluginMode()
 
   return {
     isPlugin,
-    hasCredentials: isPlugin
-      ? getPluginCredentials() !== null
-      : !!(serverAddress && apiKey),
+    hasCredentials: resolveHasCredentials(isPlugin, serverAddress, apiKey),
     isConnected: validAuth,
+    isValidating: validationStatus === 'validating',
+    hasValidated: validationStatus === 'validated' || validAuth,
   }
 }

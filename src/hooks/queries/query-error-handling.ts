@@ -13,7 +13,7 @@ export { AppError as QueryError }
 
 export const createQueryKey = <T extends ReadonlyArray<unknown>>(
   ...parts: T
-): QueryKey => parts as unknown as QueryKey
+): QueryKey => parts
 
 export const shouldRetryQuery = (
   failureCount: number,
