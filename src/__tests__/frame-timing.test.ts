@@ -119,10 +119,7 @@ describe('player timing utilities', () => {
   it('resolves frame step from media metadata with fallback', () => {
     const item = createItemWithVideoFrameRate(24000 / 1001)
     expect(resolveFrameStepSeconds(item)).toBeCloseTo(1001 / 24000, 9)
-    expect(resolveFrameStepSeconds({} as BaseItemDto)).toBeCloseTo(
-      DEFAULT_FRAME_STEP,
-      9,
-    )
+    expect(resolveFrameStepSeconds({})).toBeCloseTo(DEFAULT_FRAME_STEP, 9)
   })
 
   it('cheatsheet step frame and speed hotkeys match PLAYER_HOTKEYS', () => {

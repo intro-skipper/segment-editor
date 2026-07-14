@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   videoPlayerIsLoading: true,
   videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
-  segmentSkipMode: 'button' as 'button' | 'skip' | 'disabled',
+  segmentSkipMode: 'button',
   segmentSkipModeRevision: 0,
   fullscreenUi: {
     isFullscreen: true,
@@ -195,7 +195,7 @@ function createItem(): BaseItemDto {
         ],
       },
     ],
-  } as BaseItemDto
+  }
 }
 
 function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
@@ -203,7 +203,7 @@ function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
     ItemId: 'item-1',
     Type: 'Intro',
     ...overrides,
-  } as MediaSegmentDto
+  }
 }
 
 function renderPlayer(overrides: Partial<PlayerProps> = {}) {

@@ -6,7 +6,7 @@
  * DynamicThemeScope; all role colors derive from it there.
  */
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import {
   QuantizerCelebi,
   Score,
@@ -51,7 +51,10 @@ const seedCache = new LRUCache<string, string>(
 
 const pendingSeeds = new Map<string, Promise<string | null>>()
 
-function subscribeSeedUrl(url: string | null, listener: () => void): () => void {
+function subscribeSeedUrl(
+  url: string | null,
+  listener: () => void,
+): () => void {
   if (!url) return () => {}
 
   let listeners = seedListeners.get(url)
@@ -77,7 +80,12 @@ function subscribeSeedExtraction(
   enabled: boolean,
   listener: () => void,
 ): () => void {
-  const unsubscribe = subscribeSeedUrl(url, listener)
+  const unsubscribe = subscribeSeedUrl(url, () => {
+    listener()
+    if (url && enabled && !getSeedSnapshot(url, enabled)) {
+      void getSeedColor(url)
+    }
+  })
 
   if (url && enabled && !getSeedSnapshot(url, enabled)) {
     void getSeedColor(url)
@@ -117,9 +125,10 @@ function quantizeSeed(imageData: ImageData): string | null {
   }
   if (pixels.length === 0) return null
 
-  const ranked = Score.score(QuantizerCelebi.quantize(pixels, MAX_QUANTIZE_COLORS))
-  const top = ranked[0]
-  return top === undefined ? null : hexFromArgb(top)
+  const ranked = Score.score(
+    QuantizerCelebi.quantize(pixels, MAX_QUANTIZE_COLORS),
+  )
+  return hexFromArgb(ranked[0])
 }
 
 async function extractSeed(blobUrl: string): Promise<string | null> {
@@ -212,21 +221,11 @@ export function useArtworkColor(
   const monochrome = useAppStore(selectMonochrome)
   const enabled = (options?.enabled ?? true) && !monochrome
   const cachedSeed = useSyncExternalStore(
-    (onStoreChange) => subscribeSeedExtraction(imageUrl, enabled, onStoreChange),
+    (onStoreChange) =>
+      subscribeSeedExtraction(imageUrl, enabled, onStoreChange),
     () => getSeedSnapshot(imageUrl, enabled),
     () => null,
   )
-
-  // Recovery kick: extraction is otherwise only requested at subscribe time,
-  // which cannot restart it when a resubscribe is missed after `enabled`
-  // flips back (e.g. monochrome toggled off) or when the cache entry was
-  // evicted while mounted. Re-request whenever the seed is needed but absent;
-  // the seed cache and pending-extraction dedup keep this cheap.
-  useEffect(() => {
-    if (imageUrl && enabled && !cachedSeed) {
-      void getSeedColor(imageUrl)
-    }
-  }, [imageUrl, enabled, cachedSeed])
 
   return cachedSeed
 }

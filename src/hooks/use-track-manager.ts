@@ -150,7 +150,7 @@ export function useTrackManager({
     if (!item) {
       return { audioTracks: [], subtitleTracks: [] }
     }
-    return extractTracks(item as Parameters<typeof extractTracks>[0])
+    return extractTracks(item)
   })()
 
   const itemId = item?.Id ?? undefined

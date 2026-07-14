@@ -77,7 +77,6 @@
         "import/newline-after-import": "error",
         "import/no-commonjs": "error",
         "import/no-duplicates": "error",
-        "@stylistic/spaced-comment": "error",
         "typescript/ban-ts-comment": [
           "error",
           {
@@ -112,7 +111,6 @@
         "typescript/prefer-for-of": "warn",
         "typescript/triple-slash-reference": "error"
       },
-      "jsPlugins": ["@stylistic/eslint-plugin"],
       "env": {
         "es2020": true
       }

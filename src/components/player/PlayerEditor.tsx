@@ -69,7 +69,20 @@ interface PlayerEditorProps {
   className?: string
 }
 
-type SegmentUpdater = (prev: Array<MediaSegmentDto>) => Array<MediaSegmentDto>
+interface EditingState {
+  localEditingSegments: Array<MediaSegmentDto> | null
+  activeIndex: number
+}
+
+interface EditingUpdate {
+  segments: Array<MediaSegmentDto>
+  activeIndex?: number
+}
+
+type SegmentUpdater = (
+  segments: Array<MediaSegmentDto>,
+  activeIndex: number,
+) => EditingUpdate | null
 
 interface ParsedImportResult {
   segments: Array<MediaSegmentDto>
@@ -197,10 +210,12 @@ function useRenderPlayerEditor({
 
   const sortedServerSegments = serverSegments.toSorted(sortSegmentsByStart)
 
-  const [localEditingSegments, setLocalEditingSegments] =
-    React.useState<Array<MediaSegmentDto> | null>(null)
+  const [{ localEditingSegments, activeIndex }, setEditingState] =
+    React.useState<EditingState>({
+      localEditingSegments: null,
+      activeIndex: 0,
+    })
   const editingSegments = localEditingSegments ?? sortedServerSegments
-  const [activeIndex, setActiveIndex] = React.useState(0)
   const [playerTimestamp, setPlayerTimestamp] = React.useState<number>()
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
@@ -223,8 +238,7 @@ function useRenderPlayerEditor({
   const [renderedItemId, setRenderedItemId] = React.useState(item.Id)
   if (renderedItemId !== item.Id) {
     setRenderedItemId(item.Id)
-    setLocalEditingSegments(null)
-    setActiveIndex(0)
+    setEditingState({ localEditingSegments: null, activeIndex: 0 })
     setEditDialogOpen(false)
     setEditingSegmentIndex(null)
     setPendingImport(null)
@@ -276,8 +290,19 @@ function useRenderPlayerEditor({
     [],
   )
 
-  const updateEditingSegments = (updater: SegmentUpdater) => {
-    setLocalEditingSegments((prev) => updater(prev ?? sortedServerSegments))
+  const updateEditingSegments = (updater: SegmentUpdater): void => {
+    setEditingState((previous) => {
+      const update = updater(
+        previous.localEditingSegments ?? sortedServerSegments,
+        previous.activeIndex,
+      )
+      if (!update) return previous
+
+      return {
+        localEditingSegments: update.segments,
+        activeIndex: update.activeIndex ?? previous.activeIndex,
+      }
+    })
   }
 
   const runtimeSeconds = ticksToSeconds(item.RunTimeTicks) || 0
@@ -293,23 +318,22 @@ function useRenderPlayerEditor({
       EndTicks: data.end ?? data.start + 1,
     }
 
-    updateEditingSegments((prev) => {
+    updateEditingSegments((segments) => {
       const { nextSegments, insertedIndex } = insertSegmentSorted(
-        prev,
+        segments,
         newSegment,
       )
-      setActiveIndex(insertedIndex)
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleUpdateSegmentTimestamp = (data: TimestampUpdate) => {
-    updateEditingSegments((prev) => {
-      if (prev.length === 0) return prev
+    updateEditingSegments((segments, currentActiveIndex) => {
+      if (segments.length === 0) return null
 
-      const targetIndex = data.index ?? activeIndex
-      const segment = prev[targetIndex] as MediaSegmentDto | undefined
-      if (segment === undefined) return prev
+      const targetIndex = data.index ?? currentActiveIndex
+      const segment = segments[targetIndex] as MediaSegmentDto | undefined
+      if (segment === undefined) return null
 
       const updatedSegment: MediaSegmentDto = {
         ...segment,
@@ -318,12 +342,10 @@ function useRenderPlayerEditor({
       }
 
       const { nextSegments, insertedIndex } = replaceSegmentSorted(
-        prev,
+        segments,
         updatedSegment,
       )
-      setActiveIndex(insertedIndex)
-
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
@@ -334,49 +356,46 @@ function useRenderPlayerEditor({
   }
 
   const handleUpdateSegment = (data: SegmentUpdate) => {
-    updateEditingSegments((prev) => {
-      const segmentToUpdate = prev.find((seg) => seg.Id === data.id)
-      if (!segmentToUpdate) return prev
+    updateEditingSegments((segments) => {
+      const segmentToUpdate = segments.find((seg) => seg.Id === data.id)
+      if (!segmentToUpdate) return null
 
-      const { nextSegments } = replaceSegmentSorted(prev, {
+      const { nextSegments } = replaceSegmentSorted(segments, {
         ...segmentToUpdate,
         StartTicks: data.start,
         EndTicks: data.end,
       })
-
-      return nextSegments
+      return { segments: nextSegments }
     })
   }
 
   const handleChangeSegmentType = (index: number, type: MediaSegmentType) => {
-    updateEditingSegments((prev) => {
-      const segment = prev[index] as MediaSegmentDto | undefined
-      if (!segment || segment.Type === type) return prev
+    updateEditingSegments((segments) => {
+      const segment = segments[index] as MediaSegmentDto | undefined
+      if (!segment || segment.Type === type) return null
 
-      const { nextSegments, insertedIndex } = replaceSegmentSorted(prev, {
+      const { nextSegments, insertedIndex } = replaceSegmentSorted(segments, {
         ...segment,
         Type: type,
       })
-      setActiveIndex(insertedIndex)
-
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleDeleteSegment = (index: number) => {
-    updateEditingSegments((prev) => {
-      if (index < 0 || index >= prev.length) return prev
+    updateEditingSegments((segments, currentActiveIndex) => {
+      if (index < 0 || index >= segments.length) return null
 
-      const updated = [...prev]
+      const updated = [...segments]
       updated.splice(index, 1)
 
-      setActiveIndex((prevIndex) => {
-        if (updated.length === 0) return 0
-        if (prevIndex > index) return prevIndex - 1
-        return Math.max(0, Math.min(prevIndex, updated.length - 1))
-      })
-
-      return updated
+      const nextActiveIndex =
+        updated.length === 0
+          ? 0
+          : currentActiveIndex > index
+            ? currentActiveIndex - 1
+            : Math.max(0, Math.min(currentActiveIndex, updated.length - 1))
+      return { segments: updated, activeIndex: nextActiveIndex }
     })
   }
 
@@ -420,19 +439,20 @@ function useRenderPlayerEditor({
   }
 
   const handleSaveSegmentFromDialog = (updatedSegment: MediaSegmentDto) => {
-    updateEditingSegments((prev) => {
+    updateEditingSegments((segments) => {
       const { nextSegments, insertedIndex } = replaceSegmentSorted(
-        prev,
+        segments,
         updatedSegment,
       )
-      setActiveIndex(insertedIndex)
-      return nextSegments
+      return { segments: nextSegments, activeIndex: insertedIndex }
     })
   }
 
   const handleDeleteSegmentFromDialog = (segment: MediaSegmentDto) => {
-    updateEditingSegments((prev) => prev.filter((seg) => seg.Id !== segment.Id))
-    setActiveIndex((prev) => Math.max(0, prev - 1))
+    updateEditingSegments((segments, currentActiveIndex) => ({
+      segments: segments.filter((seg) => seg.Id !== segment.Id),
+      activeIndex: Math.max(0, currentActiveIndex - 1),
+    }))
   }
 
   const handlePasteFromClipboard = () => {
@@ -460,11 +480,10 @@ function useRenderPlayerEditor({
           return
         }
 
-        updateEditingSegments(() => {
-          const updated = result.segments.toSorted(sortSegmentsByStart)
-          setActiveIndex(0)
-          return updated
-        })
+        updateEditingSegments(() => ({
+          segments: result.segments.toSorted(sortSegmentsByStart),
+          activeIndex: 0,
+        }))
 
         const infoSuffix = buildImportInfoSuffix(result)
         showNotification({
@@ -495,15 +514,18 @@ function useRenderPlayerEditor({
       // Clear only the exact edits this save persisted. If the item changed
       // or the user kept editing while the save was in flight, the current
       // edits are a different array and must survive.
-      setLocalEditingSegments((prev) => (prev === savedSegments ? null : prev))
+      setEditingState((previous) =>
+        previous.localEditingSegments === savedSegments
+          ? { ...previous, localEditingSegments: null }
+          : previous,
+      )
     } catch {
       // Errors surface via the mutation's onError toast; edits stay dirty.
     }
   }
 
   const handleDiscardEdits = () => {
-    setLocalEditingSegments(null)
-    setActiveIndex(0)
+    setEditingState({ localEditingSegments: null, activeIndex: 0 })
   }
 
   const handleCopyAllAsJson = async () => {
@@ -551,11 +573,10 @@ function useRenderPlayerEditor({
     const pending = pendingImport
     if (!pending) return
 
-    updateEditingSegments(() => {
-      const updated = pending.segments.toSorted(sortSegmentsByStart)
-      setActiveIndex(0)
-      return updated
-    })
+    updateEditingSegments(() => ({
+      segments: pending.segments.toSorted(sortSegmentsByStart),
+      activeIndex: 0,
+    }))
 
     const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
@@ -570,10 +591,9 @@ function useRenderPlayerEditor({
     const pending = pendingImport
     if (!pending) return
 
-    updateEditingSegments((prev) => {
-      const merged = [...prev, ...pending.segments].sort(sortSegmentsByStart)
-      return merged
-    })
+    updateEditingSegments((segments) => ({
+      segments: [...segments, ...pending.segments].sort(sortSegmentsByStart),
+    }))
 
     const infoSuffix = buildImportInfoSuffix(pending)
     showNotification({
@@ -598,17 +618,24 @@ function useRenderPlayerEditor({
   })
 
   useHotkey('[', () => {
-    setActiveIndex((prev) =>
-      editingSegments.length === 0
-        ? 0
-        : (prev - 1 + editingSegments.length) % editingSegments.length,
-    )
+    setEditingState((previous) => ({
+      ...previous,
+      activeIndex:
+        editingSegments.length === 0
+          ? 0
+          : (previous.activeIndex - 1 + editingSegments.length) %
+            editingSegments.length,
+    }))
   })
 
   useHotkey(']', () => {
-    setActiveIndex((prev) =>
-      editingSegments.length === 0 ? 0 : (prev + 1) % editingSegments.length,
-    )
+    setEditingState((previous) => ({
+      ...previous,
+      activeIndex:
+        editingSegments.length === 0
+          ? 0
+          : (previous.activeIndex + 1) % editingSegments.length,
+    }))
   })
 
   return (
@@ -695,7 +722,12 @@ function useRenderPlayerEditor({
                   onEdit={handleOpenEditDialog}
                   onChangeType={handleChangeSegmentType}
                   onPlayerTimestamp={handlePlayerTimestamp}
-                  onSetActive={setActiveIndex}
+                  onSetActive={(nextActiveIndex) =>
+                    setEditingState((previous) => ({
+                      ...previous,
+                      activeIndex: nextActiveIndex,
+                    }))
+                  }
                   getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
                   onCopyAllAsJson={handleCopyAllAsJson}
                 />

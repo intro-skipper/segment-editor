@@ -14,7 +14,7 @@ function segment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
     ItemId: 'item-1',
     Type: 'Intro',
     ...overrides,
-  } as MediaSegmentDto
+  }
 }
 
 describe('player segment skip helpers', () => {

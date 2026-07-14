@@ -166,7 +166,7 @@ describe('Feature: direct-play-fallback, Property 3: Strategy Selection Correctn
           ],
         },
       ],
-    } as BaseItemDto
+    }
   }
 
   /**
@@ -397,7 +397,7 @@ describe('Feature: direct-play-fallback, Property 3: Strategy Selection Correctn
           Id: itemId,
           Name: 'Test Video',
           MediaSources: [],
-        } as BaseItemDto
+        }
 
         const config = await getPlaybackConfig(item)
 

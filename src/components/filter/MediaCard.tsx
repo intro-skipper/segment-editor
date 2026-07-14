@@ -7,7 +7,10 @@ import { ItemImage } from '@/components/media/ItemImage'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
-import { getMediaItemLabel, getSeriesCountLabel } from '@/components/filter/media-item-label'
+import {
+  getMediaItemLabel,
+  getSeriesCountLabel,
+} from '@/components/filter/media-item-label'
 
 interface MediaCardProps {
   item: BaseItemDto

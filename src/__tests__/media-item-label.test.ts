@@ -3,7 +3,10 @@ import type { TFunction } from 'i18next'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
-import { getMediaItemLabel, getSeriesCountLabel } from '@/components/filter/media-item-label'
+import {
+  getMediaItemLabel,
+  getSeriesCountLabel,
+} from '@/components/filter/media-item-label'
 
 describe('getMediaItemLabel', () => {
   it('uses item-specific accessibility keys with name and year', () => {
@@ -11,14 +14,11 @@ describe('getMediaItemLabel', () => {
       (key: string, options: { name: string }) => `${key}:${options.name}`,
     )
 
-    const label = getMediaItemLabel(
-      t as unknown as TFunction,
-      {
-        Name: 'Blade Runner',
-        ProductionYear: 1982,
-        Type: BaseItemKind.Movie,
-      } as BaseItemDto,
-    )
+    const label = getMediaItemLabel(t as unknown as TFunction, {
+      Name: 'Blade Runner',
+      ProductionYear: 1982,
+      Type: BaseItemKind.Movie,
+    })
 
     expect(label).toBe('accessibility.mediaCard.playMovie:Blade Runner (1982)')
     expect(t).toHaveBeenCalledWith('accessibility.mediaCard.playMovie', {
@@ -52,7 +52,7 @@ describe('getSeriesCountLabel', () => {
       Type: BaseItemKind.Series,
       ChildCount: 3,
       RecursiveItemCount: 36,
-    } as BaseItemDto)
+    })
 
     expect(label).toBe('items.seasonCount:3')
   })
@@ -62,7 +62,7 @@ describe('getSeriesCountLabel', () => {
       Type: BaseItemKind.Series,
       ChildCount: 1,
       RecursiveItemCount: 12,
-    } as BaseItemDto)
+    })
 
     expect(label).toBe('items.episodeCount:12')
   })
@@ -71,7 +71,7 @@ describe('getSeriesCountLabel', () => {
     const label = getSeriesCountLabel(t, {
       Type: BaseItemKind.Series,
       ChildCount: 1,
-    } as BaseItemDto)
+    })
 
     expect(label).toBe('items.seasonCount:1')
   })
@@ -81,10 +81,8 @@ describe('getSeriesCountLabel', () => {
       getSeriesCountLabel(t, {
         Type: BaseItemKind.Movie,
         ChildCount: 2,
-      } as BaseItemDto),
+      }),
     ).toBeNull()
-    expect(
-      getSeriesCountLabel(t, { Type: BaseItemKind.Series } as BaseItemDto),
-    ).toBeNull()
+    expect(getSeriesCountLabel(t, { Type: BaseItemKind.Series })).toBeNull()
   })
 })

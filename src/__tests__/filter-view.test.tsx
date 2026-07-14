@@ -16,7 +16,7 @@ const refetchItemsMock = vi.hoisted(() => vi.fn())
 const useItemsOptionsMock = vi.hoisted(() => vi.fn())
 
 const routeSearchState = vi.hoisted(() => ({
-  current: {} as { collection?: string; page?: number; search?: string },
+  current: {},
 }))
 
 const pluginModeState = vi.hoisted(() => ({
@@ -131,7 +131,7 @@ vi.mock('@/components/filter/MediaCard', () => ({
 }))
 
 function makeCollection(id: string, name: string): VirtualFolderInfo {
-  return { ItemId: id, Name: name } as VirtualFolderInfo
+  return { ItemId: id, Name: name }
 }
 
 function mediaItem(id: string, name: string): BaseItemDto {

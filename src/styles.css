@@ -6,8 +6,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Base theme generated from brand seed #d87943 via tools/generate-base-theme.mjs
-     (same Material 3 pipeline as the artwork-derived dynamic schemes) */
+  /* Base theme generated from brand seed #d87943 using the same Material 3
+     pipeline as the artwork-derived dynamic schemes. */
   --background: #fff8f6;
   --foreground: #221a15;
   --card: #fff1eb;

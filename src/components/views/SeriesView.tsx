@@ -33,7 +33,6 @@ const SeasonTabs = function SeasonTabsComponent({
   selectedSeasonId,
   onSeasonSelect,
 }: SeasonTabsProps) {
-
   const orderedSeasons = (() => {
     const normal: typeof seasons = []
     const specials: typeof seasons = []

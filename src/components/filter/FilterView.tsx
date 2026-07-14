@@ -490,8 +490,8 @@ function useRenderFilterView() {
                             const index = rowStartIndex + columnIndex
                             return (
                               <MediaCard
-                                {...getItemProps(index)}
                                 key={item.Id ?? `media-item-${index}`}
+                                {...getItemProps(index)}
                                 item={item}
                                 index={index}
                               />

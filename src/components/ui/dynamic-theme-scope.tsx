@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { useResolvedTheme } from '@/hooks/use-artwork-color'
 import { buildDynamicThemeVars } from '@/lib/m3-dynamic-theme'
@@ -32,7 +32,7 @@ export function DynamicThemeScope({
         'bg-background text-foreground transition-colors duration-500',
         className,
       )}
-      style={(vars ?? undefined) as CSSProperties | undefined}
+      style={vars ?? undefined}
     >
       {children}
     </div>

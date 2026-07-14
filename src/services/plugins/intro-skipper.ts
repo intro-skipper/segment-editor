@@ -275,7 +275,7 @@ export function introSkipperClipboardTextToSegments(
     : isRecord(parsed)
       ? (findNestedEventsArray(parsed) ??
         (looksLikeSingleEventObject(parsed)
-          ? ([parsed as IntroSkipperEvent] as Array<IntroSkipperEvent>)
+          ? ([parsed] as Array<IntroSkipperEvent>)
           : null))
       : null
 

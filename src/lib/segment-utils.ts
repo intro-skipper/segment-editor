@@ -52,16 +52,19 @@ export const areSegmentListsEqual = (
   const sortedA = listA.toSorted(compareSegmentsCanonical)
   const sortedB = listB.toSorted(compareSegmentsCanonical)
 
-  return sortedA.every((segment, index) => {
-    const other = sortedB[index] as MediaSegmentDto | undefined
-    return (
-      other !== undefined &&
-      segment.Id === other.Id &&
-      segment.Type === other.Type &&
-      segment.StartTicks === other.StartTicks &&
-      segment.EndTicks === other.EndTicks
-    )
-  })
+  return (
+    sortedA.length === sortedB.length &&
+    sortedA.every((segment, index) => {
+      const other = sortedB[index] as MediaSegmentDto | undefined
+      return (
+        other !== undefined &&
+        segment.Id === other.Id &&
+        segment.Type === other.Type &&
+        segment.StartTicks === other.StartTicks &&
+        segment.EndTicks === other.EndTicks
+      )
+    })
+  )
 }
 
 /**

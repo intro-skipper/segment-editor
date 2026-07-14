@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import Hls from 'hls.js'
+import type { ErrorData } from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { RECOVERY_TIMEOUT_MS } = PLAYER_CONFIG
@@ -130,7 +131,10 @@ export function useHlsPlayer({
         }, RECOVERY_TIMEOUT_MS)
       }
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
+      const handleError = (
+        _event: typeof Hls.Events.ERROR,
+        data: ErrorData,
+      ) => {
         if (!isActiveRef.current || !data.fatal) return
 
         switch (data.type) {
@@ -149,17 +153,32 @@ export function useHlsPlayer({
               createLocalizedError('unknown', 'player.error.unknown', false),
             )
         }
-      })
+      }
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      const handleManifestParsed = () => {
         if (!isActiveRef.current) return
         reportError(null)
         clearRecoveryTimer(recoveryTimerRef)
         reportRecoveryEnd()
-      })
+      }
+
+      hls.on(Hls.Events.ERROR, handleError)
+      hls.on(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
 
       hls.loadSource(videoUrl)
       hlsRef.current = hls
+
+      return () => {
+        isActiveRef.current = false
+        if (recoveryTimer.current) {
+          clearTimeout(recoveryTimer.current)
+          recoveryTimer.current = null
+        }
+        hls.off(Hls.Events.ERROR, handleError)
+        hls.off(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
+        hls.destroy()
+        if (hlsRef.current === hls) hlsRef.current = null
+      }
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = videoUrl
     }

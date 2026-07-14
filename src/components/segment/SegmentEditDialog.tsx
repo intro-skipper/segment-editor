@@ -79,7 +79,7 @@ export function SegmentEditDialog(props: SegmentEditDialogProps) {
       ].join(':')
 
   return (
-    <SegmentEditDialogContent {...props} key={`${segmentKey}:${openSession}`} />
+    <SegmentEditDialogContent key={`${segmentKey}:${openSession}`} {...props} />
   )
 }
 

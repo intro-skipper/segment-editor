@@ -31,6 +31,13 @@ const SEARCH_RESULT_LIMIT = 80
 const SEARCH_DEBOUNCE_MS = 140
 const MIN_SEARCH_LENGTH = 1
 const VIRTUAL_OVERSCAN = 4
+const EXCLUDED_ITEM_TYPE_LOOKUP: Record<string, true> = {
+  [BaseItemKind.Episode]: true,
+  [BaseItemKind.Season]: true,
+}
+const EXCLUDED_ITEM_TYPES = Object.keys(
+  EXCLUDED_ITEM_TYPE_LOOKUP,
+) as Array<BaseItemKind>
 
 interface CommandPaletteProps {
   open: boolean
@@ -213,9 +220,7 @@ export default function CommandPalette({
   const deferredSearch = useDeferredValue(search)
   const trimmedSearch = deferredSearch.trim()
   const canSearch = debouncedSearch.length >= MIN_SEARCH_LENGTH
-  const excludedItemTypes: Array<BaseItemKind> | undefined = includeEpisodes
-    ? undefined
-    : [BaseItemKind.Episode, BaseItemKind.Season]
+  const excludedItemTypes = includeEpisodes ? undefined : EXCLUDED_ITEM_TYPES
 
   useEffect(() => {
     if (!open) return
@@ -241,7 +246,7 @@ export default function CommandPalette({
   const resultItems = excludedItemTypes
     ? queriedItems.filter(
         (item) =>
-          item.Type === undefined || !excludedItemTypes.includes(item.Type),
+          item.Type === undefined || !(item.Type in EXCLUDED_ITEM_TYPE_LOOKUP),
       )
     : queriedItems
 
