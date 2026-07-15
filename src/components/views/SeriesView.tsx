@@ -4,12 +4,16 @@ import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useEpisodes } from '@/services/items/queries'
+import { useSegments } from '@/services/segments/queries'
+import { useInView } from '@/hooks/use-in-view'
 import { ItemImage } from '@/components/media/ItemImage'
+import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { cn } from '@/lib/utils'
+import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
 interface SeriesViewProps {
@@ -74,6 +78,48 @@ const SeasonTabs = function SeasonTabsComponent({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+interface EpisodeSegmentTimelineProps {
+  episodeId: string
+  runtimeSeconds: number
+}
+
+/**
+ * Prefetch margin for per-episode segment queries. Rows within this distance
+ * of the viewport start fetching, so bars are ready as the user scrolls
+ * while off-screen rows of large seasons don't fire requests on mount.
+ */
+const SEGMENT_PREFETCH_ROOT_MARGIN = '600px 0px'
+
+function EpisodeSegmentTimeline({
+  episodeId,
+  runtimeSeconds,
+}: EpisodeSegmentTimelineProps) {
+  const { ref, inView } = useInView<HTMLDivElement>({
+    rootMargin: SEGMENT_PREFETCH_ROOT_MARGIN,
+  })
+  const {
+    data: segments,
+    isPending,
+    isError,
+  } = useSegments(episodeId, { enabled: inView })
+
+  // Keep the observer target mounted for cached errors so entering the
+  // viewport can re-enable the query and retry it.
+  if (!episodeId) return null
+
+  return (
+    <div ref={ref} className="mt-2 md:mt-2.5">
+      {!isError && (
+        <SegmentTimeline
+          segments={segments ?? []}
+          runtimeSeconds={runtimeSeconds}
+          isLoading={isPending}
+        />
+      )}
     </div>
   )
 }
@@ -144,6 +190,10 @@ const EpisodeCard = function EpisodeCardComponent({
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
+        <EpisodeSegmentTimeline
+          episodeId={episodeId}
+          runtimeSeconds={ticksToSeconds(episode.RunTimeTicks)}
+        />
       </div>
     </InteractiveCard>
   )
