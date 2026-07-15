@@ -9,9 +9,7 @@ import { useInView } from '@/hooks/use-in-view'
 
 function Probe({ rootMargin }: { rootMargin?: string }) {
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin })
-  return (
-    <div ref={ref} data-testid="probe" data-inview={inView ? 'yes' : 'no'} />
-  )
+  return <div ref={ref}>{inView ? 'visible' : 'hidden'}</div>
 }
 
 type ObserverCallback = (entries: Array<{ isIntersecting: boolean }>) => void
@@ -56,15 +54,14 @@ describe('useInView', () => {
     // jsdom has no IntersectionObserver by default
     render(<Probe />)
 
-    expect(screen.getByTestId('probe').dataset.inview).toBe('yes')
+    expect(screen.getByText('visible')).toBeTruthy()
   })
 
   it('stays hidden until the element intersects, then latches', () => {
     installMockObserver()
     render(<Probe rootMargin="600px 0px" />)
 
-    const probe = screen.getByTestId('probe')
-    expect(probe.dataset.inview).toBe('no')
+    const probe = screen.getByText('hidden')
 
     const observer = MockIntersectionObserver.instances[0]
     expect(observer.options?.rootMargin).toBe('600px 0px')
@@ -73,12 +70,12 @@ describe('useInView', () => {
     act(() => {
       observer.callback([{ isIntersecting: false }])
     })
-    expect(probe.dataset.inview).toBe('no')
+    expect(probe.textContent).toBe('hidden')
 
     act(() => {
       observer.callback([{ isIntersecting: true }])
     })
-    expect(probe.dataset.inview).toBe('yes')
+    expect(probe.textContent).toBe('visible')
     expect(observer.disconnected).toBe(true)
 
     // Latch: no further observation once visible

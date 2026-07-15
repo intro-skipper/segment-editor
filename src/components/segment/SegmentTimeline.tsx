@@ -20,9 +20,6 @@ import { cn } from '@/lib/utils'
  */
 const MIN_VISIBLE_WIDTH_PERCENT = 0.8
 
-const formatRegionRange = (typeLabel: string, region: SegmentRegion): string =>
-  `${typeLabel} ${formatCompactTime(region.startSeconds)} – ${formatCompactTime(region.endSeconds)}`
-
 interface SegmentTimelineProps {
   /** Segments with StartTicks/EndTicks in seconds (as returned by useSegments) */
   segments: Array<MediaSegmentDto>
@@ -45,7 +42,7 @@ export function SegmentTimeline({
   // values fall back to the raw type string.
   const regionLabel = (region: SegmentRegion): string => {
     const type = region.type ?? 'Unknown'
-    return formatRegionRange(t(`segmentType.${type}`, type), region)
+    return `${t(`segmentType.${type}`, type)} ${formatCompactTime(region.startSeconds)} – ${formatCompactTime(region.endSeconds)}`
   }
 
   if (isLoading) {
@@ -56,7 +53,6 @@ export function SegmentTimeline({
           className,
         )}
         aria-hidden="true"
-        data-testid="segment-timeline-loading"
       />
     )
   }
@@ -84,7 +80,6 @@ export function SegmentTimeline({
     <div
       role="img"
       aria-label={label}
-      data-testid="segment-timeline"
       className={cn(
         'relative h-1.5 rounded-full overflow-hidden bg-primary/15',
         className,

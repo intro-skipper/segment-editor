@@ -74,10 +74,9 @@ describe('SegmentTimeline', () => {
       />,
     )
 
-    const timeline = screen.getByTestId('segment-timeline')
-    expect(timeline.getAttribute('aria-label')).toBe(
-      'Segments: Intro 0:00 – 1:30, Outro 20:00 – 24:00',
-    )
+    const timeline = screen.getByRole('img', {
+      name: 'Segments: Intro 0:00 – 1:30, Outro 20:00 – 24:00',
+    })
 
     const regions = Array.from(timeline.children) as Array<HTMLElement>
     expect(regions).toHaveLength(2)
@@ -96,7 +95,7 @@ describe('SegmentTimeline', () => {
       <SegmentTimeline segments={[segment(10, 11)]} runtimeSeconds={1440} />,
     )
 
-    const timeline = screen.getByTestId('segment-timeline')
+    const timeline = screen.getByRole('img')
     const regions = Array.from(timeline.children) as Array<HTMLElement>
     expect(regions).toHaveLength(1)
     expect(regions[0].style.width).toBe('0.8%')
@@ -110,10 +109,9 @@ describe('SegmentTimeline', () => {
       />,
     )
 
-    const timeline = screen.getByTestId('segment-timeline')
-    expect(timeline.getAttribute('aria-label')).toBe(
-      'Segments: Zusammenfassung 0:10 – 1:00',
-    )
+    const timeline = screen.getByRole('img', {
+      name: 'Segments: Zusammenfassung 0:10 – 1:00',
+    })
 
     const regions = Array.from(timeline.children) as Array<HTMLElement>
     expect(regions[0].title).toBe('Zusammenfassung 0:10 – 1:00')
@@ -122,16 +120,19 @@ describe('SegmentTimeline', () => {
   it('renders an empty labelled track when no segments exist', () => {
     render(<SegmentTimeline segments={[]} runtimeSeconds={1440} />)
 
-    const timeline = screen.getByTestId('segment-timeline')
-    expect(timeline.getAttribute('aria-label')).toBe('No segments')
+    const timeline = screen.getByRole('img', { name: 'No segments' })
     expect(timeline.children).toHaveLength(0)
   })
 
   it('renders a placeholder while loading', () => {
-    render(<SegmentTimeline segments={[]} runtimeSeconds={1440} isLoading />)
+    const { container } = render(
+      <SegmentTimeline segments={[]} runtimeSeconds={1440} isLoading />,
+    )
 
-    expect(screen.getByTestId('segment-timeline-loading')).toBeTruthy()
-    expect(screen.queryByTestId('segment-timeline')).toBeNull()
+    expect(screen.queryByRole('img')).toBeNull()
+    const placeholder = container.firstElementChild
+    expect(placeholder?.className).toContain('animate-pulse')
+    expect(placeholder?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('scales against the furthest segment end when runtime is unknown', () => {
@@ -142,7 +143,7 @@ describe('SegmentTimeline', () => {
       />,
     )
 
-    const timeline = screen.getByTestId('segment-timeline')
+    const timeline = screen.getByRole('img')
     const regions = Array.from(timeline.children) as Array<HTMLElement>
     expect(regions).toHaveLength(2)
     expect(regions[0].style.width).toBe('10%')
