@@ -33,7 +33,9 @@ describe('isViewTransitionAbortError', () => {
     ).toBe(true)
   })
 
-  it('matches the Chromium invalid state transition rejection', () => {
+  it('keeps Chromium invalid-state transition failures visible', () => {
+    // Chromium uses this generic rejection for real authoring defects such
+    // as duplicate view-transition-name values — it must not be suppressed.
     expect(
       isViewTransitionAbortError(
         new DOMException(
@@ -41,7 +43,7 @@ describe('isViewTransitionAbortError', () => {
           'InvalidStateError',
         ),
       ),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('ignores unrelated abort errors such as cancelled fetches', () => {
