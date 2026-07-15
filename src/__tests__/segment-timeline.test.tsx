@@ -14,6 +14,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
     t: (_key: string, fallbackOrOptions?: string | Record<string, unknown>) => {
+      // Prove type-label localization is wired without translating every key
+      if (_key === 'segmentType.Recap') return 'Zusammenfassung'
       if (typeof fallbackOrOptions === 'string') return fallbackOrOptions
       if (fallbackOrOptions && typeof fallbackOrOptions === 'object') {
         const { defaultValue, ...params } = fallbackOrOptions
@@ -98,6 +100,23 @@ describe('SegmentTimeline', () => {
     const regions = Array.from(timeline.children) as Array<HTMLElement>
     expect(regions).toHaveLength(1)
     expect(regions[0].style.width).toBe('0.8%')
+  })
+
+  it('localizes segment type names in tooltips and accessible labels', () => {
+    render(
+      <SegmentTimeline
+        segments={[segment(10, 60, MediaSegmentType.Recap)]}
+        runtimeSeconds={1440}
+      />,
+    )
+
+    const timeline = screen.getByTestId('segment-timeline')
+    expect(timeline.getAttribute('aria-label')).toBe(
+      'Segments: Zusammenfassung 0:10 – 1:00',
+    )
+
+    const regions = Array.from(timeline.children) as Array<HTMLElement>
+    expect(regions[0].title).toBe('Zusammenfassung 0:10 – 1:00')
   })
 
   it('renders an empty labelled track when no segments exist', () => {

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { MediaSegmentType } from '@/types/jellyfin'
-import { getSegmentRegions } from '@/lib/segment-utils'
+import {
+  getSegmentColor,
+  getSegmentCssVar,
+  getSegmentRegions,
+} from '@/lib/segment-utils'
 
 // StartTicks/EndTicks are in SECONDS at the UI boundary (see segments/api.ts)
 const segment = (
@@ -130,5 +134,30 @@ describe('getSegmentRegions', () => {
 
     expect(regions).toHaveLength(1)
     expect(regions[0].color).toBe('var(--segment-unknown)')
+  })
+
+  it('does not crash on server enum values unknown to this client', () => {
+    // A newer Jellyfin server may report types this client does not know;
+    // the schema warning is logged but DTOs are still forwarded to the UI.
+    const futureType: MediaSegmentDto = {
+      Id: 'seg-future',
+      ItemId: 'item-1',
+      Type: 'HolidaySpecial' as MediaSegmentType,
+      StartTicks: 10,
+      EndTicks: 60,
+    }
+    const regions = getSegmentRegions([futureType], 100)
+
+    expect(regions).toHaveLength(1)
+    expect(regions[0].color).toBe('var(--segment-unknown)')
+  })
+
+  it('resolves helper colors safely for unknown types', () => {
+    const futureType = 'HolidaySpecial' as MediaSegmentType
+
+    expect(getSegmentColor(futureType)).toBe('bg-segment-unknown')
+    expect(getSegmentCssVar(futureType)).toBe('var(--segment-unknown)')
+    expect(getSegmentColor(undefined)).toBe('bg-segment-unknown')
+    expect(getSegmentCssVar(undefined)).toBe('var(--segment-unknown)')
   })
 })

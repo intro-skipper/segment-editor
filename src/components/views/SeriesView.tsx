@@ -5,6 +5,7 @@ import { AlertCircle, Play } from 'lucide-react'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useEpisodes } from '@/services/items/queries'
 import { useSegments } from '@/services/segments/queries'
+import { useInView } from '@/hooks/use-in-view'
 import { ItemImage } from '@/components/media/ItemImage'
 import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
 import { InteractiveCard } from '@/components/ui/interactive-card'
@@ -86,23 +87,38 @@ interface EpisodeSegmentTimelineProps {
   runtimeSeconds: number
 }
 
+/**
+ * Prefetch margin for per-episode segment queries. Rows within this distance
+ * of the viewport start fetching, so bars are ready as the user scrolls
+ * while off-screen rows of large seasons don't fire requests on mount.
+ */
+const SEGMENT_PREFETCH_ROOT_MARGIN = '600px 0px'
+
 function EpisodeSegmentTimeline({
   episodeId,
   runtimeSeconds,
 }: EpisodeSegmentTimelineProps) {
-  const { data: segments, isPending, isError } = useSegments(episodeId)
+  const { ref, inView } = useInView<HTMLDivElement>({
+    rootMargin: SEGMENT_PREFETCH_ROOT_MARGIN,
+  })
+  const {
+    data: segments,
+    isPending,
+    isError,
+  } = useSegments(episodeId, { enabled: inView })
 
   // useSegments disables the query for an empty id; bail out so those
   // episodes render nothing instead of a perpetual loading placeholder.
   if (!episodeId || isError) return null
 
   return (
-    <SegmentTimeline
-      segments={segments ?? []}
-      runtimeSeconds={runtimeSeconds}
-      isLoading={isPending}
-      className="mt-2 md:mt-2.5"
-    />
+    <div ref={ref} className="mt-2 md:mt-2.5">
+      <SegmentTimeline
+        segments={segments ?? []}
+        runtimeSeconds={runtimeSeconds}
+        isLoading={isPending}
+      />
+    </div>
   )
 }
 

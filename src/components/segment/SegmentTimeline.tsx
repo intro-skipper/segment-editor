@@ -20,8 +20,8 @@ import { cn } from '@/lib/utils'
  */
 const MIN_VISIBLE_WIDTH_PERCENT = 0.8
 
-const formatRegionRange = (region: SegmentRegion): string =>
-  `${region.type ?? 'Unknown'} ${formatCompactTime(region.startSeconds)} – ${formatCompactTime(region.endSeconds)}`
+const formatRegionRange = (typeLabel: string, region: SegmentRegion): string =>
+  `${typeLabel} ${formatCompactTime(region.startSeconds)} – ${formatCompactTime(region.endSeconds)}`
 
 interface SegmentTimelineProps {
   /** Segments with StartTicks/EndTicks in seconds (as returned by useSegments) */
@@ -40,6 +40,13 @@ export function SegmentTimeline({
   className,
 }: SegmentTimelineProps) {
   const { t } = useTranslation()
+
+  // Localized like SegmentSlider/SegmentTypeMenu; unknown server enum
+  // values fall back to the raw type string.
+  const regionLabel = (region: SegmentRegion): string => {
+    const type = region.type ?? 'Unknown'
+    return formatRegionRange(t(`segmentType.${type}`, type), region)
+  }
 
   if (isLoading) {
     return (
@@ -70,7 +77,7 @@ export function SegmentTimeline({
       ? t('segment.timeline.empty', 'No segments')
       : t('segment.timeline.label', {
           defaultValue: 'Segments: {{list}}',
-          list: regions.map(formatRegionRange).join(', '),
+          list: regions.map(regionLabel).join(', '),
         })
 
   return (
@@ -92,7 +99,7 @@ export function SegmentTimeline({
             width: `${region.width}%`,
             backgroundColor: region.color,
           }}
-          title={formatRegionRange(region)}
+          title={regionLabel(region)}
         />
       ))}
     </div>

@@ -92,11 +92,26 @@ export const resolveSegmentIndex = (
   return ref.index >= 0 && ref.index < segments.length ? ref.index : -1
 }
 
+type SegmentColorConfig = (typeof SEGMENT_COLORS)[MediaSegmentType]
+
+/**
+ * Runtime-safe color lookup. Segment data comes from the server, which may
+ * report enum values this client doesn't know yet (newer Jellyfin versions);
+ * those fall back to the default color instead of crashing the render.
+ */
+const getSegmentColorConfig = (
+  type: MediaSegmentType | undefined,
+): SegmentColorConfig => {
+  if (!type) return DEFAULT_SEGMENT_COLOR
+  const config = SEGMENT_COLORS[type] as SegmentColorConfig | undefined
+  return config ?? DEFAULT_SEGMENT_COLOR
+}
+
 export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
-  (type && SEGMENT_COLORS[type].bg) ?? DEFAULT_SEGMENT_COLOR.bg
+  getSegmentColorConfig(type).bg
 
 export const getSegmentCssVar = (type: MediaSegmentType | undefined): string =>
-  (type && SEGMENT_COLORS[type].css) ?? DEFAULT_SEGMENT_COLOR.css
+  getSegmentColorConfig(type).css
 
 /**
  * A segment mapped to percent-based track coordinates for timeline rendering.
@@ -161,15 +176,12 @@ export const getSegmentRegions = (
       }
     }
 
-    const colorConfig = segment.Type
-      ? SEGMENT_COLORS[segment.Type]
-      : DEFAULT_SEGMENT_COLOR
     regions.push({
       id: segment.Id,
       type: segment.Type,
       start: left,
       width,
-      color: colorConfig.css,
+      color: getSegmentColorConfig(segment.Type).css,
       startSeconds: Math.max(0, Math.min(startSeconds, duration)),
       endSeconds: Math.max(0, Math.min(endSeconds, duration)),
     })
