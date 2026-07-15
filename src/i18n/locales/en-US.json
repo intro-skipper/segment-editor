@@ -190,7 +190,11 @@
     "sliderGroup": "{{type}} segment range slider",
     "sliderDescription": "{{type}} segment from {{start}} to {{end}}, duration {{duration}}. Use arrow keys to adjust handles.",
     "startHandle": "{{type}} segment start handle",
-    "endHandle": "{{type}} segment end handle"
+    "endHandle": "{{type}} segment end handle",
+    "timeline": {
+      "label": "Segments: {{list}}",
+      "empty": "No segments"
+    }
   },
   "validation": {
     "StartEnd": "Start is always before End"

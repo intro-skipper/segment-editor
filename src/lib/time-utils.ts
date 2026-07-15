@@ -118,6 +118,26 @@ export function formatReadableTime(timeInSeconds: number): string {
   return parts.join(' ')
 }
 
+/**
+ * Formats seconds as a compact clock time like '1:54' or '1:01:05'
+ * (no milliseconds). Returns '0:00' for invalid inputs.
+ * @param timeInSeconds - Time value in seconds
+ * @returns Compact clock time string
+ */
+export function formatCompactTime(timeInSeconds: number): string {
+  const time = Math.floor(clampToTimeRange(timeInSeconds))
+
+  const hours = Math.floor(time / 3600)
+  const minutes = Math.floor((time % 3600) / 60)
+  const seconds = time % 60
+  const ss = String(seconds).padStart(2, '0')
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`
+  }
+  return `${minutes}:${ss}`
+}
+
 /** Time multipliers: [seconds, minutes, hours] */
 const TIME_MULTIPLIERS = [1, 60, 3600] as const
 

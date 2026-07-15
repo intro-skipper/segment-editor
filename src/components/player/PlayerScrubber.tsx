@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next'
 
 import type { ChapterInfo, MediaSegmentDto } from '@/types/jellyfin'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
+import type { SegmentRegion } from '@/lib/segment-utils'
 import { cn } from '@/lib/utils'
 import { formatTime, ticksToSeconds } from '@/lib/time-utils'
 import { handleRangeKeyboard } from '@/lib/range-keyboard'
-import { DEFAULT_SEGMENT_COLOR, SEGMENT_COLORS } from '@/lib/constants'
+import { getSegmentRegions } from '@/lib/segment-utils'
 import {
   getBestTrickplayInfo,
   getTrickplayPosition,
@@ -50,14 +51,6 @@ interface ChapterMarker {
   time: number
 }
 
-interface SegmentRegion {
-  id: MediaSegmentDto['Id']
-  type: MediaSegmentDto['Type']
-  start: number
-  width: number
-  color: string
-}
-
 function getChapterMarkers(
   chapters: Array<ChapterInfo> | null | undefined,
   duration: number,
@@ -77,37 +70,6 @@ function getChapterMarkers(
     }
   }
   return markers
-}
-
-function getSegmentRegions(
-  segments: Array<MediaSegmentDto> | undefined,
-  duration: number,
-): Array<SegmentRegion> {
-  if (!segments || segments.length === 0 || duration <= 0) return []
-
-  const regions: Array<SegmentRegion> = []
-  for (const segment of segments) {
-    const startSeconds = segment.StartTicks ?? 0
-    const startPercent = (startSeconds / duration) * 100
-    if (startPercent >= 100) continue
-    const endSeconds = segment.EndTicks ?? 0
-    const endPercent = (endSeconds / duration) * 100
-    const clampedStart = Math.max(0, startPercent)
-    const clampedEnd = Math.min(100, endPercent)
-    const width = Math.max(0, clampedEnd - clampedStart)
-    if (width <= 0.1) continue
-    const colorConfig = segment.Type
-      ? SEGMENT_COLORS[segment.Type]
-      : DEFAULT_SEGMENT_COLOR
-    regions.push({
-      id: segment.Id,
-      type: segment.Type,
-      start: clampedStart,
-      width,
-      color: colorConfig.css,
-    })
-  }
-  return regions
 }
 
 function ScrubberTrack({
