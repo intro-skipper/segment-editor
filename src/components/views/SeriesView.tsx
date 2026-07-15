@@ -107,17 +107,19 @@ function EpisodeSegmentTimeline({
     isError,
   } = useSegments(episodeId, { enabled: inView })
 
-  // useSegments disables the query for an empty id; bail out so those
-  // episodes render nothing instead of a perpetual loading placeholder.
-  if (!episodeId || isError) return null
+  // Keep the observer target mounted for cached errors so entering the
+  // viewport can re-enable the query and retry it.
+  if (!episodeId) return null
 
   return (
     <div ref={ref} className="mt-2 md:mt-2.5">
-      <SegmentTimeline
-        segments={segments ?? []}
-        runtimeSeconds={runtimeSeconds}
-        isLoading={isPending}
-      />
+      {!isError && (
+        <SegmentTimeline
+          segments={segments ?? []}
+          runtimeSeconds={runtimeSeconds}
+          isLoading={isPending}
+        />
+      )}
     </div>
   )
 }
