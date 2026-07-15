@@ -133,8 +133,8 @@ importers:
         specifier: ^0.24.0
         version: 0.24.0
       react-doctor:
-        specifier: 0.7.7
-        version: 0.7.7(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0))(oxlint-tsgolint@0.24.0)
+        specifier: 0.7.8
+        version: 0.7.8(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0))(oxlint-tsgolint@0.24.0)
       shadcn:
         specifier: ^4.13.0
         version: 4.13.0(typescript@7.0.2)
@@ -2484,8 +2484,8 @@ packages:
   '@types/validate-npm-package-name@4.0.2':
     resolution: {integrity: sha512-lrpDziQipxCEeK5kWxvljWYhUvOiB2A9izZd9B2AFarYAkqZshb4lPbRs7zKEic6eGtH8V/2qJW+dPp9OtF6bw==}
 
-  '@typescript-eslint/types@8.63.0':
-    resolution: {integrity: sha512-xyLtl9DUBBFrcJS4x2pIqGLH68/tC2uOa4Z7pUteW09D3bXnnXUom4dyPikzWgB7llmIc1zoeI3aoUdC4rPK/Q==}
+  '@typescript-eslint/types@8.64.0':
+    resolution: {integrity: sha512-qjhfuTfLXjA4IOzXvz0rTjT01BqEiIgPoUeMwiEjnaHKJMTNo8rH5pYW1a2L/0Dnux2fPC85AeyJoWaGa8WxTA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
@@ -3075,8 +3075,8 @@ packages:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
 
-  deslop-js@0.7.7:
-    resolution: {integrity: sha512-mUr2B3FZM+vJZK4w6ZRwuHm6cXVWM5kS4xGRjRLC0yyen/zD+/ZI7QtH/UqUN0LaEIQZL2+P8PMcsDOIB5xgPQ==}
+  deslop-js@0.7.8:
+    resolution: {integrity: sha512-QMmb3Z/ARvYZmZneudb8cnY/4mVvZTdhUyA9TC2skwOcm7KvY9zyOdn0TApQc4rL0VM2TffFkmo3ky/lJZX7qw==}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -4195,8 +4195,8 @@ packages:
       vite-plus:
         optional: true
 
-  oxlint-plugin-react-doctor@0.7.7:
-    resolution: {integrity: sha512-OMl/8k3rcxTSyMJWUL/pdq/ZZKFtv1F4kyM+AWYsj/YYaL/nftL/idrJOxyd2CuFa5Nrbz2DlK3QFRej1uwQ/Q==}
+  oxlint-plugin-react-doctor@0.7.8:
+    resolution: {integrity: sha512-3f9/jFLIC/KRLPYqxiXSk20cq47luGy9Oz5Ru7nK7w0EI9B9zuMvAU92bK9jFiwFE7Lc9PA8ER6Y+naYaGFQGw==}
     engines: {node: ^20.19.0 || >=22.13.0}
 
   oxlint-tsgolint@0.24.0:
@@ -4394,8 +4394,8 @@ packages:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
-  react-doctor@0.7.7:
-    resolution: {integrity: sha512-kHlzPDZNRKlQbXsXgnFh1I4mL0ybt0xJca3/uRMZafaXR4AG5zf7iFMqtdRUiFWHeefE4vGf4YQmkYkXzE1rlg==}
+  react-doctor@0.7.8:
+    resolution: {integrity: sha512-G3spmtZJE/gWWPRJ3rpgUWTPRDJpEmdRja7iNZ7RAXlfpEO+NWVzPTca/cPI9hLwPo2Aq5/BZggo5JDBrwGrlA==}
     engines: {node: ^20.19.0 || >=22.13.0}
     hasBin: true
 
@@ -7359,7 +7359,7 @@ snapshots:
 
   '@types/validate-npm-package-name@4.0.2': {}
 
-  '@typescript-eslint/types@8.63.0': {}
+  '@typescript-eslint/types@8.64.0': {}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -7888,7 +7888,7 @@ snapshots:
 
   dequal@2.0.3: {}
 
-  deslop-js@0.7.7:
+  deslop-js@0.7.8:
     dependencies:
       '@oxc-project/types': 0.138.0
       fast-glob: 3.3.3
@@ -9119,9 +9119,9 @@ snapshots:
       '@oxfmt/binding-win32-ia32-msvc': 0.58.0
       '@oxfmt/binding-win32-x64-msvc': 0.58.0
 
-  oxlint-plugin-react-doctor@0.7.7:
+  oxlint-plugin-react-doctor@0.7.8:
     dependencies:
-      '@typescript-eslint/types': 8.63.0
+      '@typescript-eslint/types': 8.64.0
       eslint-scope: 9.1.2
       eslint-visitor-keys: 5.0.1
       oxc-parser: 0.138.0
@@ -9318,19 +9318,19 @@ snapshots:
       iconv-lite: 0.7.3
       unpipe: 1.0.0
 
-  react-doctor@0.7.7(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0))(oxlint-tsgolint@0.24.0):
+  react-doctor@0.7.8(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0))(oxlint-tsgolint@0.24.0):
     dependencies:
       '@babel/code-frame': 7.29.7
       '@sentry/node': 10.65.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))
       agent-install: 0.0.5
       conf: 15.1.0
       confbox: 0.2.4
-      deslop-js: 0.7.7
+      deslop-js: 0.7.8
       eslint-plugin-react-hooks: 7.1.1(eslint@10.7.0(jiti@2.7.0))
       jiti: 2.7.0
       magicast: 0.5.3
       oxlint: 1.66.0(oxlint-tsgolint@0.24.0)
-      oxlint-plugin-react-doctor: 0.7.7
+      oxlint-plugin-react-doctor: 0.7.8
       prompts: 2.4.2
       typescript: 5.9.3
       vscode-languageserver: 9.0.1
