@@ -90,10 +90,7 @@ describe('createViewTransitionAbortHandler', () => {
 
 describe('installViewTransitionAbortHandler', () => {
   it('registers and removes the unhandledrejection listener', () => {
-    const originalWindow = Object.getOwnPropertyDescriptor(
-      globalThis,
-      'window',
-    )
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
     const addEventListener = vi.fn()
     const removeEventListener = vi.fn()
 
