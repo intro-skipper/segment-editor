@@ -179,7 +179,7 @@ function HoverTimePreview({
       style={hoverIndicatorStyle}
     >
       {trickplayPosition && <TrickplayPreview position={trickplayPosition} />}
-      <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+      <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap tabular-nums">
         {formatTime(hoverTime)}
       </div>
     </div>

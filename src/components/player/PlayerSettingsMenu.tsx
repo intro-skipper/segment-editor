@@ -202,7 +202,7 @@ export function PlayerSettingsMenu({
                   )}
                   className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
                 />
-                <span className="text-sm font-mono min-w-[6ch] text-right">
+                <span className="text-sm tabular-nums min-w-[6ch] text-right">
                   {subtitleOffset > 0 ? '+' : ''}
                   {subtitleOffset.toFixed(1)}s
                 </span>
