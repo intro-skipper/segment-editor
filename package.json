@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource-variable/geist-mono": "^5.2.8",
     "@jellyfin/sdk": "^0.13.0",
     "@material/material-color-utilities": "^0.4.0",
     "@tanstack/react-form": "^1.33.2",

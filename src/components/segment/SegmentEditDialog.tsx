@@ -258,7 +258,7 @@ function SegmentEditDialogContent({
                       onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
                       {formatTime(draftRange.startSeconds)}
                     </span>
                   </div>
@@ -290,7 +290,7 @@ function SegmentEditDialogContent({
                       onBlur={() => handleTimeFieldBlur(field)}
                       className="font-mono flex-1"
                     />
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
                       {formatTime(draftRange.endSeconds)}
                     </span>
                   </div>
@@ -301,10 +301,10 @@ function SegmentEditDialogContent({
             <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
               <Label className="sm:text-right">{t('segment.duration')}</Label>
               <div className="sm:col-span-3">
-                <span className="text-sm font-mono">
+                <span className="text-sm tabular-nums">
                   {formatTime(duration)}
                 </span>
-                <span className="text-sm text-muted-foreground ml-2">
+                <span className="text-sm text-muted-foreground ml-2 tabular-nums">
                   ({duration.toFixed(3)}s)
                 </span>
               </div>
