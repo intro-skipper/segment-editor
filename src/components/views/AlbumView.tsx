@@ -45,7 +45,10 @@ const TrackRow = function TrackRowComponent({
       )}
       aria-label={`Play track ${trackNumber}: ${track.Name || `Track ${trackNumber}`}, duration ${duration}`}
     >
-      <div className="w-8 text-center text-muted-foreground" aria-hidden="true">
+      <div
+        className="w-8 text-center text-muted-foreground tabular-nums"
+        aria-hidden="true"
+      >
         <span className="group-hover:hidden">{trackNumber}</span>
         <Play className="size-4 hidden group-hover:inline" />
       </div>
@@ -57,7 +60,7 @@ const TrackRow = function TrackRowComponent({
       </div>
 
       <div
-        className="text-sm text-muted-foreground"
+        className="text-sm text-muted-foreground tabular-nums"
         aria-label={`Duration: ${duration}`}
       >
         {duration}

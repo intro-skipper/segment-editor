@@ -186,7 +186,7 @@ const EpisodeCard = function EpisodeCardComponent({
         <p className="font-semibold truncate leading-tight text-base md:text-lg text-foreground">
           {episode.Name || episodeLabel}
         </p>
-        <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 text-muted-foreground">
+        <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 text-muted-foreground tabular-nums">
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
