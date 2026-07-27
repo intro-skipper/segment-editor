@@ -32,11 +32,11 @@ export function PlayerSkeleton() {
         <Skeleton className="aspect-video w-full rounded-2xl" />
         <div className="space-y-4">
           <Skeleton
-            className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
+            className="h-20 w-full rounded-2xl animate-in fade-in animation-duration-300"
             style={{ animationDelay: staggerDelay(1, STAGGER_SLOW) }}
           />
           <Skeleton
-            className="h-20 w-full rounded-2xl animate-in fade-in duration-300"
+            className="h-20 w-full rounded-2xl animate-in fade-in animation-duration-300"
             style={{ animationDelay: staggerDelay(2, STAGGER_SLOW) }}
           />
         </div>
@@ -73,7 +73,7 @@ export function PlayerPage() {
           minHeightClass="min-h-[var(--spacing-page-min-height-lg)]"
         >
           <Suspense fallback={<PlayerSkeleton />}>
-            <div className="animate-in fade-in duration-300">
+            <div className="animate-in fade-in animation-duration-300">
               <PlayerEditor item={item} fetchSegments={fetchSegments} />
             </div>
           </Suspense>

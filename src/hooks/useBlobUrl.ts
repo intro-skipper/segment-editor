@@ -8,10 +8,10 @@
 
 import { useSyncExternalStore } from 'react'
 import {
-  blobCache,
   fetchBlobUrl,
   getBlobCacheUrlSnapshot,
   subscribeBlobCacheUrl,
+  touchBlobUrl,
 } from '@/lib/cache-manager'
 
 function subscribeBlobUrl(
@@ -27,7 +27,7 @@ function subscribeBlobUrl(
 
   if (url) {
     if (getBlobCacheUrlSnapshot(url)) {
-      blobCache.get(url)
+      touchBlobUrl(url)
     } else {
       void fetchBlobUrl(url)
     }

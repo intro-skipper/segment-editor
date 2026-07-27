@@ -4,21 +4,27 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBlobUrl } from '@/hooks/useBlobUrl'
-import { blobCache, getBlobCacheUrlSnapshot } from '@/lib/cache-manager'
+import {
+  blobCache,
+  blobUrlRecency,
+  clearBlobCache,
+  getBlobCacheUrlSnapshot,
+  removeBlobUrl,
+} from '@/lib/cache-manager'
 
 const cachedUrl = 'https://example.test/cached.jpg'
 const newerUrl = 'https://example.test/newer.jpg'
 const evictedUrl = 'https://example.test/evicted.jpg'
 
 beforeEach(() => {
-  blobCache.clear()
+  clearBlobCache()
 })
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  blobCache.clear()
+  clearBlobCache()
 })
 
 describe('useBlobUrl', () => {
@@ -31,7 +37,7 @@ describe('useBlobUrl', () => {
     expect(result.current).toBe('blob:cached')
 
     await waitFor(() => {
-      expect(Array.from(blobCache.keys()).at(-1)).toBe(cachedUrl)
+      expect(Array.from(blobUrlRecency).at(-1)).toBe(cachedUrl)
     })
   })
 
@@ -92,7 +98,7 @@ describe('useBlobUrl', () => {
     expect(fetchMock).not.toHaveBeenCalled()
 
     act(() => {
-      blobCache.delete(evictedUrl)
+      removeBlobUrl(evictedUrl)
     })
 
     await waitFor(() => {

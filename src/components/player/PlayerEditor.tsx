@@ -718,10 +718,7 @@ function useRenderPlayerEditor({
         ) : (
           <div className="space-y-3 pb-2">
             {editingSegments.map((segment, index) => (
-              <div
-                key={segment.Id ?? `segment-${index}`}
-                style={SEGMENT_VIRTUALIZATION_STYLE}
-              >
+              <div key={segment.Id} style={SEGMENT_VIRTUALIZATION_STYLE}>
                 <SegmentSlider
                   segment={segment}
                   index={index}

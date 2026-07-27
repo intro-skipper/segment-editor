@@ -37,7 +37,7 @@ export function SeriesSkeleton() {
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton
               key={i}
-              className="h-14 w-full rounded-lg animate-in fade-in duration-300"
+              className="h-14 w-full rounded-lg animate-in fade-in animation-duration-300"
               style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
             />
           ))}

@@ -83,7 +83,7 @@ export const LibraryCard = function LibraryCardComponent({
         'transition-[transform,box-shadow,border-color] duration-200',
         'hover:scale-[1.02] active:scale-[0.98]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        'animate-in fade-in slide-in-from-bottom-3 duration-400 fill-mode-both',
+        'animate-in fade-in slide-in-from-bottom-3 animation-duration-400 fill-mode-both',
         className,
       )}
       style={{ animationDelay }}

@@ -44,7 +44,7 @@ export function MediaGridSkeleton({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="animate-in fade-in duration-300"
+          className="animate-in fade-in animation-duration-300"
           style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
         >
           <MediaCardSkeleton />

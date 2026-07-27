@@ -10,24 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SeriesItemIdRouteImport } from './routes/series/$itemId'
-import { Route as PlayerItemIdRouteImport } from './routes/player/$itemId'
-import { Route as ArtistItemIdRouteImport } from './routes/artist/$itemId'
 import { Route as AlbumItemIdRouteImport } from './routes/album/$itemId'
+import { Route as ArtistItemIdRouteImport } from './routes/artist/$itemId'
+import { Route as PlayerItemIdRouteImport } from './routes/player/$itemId'
+import { Route as SeriesItemIdRouteImport } from './routes/series/$itemId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SeriesItemIdRoute = SeriesItemIdRouteImport.update({
-  id: '/series/$itemId',
-  path: '/series/$itemId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlayerItemIdRoute = PlayerItemIdRouteImport.update({
-  id: '/player/$itemId',
-  path: '/player/$itemId',
+const AlbumItemIdRoute = AlbumItemIdRouteImport.update({
+  id: '/album/$itemId',
+  path: '/album/$itemId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArtistItemIdRoute = ArtistItemIdRouteImport.update({
@@ -35,9 +30,14 @@ const ArtistItemIdRoute = ArtistItemIdRouteImport.update({
   path: '/artist/$itemId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AlbumItemIdRoute = AlbumItemIdRouteImport.update({
-  id: '/album/$itemId',
-  path: '/album/$itemId',
+const PlayerItemIdRoute = PlayerItemIdRouteImport.update({
+  id: '/player/$itemId',
+  path: '/player/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeriesItemIdRoute = SeriesItemIdRouteImport.update({
+  id: '/series/$itemId',
+  path: '/series/$itemId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -104,18 +104,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/series/$itemId': {
-      id: '/series/$itemId'
-      path: '/series/$itemId'
-      fullPath: '/series/$itemId'
-      preLoaderRoute: typeof SeriesItemIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/player/$itemId': {
-      id: '/player/$itemId'
-      path: '/player/$itemId'
-      fullPath: '/player/$itemId'
-      preLoaderRoute: typeof PlayerItemIdRouteImport
+    '/album/$itemId': {
+      id: '/album/$itemId'
+      path: '/album/$itemId'
+      fullPath: '/album/$itemId'
+      preLoaderRoute: typeof AlbumItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/artist/$itemId': {
@@ -125,11 +118,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/album/$itemId': {
-      id: '/album/$itemId'
-      path: '/album/$itemId'
-      fullPath: '/album/$itemId'
-      preLoaderRoute: typeof AlbumItemIdRouteImport
+    '/player/$itemId': {
+      id: '/player/$itemId'
+      path: '/player/$itemId'
+      fullPath: '/player/$itemId'
+      preLoaderRoute: typeof PlayerItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/series/$itemId': {
+      id: '/series/$itemId'
+      path: '/series/$itemId'
+      fullPath: '/series/$itemId'
+      preLoaderRoute: typeof SeriesItemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

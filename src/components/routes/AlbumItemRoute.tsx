@@ -41,7 +41,7 @@ export function AlbumSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton
               key={i}
-              className="h-12 w-full rounded-lg animate-in fade-in duration-300"
+              className="h-12 w-full rounded-lg animate-in fade-in animation-duration-300"
               style={{ animationDelay: staggerDelay(i) }}
             />
           ))}

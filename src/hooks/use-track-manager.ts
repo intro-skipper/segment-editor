@@ -267,9 +267,9 @@ export function useTrackManager({
       )
       setError(errorMsg)
       showError(errorMsg)
+    } finally {
+      setIsTrackOperationPending(false)
     }
-
-    setIsTrackOperationPending(false)
   }
 
   const selectSubtitleTrack = async (index: number | null): Promise<void> => {
@@ -339,9 +339,9 @@ export function useTrackManager({
       )
       setError(errorMsg)
       showError(errorMsg)
+    } finally {
+      setIsTrackOperationPending(false)
     }
-
-    setIsTrackOperationPending(false)
   }
 
   return {

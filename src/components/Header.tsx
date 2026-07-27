@@ -80,9 +80,9 @@ function CollectionSelector({
         align="start"
         className="min-w-[var(--spacing-dropdown-min)]"
       >
-        {collections.map((c, index) => (
+        {collections.map((c) => (
           <DropdownMenuItem
-            key={c.ItemId ?? c.Name ?? `collection-${index}`}
+            key={c.ItemId ?? c.Name}
             onClick={() => onSelect(c.ItemId ?? null)}
             className={cn(
               'cursor-pointer',
@@ -357,7 +357,8 @@ export default function Header() {
                     onBack={handleBack}
                   />
                 ) : (
-                  collections?.length && (
+                  collections &&
+                  collections.length > 0 && (
                     <CollectionSelector
                       collections={collections}
                       selectedId={selectedCollection ?? null}

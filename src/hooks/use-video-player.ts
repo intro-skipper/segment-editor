@@ -452,24 +452,24 @@ export function useVideoPlayer({
           hlsPlaySessionId,
         )
 
-        if (playbackRequestIdRef.current === requestId) {
-          if (mediaSourceId !== null) {
-            let playSessionId = hlsPlaySessionId
-            if (config.strategy !== 'hls') {
-              playSessionId = createPlaySessionId()
-            }
+        if (playbackRequestIdRef.current !== requestId) return
 
-            setJellyfinSessionIdentity(
-              createJellyfinSessionIdentity(
-                itemId,
-                mediaSourceId,
-                playSessionId,
-                config.strategy,
-              ),
-            )
-            handleInitPlaybackSuccess(config, itemId)
-            pendingPostCommitStartRef.current = {}
+        if (mediaSourceId !== null) {
+          let playSessionId = hlsPlaySessionId
+          if (config.strategy !== 'hls') {
+            playSessionId = createPlaySessionId()
           }
+
+          setJellyfinSessionIdentity(
+            createJellyfinSessionIdentity(
+              itemId,
+              mediaSourceId,
+              playSessionId,
+              config.strategy,
+            ),
+          )
+          handleInitPlaybackSuccess(config, itemId)
+          pendingPostCommitStartRef.current = {}
         }
       } catch (err) {
         if (playbackRequestIdRef.current !== requestId) return

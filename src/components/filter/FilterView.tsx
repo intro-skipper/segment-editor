@@ -344,7 +344,7 @@ function useRenderFilterView() {
           )}
 
         {showLoading && (
-          <div className="animate-in fade-in duration-200">
+          <div className="animate-in fade-in animation-duration-200">
             {viewMode === 'list' ? (
               <MediaListSkeleton
                 count={Math.min(effectivePageSize, 12)}
@@ -440,7 +440,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <MediaListRow
-                    key={item.Id ?? `media-item-${index}`}
+                    key={item.Id}
                     item={item}
                     index={index}
                     label={getMediaItemLabel(t, item)}
@@ -490,7 +490,7 @@ function useRenderFilterView() {
                             const index = rowStartIndex + columnIndex
                             return (
                               <MediaCard
-                                key={item.Id ?? `media-item-${index}`}
+                                key={item.Id}
                                 {...getItemProps(index)}
                                 item={item}
                                 index={index}
@@ -514,7 +514,7 @@ function useRenderFilterView() {
               >
                 {paginatedItems.map((item, index) => (
                   <div
-                    key={item.Id ?? `media-item-${index}`}
+                    key={item.Id}
                     style={{
                       contentVisibility: 'auto',
                       containIntrinsicSize: '0 320px',

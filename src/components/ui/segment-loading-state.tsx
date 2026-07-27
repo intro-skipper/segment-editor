@@ -23,7 +23,7 @@ export function SegmentLoadingState({
           key={i}
           className={cn(
             'p-4 rounded-2xl border border-border/50 bg-card/30',
-            'animate-in fade-in duration-300',
+            'animate-in fade-in animation-duration-300',
           )}
           style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
         >

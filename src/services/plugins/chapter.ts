@@ -33,10 +33,13 @@ const CHAPTER_NAME_KEYWORDS: Array<
   ['ad', MediaSegmentType.Commercial],
 ]
 
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const CHAPTER_NAME_PATTERNS: Array<
   readonly [pattern: RegExp, type: MediaSegmentType]
 > = CHAPTER_NAME_KEYWORDS.map(([keyword, type]) => [
-  new RegExp(`\\b${keyword}\\b`),
+  new RegExp(`\\b${escapeRegExp(keyword)}\\b`),
   type,
 ])
 

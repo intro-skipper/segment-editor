@@ -204,26 +204,38 @@ export function subscribeBlobCacheUrl(
 export function getBlobCacheUrlSnapshot(
   url: string | null | undefined,
 ): string {
-  return url ? (blobCache.peek(url) ?? '') : ''
+  return url ? (blobCache.get(url) ?? '') : ''
 }
 
 /**
- * Pre-configured blob URL cache for media thumbnails.
- * Uses the MAX_BLOB_CACHE_SIZE from CACHE_CONFIG.
- * Automatically revokes blob URLs when entries are evicted.
+ * Blob URL cache for media thumbnails, keyed by source URL.
+ * Every stored value is an object URL owned by this module: it is revoked
+ * when its entry is overwritten, evicted at capacity, removed, or cleared.
+ * Reads are pure; recency lives in blobUrlRecency so snapshots stay
+ * render-safe.
  */
-export const blobCache = new LRUCache<string, string>(
-  CACHE_CONFIG.MAX_BLOB_CACHE_SIZE,
-  {
-    onEvict: (url) => {
-      // Validate URL before revoking to prevent errors
-      if (url && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url)
-      }
-    },
-    onChange: notifyBlobCacheChange,
-  },
-)
+export const blobCache = new Map<string, string>()
+
+/** Source URLs ordered least- to most-recently used; drives eviction. */
+export const blobUrlRecency = new Set<string>()
+
+/** Marks a cached URL as most recently used so eviction skips it longest. */
+export function touchBlobUrl(url: string): void {
+  if (!blobCache.has(url)) return
+  blobUrlRecency.delete(url)
+  blobUrlRecency.add(url)
+}
+
+/** Removes one entry, revoking its object URL and notifying subscribers. */
+export function removeBlobUrl(url: string): void {
+  const staleBlobUrl = blobCache.get(url)
+  if (staleBlobUrl) {
+    URL.revokeObjectURL(staleBlobUrl)
+  }
+  blobCache.delete(url)
+  blobUrlRecency.delete(url)
+  notifyBlobCacheChange(url)
+}
 
 interface FetchBlobUrlOptions {
   signal?: AbortSignal
@@ -240,14 +252,24 @@ async function requestBlobUrl(
     const res = await fetch(url, { signal: options?.signal })
     if (!res.ok) return null
 
-    const blobUrl = URL.createObjectURL(await res.blob())
-    if (options?.signal?.aborted) {
-      URL.revokeObjectURL(blobUrl)
-      return null
+    const blob = await res.blob()
+    if (options?.signal?.aborted) return null
+
+    const previousBlobUrl = blobCache.get(url)
+    if (previousBlobUrl) {
+      URL.revokeObjectURL(previousBlobUrl)
+    }
+    while (blobCache.size >= CACHE_CONFIG.MAX_BLOB_CACHE_SIZE) {
+      const oldestUrl =
+        blobUrlRecency.keys().next().value ?? blobCache.keys().next().value
+      if (oldestUrl === undefined) break
+      removeBlobUrl(oldestUrl)
     }
 
-    blobCache.set(url, blobUrl)
-    return blobUrl
+    blobCache.set(url, URL.createObjectURL(blob))
+    touchBlobUrl(url)
+    notifyBlobCacheChange(url)
+    return blobCache.get(url) ?? null
   } catch {
     return null
   }
@@ -266,7 +288,10 @@ export function fetchBlobUrl(
 ): Promise<string | null> {
   // Return cached immediately
   const cached = blobCache.get(url)
-  if (cached) return Promise.resolve(cached)
+  if (cached) {
+    touchBlobUrl(url)
+    return Promise.resolve(cached)
+  }
 
   // Abortable calls skip dedupe so each caller can cancel independently.
   if (options?.signal) {
@@ -284,4 +309,15 @@ export function fetchBlobUrl(
   void promise.finally(() => pendingBlobFetches.delete(url))
 
   return promise
+}
+
+/** Revokes every cached object URL, empties the cache, and notifies. */
+export function clearBlobCache(): void {
+  blobCache.forEach((cachedBlobUrl) => URL.revokeObjectURL(cachedBlobUrl))
+  const urls = Array.from(blobCache.keys())
+  blobCache.clear()
+  blobUrlRecency.clear()
+  for (const url of urls) {
+    notifyBlobCacheChange(url)
+  }
 }

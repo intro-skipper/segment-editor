@@ -34,7 +34,7 @@ export function ArtistSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="space-y-2 animate-in fade-in duration-300"
+              className="space-y-2 animate-in fade-in animation-duration-300"
               style={{ animationDelay: staggerDelay(i) }}
             >
               <Skeleton className="aspect-square w-full rounded-lg" />

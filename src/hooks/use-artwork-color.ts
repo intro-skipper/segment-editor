@@ -193,7 +193,7 @@ async function getSeedColor(url: string): Promise<string | null> {
       const cachedSeed = seedCache.get(url)
       if (cachedSeed) return cachedSeed
 
-      const blobUrl = blobCache.peek(url) ?? (await fetchBlobUrl(url))
+      const blobUrl = blobCache.get(url) ?? (await fetchBlobUrl(url))
       if (!blobUrl) return null
 
       const seed = await extractSeed(blobUrl)

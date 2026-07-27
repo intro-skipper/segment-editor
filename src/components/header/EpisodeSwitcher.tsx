@@ -35,7 +35,7 @@ const EpisodeItemSkeleton = function EpisodeItemSkeletonComponent({
 }) {
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2.5 animate-in fade-in duration-300"
+      className="flex items-center gap-3 px-3 py-2.5 animate-in fade-in animation-duration-300"
       style={{ animationDelay: staggerDelay(index) }}
       aria-hidden="true"
     >
