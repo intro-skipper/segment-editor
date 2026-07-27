@@ -11,6 +11,8 @@ count.txt
 .wrangler
 .agents
 .omo
+.claude
+docs
 package-lock.json
 
 # Generated mock-server poster cache
