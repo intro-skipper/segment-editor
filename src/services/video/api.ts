@@ -1,8 +1,15 @@
 import type { BaseItemDto, ImageType } from '@/types/jellyfin'
-import type { MediaSourceInfo } from '@/services/video/compatibility'
+import type {
+  AudioStreamInfo,
+  MediaSourceInfo,
+} from '@/services/video/compatibility'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
-import { checkCompatibility } from '@/services/video/compatibility'
+import {
+  checkCompatibility,
+  isAudioTrackDirectPlayable,
+} from '@/services/video/compatibility'
+import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import { createPlaySessionId } from '@/services/video/session'
 
 interface VideoStreamOptions {
@@ -267,11 +274,11 @@ export function extractMediaSourceInfo(
   const mediaStreams = source.MediaStreams ?? []
 
   const videoStream = mediaStreams.find((s) => s.Type === 'Video')
-  const audioStream = mediaStreams.find((s) => s.Type === 'Audio')
+  const audioStreams = mediaStreams.filter((s) => s.Type === 'Audio')
 
   const container = source.Container ?? ''
   const videoCodec = videoStream?.Codec ?? ''
-  const audioCodec = audioStream?.Codec ?? ''
+  const audioCodec = audioStreams[0]?.Codec ?? ''
 
   if (!container || !videoCodec) {
     return null
@@ -282,7 +289,47 @@ export function extractMediaSourceInfo(
     videoCodec,
     audioCodec,
     bitrate: source.Bitrate ?? undefined,
+    video: {
+      codec: videoCodec,
+      profile: videoStream?.Profile ?? undefined,
+      level: videoStream?.Level ?? undefined,
+      width: videoStream?.Width ?? undefined,
+      height: videoStream?.Height ?? undefined,
+      bitrate: videoStream?.BitRate ?? undefined,
+      bitDepth: videoStream?.BitDepth ?? undefined,
+      videoRange: videoStream?.VideoRange,
+      frameRate:
+        videoStream?.AverageFrameRate ??
+        videoStream?.RealFrameRate ??
+        undefined,
+    },
+    audioStreams: audioStreams.map((stream, position) => ({
+      index: stream.Index ?? position,
+      codec: stream.Codec ?? '',
+      channels: stream.Channels ?? undefined,
+    })),
   }
+}
+
+/**
+ * Whether the requested audio stream can be selected natively during direct
+ * play: the browser must expose the HTML `audioTracks` API and be able to
+ * decode that specific track (a flagged Chromium still cannot decode DTS).
+ */
+function canStartDirectPlayWithAudioTrack(
+  mediaSourceInfo: MediaSourceInfo | null,
+  audioStreamIndex: number | undefined,
+): boolean {
+  if (audioStreamIndex === undefined) return false
+  if (!supportsNativeAudioTrackSwitching()) return false
+
+  const targetStream: AudioStreamInfo | undefined =
+    mediaSourceInfo?.audioStreams?.find(
+      (stream) => stream.index === audioStreamIndex,
+    )
+  if (!targetStream) return false
+
+  return isAudioTrackDirectPlayable(targetStream.codec)
 }
 
 export async function getPlaybackConfig(
@@ -315,7 +362,13 @@ export async function getPlaybackConfig(
     audioStreamIndex !== undefined &&
     isNonFirstAudioTrack(item, audioStreamIndex)
 
-  if (compatibility.canDirectPlay && !needsNonDefaultAudio && !forceHls) {
+  // A non-default audio track only forces a transcode when the browser cannot
+  // select that track natively on the direct-played file.
+  const canDirectPlayRequestedAudio =
+    !needsNonDefaultAudio ||
+    canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
+
+  if (compatibility.canDirectPlay && canDirectPlayRequestedAudio && !forceHls) {
     const url = getDirectPlayUrl({
       itemId: item.Id,
       mediaSourceId,

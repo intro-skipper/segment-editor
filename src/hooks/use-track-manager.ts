@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -14,9 +14,11 @@ import type {
 } from '@/services/video/tracks'
 import { extractTracks } from '@/services/video/tracks'
 import {
+  applyInitialAudioTrack,
   switchAudioTrack,
   switchSubtitleTrack,
 } from '@/services/video/track-switching'
+import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import {
   preloadJassubRenderer,
   requiresJassubRenderer,
@@ -40,6 +42,11 @@ interface UseTrackManagerReturn {
   selectSubtitleTrack: (index: number | null) => Promise<void>
   isLoading: boolean
   error: string | null
+  /**
+   * Whether the browser can switch audio tracks natively during direct play.
+   * When false, switching audio in direct play restarts the stream as a transcode.
+   */
+  nativeAudioSwitchingSupported: boolean
 }
 
 interface UserTrackSelectionState {
@@ -212,6 +219,66 @@ export function useTrackManager({
     signal: abortControllerRef.current!.signal,
   })
 
+  const reportTrackSwitchFailure = (result: TrackSwitchResult): void => {
+    if (result.success || !result.error) return
+
+    const errorMsg = getTrackSwitchErrorMessage(
+      result.error,
+      t('player.tracks.error.switchFailed'),
+    )
+    setError(errorMsg)
+    showError(errorMsg)
+  }
+
+  // Direct play always starts on the container's default audio track, so a
+  // session that starts on another track has to enable it natively once
+  // metadata is available (or reload as a transcode when that is impossible).
+  const applyInitialAudioSelection = useEffectEvent(
+    async (video: HTMLVideoElement, index: number): Promise<void> => {
+      try {
+        const result = await applyInitialAudioTrack(
+          index,
+          createSwitchOptions(video),
+        )
+        reportTrackSwitchFailure(result)
+      } catch (err) {
+        const errorMsg = getCaughtTrackSwitchErrorMessage(
+          err,
+          t('player.tracks.error.switchFailed'),
+        )
+        setError(errorMsg)
+        showError(errorMsg)
+      }
+    },
+  )
+
+  const hasMultipleAudioTracks = audioTracks.length > 1
+
+  useEffect(() => {
+    if (strategy !== 'direct' || !hasMultipleAudioTracks) return
+
+    const video = videoRef.current
+    if (!video) return
+
+    let cancelled = false
+    const applySelection = () => {
+      if (cancelled) return
+      void applyInitialAudioSelection(video, activeAudioIndex)
+    }
+
+    // Stays subscribed: a direct-play reload (retry, error recovery) rebuilds
+    // the native track list and needs the selection applied again.
+    video.addEventListener('loadedmetadata', applySelection)
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      applySelection()
+    }
+
+    return () => {
+      cancelled = true
+      video.removeEventListener('loadedmetadata', applySelection)
+    }
+  }, [strategy, hasMultipleAudioTracks, activeAudioIndex, itemId, videoRef])
+
   const selectAudioTrack = async (index: number): Promise<void> => {
     const video = videoRef.current
     if (!video) {
@@ -252,13 +319,8 @@ export function useTrackManager({
                 subtitleIndex: null,
               },
         )
-      } else if (result.error) {
-        const errorMsg = getTrackSwitchErrorMessage(
-          result.error,
-          t('player.tracks.error.switchFailed'),
-        )
-        setError(errorMsg)
-        showError(errorMsg)
+      } else {
+        reportTrackSwitchFailure(result)
       }
     } catch (err) {
       const errorMsg = getCaughtTrackSwitchErrorMessage(
@@ -350,5 +412,6 @@ export function useTrackManager({
     selectSubtitleTrack,
     isLoading: isTrackOperationPending,
     error,
+    nativeAudioSwitchingSupported: supportsNativeAudioTrackSwitching(),
   }
 }

@@ -21,6 +21,11 @@ interface TrackSelectorProps {
   onSelectAudio: (index: number) => void
   onSelectSubtitle: (index: number | null) => void
   strategy?: PlaybackStrategy
+  /**
+   * How switching audio behaves in direct play: 'native' switches in place,
+   * 'transcode' restarts the stream through the transcoder.
+   */
+  audioSwitching?: 'native' | 'transcode'
   disabled?: boolean
   className?: string
   portalContainer?: React.RefObject<HTMLElement | null>
@@ -31,6 +36,7 @@ export const TrackSelector = function TrackSelectorComponent({
   onSelectAudio,
   onSelectSubtitle,
   strategy,
+  audioSwitching,
   disabled = false,
   className,
   portalContainer,
@@ -46,6 +52,8 @@ export const TrackSelector = function TrackSelectorComponent({
 
   const isDirect = strategy === 'direct'
   const StrategyIcon = isDirect ? Zap : Monitor
+  const showTranscodeHint =
+    isDirect && audioSwitching === 'transcode' && audioTracks.length > 1
 
   return (
     <DropdownMenu>
@@ -138,6 +146,15 @@ export const TrackSelector = function TrackSelectorComponent({
                 </DropdownMenuItem>
               )
             })}
+
+            {showTranscodeHint && (
+              <p className="px-3 pb-1 text-xs text-muted-foreground">
+                {t(
+                  'player.tracks.audioSwitchTranscodeHint',
+                  'Switching audio restarts the stream as a transcode',
+                )}
+              </p>
+            )}
           </DropdownMenuGroup>
         )}
 

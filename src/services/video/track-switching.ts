@@ -11,6 +11,7 @@ import type { PlaybackStrategy } from '@/services/video/api'
 import { getVideoStreamUrl } from '@/services/video/api'
 import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
+import { isAudioTrackDirectPlayable } from '@/services/video/compatibility'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
 /**
@@ -33,6 +34,8 @@ interface AudioTrackList {
   readonly length: number
   [index: number]: AudioTrack
   getTrackById: (id: string) => AudioTrack | null
+  addEventListener?: (type: string, listener: () => void) => void
+  removeEventListener?: (type: string, listener: () => void) => void
 }
 
 /**
@@ -94,6 +97,20 @@ interface TrackSwitchOptions {
   /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
   signal?: AbortSignal
 }
+
+/**
+ * Options for applying the initially selected audio track on playback start.
+ */
+export interface InitialAudioTrackOptions extends TrackSwitchOptions {
+  /**
+   * How long to wait for the native audio track list to populate after
+   * `loadedmetadata`, in milliseconds. Set to 0 to read the list immediately.
+   */
+  nativeTrackTimeoutMs?: number
+}
+
+/** Default wait for the native audio track list to populate. */
+const NATIVE_AUDIO_TRACK_TIMEOUT_MS = 1000
 
 export interface HlsReloadRequest {
   url: string
@@ -321,6 +338,61 @@ function enableOnlyNativeAudioTrack(
   }
 }
 
+function getNativeAudioTracks(
+  videoElement: HTMLVideoElement,
+): AudioTrackList | undefined {
+  return (videoElement as HTMLVideoElementWithAudioTracks).audioTracks
+}
+
+/**
+ * Waits for the native audio track list to expose more than one track.
+ *
+ * Browsers populate `audioTracks` while parsing the container, which can lag
+ * behind `loadedmetadata`. Resolves early on `addtrack`, and after the timeout
+ * with whatever the list holds so the caller can fall back.
+ */
+async function waitForNativeAudioTracks(
+  nativeAudioTracks: AudioTrackList,
+  timeoutMs: number,
+): Promise<AudioTrackList> {
+  if (nativeAudioTracks.length > 1 || timeoutMs <= 0) {
+    return nativeAudioTracks
+  }
+
+  const addEventListener = nativeAudioTracks.addEventListener
+  const removeEventListener = nativeAudioTracks.removeEventListener
+  if (!addEventListener || !removeEventListener) {
+    return nativeAudioTracks
+  }
+
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      clearTimeout(timeoutId)
+      removeEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+      resolve()
+    }
+
+    const handleAddTrack = () => {
+      if (nativeAudioTracks.length > 1) finish()
+    }
+
+    const timeoutId = setTimeout(finish, timeoutMs)
+    addEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+  })
+
+  return nativeAudioTracks
+}
+
+/**
+ * Returns the track the container plays by default: the one flagged default,
+ * or the first audio track when no flag is set.
+ */
+function getContainerDefaultAudioTrack(
+  audioTracks: Array<AudioTrackInfo>,
+): AudioTrackInfo | undefined {
+  return audioTracks.find((track) => track.isDefault) ?? audioTracks[0]
+}
+
 function hideTextTracks(textTracks: ArrayLike<TextTrack>): void {
   Array.from(textTracks).forEach((track) => {
     track.mode = 'hidden'
@@ -475,11 +547,16 @@ async function switchDirectPlayAudioTrack(
     )
   }
 
-  const nativeAudioTracks = (videoElement as HTMLVideoElementWithAudioTracks)
-    .audioTracks
+  const nativeAudioTracks = getNativeAudioTracks(videoElement)
 
   // Strategy 1: Try native AudioTrack API (Safari, some Chromium)
-  if (nativeAudioTracks && nativeAudioTracks.length > 1) {
+  // A browser exposing the API can still be unable to decode the target track
+  // (e.g. DTS): enabling it would play silence, so those switches transcode.
+  if (
+    nativeAudioTracks &&
+    nativeAudioTracks.length > 1 &&
+    isAudioTrackDirectPlayable(targetTrack.codec)
+  ) {
     const nativeTrackIndex = findNativeAudioTrackIndex(
       trackIndex,
       targetTrack,
@@ -495,6 +572,76 @@ async function switchDirectPlayAudioTrack(
 
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
+  return reloadHlsAudioTrack(trackIndex, options, {
+    missingItemId:
+      'Audio track switching requires transcoding in this browser. Item ID not available.',
+    missingReloadCallback:
+      'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
+    urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
+    reloadFailed: 'Failed to reload HLS stream for audio track switching',
+  })
+}
+
+/**
+ * Applies the initially selected audio track once direct play has metadata.
+ *
+ * Direct play always starts on the container's default track, so a session
+ * that starts on any other track has to enable the matching native track. When
+ * the native list never populates, holds no match, or the track cannot be
+ * decoded, the stream reloads as an HLS transcode with the requested
+ * `AudioStreamIndex` instead of silently playing the wrong audio.
+ *
+ * @param trackIndex - The Jellyfin MediaStream index of the audio track to activate
+ * @param options - Track switch options (call after `loadedmetadata`)
+ * @returns Promise resolving to the result of the operation
+ */
+export async function applyInitialAudioTrack(
+  trackIndex: number,
+  options: InitialAudioTrackOptions,
+): Promise<TrackSwitchResult> {
+  const { strategy, videoElement, audioTracks } = options
+
+  if (strategy !== 'direct') {
+    return { success: true }
+  }
+
+  const targetTrack = findTrackByMediaStreamIndex(audioTracks, trackIndex)
+  if (!targetTrack) {
+    return createTrackSwitchError(
+      'track_unavailable',
+      `Audio track with index ${trackIndex} not found`,
+      trackIndex,
+    )
+  }
+
+  // The container default is already playing; nothing to enable.
+  const defaultTrack = getContainerDefaultAudioTrack(audioTracks ?? [])
+  if (defaultTrack?.index === trackIndex) {
+    return { success: true }
+  }
+
+  const nativeAudioTracks = getNativeAudioTracks(videoElement)
+  if (nativeAudioTracks && isAudioTrackDirectPlayable(targetTrack.codec)) {
+    const populatedTracks = await waitForNativeAudioTracks(
+      nativeAudioTracks,
+      options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
+    )
+
+    if (populatedTracks.length > 1) {
+      const nativeTrackIndex = findNativeAudioTrackIndex(
+        trackIndex,
+        targetTrack,
+        populatedTracks,
+        audioTracks,
+      )
+
+      if (nativeTrackIndex !== -1) {
+        enableOnlyNativeAudioTrack(populatedTracks, nativeTrackIndex)
+        return { success: true }
+      }
+    }
+  }
+
   return reloadHlsAudioTrack(trackIndex, options, {
     missingItemId:
       'Audio track switching requires transcoding in this browser. Item ID not available.',

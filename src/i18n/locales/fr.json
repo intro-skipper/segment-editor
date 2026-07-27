@@ -226,6 +226,7 @@
       "unknown": "Inconnu",
       "selector": "Pistes audio et sous-titres",
       "noTracks": "Aucune piste disponible",
+      "audioSwitchTranscodeHint": "Switching audio restarts the stream as a transcode",
       "channels": {
         "mono": "Mono",
         "stereo": "Stéréo",

@@ -6,9 +6,10 @@
  * returning a CompatibilityResult that accurately reflects browser support.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
 import type { MediaSourceInfo } from '@/services/video/compatibility'
+import type * as CapabilitiesModule from '@/services/video/capabilities'
 import {
   DIRECT_PLAY_AUDIO_CODECS,
   DIRECT_PLAY_CONTAINERS,
@@ -16,6 +17,17 @@ import {
   checkCompatibility,
   clearCache,
 } from '@/services/video/compatibility'
+
+// MKV direct play is feature detected through canPlayType, which returns ''
+// under jsdom/node. Mock the probe so container support is deterministic and
+// the container check never shadows the codec assertions below.
+vi.mock('@/services/video/capabilities', async (importOriginal) => {
+  const original = await importOriginal<typeof CapabilitiesModule>()
+  return {
+    ...original,
+    probeCanPlayType: vi.fn(() => 'maybe'),
+  }
+})
 
 // Arbitrary generators for media source info
 const supportedContainerArb = fc.constantFrom(...DIRECT_PLAY_CONTAINERS)

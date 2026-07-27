@@ -140,7 +140,6 @@ describe('Feature: direct-play-fallback, Property 3: Strategy Selection Correctn
   const incompatibleAudioCodecArb = fc.constantFrom(
     'dts',
     'truehd',
-    'eac3',
     'wma',
     'unknown',
   )

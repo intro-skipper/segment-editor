@@ -293,6 +293,7 @@
       "unknown": "Unknown",
       "selector": "Audio and subtitle tracks",
       "noTracks": "No tracks available",
+      "audioSwitchTranscodeHint": "Switching audio restarts the stream as a transcode",
       "channels": {
         "mono": "Mono",
         "stereo": "Stereo",
