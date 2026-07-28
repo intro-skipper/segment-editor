@@ -39,7 +39,7 @@ interface UseVideoPlayerOptions {
   item: BaseItemDto | null
   preferredAudioStreamIndex?: number
   jellyfinPlaybackSyncEnabled?: boolean
-  onError?: (error: VideoPlayerError) => void
+  onError?: (error: VideoPlayerError | null) => void
   onStrategyChange?: (strategy: PlaybackStrategy) => void
   onRecoveryStart?: () => void
   onRecoveryEnd?: () => void
@@ -193,7 +193,10 @@ export function useVideoPlayer({
       setError(videoError)
       onError?.(videoError)
     } else {
+      // Propagate the cleared error so the consumer's error overlay is
+      // dismissed too (e.g. on retry or when a new source starts loading).
       setError(null)
+      onError?.(null)
     }
   }
 
@@ -534,6 +537,7 @@ export function useVideoPlayer({
 
   const retry = () => {
     setError(null)
+    onError?.(null)
     networkRetryCountRef.current = 0
 
     if (strategy === 'hls') {
