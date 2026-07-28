@@ -204,6 +204,15 @@ function isPositiveNumber(value: number | undefined): value is number {
 }
 
 /**
+ * Selects the two-digit bit-depth field shared by the `av01`/`vp09` codec
+ * strings: 10 bits and above map to `10`, everything else (including missing
+ * metadata) to the 8-bit default.
+ */
+function chooseBitDepth(bitDepth: number | undefined): '08' | '10' {
+  return isPositiveNumber(bitDepth) && bitDepth >= 10 ? '10' : '08'
+}
+
+/**
  * Normalizes a level reported as either `4.1` or `41` into the ×10 integer
  * form used by the `avc1`/`vp09` codec strings. Jellyfin reports both shapes
  * depending on the probing backend.
@@ -298,9 +307,8 @@ function normalizeAv1SeqLevel(level: number | undefined): number {
  */
 export function buildAv1CodecString(level?: number, bitDepth?: number): string {
   const seqLevel = String(normalizeAv1SeqLevel(level)).padStart(2, '0')
-  const depth = isPositiveNumber(bitDepth) && bitDepth >= 10 ? '10' : '08'
 
-  return `av01.0.${seqLevel}M.${depth}`
+  return `av01.0.${seqLevel}M.${chooseBitDepth(bitDepth)}`
 }
 
 /**
@@ -323,9 +331,8 @@ export function buildVp9CodecString(
     normalizedLevel === undefined
       ? DEFAULT_VP9_LEVEL_ID
       : String(normalizedLevel).padStart(2, '0')
-  const depth = isPositiveNumber(bitDepth) && bitDepth >= 10 ? '10' : '08'
 
-  return `vp09.${profileId}.${levelId}.${depth}`
+  return `vp09.${profileId}.${levelId}.${chooseBitDepth(bitDepth)}`
 }
 
 /**
@@ -386,11 +393,23 @@ export function getDirectPlayContainers(): ReadonlyArray<string> {
 }
 
 /**
- * Checks if a container is supported for direct play in the current browser.
+ * Feature detects Matroska direct play support.
  *
  * MKV is feature detected instead of assumed: Chromium only recognizes
  * `video/x-matroska` from version 145 onwards (older builds return `''` and
  * must transcode).
+ */
+function isMkvDirectPlayable(): boolean {
+  // Firefox 145+ plays MKV, but any MKV with a supported audio track is
+  // buffered in full before playback starts (Bugzilla 2000420, unfixed),
+  // so MKV direct play stays disabled there.
+  if (isFirefox()) return false
+  return probeCanPlayType(MATROSKA_MIME_TYPE) !== ''
+}
+
+/**
+ * Checks if a container is supported for direct play in the current browser.
+ * MKV support is feature detected per browser, see {@link isMkvDirectPlayable}.
  */
 export function isDirectPlayContainerSupported(container: string): boolean {
   const normalized = container.toLowerCase()
@@ -400,11 +419,7 @@ export function isDirectPlayContainerSupported(container: string): boolean {
   }
 
   if (normalized === 'mkv') {
-    // Firefox 145+ plays MKV, but any MKV with a supported audio track is
-    // buffered in full before playback starts (Bugzilla 2000420, unfixed),
-    // so MKV direct play stays disabled there.
-    if (isFirefox()) return false
-    return probeCanPlayType(MATROSKA_MIME_TYPE) !== ''
+    return isMkvDirectPlayable()
   }
 
   return true

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -14,11 +14,11 @@ import type {
 } from '@/services/video/tracks'
 import { extractTracks } from '@/services/video/tracks'
 import {
-  applyInitialAudioTrack,
   switchAudioTrack,
   switchSubtitleTrack,
 } from '@/services/video/track-switching'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
+import { useInitialAudioSelection } from '@/hooks/use-initial-audio-selection'
 import {
   preloadJassubRenderer,
   requiresJassubRenderer,
@@ -230,54 +230,25 @@ export function useTrackManager({
     showError(errorMsg)
   }
 
-  // Direct play always starts on the container's default audio track, so a
-  // session that starts on another track has to enable it natively once
-  // metadata is available (or reload as a transcode when that is impossible).
-  const applyInitialAudioSelection = useEffectEvent(
-    async (video: HTMLVideoElement, index: number): Promise<void> => {
-      try {
-        const result = await applyInitialAudioTrack(
-          index,
-          createSwitchOptions(video),
-        )
-        reportTrackSwitchFailure(result)
-      } catch (err) {
-        const errorMsg = getCaughtTrackSwitchErrorMessage(
-          err,
-          t('player.tracks.error.switchFailed'),
-        )
-        setError(errorMsg)
-        showError(errorMsg)
-      }
-    },
-  )
+  const handleCaughtTrackSwitchError = (err: unknown): void => {
+    const errorMsg = getCaughtTrackSwitchErrorMessage(
+      err,
+      t('player.tracks.error.switchFailed'),
+    )
+    setError(errorMsg)
+    showError(errorMsg)
+  }
 
-  const hasMultipleAudioTracks = audioTracks.length > 1
-
-  useEffect(() => {
-    if (strategy !== 'direct' || !hasMultipleAudioTracks) return
-
-    const video = videoRef.current
-    if (!video) return
-
-    let cancelled = false
-    const applySelection = () => {
-      if (cancelled) return
-      void applyInitialAudioSelection(video, activeAudioIndex)
-    }
-
-    // Stays subscribed: a direct-play reload (retry, error recovery) rebuilds
-    // the native track list and needs the selection applied again.
-    video.addEventListener('loadedmetadata', applySelection)
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      applySelection()
-    }
-
-    return () => {
-      cancelled = true
-      video.removeEventListener('loadedmetadata', applySelection)
-    }
-  }, [strategy, hasMultipleAudioTracks, activeAudioIndex, itemId, videoRef])
+  useInitialAudioSelection({
+    strategy,
+    videoRef,
+    activeAudioIndex,
+    audioTracks,
+    itemId,
+    createSwitchOptions,
+    onFailure: reportTrackSwitchFailure,
+    onCaughtError: handleCaughtTrackSwitchError,
+  })
 
   const selectAudioTrack = async (index: number): Promise<void> => {
     const video = videoRef.current
@@ -323,12 +294,7 @@ export function useTrackManager({
         reportTrackSwitchFailure(result)
       }
     } catch (err) {
-      const errorMsg = getCaughtTrackSwitchErrorMessage(
-        err,
-        t('player.tracks.error.switchFailed'),
-      )
-      setError(errorMsg)
-      showError(errorMsg)
+      handleCaughtTrackSwitchError(err)
     } finally {
       setIsTrackOperationPending(false)
     }
@@ -387,20 +353,10 @@ export function useTrackManager({
               },
         )
       } else if (result.error) {
-        const errorMsg = getTrackSwitchErrorMessage(
-          result.error,
-          t('player.tracks.error.switchFailed'),
-        )
-        setError(errorMsg)
-        showError(errorMsg)
+        reportTrackSwitchFailure(result)
       }
     } catch (err) {
-      const errorMsg = getCaughtTrackSwitchErrorMessage(
-        err,
-        t('player.tracks.error.switchFailed'),
-      )
-      setError(errorMsg)
-      showError(errorMsg)
+      handleCaughtTrackSwitchError(err)
     } finally {
       setIsTrackOperationPending(false)
     }

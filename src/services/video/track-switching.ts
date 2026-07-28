@@ -345,6 +345,53 @@ function getNativeAudioTracks(
 }
 
 /**
+ * Tries to activate an audio track through the native AudioTrack API.
+ *
+ * A browser exposing the API can still be unable to decode the target track
+ * (e.g. DTS): enabling it would play silence, so those switches report
+ * failure and the caller transcodes instead.
+ *
+ * @param waitTimeoutMs - When set, waits this long for the native track list
+ *   to populate before reading it (used for the initial selection, which runs
+ *   right after `loadedmetadata`). Omit to read the list immediately.
+ * @returns true when the native track was enabled, false when the caller
+ *   must fall back to an HLS transcode
+ */
+async function tryEnableNativeAudioTrack(
+  trackIndex: number,
+  targetTrack: AudioTrackInfo,
+  options: TrackSwitchOptions,
+  waitTimeoutMs?: number,
+): Promise<boolean> {
+  const nativeAudioTracks = getNativeAudioTracks(options.videoElement)
+  if (!nativeAudioTracks || !isAudioTrackDirectPlayable(targetTrack.codec)) {
+    return false
+  }
+
+  const populatedTracks =
+    waitTimeoutMs === undefined
+      ? nativeAudioTracks
+      : await waitForNativeAudioTracks(nativeAudioTracks, waitTimeoutMs)
+
+  if (populatedTracks.length <= 1) {
+    return false
+  }
+
+  const nativeTrackIndex = findNativeAudioTrackIndex(
+    trackIndex,
+    targetTrack,
+    populatedTracks,
+    options.audioTracks,
+  )
+  if (nativeTrackIndex === -1) {
+    return false
+  }
+
+  enableOnlyNativeAudioTrack(populatedTracks, nativeTrackIndex)
+  return true
+}
+
+/**
  * Waits for the native audio track list to expose more than one track.
  *
  * Browsers populate `audioTracks` while parsing the container, which can lag
@@ -404,6 +451,16 @@ interface HlsReloadMessages {
   missingReloadCallback: string
   urlGenerationFailed: string
   reloadFailed: string
+}
+
+/** Messages for the direct-play → HLS transcode fallback paths. */
+const DIRECT_PLAY_HLS_FALLBACK_MESSAGES: HlsReloadMessages = {
+  missingItemId:
+    'Audio track switching requires transcoding in this browser. Item ID not available.',
+  missingReloadCallback:
+    'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
+  urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
+  reloadFailed: 'Failed to reload HLS stream for audio track switching',
 }
 
 async function reloadHlsAudioTrack(
@@ -536,9 +593,10 @@ async function switchDirectPlayAudioTrack(
   trackIndex: number,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  const { videoElement, audioTracks } = options
-
-  const targetTrack = findTrackByMediaStreamIndex(audioTracks, trackIndex)
+  const targetTrack = findTrackByMediaStreamIndex(
+    options.audioTracks,
+    trackIndex,
+  )
   if (!targetTrack) {
     return createTrackSwitchError(
       'track_unavailable',
@@ -547,39 +605,18 @@ async function switchDirectPlayAudioTrack(
     )
   }
 
-  const nativeAudioTracks = getNativeAudioTracks(videoElement)
-
   // Strategy 1: Try native AudioTrack API (Safari, some Chromium)
-  // A browser exposing the API can still be unable to decode the target track
-  // (e.g. DTS): enabling it would play silence, so those switches transcode.
-  if (
-    nativeAudioTracks &&
-    nativeAudioTracks.length > 1 &&
-    isAudioTrackDirectPlayable(targetTrack.codec)
-  ) {
-    const nativeTrackIndex = findNativeAudioTrackIndex(
-      trackIndex,
-      targetTrack,
-      nativeAudioTracks,
-      audioTracks,
-    )
-
-    if (nativeTrackIndex !== -1) {
-      enableOnlyNativeAudioTrack(nativeAudioTracks, nativeTrackIndex)
-      return { success: true }
-    }
+  if (await tryEnableNativeAudioTrack(trackIndex, targetTrack, options)) {
+    return { success: true }
   }
 
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
-  return reloadHlsAudioTrack(trackIndex, options, {
-    missingItemId:
-      'Audio track switching requires transcoding in this browser. Item ID not available.',
-    missingReloadCallback:
-      'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
-    urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
-    reloadFailed: 'Failed to reload HLS stream for audio track switching',
-  })
+  return reloadHlsAudioTrack(
+    trackIndex,
+    options,
+    DIRECT_PLAY_HLS_FALLBACK_MESSAGES,
+  )
 }
 
 /**
@@ -599,7 +636,7 @@ export async function applyInitialAudioTrack(
   trackIndex: number,
   options: InitialAudioTrackOptions,
 ): Promise<TrackSwitchResult> {
-  const { strategy, videoElement, audioTracks } = options
+  const { strategy, audioTracks } = options
 
   if (strategy !== 'direct') {
     return { success: true }
@@ -620,36 +657,21 @@ export async function applyInitialAudioTrack(
     return { success: true }
   }
 
-  const nativeAudioTracks = getNativeAudioTracks(videoElement)
-  if (nativeAudioTracks && isAudioTrackDirectPlayable(targetTrack.codec)) {
-    const populatedTracks = await waitForNativeAudioTracks(
-      nativeAudioTracks,
-      options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
-    )
-
-    if (populatedTracks.length > 1) {
-      const nativeTrackIndex = findNativeAudioTrackIndex(
-        trackIndex,
-        targetTrack,
-        populatedTracks,
-        audioTracks,
-      )
-
-      if (nativeTrackIndex !== -1) {
-        enableOnlyNativeAudioTrack(populatedTracks, nativeTrackIndex)
-        return { success: true }
-      }
-    }
+  const enabled = await tryEnableNativeAudioTrack(
+    trackIndex,
+    targetTrack,
+    options,
+    options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
+  )
+  if (enabled) {
+    return { success: true }
   }
 
-  return reloadHlsAudioTrack(trackIndex, options, {
-    missingItemId:
-      'Audio track switching requires transcoding in this browser. Item ID not available.',
-    missingReloadCallback:
-      'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
-    urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
-    reloadFailed: 'Failed to reload HLS stream for audio track switching',
-  })
+  return reloadHlsAudioTrack(
+    trackIndex,
+    options,
+    DIRECT_PLAY_HLS_FALLBACK_MESSAGES,
+  )
 }
 
 /**
