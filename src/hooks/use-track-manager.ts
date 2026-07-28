@@ -17,6 +17,7 @@ import {
   switchAudioTrack,
   switchSubtitleTrack,
 } from '@/services/video/track-switching'
+import { runTrackOperation } from '@/services/video/track-operation'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import { useInitialAudioSelection } from '@/hooks/use-initial-audio-selection'
 import {
@@ -38,8 +39,10 @@ interface UseTrackManagerOptions {
 
 interface UseTrackManagerReturn {
   trackState: TrackState
-  selectAudioTrack: (index: number) => Promise<void>
-  selectSubtitleTrack: (index: number | null) => Promise<void>
+  /** Resolves true only when the switch was applied and recorded; callers
+   * must not persist preferences for a switch that resolved false. */
+  selectAudioTrack: (index: number) => Promise<boolean>
+  selectSubtitleTrack: (index: number | null) => Promise<boolean>
   isLoading: boolean
   error: string | null
   /**
@@ -95,19 +98,27 @@ function findPreferredSubtitleIndex(
   return null
 }
 
-function getTrackSwitchErrorMessage(
-  error: { message: string },
-  fallback: string,
-): string {
-  return error.message ? error.message : fallback
+const EMPTY_SELECTION: Omit<UserTrackSelectionState, 'key'> = {
+  hasAudioSelection: false,
+  audioIndex: 0,
+  hasSubtitleSelection: false,
+  subtitleIndex: null,
 }
 
-function getCaughtTrackSwitchErrorMessage(
-  error: unknown,
-  fallback: string,
-): string {
-  if (error instanceof Error) return error.message
-  return fallback
+/**
+ * Builds a `setUserSelection` updater that merges `patch` while the selection
+ * still belongs to `key` and starts a fresh selection record for `key`
+ * otherwise (first selection for an item, or a switch that resolved after the
+ * item changed).
+ */
+function buildSelectionUpdater(
+  key: string,
+  patch: Partial<Omit<UserTrackSelectionState, 'key'>>,
+): (prev: UserTrackSelectionState) => UserTrackSelectionState {
+  return (prev) =>
+    prev.key === key
+      ? { ...prev, ...patch }
+      : { key, ...EMPTY_SELECTION, ...patch }
 }
 
 export function useTrackManager({
@@ -122,10 +133,7 @@ export function useTrackManager({
 
   const [userSelection, setUserSelection] = useState<UserTrackSelectionState>({
     key: '',
-    hasAudioSelection: false,
-    audioIndex: 0,
-    hasSubtitleSelection: false,
-    subtitleIndex: null,
+    ...EMPTY_SELECTION,
   })
   const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -163,11 +171,11 @@ export function useTrackManager({
 
   const itemId = item?.Id ?? undefined
 
-  const trackResetKey = `${itemId ?? ''}|${preferredAudioLanguage ?? ''}|${
-    preferredSubtitleLanguage ?? ''
-  }|${subtitlesEnabled ? '1' : '0'}|${audioTracks.length}|${
-    subtitleTracks.length
-  }`
+  // Keyed by item identity only. Player persists the chosen language after
+  // every successful switch, so preference values in this key would let that
+  // write invalidate the very selection that caused it (checkmark snapping
+  // back to the first track of the same language).
+  const trackResetKey = `${itemId ?? ''}|${audioTracks.length}|${subtitleTracks.length}`
 
   const preferredAudioIndex = itemId
     ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
@@ -223,24 +231,38 @@ export function useTrackManager({
     signal: signal ?? abortControllerRef.current!.signal,
   })
 
+  // Toast titles stay localized; the raw (English) service message is only
+  // ever the secondary description, matching the use-jassub-renderer
+  // convention.
   const reportTrackSwitchFailure = (result: TrackSwitchResult): void => {
     if (result.success || !result.error) return
 
-    const errorMsg = getTrackSwitchErrorMessage(
-      result.error,
-      t('player.tracks.error.switchFailed'),
-    )
-    setError(errorMsg)
-    showError(errorMsg)
+    const detail = result.error.message || null
+    setError(detail ?? t('player.tracks.error.switchFailed'))
+    showError(t('player.tracks.error.switchFailed'), detail ?? undefined)
   }
 
   const handleCaughtTrackSwitchError = (err: unknown): void => {
-    const errorMsg = getCaughtTrackSwitchErrorMessage(
-      err,
-      t('player.tracks.error.switchFailed'),
+    const detail = err instanceof Error && err.message ? err.message : null
+    setError(detail ?? t('player.tracks.error.switchFailed'))
+    showError(t('player.tracks.error.switchFailed'), detail ?? undefined)
+  }
+
+  // A failed initial application leaves the element playing the container
+  // default, so record that as the confirmed selection: the checkmark then
+  // reflects what is actually audible, and clicking the preferred track is a
+  // real retry instead of dying on the active-index no-op check.
+  const confirmFallbackAudioSelection = (): void => {
+    if (audioTracks.length === 0) return
+    const fallbackIndex =
+      audioTracks.find((track) => track.isDefault)?.index ??
+      audioTracks[0].index
+    setUserSelection(
+      buildSelectionUpdater(trackResetKey, {
+        hasAudioSelection: true,
+        audioIndex: fallbackIndex,
+      }),
     )
-    setError(errorMsg)
-    showError(errorMsg)
   }
 
   useInitialAudioSelection({
@@ -250,15 +272,31 @@ export function useTrackManager({
     audioTracks,
     resetKey: itemId,
     createSwitchOptions,
-    onFailure: reportTrackSwitchFailure,
-    onCaughtError: handleCaughtTrackSwitchError,
+    setPending: setIsTrackOperationPending,
+    onResult: (index, result) => {
+      if (result.success) {
+        setUserSelection(
+          buildSelectionUpdater(trackResetKey, {
+            hasAudioSelection: true,
+            audioIndex: index,
+          }),
+        )
+      } else {
+        reportTrackSwitchFailure(result)
+        confirmFallbackAudioSelection()
+      }
+    },
+    onCaughtError: (err) => {
+      handleCaughtTrackSwitchError(err)
+      confirmFallbackAudioSelection()
+    },
   })
 
-  const selectAudioTrack = async (index: number): Promise<void> => {
+  const selectAudioTrack = async (index: number): Promise<boolean> => {
     const video = videoRef.current
     if (!video) {
       setError(t('player.tracks.error.noVideo'))
-      return
+      return false
     }
 
     const track = audioTrackMap.get(index)
@@ -266,49 +304,52 @@ export function useTrackManager({
       const errorMsg = t('player.tracks.error.trackNotFound')
       setError(errorMsg)
       showError(errorMsg)
-      return
+      return false
     }
 
     if (index === trackState.activeAudioIndex) {
-      return
+      return false
     }
 
-    setIsTrackOperationPending(true)
+    if (isTrackOperationPending) {
+      return false
+    }
+
     setError(null)
 
-    try {
-      const result: TrackSwitchResult = await switchAudioTrack(
-        index,
-        createSwitchOptions(video),
-      )
-
-      if (result.success) {
-        setUserSelection((prev) =>
-          prev.key === trackResetKey
-            ? { ...prev, hasAudioSelection: true, audioIndex: index }
-            : {
-                key: trackResetKey,
+    const signal = abortControllerRef.current!.signal
+    let switched = false
+    await runTrackOperation(
+      () => switchAudioTrack(index, createSwitchOptions(video, signal)),
+      {
+        signal,
+        setPending: setIsTrackOperationPending,
+        onResult: (result) => {
+          if (result.success) {
+            switched = true
+            setUserSelection(
+              buildSelectionUpdater(trackResetKey, {
                 hasAudioSelection: true,
                 audioIndex: index,
-                hasSubtitleSelection: false,
-                subtitleIndex: null,
-              },
-        )
-      } else {
-        reportTrackSwitchFailure(result)
-      }
-      setIsTrackOperationPending(false)
-    } catch (err) {
-      handleCaughtTrackSwitchError(err)
-      setIsTrackOperationPending(false)
-    }
+              }),
+            )
+          } else {
+            reportTrackSwitchFailure(result)
+          }
+        },
+        onCaughtError: handleCaughtTrackSwitchError,
+      },
+    )
+    return switched
   }
 
-  const selectSubtitleTrack = async (index: number | null): Promise<void> => {
+  const selectSubtitleTrack = async (
+    index: number | null,
+  ): Promise<boolean> => {
     const video = videoRef.current
     if (!video) {
       setError(t('player.tracks.error.noVideo'))
-      return
+      return false
     }
 
     let selectedTrack: SubtitleTrackInfo | null = null
@@ -318,52 +359,49 @@ export function useTrackManager({
         const errorMsg = t('player.tracks.error.trackNotFound')
         setError(errorMsg)
         showError(errorMsg)
-        return
+        return false
       }
       selectedTrack = track
     }
 
     if (index === trackState.activeSubtitleIndex) {
-      return
+      return false
+    }
+
+    if (isTrackOperationPending) {
+      return false
     }
 
     if (selectedTrack !== null && requiresJassubRenderer(selectedTrack)) {
       void preloadJassubRenderer().catch(() => {})
     }
 
-    setIsTrackOperationPending(true)
     setError(null)
 
-    try {
-      const result: TrackSwitchResult = await switchSubtitleTrack(
-        index,
-        createSwitchOptions(video),
-      )
-
-      if (result.success) {
-        setUserSelection((prev) =>
-          prev.key === trackResetKey
-            ? {
-                ...prev,
+    const signal = abortControllerRef.current!.signal
+    let switched = false
+    await runTrackOperation(
+      () => switchSubtitleTrack(index, createSwitchOptions(video, signal)),
+      {
+        signal,
+        setPending: setIsTrackOperationPending,
+        onResult: (result) => {
+          if (result.success) {
+            switched = true
+            setUserSelection(
+              buildSelectionUpdater(trackResetKey, {
                 hasSubtitleSelection: true,
                 subtitleIndex: index,
-              }
-            : {
-                key: trackResetKey,
-                hasAudioSelection: false,
-                audioIndex: 0,
-                hasSubtitleSelection: true,
-                subtitleIndex: index,
-              },
-        )
-      } else if (result.error) {
-        reportTrackSwitchFailure(result)
-      }
-      setIsTrackOperationPending(false)
-    } catch (err) {
-      handleCaughtTrackSwitchError(err)
-      setIsTrackOperationPending(false)
-    }
+              }),
+            )
+          } else {
+            reportTrackSwitchFailure(result)
+          }
+        },
+        onCaughtError: handleCaughtTrackSwitchError,
+      },
+    )
+    return switched
   }
 
   return {

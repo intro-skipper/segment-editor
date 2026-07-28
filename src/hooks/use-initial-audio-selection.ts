@@ -6,6 +6,7 @@ import type {
 } from '@/services/video/track-switching'
 import type { AudioTrackInfo } from '@/services/video/tracks'
 import { applyInitialAudioTrack } from '@/services/video/track-switching'
+import { runTrackOperation } from '@/services/video/track-operation'
 
 interface UseInitialAudioSelectionOptions {
   strategy: PlaybackStrategy
@@ -19,8 +20,12 @@ interface UseInitialAudioSelectionOptions {
     videoElement: HTMLVideoElement,
     signal: AbortSignal,
   ) => InitialAudioTrackOptions
-  /** Reports a failed {@link TrackSwitchResult} (no-op on success) */
-  onFailure: (result: TrackSwitchResult) => void
+  /** Held true while an application runs, so the UI can disable track
+   * selection during the (possibly stream-reloading) window */
+  setPending: (pending: boolean) => void
+  /** Receives the index the application targeted and its outcome; on failure
+   * the element is still playing the container default track */
+  onResult: (index: number, result: TrackSwitchResult) => void
   onCaughtError: (err: unknown) => void
 }
 
@@ -38,7 +43,8 @@ export function useInitialAudioSelection({
   audioTracks,
   resetKey,
   createSwitchOptions,
-  onFailure,
+  setPending,
+  onResult,
   onCaughtError,
 }: UseInitialAudioSelectionOptions): void {
   const hasMultipleAudioTracks = audioTracks.length > 1
@@ -49,17 +55,15 @@ export function useInitialAudioSelection({
       index: number,
       signal: AbortSignal,
     ): Promise<void> => {
-      try {
-        const result = await applyInitialAudioTrack(
-          index,
-          createSwitchOptions(video, signal),
-        )
-        if (signal.aborted) return
-        onFailure(result)
-      } catch (err) {
-        if (signal.aborted) return
-        onCaughtError(err)
-      }
+      await runTrackOperation(
+        () => applyInitialAudioTrack(index, createSwitchOptions(video, signal)),
+        {
+          signal,
+          setPending,
+          onResult: (result) => onResult(index, result),
+          onCaughtError,
+        },
+      )
     },
   )
 

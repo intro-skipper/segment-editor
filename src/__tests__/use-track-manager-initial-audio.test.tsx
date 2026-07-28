@@ -66,11 +66,15 @@ function renderTrackManager(
   strategy: PlaybackStrategy,
   video: HTMLVideoElement,
 ) {
+  // Stable ref identity across re-renders, like the useRef object the real
+  // Player passes; an inline literal would re-run the initial-audio effect
+  // (and abort its controller) on every state update.
+  const videoRef = { current: video }
   return renderHook(() =>
     useTrackManager({
       item: createItem(),
       strategy,
-      videoRef: { current: video },
+      videoRef,
       t: (key: string) => key,
       onReloadHls: vi.fn(),
     }),
@@ -156,6 +160,7 @@ describe('useTrackManager initial audio track application', () => {
       expect(result.current.error).toBe('Audio track with index 2 not found')
     })
     expect(showErrorMock).toHaveBeenCalledWith(
+      'player.tracks.error.switchFailed',
       'Audio track with index 2 not found',
     )
   })

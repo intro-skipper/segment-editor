@@ -762,14 +762,16 @@ function useRenderPlayer({
   const toggleSubtitles = async () => {
     try {
       if (trackState.activeSubtitleIndex !== null) {
-        await selectSubtitleTrack(null)
-        setSubtitlesEnabled(false)
+        if (await selectSubtitleTrack(null)) {
+          setSubtitlesEnabled(false)
+        }
       } else if (trackState.subtitleTracks.length > 0) {
         const firstTrack = trackState.subtitleTracks[0]
-        await selectSubtitleTrack(firstTrack.index)
-        setSubtitlesEnabled(true)
-        if (firstTrack.language) {
-          setPreferredSubtitleLanguage(firstTrack.language)
+        if (await selectSubtitleTrack(firstTrack.index)) {
+          setSubtitlesEnabled(true)
+          if (firstTrack.language) {
+            setPreferredSubtitleLanguage(firstTrack.language)
+          }
         }
       }
     } catch {
@@ -842,11 +844,16 @@ function useRenderPlayer({
   }
 
   const handleAudioTrackSelect = async (index: number) => {
+    let switched = false
     try {
-      await selectAudioTrack(index)
+      switched = await selectAudioTrack(index)
     } catch {
       return
     }
+    // Persist only what was actually applied: recording a language the switch
+    // could not deliver would desync the persisted preference (and every
+    // later item's auto-selection) from what is audible.
+    if (!switched) return
     const selectedTrack = trackState.audioTracks.find(
       (track) => track.index === index,
     )
@@ -856,11 +863,13 @@ function useRenderPlayer({
   }
 
   const handleSubtitleTrackSelect = async (index: number | null) => {
+    let switched = false
     try {
-      await selectSubtitleTrack(index)
+      switched = await selectSubtitleTrack(index)
     } catch {
       return
     }
+    if (!switched) return
     if (index === null) {
       setSubtitlesEnabled(false)
     } else {
