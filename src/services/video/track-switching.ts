@@ -94,7 +94,7 @@ interface TrackSwitchOptions {
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
   onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
-  /** AbortSignal to cancel async operations (e.g. subtitle load timeout) on unmount */
+  /** AbortSignal that cancels stale async operations (subtitle load, initial audio apply) */
   signal?: AbortSignal
 }
 
@@ -371,7 +371,17 @@ async function tryEnableNativeAudioTrack(
   const populatedTracks =
     waitTimeoutMs === undefined
       ? nativeAudioTracks
-      : await waitForNativeAudioTracks(nativeAudioTracks, waitTimeoutMs)
+      : await waitForNativeAudioTracks(
+          nativeAudioTracks,
+          waitTimeoutMs,
+          options.signal,
+        )
+
+  // The request went stale while waiting (newer selection, item change,
+  // unmount): enabling a track now would fight the newer state.
+  if (options.signal?.aborted) {
+    return false
+  }
 
   if (populatedTracks.length <= 1) {
     return false
@@ -395,14 +405,16 @@ async function tryEnableNativeAudioTrack(
  * Waits for the native audio track list to expose more than one track.
  *
  * Browsers populate `audioTracks` while parsing the container, which can lag
- * behind `loadedmetadata`. Resolves early on `addtrack`, and after the timeout
- * with whatever the list holds so the caller can fall back.
+ * behind `loadedmetadata`. Resolves early on `addtrack` or when the signal
+ * aborts, and after the timeout with whatever the list holds so the caller
+ * can fall back.
  */
 async function waitForNativeAudioTracks(
   nativeAudioTracks: AudioTrackList,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<AudioTrackList> {
-  if (nativeAudioTracks.length > 1 || timeoutMs <= 0) {
+  if (nativeAudioTracks.length > 1 || timeoutMs <= 0 || signal?.aborted) {
     return nativeAudioTracks
   }
 
@@ -416,6 +428,7 @@ async function waitForNativeAudioTracks(
     const finish = () => {
       clearTimeout(timeoutId)
       removeEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+      signal?.removeEventListener('abort', finish)
       resolve()
     }
 
@@ -425,6 +438,7 @@ async function waitForNativeAudioTracks(
 
     const timeoutId = setTimeout(finish, timeoutMs)
     addEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+    signal?.addEventListener('abort', finish)
   })
 
   return nativeAudioTracks
@@ -628,6 +642,10 @@ async function switchDirectPlayAudioTrack(
  * decoded, the stream reloads as an HLS transcode with the requested
  * `AudioStreamIndex` instead of silently playing the wrong audio.
  *
+ * When `options.signal` aborts (newer selection, item change, unmount), the
+ * pending application becomes a no-op instead of enabling a stale track or
+ * reloading the stream for an outdated index.
+ *
  * @param trackIndex - The Jellyfin MediaStream index of the audio track to activate
  * @param options - Track switch options (call after `loadedmetadata`)
  * @returns Promise resolving to the result of the operation
@@ -636,9 +654,9 @@ export async function applyInitialAudioTrack(
   trackIndex: number,
   options: InitialAudioTrackOptions,
 ): Promise<TrackSwitchResult> {
-  const { strategy, audioTracks } = options
+  const { strategy, audioTracks, signal } = options
 
-  if (strategy !== 'direct') {
+  if (strategy !== 'direct' || signal?.aborted) {
     return { success: true }
   }
 
@@ -664,6 +682,11 @@ export async function applyInitialAudioTrack(
     options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
   )
   if (enabled) {
+    return { success: true }
+  }
+
+  // A stale application must not reload the stream for an outdated index.
+  if (signal?.aborted) {
     return { success: true }
   }
 

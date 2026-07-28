@@ -159,4 +159,46 @@ describe('useTrackManager initial audio track application', () => {
       'Audio track with index 2 not found',
     )
   })
+
+  it('aborts a pending application on unmount and ignores its stale result', async () => {
+    let resolveApply: ((result: unknown) => void) | undefined
+    applyInitialAudioTrackMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveApply = resolve
+        }) as never,
+    )
+
+    const video = createVideo(HTMLMediaElement.HAVE_METADATA)
+    const { unmount } = renderTrackManager('direct', video)
+
+    await waitFor(() => {
+      expect(applyInitialAudioTrackMock).toHaveBeenCalled()
+    })
+
+    const options = (
+      applyInitialAudioTrackMock.mock.calls[0] as unknown as [
+        number,
+        { signal: AbortSignal },
+      ]
+    )[1]
+    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(options.signal.aborted).toBe(false)
+
+    unmount()
+    expect(options.signal.aborted).toBe(true)
+
+    await act(async () => {
+      resolveApply?.({
+        success: false,
+        error: {
+          type: 'unknown_error',
+          message: 'stale failure',
+          trackIndex: JAPANESE_STREAM_INDEX,
+        },
+      })
+    })
+
+    expect(showErrorMock).not.toHaveBeenCalled()
+  })
 })

@@ -237,6 +237,73 @@ describe('applyInitialAudioTrack', () => {
     expect(onReloadHls).toHaveBeenCalledTimes(1)
   })
 
+  it('becomes a no-op when aborted while waiting for the native track list', async () => {
+    const listeners: Array<() => void> = []
+    const nativeTracks: TestNativeAudioTrackList = createNativeTrackList([
+      'eng',
+    ])
+    nativeTracks.addEventListener = (_type, listener) => {
+      listeners.push(listener)
+    }
+    nativeTracks.removeEventListener = () => {}
+    const onReloadHls = vi.fn<() => Promise<void>>()
+    const controller = new AbortController()
+
+    const pending = applyInitialAudioTrack(7, {
+      strategy: 'direct',
+      videoElement: createVideoWithNativeTracks(nativeTracks),
+      audioTracks: [
+        createAudioTrack(5, 0),
+        createAudioTrack(7, 1, { language: 'jpn' }),
+      ],
+      itemId: 'item-native',
+      onReloadHls,
+      nativeTrackTimeoutMs: 5000,
+      signal: controller.signal,
+    })
+
+    await Promise.resolve()
+    controller.abort()
+    // A late addtrack must not resurrect the stale application.
+    nativeTracks.push({ enabled: false, language: 'jpn' })
+    listeners.forEach((listener) => {
+      listener()
+    })
+
+    await expect(pending).resolves.toEqual({ success: true })
+    expect(nativeTracks.map((track) => track.enabled)).toEqual([true, false])
+    expect(onReloadHls).not.toHaveBeenCalled()
+  })
+
+  it('does not reload when aborted before it starts', async () => {
+    const onReloadHls = vi.fn<() => Promise<void>>()
+    const controller = new AbortController()
+    controller.abort()
+
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'audioTracks', {
+      configurable: true,
+      value: undefined,
+    })
+
+    await expect(
+      applyInitialAudioTrack(7, {
+        strategy: 'direct',
+        videoElement: video,
+        audioTracks: [
+          createAudioTrack(5, 0),
+          createAudioTrack(7, 1, { language: 'jpn' }),
+        ],
+        itemId: 'item-native',
+        onReloadHls,
+        nativeTrackTimeoutMs: 0,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ success: true })
+
+    expect(onReloadHls).not.toHaveBeenCalled()
+  })
+
   it('reports an error when the requested track is unknown', async () => {
     const nativeTracks = createNativeTrackList(['eng', 'jpn'])
 

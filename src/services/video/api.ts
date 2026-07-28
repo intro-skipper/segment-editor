@@ -421,7 +421,7 @@ function isNonDefaultAudioTrack(
   )
 
   const defaultAudioStream =
-    audioStreams.find((s) => s.IsDefault) ?? audioStreams[0]
+    audioStreams.find((s) => s.IsDefault) ?? audioStreams.at(0)
 
   if (!defaultAudioStream) {
     return false

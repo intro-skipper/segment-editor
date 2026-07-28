@@ -42,14 +42,20 @@ export function useInitialAudioSelection({
   const hasMultipleAudioTracks = audioTracks.length > 1
 
   const applyInitialAudioSelection = useEffectEvent(
-    async (video: HTMLVideoElement, index: number): Promise<void> => {
+    async (
+      video: HTMLVideoElement,
+      index: number,
+      signal: AbortSignal,
+    ): Promise<void> => {
       try {
-        const result = await applyInitialAudioTrack(
-          index,
-          createSwitchOptions(video),
-        )
+        const result = await applyInitialAudioTrack(index, {
+          ...createSwitchOptions(video),
+          signal,
+        })
+        if (signal.aborted) return
         onFailure(result)
       } catch (err) {
+        if (signal.aborted) return
         onCaughtError(err)
       }
     },
@@ -61,10 +67,16 @@ export function useInitialAudioSelection({
     const video = videoRef.current
     if (!video) return
 
-    let cancelled = false
+    // Aborts pending applications on cleanup so a stale run cannot enable an
+    // outdated track or reload the stream after a newer selection or unmount.
+    const controller = new AbortController()
     const applySelection = () => {
-      if (cancelled) return
-      void applyInitialAudioSelection(video, activeAudioIndex)
+      if (controller.signal.aborted) return
+      void applyInitialAudioSelection(
+        video,
+        activeAudioIndex,
+        controller.signal,
+      )
     }
 
     // Stays subscribed: a direct-play reload (retry, error recovery) rebuilds
@@ -75,7 +87,7 @@ export function useInitialAudioSelection({
     }
 
     return () => {
-      cancelled = true
+      controller.abort()
       video.removeEventListener('loadedmetadata', applySelection)
     }
   }, [strategy, hasMultipleAudioTracks, activeAudioIndex, itemId, videoRef])
