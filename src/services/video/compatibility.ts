@@ -46,6 +46,8 @@ export interface AudioStreamInfo {
   index: number
   codec: string
   channels?: number
+  /** Whether the container flags this stream as the default audio track */
+  isDefault?: boolean
 }
 
 /**
@@ -74,16 +76,6 @@ interface CompatibilityResult {
 }
 
 /**
- * Cached codec capability information.
- */
-interface CodecCapability {
-  supported: boolean
-  smooth: boolean
-  powerEfficient: boolean
-  timestamp: number
-}
-
-/**
  * Optional stream metadata used to refine a codec capability query.
  */
 export interface CodecCapabilityHints {
@@ -104,29 +96,6 @@ export interface CodecCapabilityHints {
  */
 export const DIRECT_PLAY_CONTAINERS = ['mp4', 'mkv', 'webm'] as const
 
-/**
- * Supported video codecs for direct play.
- */
-export const DIRECT_PLAY_VIDEO_CODECS = [
-  'h264',
-  'hevc',
-  'h265',
-  'vp9',
-  'av1',
-] as const
-
-/**
- * Supported audio codecs for direct play.
- */
-export const DIRECT_PLAY_AUDIO_CODECS = [
-  'aac',
-  'mp3',
-  'opus',
-  'flac',
-  'ac3',
-  'eac3',
-] as const
-
 /** MIME type probed to detect Matroska direct play support. */
 const MATROSKA_MIME_TYPE = 'video/x-matroska'
 
@@ -145,9 +114,9 @@ const DEFAULT_AUDIO_SAMPLERATE = 48_000
 
 /**
  * Cache for browser codec capability results.
- * Key format: `${type}:${contentType}:${configSignature}`
+ * Key format: `${type}:${configSignature}`
  */
-const capabilityCache: Map<string, CodecCapability> = new Map()
+const capabilityCache: Map<string, boolean> = new Map()
 
 /**
  * Clears the capability cache.
@@ -352,6 +321,38 @@ export function buildVp9CodecString(
   return `vp09.${profileId}.${levelId}.${depth}`
 }
 
+function buildHevcContentType(video?: VideoStreamInfo): string {
+  return `video/mp4; codecs="${buildHevcCodecString(video?.profile, video?.level)}"`
+}
+
+/**
+ * Content type builders for the supported video codecs, keyed by the codec
+ * name Jellyfin reports. This table is the single definition of which video
+ * codecs are direct playable: {@link DIRECT_PLAY_VIDEO_CODECS} is derived from
+ * its keys, so a codec can never be listed as supported without a way to build
+ * its content type (or the reverse).
+ */
+const VIDEO_CODEC_CONTENT_TYPE_BUILDERS: Record<
+  string,
+  ((video?: VideoStreamInfo) => string) | undefined
+> = {
+  h264: (video) =>
+    `video/mp4; codecs="${buildH264CodecString(video?.profile, video?.level)}"`,
+  hevc: buildHevcContentType,
+  h265: buildHevcContentType,
+  vp9: (video) =>
+    `video/webm; codecs="${buildVp9CodecString(video?.profile, video?.level, video?.bitDepth)}"`,
+  av1: (video) =>
+    `video/mp4; codecs="${buildAv1CodecString(video?.level, video?.bitDepth)}"`,
+}
+
+/**
+ * Supported video codecs for direct play.
+ */
+export const DIRECT_PLAY_VIDEO_CODECS: ReadonlyArray<string> = Object.keys(
+  VIDEO_CODEC_CONTENT_TYPE_BUILDERS,
+)
+
 /**
  * Builds the MediaCapabilities/`canPlayType` content type for a video codec,
  * deriving the codec string from the real stream metadata when available.
@@ -362,23 +363,14 @@ export function buildVideoContentType(
   codec: string,
   video?: VideoStreamInfo,
 ): string | null {
-  switch (codec.toLowerCase()) {
-    case 'h264':
-      return `video/mp4; codecs="${buildH264CodecString(video?.profile, video?.level)}"`
-    case 'hevc':
-    case 'h265':
-      return `video/mp4; codecs="${buildHevcCodecString(video?.profile, video?.level)}"`
-    case 'av1':
-      return `video/mp4; codecs="${buildAv1CodecString(video?.level, video?.bitDepth)}"`
-    case 'vp9':
-      return `video/webm; codecs="${buildVp9CodecString(video?.profile, video?.level, video?.bitDepth)}"`
-    default:
-      return null
-  }
+  const build = VIDEO_CODEC_CONTENT_TYPE_BUILDERS[codec.toLowerCase()]
+  return build ? build(video) : null
 }
 
 /**
- * Content types for the supported audio codecs.
+ * Content types for the supported audio codecs. This table is the single
+ * definition of which audio codecs are direct playable:
+ * {@link DIRECT_PLAY_AUDIO_CODECS} is derived from its keys.
  */
 const AUDIO_CODEC_MIME_MAP: Record<string, string> = {
   aac: 'audio/mp4; codecs="mp4a.40.2"',
@@ -388,6 +380,12 @@ const AUDIO_CODEC_MIME_MAP: Record<string, string> = {
   ac3: 'audio/mp4; codecs="ac-3"',
   eac3: 'audio/mp4; codecs="ec-3"',
 }
+
+/**
+ * Supported audio codecs for direct play.
+ */
+export const DIRECT_PLAY_AUDIO_CODECS: ReadonlyArray<string> =
+  Object.keys(AUDIO_CODEC_MIME_MAP)
 
 /**
  * Builds the MediaCapabilities/`canPlayType` content type for an audio codec.
@@ -446,6 +444,18 @@ function clampNumber(value: number | undefined, fallback: number): number {
   return isPositiveNumber(value) ? value : fallback
 }
 
+/**
+ * Rounds a bitrate up to the next whole Mbps.
+ *
+ * Decoder support is tiered rather than exact, so probing at Mbps granularity
+ * gives the same answer as the raw stream bitrate while letting every file at
+ * a given quality tier share one cache entry. Keeping the raw value would make
+ * the cache key unique per file, so every playback would re-probe.
+ */
+function toMbpsBucket(bitrate: number): number {
+  return Math.max(1, Math.ceil(bitrate / 1_000_000)) * 1_000_000
+}
+
 function buildVideoDecodingConfig(
   contentType: string,
   video?: VideoStreamInfo,
@@ -454,8 +464,10 @@ function buildVideoDecodingConfig(
     contentType,
     width: Math.round(clampNumber(video?.width, DEFAULT_VIDEO_WIDTH)),
     height: Math.round(clampNumber(video?.height, DEFAULT_VIDEO_HEIGHT)),
-    bitrate: Math.round(clampNumber(video?.bitrate, DEFAULT_VIDEO_BITRATE)),
-    framerate: clampNumber(video?.frameRate, DEFAULT_VIDEO_FRAMERATE),
+    bitrate: toMbpsBucket(clampNumber(video?.bitrate, DEFAULT_VIDEO_BITRATE)),
+    framerate: Math.round(
+      clampNumber(video?.frameRate, DEFAULT_VIDEO_FRAMERATE),
+    ),
   }
 }
 
@@ -469,21 +481,24 @@ function buildAudioDecodingConfig(contentType: string, channels?: number) {
 }
 
 /**
- * Builds a stable cache key for a codec capability query.
- * Different stream metadata must not share a cached answer.
+ * Builds the decoding config for a capability query.
+ * The config doubles as the cache key, so a field that refines the probe
+ * cannot be added without also refining the key.
  */
-function getCapabilityCacheKey(
+function buildDecodingConfig(
   type: 'video' | 'audio',
   contentType: string,
   hints: CodecCapabilityHints | undefined,
-): string {
-  if (type === 'video') {
-    const config = buildVideoDecodingConfig(contentType, hints?.video)
-    return `video:${contentType}:${config.width}x${config.height}@${config.bitrate}/${config.framerate}`
-  }
-
-  const config = buildAudioDecodingConfig(contentType, hints?.channels)
-  return `audio:${contentType}:${config.channels}ch`
+) {
+  return type === 'video'
+    ? {
+        type: 'file' as const,
+        video: buildVideoDecodingConfig(contentType, hints?.video),
+      }
+    : {
+        type: 'file' as const,
+        audio: buildAudioDecodingConfig(contentType, hints?.channels),
+      }
 }
 
 /**
@@ -495,12 +510,9 @@ function canPlayTypeFallback(contentType: string): boolean {
   return result === 'probably' || result === 'maybe'
 }
 
-function cacheCapability(
-  cacheKey: string,
-  capability: Omit<CodecCapability, 'timestamp'>,
-): boolean {
-  capabilityCache.set(cacheKey, { ...capability, timestamp: Date.now() })
-  return capability.supported
+function cacheCapability(cacheKey: string, supported: boolean): boolean {
+  capabilityCache.set(cacheKey, supported)
+  return supported
 }
 
 /**
@@ -525,65 +537,41 @@ export async function isCodecSupported(
       ? buildVideoContentType(normalizedCodec, hints?.video)
       : buildAudioContentType(normalizedCodec)
 
+  const config =
+    contentType === null ? null : buildDecodingConfig(type, contentType, hints)
+
   const cacheKey =
-    contentType === null
+    config === null
       ? `${type}:${normalizedCodec}`
-      : getCapabilityCacheKey(type, contentType, hints)
+      : `${type}:${JSON.stringify(config.video ?? config.audio)}`
 
   // Check cache first
   const cached = capabilityCache.get(cacheKey)
   if (cached !== undefined) {
-    return cached.supported
+    return cached
   }
 
   // Safari handles HLS natively, so we can be more permissive
   if (isSafari() && type === 'video') {
-    return cacheCapability(cacheKey, {
-      supported: true,
-      smooth: true,
-      powerEfficient: true,
-    })
+    return cacheCapability(cacheKey, true)
   }
 
-  if (contentType === null) {
-    return cacheCapability(cacheKey, {
-      supported: false,
-      smooth: false,
-      powerEfficient: false,
-    })
+  if (contentType === null || config === null) {
+    return cacheCapability(cacheKey, false)
   }
 
   // Try MediaCapabilities API first
   if (typeof navigator !== 'undefined' && 'mediaCapabilities' in navigator) {
     try {
-      const config =
-        type === 'video'
-          ? {
-              type: 'file' as const,
-              video: buildVideoDecodingConfig(contentType, hints?.video),
-            }
-          : {
-              type: 'file' as const,
-              audio: buildAudioDecodingConfig(contentType, hints?.channels),
-            }
-
       const result = await navigator.mediaCapabilities.decodingInfo(config)
-      return cacheCapability(cacheKey, {
-        supported: result.supported,
-        smooth: result.smooth,
-        powerEfficient: result.powerEfficient,
-      })
+      return cacheCapability(cacheKey, result.supported)
     } catch {
       // Fall through to canPlayType fallback
     }
   }
 
   // Fallback to canPlayType
-  return cacheCapability(cacheKey, {
-    supported: canPlayTypeFallback(contentType),
-    smooth: false,
-    powerEfficient: false,
-  })
+  return cacheCapability(cacheKey, canPlayTypeFallback(contentType))
 }
 
 // ============================================================================
@@ -594,20 +582,7 @@ export async function isCodecSupported(
  * Checks if a video codec is in the supported list.
  */
 function isVideoCodecInList(codec: string): boolean {
-  const normalized = codec.toLowerCase()
-  return (DIRECT_PLAY_VIDEO_CODECS as ReadonlyArray<string>).includes(
-    normalized,
-  )
-}
-
-/**
- * Checks if an audio codec is in the supported list.
- */
-function isAudioCodecInList(codec: string): boolean {
-  const normalized = codec.toLowerCase()
-  return (DIRECT_PLAY_AUDIO_CODECS as ReadonlyArray<string>).includes(
-    normalized,
-  )
+  return DIRECT_PLAY_VIDEO_CODECS.includes(codec.toLowerCase())
 }
 
 /**
@@ -623,7 +598,7 @@ function isAudioCodecInList(codec: string): boolean {
  * @returns true when the browser can decode the track without transcoding
  */
 export function isAudioTrackDirectPlayable(codec: string): boolean {
-  return isAudioCodecInList(codec)
+  return DIRECT_PLAY_AUDIO_CODECS.includes(codec.toLowerCase())
 }
 
 /**
@@ -670,10 +645,23 @@ export async function checkCompatibility(
     }
   }
 
-  // Check browser support for video codec
-  const videoSupported = await isCodecSupported(videoCodec, 'video', {
-    video: mediaSource.video,
-  })
+  // Check audio codec is in supported list
+  if (!audioCodec || !isAudioTrackDirectPlayable(audioCodec)) {
+    return {
+      canDirectPlay: false,
+      reason: `Unsupported audio codec: ${audioCodec || 'unknown'}`,
+    }
+  }
+
+  // Both browser probes are independent, so they run concurrently rather than
+  // paying two serial MediaCapabilities round trips on every playback start.
+  const [videoSupported, audioSupported] = await Promise.all([
+    isCodecSupported(videoCodec, 'video', { video: mediaSource.video }),
+    isCodecSupported(audioCodec, 'audio', {
+      channels: mediaSource.audioStreams?.[0]?.channels,
+    }),
+  ])
+
   if (!videoSupported) {
     return {
       canDirectPlay: false,
@@ -681,18 +669,6 @@ export async function checkCompatibility(
     }
   }
 
-  // Check audio codec is in supported list
-  if (!audioCodec || !isAudioCodecInList(audioCodec)) {
-    return {
-      canDirectPlay: false,
-      reason: `Unsupported audio codec: ${audioCodec || 'unknown'}`,
-    }
-  }
-
-  // Check browser support for audio codec
-  const audioSupported = await isCodecSupported(audioCodec, 'audio', {
-    channels: mediaSource.audioStreams?.[0]?.channels,
-  })
   if (!audioSupported) {
     return {
       canDirectPlay: false,

@@ -43,10 +43,11 @@ interface UseTrackManagerReturn {
   isLoading: boolean
   error: string | null
   /**
-   * Whether the browser can switch audio tracks natively during direct play.
-   * When false, switching audio in direct play restarts the stream as a transcode.
+   * Whether selecting a different audio track will restart the stream as a
+   * transcode instead of switching in place. True only when a direct-played
+   * file has more than one audio track and the browser cannot switch natively.
    */
-  nativeAudioSwitchingSupported: boolean
+  audioSwitchRequiresTranscode: boolean
 }
 
 interface UserTrackSelectionState {
@@ -207,7 +208,10 @@ export function useTrackManager({
     subtitleTracks.map((track) => [track.index, track]),
   )
 
-  const createSwitchOptions = (videoElement: HTMLVideoElement) => ({
+  const createSwitchOptions = (
+    videoElement: HTMLVideoElement,
+    signal: AbortSignal = abortControllerRef.current!.signal,
+  ) => ({
     strategy,
     videoElement,
     hlsInstance: hlsRef?.current,
@@ -216,7 +220,7 @@ export function useTrackManager({
     audioTracks,
     subtitleTracks,
     onReloadHls,
-    signal: abortControllerRef.current!.signal,
+    signal,
   })
 
   const reportTrackSwitchFailure = (result: TrackSwitchResult): void => {
@@ -244,7 +248,7 @@ export function useTrackManager({
     videoRef,
     activeAudioIndex,
     audioTracks,
-    itemId,
+    resetKey: itemId,
     createSwitchOptions,
     onFailure: reportTrackSwitchFailure,
     onCaughtError: handleCaughtTrackSwitchError,
@@ -368,6 +372,9 @@ export function useTrackManager({
     selectSubtitleTrack,
     isLoading: isTrackOperationPending,
     error,
-    nativeAudioSwitchingSupported: supportsNativeAudioTrackSwitching(),
+    audioSwitchRequiresTranscode:
+      strategy === 'direct' &&
+      audioTracks.length > 1 &&
+      !supportsNativeAudioTrackSwitching(),
   }
 }

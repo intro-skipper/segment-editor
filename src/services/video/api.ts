@@ -10,6 +10,7 @@ import {
   isAudioTrackDirectPlayable,
 } from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
+import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { createPlaySessionId } from '@/services/video/session'
 
 interface VideoStreamOptions {
@@ -307,6 +308,7 @@ export function extractMediaSourceInfo(
       index: stream.Index ?? position,
       codec: stream.Codec ?? '',
       channels: stream.Channels ?? undefined,
+      isDefault: stream.IsDefault ?? false,
     })),
   }
 }
@@ -352,34 +354,38 @@ export async function getPlaybackConfig(
   }
 
   const mediaSourceInfo = extractMediaSourceInfo(item)
-
-  const compatibility = await checkCompatibility(mediaSourceInfo)
-
-  const container = mediaSourceInfo?.container
   const mediaSourceId = getPlaybackMediaSourceId(item)
 
-  const needsNonDefaultAudio =
-    audioStreamIndex !== undefined &&
-    isNonDefaultAudioTrack(item, audioStreamIndex)
+  // `forceHls` discards the compatibility answer, so the probe (up to two
+  // MediaCapabilities round trips) is skipped entirely on the transcode
+  // fallback path, which runs while playback is already broken.
+  if (!forceHls) {
+    const needsNonDefaultAudio =
+      audioStreamIndex !== undefined &&
+      isNonDefaultAudioTrack(mediaSourceInfo, audioStreamIndex)
 
-  // A non-default audio track only forces a transcode when the browser cannot
-  // select that track natively on the direct-played file.
-  const canDirectPlayRequestedAudio =
-    !needsNonDefaultAudio ||
-    canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
+    // A non-default audio track only forces a transcode when the browser cannot
+    // select that track natively on the direct-played file.
+    const canDirectPlayRequestedAudio =
+      !needsNonDefaultAudio ||
+      canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
 
-  if (compatibility.canDirectPlay && canDirectPlayRequestedAudio && !forceHls) {
-    const url = getDirectPlayUrl({
-      itemId: item.Id,
-      mediaSourceId,
-      startTimeTicks,
-      container,
-    })
+    if (
+      canDirectPlayRequestedAudio &&
+      (await checkCompatibility(mediaSourceInfo)).canDirectPlay
+    ) {
+      const url = getDirectPlayUrl({
+        itemId: item.Id,
+        mediaSourceId,
+        startTimeTicks,
+        container: mediaSourceInfo?.container,
+      })
 
-    return {
-      strategy: 'direct',
-      url,
-      startTime,
+      return {
+        strategy: 'direct',
+        url,
+        startTime,
+      }
     }
   }
 
@@ -402,30 +408,20 @@ export async function getPlaybackConfig(
 
 /**
  * Whether the requested audio stream differs from the track the container
- * plays by default: the stream flagged `IsDefault`, or the first audio stream
- * when no flag is set. Mirrors `getContainerDefaultAudioTrack` in
- * track-switching.ts so the strategy decision and the initial native track
- * application agree on what "default" means.
+ * plays by default. Resolved through the shared
+ * {@link getContainerDefaultAudioTrack}, so the strategy decision and the
+ * initial native track application cannot disagree on what "default" means.
  */
 function isNonDefaultAudioTrack(
-  item: BaseItemDto,
+  mediaSourceInfo: MediaSourceInfo | null,
   audioStreamIndex: number,
 ): boolean {
-  const mediaSources = item.MediaSources
-  if (!mediaSources?.length) {
-    return false
-  }
-
-  const audioStreams = (mediaSources[0].MediaStreams ?? []).filter(
-    (s) => s.Type === 'Audio',
+  const defaultStream = getContainerDefaultAudioTrack(
+    mediaSourceInfo?.audioStreams ?? [],
   )
-
-  const defaultAudioStream =
-    audioStreams.find((s) => s.IsDefault) ?? audioStreams.at(0)
-
-  if (!defaultAudioStream) {
+  if (!defaultStream) {
     return false
   }
 
-  return defaultAudioStream.Index !== audioStreamIndex
+  return defaultStream.index !== audioStreamIndex
 }

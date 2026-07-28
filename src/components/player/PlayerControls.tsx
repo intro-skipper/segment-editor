@@ -53,11 +53,8 @@ export interface PlayerControlsProps {
     state: TrackState
     availability: 'available' | 'disabled'
     strategy?: PlaybackStrategy
-    /**
-     * How switching audio behaves in direct play: 'native' switches in place,
-     * 'transcode' restarts the stream through the transcoder.
-     */
-    audioSwitching?: 'native' | 'transcode'
+    /** Whether selecting another audio track restarts the stream as a transcode */
+    audioSwitchRequiresTranscode?: boolean
     onSelectAudio: (index: number) => void
     onSelectSubtitle: (index: number | null) => void
   }
@@ -209,7 +206,9 @@ export function PlayerControls({
             onSelectAudio={trackControls.onSelectAudio}
             onSelectSubtitle={trackControls.onSelectSubtitle}
             strategy={trackControls.strategy}
-            audioSwitching={trackControls.audioSwitching}
+            audioSwitchRequiresTranscode={
+              trackControls.audioSwitchRequiresTranscode
+            }
             disabled={trackControls.availability === 'disabled'}
             portalContainer={portalContainer}
           />

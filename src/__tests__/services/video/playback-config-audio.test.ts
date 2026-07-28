@@ -138,7 +138,7 @@ describe('extractMediaSourceInfo stream metadata', () => {
       frameRate: 25,
     })
     expect(info?.audioStreams).toEqual([
-      { index: 0, codec: 'flac', channels: undefined },
+      { index: 0, codec: 'flac', channels: undefined, isDefault: false },
     ])
   })
 })

@@ -13,9 +13,11 @@ interface UseInitialAudioSelectionOptions {
   /** The Jellyfin MediaStream index of the audio track that should play */
   activeAudioIndex: number
   audioTracks: Array<AudioTrackInfo>
-  itemId: string | undefined
+  /** Changing this restarts the selection (a new item invalidates the applied track) */
+  resetKey: string | undefined
   createSwitchOptions: (
     videoElement: HTMLVideoElement,
+    signal: AbortSignal,
   ) => InitialAudioTrackOptions
   /** Reports a failed {@link TrackSwitchResult} (no-op on success) */
   onFailure: (result: TrackSwitchResult) => void
@@ -34,7 +36,7 @@ export function useInitialAudioSelection({
   videoRef,
   activeAudioIndex,
   audioTracks,
-  itemId,
+  resetKey,
   createSwitchOptions,
   onFailure,
   onCaughtError,
@@ -48,10 +50,10 @@ export function useInitialAudioSelection({
       signal: AbortSignal,
     ): Promise<void> => {
       try {
-        const result = await applyInitialAudioTrack(index, {
-          ...createSwitchOptions(video),
-          signal,
-        })
+        const result = await applyInitialAudioTrack(
+          index,
+          createSwitchOptions(video, signal),
+        )
         if (signal.aborted) return
         onFailure(result)
       } catch (err) {
@@ -71,7 +73,6 @@ export function useInitialAudioSelection({
     // outdated track or reload the stream after a newer selection or unmount.
     const controller = new AbortController()
     const applySelection = () => {
-      if (controller.signal.aborted) return
       void applyInitialAudioSelection(
         video,
         activeAudioIndex,
@@ -90,5 +91,5 @@ export function useInitialAudioSelection({
       controller.abort()
       video.removeEventListener('loadedmetadata', applySelection)
     }
-  }, [strategy, hasMultipleAudioTracks, activeAudioIndex, itemId, videoRef])
+  }, [strategy, hasMultipleAudioTracks, activeAudioIndex, resetKey, videoRef])
 }

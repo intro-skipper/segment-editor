@@ -8,6 +8,7 @@
 import type Hls from 'hls.js'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
+import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { getVideoStreamUrl } from '@/services/video/api'
 import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
@@ -334,7 +335,13 @@ function enableOnlyNativeAudioTrack(
   enabledIndex: number,
 ): void {
   for (let i = 0; i < nativeAudioTracks.length; i++) {
-    nativeAudioTracks[i].enabled = i === enabledIndex
+    const shouldBeEnabled = i === enabledIndex
+    // Only write on an actual change: assigning `enabled` fires a `change`
+    // event on the track list even when the value is unchanged, and the
+    // initial selection re-runs whenever the stream reloads.
+    if (nativeAudioTracks[i].enabled !== shouldBeEnabled) {
+      nativeAudioTracks[i].enabled = shouldBeEnabled
+    }
   }
 }
 
@@ -351,9 +358,9 @@ function getNativeAudioTracks(
  * (e.g. DTS): enabling it would play silence, so those switches report
  * failure and the caller transcodes instead.
  *
- * @param waitTimeoutMs - When set, waits this long for the native track list
- *   to populate before reading it (used for the initial selection, which runs
- *   right after `loadedmetadata`). Omit to read the list immediately.
+ * @param waitTimeoutMs - How long to wait for the native track list to
+ *   populate before reading it (used for the initial selection, which runs
+ *   right after `loadedmetadata`). Defaults to reading the list immediately.
  * @returns true when the native track was enabled, false when the caller
  *   must fall back to an HLS transcode
  */
@@ -361,21 +368,18 @@ async function tryEnableNativeAudioTrack(
   trackIndex: number,
   targetTrack: AudioTrackInfo,
   options: TrackSwitchOptions,
-  waitTimeoutMs?: number,
+  waitTimeoutMs = 0,
 ): Promise<boolean> {
   const nativeAudioTracks = getNativeAudioTracks(options.videoElement)
   if (!nativeAudioTracks || !isAudioTrackDirectPlayable(targetTrack.codec)) {
     return false
   }
 
-  const populatedTracks =
-    waitTimeoutMs === undefined
-      ? nativeAudioTracks
-      : await waitForNativeAudioTracks(
-          nativeAudioTracks,
-          waitTimeoutMs,
-          options.signal,
-        )
+  await waitForNativeAudioTracks(
+    nativeAudioTracks,
+    waitTimeoutMs,
+    options.signal,
+  )
 
   // The request went stale while waiting (newer selection, item change,
   // unmount): enabling a track now would fight the newer state.
@@ -383,21 +387,21 @@ async function tryEnableNativeAudioTrack(
     return false
   }
 
-  if (populatedTracks.length <= 1) {
+  if (nativeAudioTracks.length <= 1) {
     return false
   }
 
   const nativeTrackIndex = findNativeAudioTrackIndex(
     trackIndex,
     targetTrack,
-    populatedTracks,
+    nativeAudioTracks,
     options.audioTracks,
   )
   if (nativeTrackIndex === -1) {
     return false
   }
 
-  enableOnlyNativeAudioTrack(populatedTracks, nativeTrackIndex)
+  enableOnlyNativeAudioTrack(nativeAudioTracks, nativeTrackIndex)
   return true
 }
 
@@ -407,21 +411,22 @@ async function tryEnableNativeAudioTrack(
  * Browsers populate `audioTracks` while parsing the container, which can lag
  * behind `loadedmetadata`. Resolves early on `addtrack` or when the signal
  * aborts, and after the timeout with whatever the list holds so the caller
- * can fall back.
+ * can fall back. `AudioTrackList` is live, so the caller keeps reading the
+ * list it passed in.
  */
 async function waitForNativeAudioTracks(
   nativeAudioTracks: AudioTrackList,
   timeoutMs: number,
   signal?: AbortSignal,
-): Promise<AudioTrackList> {
+): Promise<void> {
   if (nativeAudioTracks.length > 1 || timeoutMs <= 0 || signal?.aborted) {
-    return nativeAudioTracks
+    return
   }
 
   const addEventListener = nativeAudioTracks.addEventListener
   const removeEventListener = nativeAudioTracks.removeEventListener
   if (!addEventListener || !removeEventListener) {
-    return nativeAudioTracks
+    return
   }
 
   await new Promise<void>((resolve) => {
@@ -440,18 +445,6 @@ async function waitForNativeAudioTracks(
     addEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
     signal?.addEventListener('abort', finish)
   })
-
-  return nativeAudioTracks
-}
-
-/**
- * Returns the track the container plays by default: the one flagged default,
- * or the first audio track when no flag is set.
- */
-function getContainerDefaultAudioTrack(
-  audioTracks: Array<AudioTrackInfo>,
-): AudioTrackInfo | undefined {
-  return audioTracks.find((track) => track.isDefault) ?? audioTracks[0]
 }
 
 function hideTextTracks(textTracks: ArrayLike<TextTrack>): void {

@@ -249,8 +249,10 @@ describe('checkCompatibility decoding configs', () => {
         contentType: 'video/mp4; codecs="avc1.4D001F"',
         width: 1280,
         height: 720,
+        // Bitrate is bucketed to whole Mbps and framerate rounded so files at
+        // the same quality tier share one cached probe result.
         bitrate: 4_000_000,
-        framerate: 23.976,
+        framerate: 24,
       },
     })
     expect(decodingInfo).toHaveBeenNthCalledWith(2, {

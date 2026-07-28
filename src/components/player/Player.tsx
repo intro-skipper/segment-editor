@@ -404,7 +404,7 @@ function useRenderPlayer({
     selectAudioTrack,
     selectSubtitleTrack,
     isLoading: isTrackLoading,
-    nativeAudioSwitchingSupported,
+    audioSwitchRequiresTranscode,
   } = useTrackManager({
     item,
     strategy,
@@ -901,7 +901,7 @@ function useRenderPlayer({
       state: trackState,
       availability: !hasAnyTracks || isTrackLoading ? 'disabled' : 'available',
       strategy,
-      audioSwitching: nativeAudioSwitchingSupported ? 'native' : 'transcode',
+      audioSwitchRequiresTranscode,
       onSelectAudio: handleAudioTrackSelect,
       onSelectSubtitle: handleSubtitleTrackSelect,
     },

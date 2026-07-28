@@ -161,6 +161,23 @@ type JellyfinMediaStream = NonNullable<
 // ============================================================================
 
 /**
+ * Returns the audio track the container plays by default: the one flagged
+ * default, or the first track when no flag is set.
+ *
+ * This is the single definition of "default audio track". Both the playback
+ * strategy decision (`getPlaybackConfig`) and the initial native track
+ * application (`applyInitialAudioTrack`) resolve it through here, so they
+ * cannot disagree about which track direct play starts on.
+ *
+ * @param audioTracks - Audio streams in MediaStream order
+ */
+export function getContainerDefaultAudioTrack<
+  T extends { isDefault?: boolean },
+>(audioTracks: ReadonlyArray<T>): T | undefined {
+  return audioTracks.find((track) => track.isDefault) ?? audioTracks[0]
+}
+
+/**
  * Extracts audio and subtitle track information from a Jellyfin media item.
  * Parses MediaStreams from the first MediaSource and returns structured track info.
  *
