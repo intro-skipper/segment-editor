@@ -210,7 +210,7 @@ export function useTrackManager({
 
   const createSwitchOptions = (
     videoElement: HTMLVideoElement,
-    signal: AbortSignal = abortControllerRef.current!.signal,
+    signal?: AbortSignal,
   ) => ({
     strategy,
     videoElement,
@@ -220,7 +220,7 @@ export function useTrackManager({
     audioTracks,
     subtitleTracks,
     onReloadHls,
-    signal,
+    signal: signal ?? abortControllerRef.current!.signal,
   })
 
   const reportTrackSwitchFailure = (result: TrackSwitchResult): void => {
@@ -299,9 +299,8 @@ export function useTrackManager({
       }
     } catch (err) {
       handleCaughtTrackSwitchError(err)
-    } finally {
-      setIsTrackOperationPending(false)
     }
+    setIsTrackOperationPending(false)
   }
 
   const selectSubtitleTrack = async (index: number | null): Promise<void> => {
@@ -361,9 +360,8 @@ export function useTrackManager({
       }
     } catch (err) {
       handleCaughtTrackSwitchError(err)
-    } finally {
-      setIsTrackOperationPending(false)
     }
+    setIsTrackOperationPending(false)
   }
 
   return {
