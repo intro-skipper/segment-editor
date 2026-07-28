@@ -9,7 +9,7 @@
  */
 
 import { act, render, waitFor } from '@testing-library/react'
-import { useReducer } from 'react'
+import { useEffect, useReducer } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -18,6 +18,13 @@ import type {
   VideoPlayerErrorType,
 } from '@/hooks/use-video-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
+import { useVideoPlayer } from '@/hooks/use-video-player'
+import {
+  initialPlayerState,
+  playerReducer,
+} from '@/components/player/player-reducer'
+import type { PlayerState } from '@/components/player/player-reducer'
+import { getPlaybackConfig } from '@/services/video/api'
 
 type Listener = (event: string, data: unknown) => void
 
@@ -113,14 +120,6 @@ vi.mock('@/services/video/transcode-session', () => ({
   stopActiveEncodingKeepalive: vi.fn(),
 }))
 
-import { useVideoPlayer } from '@/hooks/use-video-player'
-import {
-  initialPlayerState,
-  playerReducer,
-} from '@/components/player/player-reducer'
-import type { PlayerState } from '@/components/player/player-reducer'
-import { getPlaybackConfig } from '@/services/video/api'
-
 function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
   switch (type) {
     case 'media_error':
@@ -168,11 +167,18 @@ function Harness({ item }: { item: BaseItemDto }) {
     },
     t: (key: string) => key,
   })
+  const { retry, videoRef } = player
 
-  observed.state = state
-  observed.retry = player.retry
+  useEffect(() => {
+    observed.state = state
+    observed.retry = retry
+  })
 
-  return <video ref={player.videoRef} />
+  return (
+    <video ref={videoRef} muted>
+      <track kind="captions" />
+    </video>
+  )
 }
 
 /** Mirrors PlayerSurface's overlay conditions. */
