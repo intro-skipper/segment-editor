@@ -75,7 +75,11 @@ describe('AV1 codec strings', () => {
   it('uses the reported seq_level_idx and bit depth', () => {
     expect(buildAv1CodecString(8, 8)).toBe('av01.0.08M.08')
     expect(buildAv1CodecString(13, 10)).toBe('av01.0.13M.10')
-    expect(buildAv1CodecString(12, 12)).toBe('av01.0.12M.10')
+  })
+
+  it('selects the Professional profile for 12-bit streams', () => {
+    expect(buildAv1CodecString(12, 12)).toBe('av01.2.12M.12')
+    expect(buildAv1CodecString(undefined, 12)).toBe('av01.2.08M.12')
   })
 
   it('converts a major.minor level into a seq_level_idx', () => {
@@ -93,6 +97,13 @@ describe('VP9 codec strings', () => {
   it('derives profile, level and bit depth', () => {
     expect(buildVp9CodecString('Profile 2', 4.1, 10)).toBe('vp09.02.41.10')
     expect(buildVp9CodecString('Profile 0', 3, 8)).toBe('vp09.00.30.08')
+  })
+
+  it('keeps 12-bit streams 12-bit and promotes 8-bit profiles', () => {
+    expect(buildVp9CodecString('Profile 2', 4.1, 12)).toBe('vp09.02.41.12')
+    expect(buildVp9CodecString('Profile 0', 4.1, 10)).toBe('vp09.02.41.10')
+    expect(buildVp9CodecString('Profile 1', 4.1, 12)).toBe('vp09.03.41.12')
+    expect(buildVp9CodecString(undefined, undefined, 10)).toBe('vp09.02.10.10')
   })
 
   it('falls back to the profile 0 / level 1.0 / 8-bit default', () => {

@@ -360,7 +360,7 @@ export async function getPlaybackConfig(
 
   const needsNonDefaultAudio =
     audioStreamIndex !== undefined &&
-    isNonFirstAudioTrack(item, audioStreamIndex)
+    isNonDefaultAudioTrack(item, audioStreamIndex)
 
   // A non-default audio track only forces a transcode when the browser cannot
   // select that track natively on the direct-played file.
@@ -400,7 +400,14 @@ export async function getPlaybackConfig(
   }
 }
 
-function isNonFirstAudioTrack(
+/**
+ * Whether the requested audio stream differs from the track the container
+ * plays by default: the stream flagged `IsDefault`, or the first audio stream
+ * when no flag is set. Mirrors `getContainerDefaultAudioTrack` in
+ * track-switching.ts so the strategy decision and the initial native track
+ * application agree on what "default" means.
+ */
+function isNonDefaultAudioTrack(
   item: BaseItemDto,
   audioStreamIndex: number,
 ): boolean {
@@ -409,13 +416,16 @@ function isNonFirstAudioTrack(
     return false
   }
 
-  const mediaStreams = mediaSources[0].MediaStreams ?? []
+  const audioStreams = (mediaSources[0].MediaStreams ?? []).filter(
+    (s) => s.Type === 'Audio',
+  )
 
-  const firstAudioStream = mediaStreams.find((s) => s.Type === 'Audio')
+  const defaultAudioStream =
+    audioStreams.find((s) => s.IsDefault) ?? audioStreams[0]
 
-  if (!firstAudioStream) {
+  if (!defaultAudioStream) {
     return false
   }
 
-  return firstAudioStream.Index !== audioStreamIndex
+  return defaultAudioStream.Index !== audioStreamIndex
 }

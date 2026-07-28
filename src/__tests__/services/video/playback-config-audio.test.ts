@@ -212,6 +212,47 @@ describe('getPlaybackConfig non-default audio track selection', () => {
     expect(supportsNativeAudioTrackSwitching).not.toHaveBeenCalled()
   })
 
+  it('direct plays the IsDefault track without native support even when it is not first', async () => {
+    vi.mocked(supportsNativeAudioTrackSwitching).mockReturnValue(false)
+
+    const item = createMultiAudioItem()
+    const streams = item.MediaSources![0].MediaStreams!
+    const firstAudio = streams.find((s) => s.Index === AAC_STREAM_INDEX)!
+    const secondAudio = streams.find(
+      (s) => s.Index === SECOND_AAC_STREAM_INDEX,
+    )!
+    firstAudio.IsDefault = false
+    secondAudio.IsDefault = true
+
+    const config = await getPlaybackConfig(
+      item,
+      undefined,
+      SECOND_AAC_STREAM_INDEX,
+    )
+
+    expect(config.strategy).toBe('direct')
+    expect(supportsNativeAudioTrackSwitching).not.toHaveBeenCalled()
+  })
+
+  it('treats the first audio stream as non-default when another stream holds the flag', async () => {
+    vi.mocked(supportsNativeAudioTrackSwitching).mockReturnValue(false)
+
+    const item = createMultiAudioItem()
+    const streams = item.MediaSources![0].MediaStreams!
+    const firstAudio = streams.find((s) => s.Index === AAC_STREAM_INDEX)!
+    const secondAudio = streams.find(
+      (s) => s.Index === SECOND_AAC_STREAM_INDEX,
+    )!
+    firstAudio.IsDefault = false
+    secondAudio.IsDefault = true
+
+    const config = await getPlaybackConfig(item, undefined, AAC_STREAM_INDEX)
+
+    const params = new URLSearchParams(config.url.split('?')[1])
+    expect(config.strategy).toBe('hls')
+    expect(params.get('AudioStreamIndex')).toBe(String(AAC_STREAM_INDEX))
+  })
+
   it('keeps forcing HLS during direct play fallback', async () => {
     const config = await getPlaybackConfig(
       createMultiAudioItem(),

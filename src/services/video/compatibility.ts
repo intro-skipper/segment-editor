@@ -205,11 +205,13 @@ function isPositiveNumber(value: number | undefined): value is number {
 
 /**
  * Selects the two-digit bit-depth field shared by the `av01`/`vp09` codec
- * strings: 10 bits and above map to `10`, everything else (including missing
- * metadata) to the 8-bit default.
+ * strings: 12 bits and above map to `12`, 10-11 to `10`, everything else
+ * (including missing metadata) to the 8-bit default.
  */
-function chooseBitDepth(bitDepth: number | undefined): '08' | '10' {
-  return isPositiveNumber(bitDepth) && bitDepth >= 10 ? '10' : '08'
+function chooseBitDepth(bitDepth: number | undefined): '08' | '10' | '12' {
+  if (!isPositiveNumber(bitDepth)) return '08'
+  if (bitDepth >= 12) return '12'
+  return bitDepth >= 10 ? '10' : '08'
 }
 
 /**
@@ -300,30 +302,39 @@ function normalizeAv1SeqLevel(level: number | undefined): number {
 }
 
 /**
- * Builds an `av01.0.<seq level>M.<bit depth>` codec string from AV1 metadata.
+ * Builds an `av01.<profile>.<seq level>M.<bit depth>` codec string from AV1
+ * metadata. 10-bit fits the Main profile (0), but 12-bit is only valid in the
+ * Professional profile (2), so the profile follows the bit depth.
  *
  * @param level - Jellyfin level (seq_level_idx or major.minor), defaults to 8
- * @param bitDepth - Bits per sample, 10+ selects the 10-bit codec string
+ * @param bitDepth - Bits per sample (8, 10, or 12), defaults to 8
  */
 export function buildAv1CodecString(level?: number, bitDepth?: number): string {
   const seqLevel = String(normalizeAv1SeqLevel(level)).padStart(2, '0')
+  const depth = chooseBitDepth(bitDepth)
 
-  return `av01.0.${seqLevel}M.${chooseBitDepth(bitDepth)}`
+  // 12-bit is only valid in the Professional profile (2); 10-bit fits Main (0).
+  const profileId = depth === '12' ? '2' : '0'
+  return `av01.${profileId}.${seqLevel}M.${depth}`
 }
 
 /**
  * Builds a `vp09.PP.LL.DD` codec string from VP9 stream metadata.
  *
+ * Profiles 0/1 only allow 8-bit, so a 10/12-bit stream reported with an
+ * 8-bit profile is promoted to the matching high-bit-depth profile (0→2,
+ * 1→3) to keep the codec string self-consistent.
+ *
  * @param profile - Jellyfin profile name ("Profile 0"), defaults to profile 0
  * @param level - Jellyfin level (4.1 or 41), defaults to level 1.0
- * @param bitDepth - Bits per sample, defaults to 8
+ * @param bitDepth - Bits per sample (8, 10, or 12), defaults to 8
  */
 export function buildVp9CodecString(
   profile?: string,
   level?: number,
   bitDepth?: number,
 ): string {
-  const profileId =
+  let profileId =
     VP9_PROFILE_IDS[profile?.trim().toLowerCase() ?? ''] ??
     DEFAULT_VP9_PROFILE_ID
   const normalizedLevel = normalizeDecimalLevel(level)
@@ -331,8 +342,14 @@ export function buildVp9CodecString(
     normalizedLevel === undefined
       ? DEFAULT_VP9_LEVEL_ID
       : String(normalizedLevel).padStart(2, '0')
+  const depth = chooseBitDepth(bitDepth)
 
-  return `vp09.${profileId}.${levelId}.${chooseBitDepth(bitDepth)}`
+  if (depth !== '08') {
+    if (profileId === '00') profileId = '02'
+    else if (profileId === '01') profileId = '03'
+  }
+
+  return `vp09.${profileId}.${levelId}.${depth}`
 }
 
 /**
