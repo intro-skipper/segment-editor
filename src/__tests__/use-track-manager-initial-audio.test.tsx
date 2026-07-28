@@ -165,6 +165,41 @@ describe('useTrackManager initial audio track application', () => {
     )
   })
 
+  it('keeps isLoading true until all overlapping applications settle', async () => {
+    const resolvers: Array<(result: unknown) => void> = []
+    applyInitialAudioTrackMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        }) as never,
+    )
+
+    const video = createVideo(HTMLMediaElement.HAVE_METADATA)
+    const { result } = renderTrackManager('direct', video)
+
+    await waitFor(() => {
+      expect(applyInitialAudioTrackMock).toHaveBeenCalledTimes(1)
+    })
+
+    // A direct-play reload mid-application re-fires loadedmetadata, starting
+    // a second application while the first is still in flight.
+    act(() => {
+      video.dispatchEvent(new Event('loadedmetadata'))
+    })
+    expect(applyInitialAudioTrackMock).toHaveBeenCalledTimes(2)
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      resolvers[0]({ success: true })
+    })
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      resolvers[1]({ success: true })
+    })
+    expect(result.current.isLoading).toBe(false)
+  })
+
   it('aborts a pending application on unmount and ignores its stale result', async () => {
     let resolveApply: ((result: unknown) => void) | undefined
     applyInitialAudioTrackMock.mockImplementation(

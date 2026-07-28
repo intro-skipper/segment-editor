@@ -138,6 +138,22 @@ export function useTrackManager({
   const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Operations can overlap despite the entry guards: the initial-audio effect
+  // re-applies on every loadedmetadata, and its own HLS-reload fallback fires
+  // one mid-operation. A bare boolean would clear when the FIRST overlapping
+  // operation finishes, unlocking the track menu while another is still in
+  // flight — so count acquisitions and only drop the flag at zero. Ref writes
+  // happen only inside operations (event/effect contexts), never during
+  // render.
+  const pendingOperationCountRef = useRef(0)
+  const setTrackOperationPending = (pending: boolean): void => {
+    pendingOperationCountRef.current = Math.max(
+      0,
+      pendingOperationCountRef.current + (pending ? 1 : -1),
+    )
+    setIsTrackOperationPending(pendingOperationCountRef.current > 0)
+  }
+
   const abortControllerRef = useRef<AbortController | null>(null)
   if (abortControllerRef.current === null)
     abortControllerRef.current = new AbortController()
@@ -272,7 +288,7 @@ export function useTrackManager({
     audioTracks,
     resetKey: itemId,
     createSwitchOptions,
-    setPending: setIsTrackOperationPending,
+    setPending: setTrackOperationPending,
     onResult: (index, result) => {
       if (result.success) {
         setUserSelection(
@@ -323,7 +339,7 @@ export function useTrackManager({
       () => switchAudioTrack(index, createSwitchOptions(video, signal)),
       {
         signal,
-        setPending: setIsTrackOperationPending,
+        setPending: setTrackOperationPending,
         onResult: (result) => {
           if (result.success) {
             switched = true
@@ -384,7 +400,7 @@ export function useTrackManager({
       () => switchSubtitleTrack(index, createSwitchOptions(video, signal)),
       {
         signal,
-        setPending: setIsTrackOperationPending,
+        setPending: setTrackOperationPending,
         onResult: (result) => {
           if (result.success) {
             switched = true

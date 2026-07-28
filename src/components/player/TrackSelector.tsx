@@ -4,6 +4,7 @@ import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
+import { isFirefox, isSafari } from '@/services/video/capabilities'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -50,6 +51,10 @@ export const TrackSelector = function TrackSelectorComponent({
   const isDirect = strategy === 'direct'
   const StrategyIcon = isDirect ? Zap : Monitor
   const showTranscodeHint = audioSwitchRequiresTranscode
+  // Chromium-only: Firefox has no flag for the audioTracks API (it is not
+  // implemented at all) and Safari ships it natively, so the tip would be
+  // misleading on both.
+  const showChromiumFlagTip = showTranscodeHint && !isFirefox() && !isSafari()
 
   return (
     <DropdownMenu>
@@ -148,6 +153,14 @@ export const TrackSelector = function TrackSelectorComponent({
                 {t(
                   'player.tracks.audioSwitchTranscodeHint',
                   'Switching audio restarts the stream as a transcode',
+                )}
+              </p>
+            )}
+            {showChromiumFlagTip && (
+              <p className="px-3 pb-1 text-xs text-muted-foreground">
+                {t(
+                  'player.tracks.audioSwitchChromiumFlagTip',
+                  'Tip: Chromium browsers can switch audio in place when "Experimental Web Platform features" is enabled in chrome://flags',
                 )}
               </p>
             )}
