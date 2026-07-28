@@ -327,4 +327,25 @@ describe('HLS error recovery overlay lifecycle', () => {
     expect(hls.swapAudioCodecCalls).toBe(1)
     expect(hls.recoverCalls).toBe(2)
   })
+
+  it('does not swap the audio codec for a new media error after a successful recovery', async () => {
+    const { hls } = await renderPlayingHarness()
+
+    act(() => {
+      hls.emit('hlsError', fatalMediaError)
+    })
+    expect(hls.recoverCalls).toBe(1)
+
+    // Playback genuinely recovers: the swap window must reset so the next
+    // independent media error does not needlessly swap a working audio track.
+    act(() => {
+      hls.emit('hlsFragBuffered')
+    })
+
+    act(() => {
+      hls.emit('hlsError', fatalMediaError)
+    })
+    expect(hls.swapAudioCodecCalls).toBe(0)
+    expect(hls.recoverCalls).toBe(2)
+  })
 })

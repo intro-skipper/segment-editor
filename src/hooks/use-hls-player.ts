@@ -200,6 +200,7 @@ export function useHlsPlayer({
         // genuinely recovered, so clear the error overlay now instead of
         // waiting for the blind recovery timer.
         hasPendingErrorRef.current = false
+        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
         reportError(null)
         clearRecoveryTimer(recoveryTimerRef)
         reportRecoveryEnd()
@@ -208,6 +209,7 @@ export function useHlsPlayer({
       const handleManifestParsed = () => {
         if (!isActiveRef.current) return
         hasPendingErrorRef.current = false
+        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
         reportError(null)
         clearRecoveryTimer(recoveryTimerRef)
         reportRecoveryEnd()
