@@ -297,10 +297,11 @@ export function useTrackManager({
       } else {
         reportTrackSwitchFailure(result)
       }
+      setIsTrackOperationPending(false)
     } catch (err) {
       handleCaughtTrackSwitchError(err)
+      setIsTrackOperationPending(false)
     }
-    setIsTrackOperationPending(false)
   }
 
   const selectSubtitleTrack = async (index: number | null): Promise<void> => {
@@ -358,10 +359,11 @@ export function useTrackManager({
       } else if (result.error) {
         reportTrackSwitchFailure(result)
       }
+      setIsTrackOperationPending(false)
     } catch (err) {
       handleCaughtTrackSwitchError(err)
+      setIsTrackOperationPending(false)
     }
-    setIsTrackOperationPending(false)
   }
 
   return {
