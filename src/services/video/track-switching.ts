@@ -630,6 +630,12 @@ async function switchDirectPlayAudioTrack(
     return { success: true }
   }
 
+  // A stale switch (newer selection, item change, unmount) must not restart
+  // the stream as a transcode for an outdated index.
+  if (options.signal?.aborted) {
+    return { success: true }
+  }
+
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
   return reloadHlsAudioTrack(

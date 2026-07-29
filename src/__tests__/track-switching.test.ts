@@ -227,6 +227,38 @@ describe('switchAudioTrack native and HLS runtime selection', () => {
     })
   })
 
+  it('does not reload as a transcode when the switch was aborted', async () => {
+    createPlaySessionIdMock.mockReturnValue('play-session-1')
+    getVideoStreamUrlMock.mockReturnValue('https://example.com/hls.m3u8')
+    const video = document.createElement('video')
+    const { list, tracks } = createNativeAudioTracks(['spa', 'fra'])
+    Object.defineProperty(video, 'audioTracks', {
+      configurable: true,
+      value: list,
+    })
+    const onReloadHls = vi.fn<() => Promise<void>>()
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      switchAudioTrack(9, {
+        strategy: 'direct',
+        videoElement: video,
+        audioTracks: [
+          createAudioTrack(5, 99, 'eng'),
+          createAudioTrack(7, 99, 'jpn'),
+          createAudioTrack(9, 99, 'kor'),
+        ],
+        itemId: 'item-native',
+        onReloadHls,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ success: true })
+
+    expect(tracks.map((track) => track.enabled)).toEqual([true, false])
+    expect(onReloadHls).not.toHaveBeenCalled()
+  })
+
   it('uses an HLS manifest audio track language match without reloading', async () => {
     const hlsInstance = {
       audioTracks: [
