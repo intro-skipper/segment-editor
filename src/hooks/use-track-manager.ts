@@ -12,13 +12,17 @@ import type {
   SubtitleTrackInfo,
   TrackState,
 } from '@/services/video/tracks'
-import { extractTracks } from '@/services/video/tracks'
+import {
+  extractTracks,
+  findPreferredAudioStreamIndex,
+} from '@/services/video/tracks'
 import {
   switchAudioTrack,
   switchSubtitleTrack,
 } from '@/services/video/track-switching'
 import { runTrackOperation } from '@/services/video/track-operation'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
+import { isAudioTrackDirectPlayable } from '@/services/video/compatibility'
 import { useInitialAudioSelection } from '@/hooks/use-initial-audio-selection'
 import {
   preloadJassubRenderer,
@@ -65,17 +69,7 @@ function findPreferredAudioIndex(
   audioTracks: Array<AudioTrackInfo>,
   preferredLanguage: string | null,
 ): number {
-  if (preferredLanguage) {
-    const preferredTrack = audioTracks.find((track) =>
-      languagesMatch(track.language, preferredLanguage),
-    )
-    if (preferredTrack) return preferredTrack.index
-  }
-
-  const defaultTrack = audioTracks.find((track) => track.isDefault)
-  if (defaultTrack) return defaultTrack.index
-
-  return audioTracks.length > 0 ? audioTracks[0].index : 0
+  return findPreferredAudioStreamIndex(audioTracks, preferredLanguage) ?? 0
 }
 
 function findPreferredSubtitleIndex(
@@ -429,6 +423,9 @@ export function useTrackManager({
     audioSwitchRequiresTranscode:
       strategy === 'direct' &&
       audioTracks.length > 1 &&
-      !supportsNativeAudioTrackSwitching(),
+      (!supportsNativeAudioTrackSwitching() ||
+        // A track the browser cannot decode (e.g. DTS) transcodes even when
+        // the native switching API is available.
+        !audioTracks.every((track) => isAudioTrackDirectPlayable(track.codec))),
   }
 }

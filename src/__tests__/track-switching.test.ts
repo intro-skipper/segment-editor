@@ -29,6 +29,20 @@ vi.mock('@/services/jellyfin', () => ({
   getDeviceId: getDeviceIdMock,
 }))
 
+// jsdom has no MediaCapabilities and canPlayType() returns '', which would
+// make every codec look undecodable. Resolve decodability from the
+// direct-play list instead so the native-switch paths stay testable.
+vi.mock('@/services/video/compatibility', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@/services/video/compatibility')>()
+  return {
+    ...original,
+    isCodecSupported: vi.fn(async (codec: string) =>
+      original.isAudioTrackDirectPlayable(codec),
+    ),
+  }
+})
+
 function createAudioTrack(
   index: number,
   relativeIndex: number,

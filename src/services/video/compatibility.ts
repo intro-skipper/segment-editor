@@ -12,6 +12,7 @@ import {
   isSafari,
   probeCanPlayType,
 } from '@/services/video/capabilities'
+import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 
 // ============================================================================
 // Types and Interfaces
@@ -226,7 +227,9 @@ export function buildH264CodecString(profile?: string, level?: number): string {
  */
 function normalizeHevcLevelId(level: number | undefined): number {
   if (!isPositiveNumber(level)) return DEFAULT_HEVC_LEVEL_ID
-  return level > 30 ? Math.round(level) : Math.round(level * 30)
+  // HEVC decimal levels stop at 6.2, and general_level_idc starts at 30
+  // (level 1.0 = 30), so >= 30 must be treated as an idc, not a decimal.
+  return level >= 30 ? Math.round(level) : Math.round(level * 30)
 }
 
 /**
@@ -271,19 +274,38 @@ function normalizeAv1SeqLevel(level: number | undefined): number {
 }
 
 /**
+ * AV1 profile ids keyed by the profile name Jellyfin reports.
+ * Main = 0 (4:2:0), High = 1 (4:4:4), Professional = 2 (4:2:2 / 12-bit).
+ */
+const AV1_PROFILE_IDS: Record<string, string> = {
+  main: '0',
+  high: '1',
+  professional: '2',
+}
+
+/**
  * Builds an `av01.<profile>.<seq level>M.<bit depth>` codec string from AV1
- * metadata. 10-bit fits the Main profile (0), but 12-bit is only valid in the
- * Professional profile (2), so the profile follows the bit depth.
+ * metadata. The profile follows the reported profile name, except that 12-bit
+ * is only valid in the Professional profile (2), which then takes precedence.
  *
+ * @param profile - Jellyfin profile name (Main, High, Professional), defaults to Main
  * @param level - Jellyfin level (seq_level_idx or major.minor), defaults to 8
  * @param bitDepth - Bits per sample (8, 10, or 12), defaults to 8
  */
-export function buildAv1CodecString(level?: number, bitDepth?: number): string {
+export function buildAv1CodecString(
+  profile?: string,
+  level?: number,
+  bitDepth?: number,
+): string {
   const seqLevel = String(normalizeAv1SeqLevel(level)).padStart(2, '0')
   const depth = chooseBitDepth(bitDepth)
 
-  // 12-bit is only valid in the Professional profile (2); 10-bit fits Main (0).
-  const profileId = depth === '12' ? '2' : '0'
+  // 12-bit is only valid in the Professional profile (2); otherwise follow
+  // the reported profile name, defaulting to Main (0).
+  const profileId =
+    depth === '12'
+      ? '2'
+      : (AV1_PROFILE_IDS[profile?.trim().toLowerCase() ?? ''] ?? '0')
   return `av01.${profileId}.${seqLevel}M.${depth}`
 }
 
@@ -343,7 +365,7 @@ const VIDEO_CODEC_CONTENT_TYPE_BUILDERS: Record<
   vp9: (video) =>
     `video/webm; codecs="${buildVp9CodecString(video?.profile, video?.level, video?.bitDepth)}"`,
   av1: (video) =>
-    `video/mp4; codecs="${buildAv1CodecString(video?.level, video?.bitDepth)}"`,
+    `video/mp4; codecs="${buildAv1CodecString(video?.profile, video?.level, video?.bitDepth)}"`,
 }
 
 /**
@@ -456,11 +478,27 @@ function toMbpsBucket(bitrate: number): number {
   return Math.max(1, Math.ceil(bitrate / 1_000_000)) * 1_000_000
 }
 
+/** Whether the stream reports a high dynamic range (Jellyfin `VideoRange`). */
+function isHdrVideoRange(videoRange: string | undefined): boolean {
+  return videoRange?.trim().toUpperCase() === 'HDR'
+}
+
+interface VideoDecodingConfig {
+  contentType: string
+  width: number
+  height: number
+  bitrate: number
+  framerate: number
+  transferFunction?: 'pq'
+  colorGamut?: 'rec2020'
+  hdrMetadataType?: 'smpteSt2086'
+}
+
 function buildVideoDecodingConfig(
   contentType: string,
   video?: VideoStreamInfo,
-) {
-  return {
+): VideoDecodingConfig {
+  const config: VideoDecodingConfig = {
     contentType,
     width: Math.round(clampNumber(video?.width, DEFAULT_VIDEO_WIDTH)),
     height: Math.round(clampNumber(video?.height, DEFAULT_VIDEO_HEIGHT)),
@@ -469,6 +507,19 @@ function buildVideoDecodingConfig(
       clampNumber(video?.frameRate, DEFAULT_VIDEO_FRAMERATE),
     ),
   }
+
+  // Probe HDR streams as HDR so SDR-only decoders reject them. PQ/rec2020/
+  // SMPTE ST 2086 is the common HDR10 shape; isCodecSupported retries without
+  // these members when the browser rejects the dictionary (they are
+  // Chromium-only). The config doubles as the cache key, so HDR and SDR
+  // probes never share an entry.
+  if (isHdrVideoRange(video?.videoRange)) {
+    config.transferFunction = 'pq'
+    config.colorGamut = 'rec2020'
+    config.hdrMetadataType = 'smpteSt2086'
+  }
+
+  return config
 }
 
 function buildAudioDecodingConfig(contentType: string, channels?: number) {
@@ -563,7 +614,24 @@ export async function isCodecSupported(
   // Try MediaCapabilities API first
   if (typeof navigator !== 'undefined' && 'mediaCapabilities' in navigator) {
     try {
-      const result = await navigator.mediaCapabilities.decodingInfo(config)
+      let result: MediaCapabilitiesDecodingInfo
+      try {
+        result = await navigator.mediaCapabilities.decodingInfo(config)
+      } catch (err) {
+        // The HDR dictionary members are Chromium-only; retry the plain SDR
+        // shape before giving up on MediaCapabilities.
+        if (config.video?.transferFunction === undefined) throw err
+        const {
+          transferFunction: _tf,
+          colorGamut: _cg,
+          hdrMetadataType: _hdr,
+          ...sdrVideo
+        } = config.video
+        result = await navigator.mediaCapabilities.decodingInfo({
+          type: 'file',
+          video: sdrVideo,
+        })
+      }
       return cacheCapability(cacheKey, result.supported)
     } catch {
       // Fall through to canPlayType fallback
@@ -610,8 +678,10 @@ export function isAudioTrackDirectPlayable(codec: string): boolean {
  * 2. Video codec compatibility (both in list and browser support)
  * 3. Audio codec compatibility (both in list and browser support)
  *
- * Only the first audio stream gates direct play; unsupported codecs on other
- * audio streams merely constrain track switching.
+ * Only the container-default audio stream (the `IsDefault`-flagged one, or
+ * the first when no flag is set) gates direct play, because that is the track
+ * the browser starts on; unsupported codecs on other audio streams merely
+ * constrain track switching.
  *
  * @param mediaSource - Media source information from Jellyfin
  * @returns Promise resolving to compatibility result
@@ -627,7 +697,15 @@ export async function checkCompatibility(
     }
   }
 
-  const { container, videoCodec, audioCodec } = mediaSource
+  const { container, videoCodec } = mediaSource
+
+  // The browser starts playback on the container-default track, so that is
+  // the stream that decides direct play. Legacy callers without audioStreams
+  // metadata fall back to the flat audioCodec field.
+  const defaultAudioStream = getContainerDefaultAudioTrack(
+    mediaSource.audioStreams ?? [],
+  )
+  const audioCodec = defaultAudioStream?.codec || mediaSource.audioCodec
 
   // Check container compatibility
   if (!container || !isDirectPlayContainerSupported(container)) {
@@ -658,7 +736,7 @@ export async function checkCompatibility(
   const [videoSupported, audioSupported] = await Promise.all([
     isCodecSupported(videoCodec, 'video', { video: mediaSource.video }),
     isCodecSupported(audioCodec, 'audio', {
-      channels: mediaSource.audioStreams?.[0]?.channels,
+      channels: defaultAudioStream?.channels,
     }),
   ])
 

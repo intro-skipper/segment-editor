@@ -12,6 +12,7 @@ import {
   clearCache,
   getDirectPlayContainers,
   isAudioTrackDirectPlayable,
+  isCodecSupported,
   isDirectPlayContainerSupported,
 } from '@/services/video/compatibility'
 
@@ -58,6 +59,8 @@ describe('HEVC codec strings', () => {
     expect(buildHevcCodecString('Main', 4.1)).toBe('hvc1.1.6.L123.B0')
     expect(buildHevcCodecString('Main', 123)).toBe('hvc1.1.6.L123.B0')
     expect(buildHevcCodecString('Main', 5.1)).toBe('hvc1.1.6.L153.B0')
+    // 30 is general_level_idc for level 1.0, not a decimal level.
+    expect(buildHevcCodecString('Main', 30)).toBe('hvc1.1.6.L30.B0')
   })
 
   it('uses the Main 10 profile prefix for 10-bit profiles', () => {
@@ -73,23 +76,30 @@ describe('HEVC codec strings', () => {
 
 describe('AV1 codec strings', () => {
   it('uses the reported seq_level_idx and bit depth', () => {
-    expect(buildAv1CodecString(8, 8)).toBe('av01.0.08M.08')
-    expect(buildAv1CodecString(13, 10)).toBe('av01.0.13M.10')
+    expect(buildAv1CodecString(undefined, 8, 8)).toBe('av01.0.08M.08')
+    expect(buildAv1CodecString(undefined, 13, 10)).toBe('av01.0.13M.10')
+  })
+
+  it('maps the reported profile name onto the profile id', () => {
+    expect(buildAv1CodecString('Main', 8, 8)).toBe('av01.0.08M.08')
+    expect(buildAv1CodecString('High', 8, 8)).toBe('av01.1.08M.08')
+    expect(buildAv1CodecString('Professional', 8, 10)).toBe('av01.2.08M.10')
   })
 
   it('selects the Professional profile for 12-bit streams', () => {
-    expect(buildAv1CodecString(12, 12)).toBe('av01.2.12M.12')
-    expect(buildAv1CodecString(undefined, 12)).toBe('av01.2.08M.12')
+    expect(buildAv1CodecString(undefined, 12, 12)).toBe('av01.2.12M.12')
+    expect(buildAv1CodecString('Main', 12, 12)).toBe('av01.2.12M.12')
+    expect(buildAv1CodecString(undefined, undefined, 12)).toBe('av01.2.08M.12')
   })
 
   it('converts a major.minor level into a seq_level_idx', () => {
-    expect(buildAv1CodecString(4.1)).toBe('av01.0.09M.08')
-    expect(buildAv1CodecString(6.3)).toBe('av01.0.19M.08')
+    expect(buildAv1CodecString(undefined, 4.1)).toBe('av01.0.09M.08')
+    expect(buildAv1CodecString(undefined, 6.3)).toBe('av01.0.19M.08')
   })
 
   it('falls back to seq level 8 and 8-bit when metadata is missing', () => {
     expect(buildAv1CodecString()).toBe('av01.0.08M.08')
-    expect(buildAv1CodecString(99)).toBe('av01.0.08M.08')
+    expect(buildAv1CodecString(undefined, 99)).toBe('av01.0.08M.08')
   })
 })
 
@@ -204,7 +214,7 @@ describe('per-track audio playability', () => {
 })
 
 describe('checkCompatibility decoding configs', () => {
-  const decodingInfo = vi.fn(async () => ({
+  const decodingInfo = vi.fn(async (_config?: unknown) => ({
     supported: true,
     smooth: true,
     powerEfficient: true,
@@ -319,5 +329,108 @@ describe('checkCompatibility decoding configs', () => {
 
     expect(result.canDirectPlay).toBe(false)
     expect(result.reason).toContain('container')
+  })
+
+  it('gates direct play on the IsDefault audio stream, not the first one', async () => {
+    const rejected = await checkCompatibility({
+      container: 'mp4',
+      videoCodec: 'h264',
+      audioCodec: 'aac',
+      audioStreams: [
+        { index: 1, codec: 'aac', channels: 2 },
+        { index: 2, codec: 'dts', channels: 8, isDefault: true },
+      ],
+    })
+
+    expect(rejected.canDirectPlay).toBe(false)
+    expect(rejected.reason).toContain('dts')
+
+    const accepted = await checkCompatibility({
+      container: 'mp4',
+      videoCodec: 'h264',
+      audioCodec: 'dts',
+      audioStreams: [
+        { index: 1, codec: 'dts', channels: 8 },
+        { index: 2, codec: 'aac', channels: 2, isDefault: true },
+      ],
+    })
+
+    expect(accepted).toEqual({ canDirectPlay: true })
+    expect(decodingInfo).toHaveBeenLastCalledWith({
+      type: 'file',
+      audio: {
+        contentType: 'audio/mp4; codecs="mp4a.40.2"',
+        channels: '2',
+        bitrate: 128_000,
+        samplerate: 48_000,
+      },
+    })
+  })
+
+  it('probes HDR streams with the HDR decoding dictionary', async () => {
+    await checkCompatibility({
+      container: 'mp4',
+      videoCodec: 'hevc',
+      audioCodec: 'aac',
+      video: {
+        codec: 'hevc',
+        profile: 'Main 10',
+        level: 153,
+        width: 3840,
+        height: 2160,
+        bitrate: 20_000_000,
+        bitDepth: 10,
+        videoRange: 'HDR',
+        frameRate: 24,
+      },
+    })
+
+    expect(decodingInfo).toHaveBeenNthCalledWith(1, {
+      type: 'file',
+      video: {
+        contentType: 'video/mp4; codecs="hvc1.2.4.L153.B0"',
+        width: 3840,
+        height: 2160,
+        bitrate: 20_000_000,
+        framerate: 24,
+        transferFunction: 'pq',
+        colorGamut: 'rec2020',
+        hdrMetadataType: 'smpteSt2086',
+      },
+    })
+  })
+
+  it('retries without the HDR dictionary when the browser rejects it', async () => {
+    decodingInfo
+      .mockRejectedValueOnce(new TypeError('unsupported member'))
+      .mockResolvedValue({
+        supported: true,
+        smooth: true,
+        powerEfficient: true,
+      })
+
+    const supported = await isCodecSupported('hevc', 'video', {
+      video: { codec: 'hevc', videoRange: 'HDR' },
+    })
+
+    expect(supported).toBe(true)
+    expect(decodingInfo).toHaveBeenCalledTimes(2)
+    const retryConfig = decodingInfo.mock.calls[1][0] as {
+      video: Record<string, unknown>
+    }
+    expect(retryConfig.video.transferFunction).toBeUndefined()
+    expect(retryConfig.video.hdrMetadataType).toBeUndefined()
+    expect(retryConfig.video.colorGamut).toBeUndefined()
+  })
+
+  it('buckets bitrates to whole Mbps in the capability cache key', async () => {
+    await isCodecSupported('h264', 'video', {
+      video: { codec: 'h264', bitrate: 4_000_001 },
+    })
+    await isCodecSupported('h264', 'video', {
+      video: { codec: 'h264', bitrate: 4_900_000 },
+    })
+
+    expect(decodingInfo).toHaveBeenCalledTimes(1)
   })
 })

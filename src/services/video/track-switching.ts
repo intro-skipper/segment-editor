@@ -12,7 +12,10 @@ import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { getVideoStreamUrl } from '@/services/video/api'
 import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
-import { isAudioTrackDirectPlayable } from '@/services/video/compatibility'
+import {
+  isAudioTrackDirectPlayable,
+  isCodecSupported,
+} from '@/services/video/compatibility'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
 /**
@@ -372,6 +375,16 @@ async function tryEnableNativeAudioTrack(
 ): Promise<boolean> {
   const nativeAudioTracks = getNativeAudioTracks(options.videoElement)
   if (!nativeAudioTracks || !isAudioTrackDirectPlayable(targetTrack.codec)) {
+    return false
+  }
+
+  // The list check above filters known-untranscodable codecs cheaply; this
+  // probe catches codecs that are on the list but have no decoder in this
+  // browser build (e.g. E-AC-3 on Chromium without proprietary codecs).
+  const codecDecodable = await isCodecSupported(targetTrack.codec, 'audio', {
+    channels: targetTrack.channels,
+  })
+  if (!codecDecodable || options.signal?.aborted) {
     return false
   }
 

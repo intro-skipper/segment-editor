@@ -8,6 +8,7 @@ import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import {
   checkCompatibility,
   isAudioTrackDirectPlayable,
+  isCodecSupported,
 } from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
@@ -279,7 +280,11 @@ export function extractMediaSourceInfo(
 
   const container = source.Container ?? ''
   const videoCodec = videoStream?.Codec ?? ''
-  const audioCodec = audioStreams[0]?.Codec ?? ''
+  // The codec that gates direct play is the container-default track's (the
+  // stream the browser starts on), not necessarily the first audio stream.
+  const defaultAudioStream =
+    audioStreams.find((s) => s.IsDefault) ?? audioStreams[0]
+  const audioCodec = defaultAudioStream?.Codec ?? ''
 
   if (!container || !videoCodec) {
     return null
@@ -316,12 +321,15 @@ export function extractMediaSourceInfo(
 /**
  * Whether the requested audio stream can be selected natively during direct
  * play: the browser must expose the HTML `audioTracks` API and be able to
- * decode that specific track (a flagged Chromium still cannot decode DTS).
+ * decode that specific track. The list check filters known-untranscodable
+ * codecs (e.g. DTS) cheaply; the MediaCapabilities probe then catches codecs
+ * that are on the list but missing a decoder in this browser build (e.g.
+ * E-AC-3 on Chromium variants without proprietary codecs).
  */
-function canStartDirectPlayWithAudioTrack(
+async function canStartDirectPlayWithAudioTrack(
   mediaSourceInfo: MediaSourceInfo | null,
   audioStreamIndex: number | undefined,
-): boolean {
+): Promise<boolean> {
   if (audioStreamIndex === undefined) return false
   if (!supportsNativeAudioTrackSwitching()) return false
 
@@ -331,7 +339,11 @@ function canStartDirectPlayWithAudioTrack(
     )
   if (!targetStream) return false
 
-  return isAudioTrackDirectPlayable(targetStream.codec)
+  if (!isAudioTrackDirectPlayable(targetStream.codec)) return false
+
+  return isCodecSupported(targetStream.codec, 'audio', {
+    channels: targetStream.channels,
+  })
 }
 
 export async function getPlaybackConfig(
@@ -368,7 +380,10 @@ export async function getPlaybackConfig(
     // select that track natively on the direct-played file.
     const canDirectPlayRequestedAudio =
       !needsNonDefaultAudio ||
-      canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
+      (await canStartDirectPlayWithAudioTrack(
+        mediaSourceInfo,
+        audioStreamIndex,
+      ))
 
     if (
       canDirectPlayRequestedAudio &&

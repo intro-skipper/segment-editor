@@ -4,7 +4,11 @@ import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
-import { isFirefox, isSafari } from '@/services/video/capabilities'
+import {
+  isFirefox,
+  isSafari,
+  supportsNativeAudioTrackSwitching,
+} from '@/services/video/capabilities'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,8 +57,13 @@ export const TrackSelector = function TrackSelectorComponent({
   const showTranscodeHint = audioSwitchRequiresTranscode
   // Chromium-only: Firefox has no flag for the audioTracks API (it is not
   // implemented at all) and Safari ships it natively, so the tip would be
-  // misleading on both.
-  const showChromiumFlagTip = showTranscodeHint && !isFirefox() && !isSafari()
+  // misleading on both. It is also pointless when the API is already exposed
+  // and the transcode hint stems from an undecodable codec instead.
+  const showChromiumFlagTip =
+    showTranscodeHint &&
+    !supportsNativeAudioTrackSwitching() &&
+    !isFirefox() &&
+    !isSafari()
 
   return (
     <DropdownMenu>

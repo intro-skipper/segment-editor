@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { extractTracks } from '@/services/video/tracks'
+import {
+  extractTracks,
+  findPreferredAudioStreamIndex,
+} from '@/services/video/tracks'
 
 describe('extractTracks null-tolerant Jellyfin input', () => {
   it('returns empty tracks for missing, null, or empty media sources', () => {
@@ -81,5 +84,45 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
         deliveryUrl: undefined,
       },
     ])
+  })
+})
+
+describe('findPreferredAudioStreamIndex', () => {
+  const makeTrack = (
+    index: number,
+    language: string | null,
+    isDefault = false,
+  ) => ({
+    index,
+    relativeIndex: index - 1,
+    language,
+    displayTitle: `Track ${index}`,
+    codec: 'aac',
+    channels: 2,
+    isDefault,
+  })
+
+  it('prefers a language match over the default flag', () => {
+    const tracks = [makeTrack(1, 'eng', true), makeTrack(2, 'jpn')]
+    expect(findPreferredAudioStreamIndex(tracks, 'jpn')).toBe(2)
+  })
+
+  it('falls back to the default-flagged track, then the first track', () => {
+    expect(
+      findPreferredAudioStreamIndex(
+        [makeTrack(1, 'eng'), makeTrack(2, 'jpn', true)],
+        'deu',
+      ),
+    ).toBe(2)
+    expect(
+      findPreferredAudioStreamIndex(
+        [makeTrack(1, 'eng'), makeTrack(2, 'jpn')],
+        null,
+      ),
+    ).toBe(1)
+  })
+
+  it('returns undefined when there are no audio tracks', () => {
+    expect(findPreferredAudioStreamIndex([], 'eng')).toBeUndefined()
   })
 })

@@ -38,7 +38,6 @@ import { getBestImageUrl } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { useSessionStore } from '@/stores/session-store'
 import { useAppStore } from '@/stores/app-store'
-import { languagesMatch } from '@/lib/language-utils'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
@@ -50,7 +49,10 @@ import {
   getSkipStepSeconds,
 } from '@/lib/player-timing-utils'
 import { snapToFrame } from '@/lib/time-utils'
-import { extractTracks } from '@/services/video/tracks'
+import {
+  extractTracks,
+  findPreferredAudioStreamIndex,
+} from '@/services/video/tracks'
 
 const PLAYBACK_UPDATE_INTERVAL_MS = 120
 
@@ -150,19 +152,12 @@ function TimelineScrubber({
   )
 }
 
-function findPreferredAudioStreamIndex(
+function findItemPreferredAudioStreamIndex(
   item: BaseItemDto,
   preferredLanguage: string | null,
 ): number | undefined {
-  if (!preferredLanguage) return undefined
   const { audioTracks } = extractTracks(item)
-  if (audioTracks.length === 0) return undefined
-
-  const matchingTrack = audioTracks.find((track) =>
-    languagesMatch(track.language, preferredLanguage),
-  )
-
-  return matchingTrack?.index
+  return findPreferredAudioStreamIndex(audioTracks, preferredLanguage)
 }
 
 function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
@@ -360,7 +355,7 @@ function useRenderPlayer({
     (s) => s.trackPreferences.preferredAudioLanguage,
   )
 
-  const preferredAudioStreamIndex = findPreferredAudioStreamIndex(
+  const preferredAudioStreamIndex = findItemPreferredAudioStreamIndex(
     item,
     preferredAudioLanguage,
   )

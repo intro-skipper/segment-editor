@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type * as CompatibilityModule from '@/services/video/compatibility'
 import { extractMediaSourceInfo, getPlaybackConfig } from '@/services/video/api'
-import { checkCompatibility } from '@/services/video/compatibility'
+import {
+  checkCompatibility,
+  isCodecSupported,
+} from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import { createPlaySessionId } from '@/services/video/session'
 
@@ -24,6 +27,7 @@ vi.mock('@/services/video/compatibility', async (importOriginal) => {
   return {
     ...original,
     checkCompatibility: vi.fn(),
+    isCodecSupported: vi.fn(),
   }
 })
 
@@ -147,6 +151,7 @@ describe('getPlaybackConfig non-default audio track selection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(checkCompatibility).mockResolvedValue({ canDirectPlay: true })
+    vi.mocked(isCodecSupported).mockResolvedValue(true)
     vi.mocked(createPlaySessionId).mockReturnValue('generated-session-id')
     vi.mocked(supportsNativeAudioTrackSwitching).mockReturnValue(true)
   })
@@ -187,6 +192,23 @@ describe('getPlaybackConfig non-default audio track selection', () => {
     const params = new URLSearchParams(config.url.split('?')[1])
     expect(config.strategy).toBe('hls')
     expect(params.get('AudioStreamIndex')).toBe(String(DTS_STREAM_INDEX))
+  })
+
+  it('transcodes when MediaCapabilities rejects a listed codec', async () => {
+    // E.g. E-AC-3 on a Chromium build without proprietary decoders: the codec
+    // passes the list check but the decoder probe says no.
+    vi.mocked(isCodecSupported).mockResolvedValue(false)
+
+    const config = await getPlaybackConfig(
+      createMultiAudioItem(),
+      undefined,
+      SECOND_AAC_STREAM_INDEX,
+    )
+
+    expect(config.strategy).toBe('hls')
+    expect(isCodecSupported).toHaveBeenCalledWith('aac', 'audio', {
+      channels: 6,
+    })
   })
 
   it('transcodes when the requested track is not part of the media source', async () => {
