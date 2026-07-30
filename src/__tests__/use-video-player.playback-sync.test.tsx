@@ -1338,12 +1338,6 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
   })
 
   it('threads the current audio stream index into the forced-HLS error fallback', async () => {
-    vi.stubGlobal('MediaError', {
-      MEDIA_ERR_ABORTED: 1,
-      MEDIA_ERR_NETWORK: 2,
-      MEDIA_ERR_DECODE: 3,
-      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    })
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
       () => undefined,
     )
@@ -1423,12 +1417,6 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
   })
 
   it('falls back to the initial preferred audio index when no current-index getter is provided', async () => {
-    vi.stubGlobal('MediaError', {
-      MEDIA_ERR_ABORTED: 1,
-      MEDIA_ERR_NETWORK: 2,
-      MEDIA_ERR_DECODE: 3,
-      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    })
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
       () => undefined,
     )

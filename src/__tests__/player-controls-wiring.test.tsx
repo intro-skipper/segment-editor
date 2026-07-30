@@ -10,6 +10,7 @@ import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/hooks/use-video-player'
+import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 type PlayerProps = ComponentProps<typeof Player>
@@ -34,7 +35,7 @@ const mocks = vi.hoisted(() => ({
   videoPlayerIsLoading: true,
   videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
-  audioSwitchTranscodeScope: 'all' as 'none' | 'some' | 'all',
+  audioSwitchTranscodeScope: 'all' as AudioSwitchTranscodeScope,
   segmentSkipMode: 'button',
   segmentSkipModeRevision: 0,
   fullscreenUi: {
@@ -155,21 +156,24 @@ vi.mock('@/services/video/api', async (importOriginal) => {
   }
 })
 
-vi.mock('@/stores/app-store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      segmentSkipMode: mocks.segmentSkipMode,
-      segmentSkipModeRevision: mocks.segmentSkipModeRevision,
-      jellyfinPlaybackSyncEnabled: false,
-      trackPreferences: {
-        preferredAudioLanguage: 'eng',
-      },
-      setShowVideoPlayer: mocks.setShowVideoPlayer,
-      setPreferredAudioLanguage: mocks.setPreferredAudioLanguage,
-      setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
-      setSubtitlesEnabled: mocks.setSubtitlesEnabled,
-    }),
-}))
+vi.mock('@/stores/app-store', () => {
+  const getState = () => ({
+    segmentSkipMode: mocks.segmentSkipMode,
+    segmentSkipModeRevision: mocks.segmentSkipModeRevision,
+    jellyfinPlaybackSyncEnabled: false,
+    trackPreferences: {
+      preferredAudioLanguage: 'eng',
+    },
+    setShowVideoPlayer: mocks.setShowVideoPlayer,
+    setPreferredAudioLanguage: mocks.setPreferredAudioLanguage,
+    setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
+    setSubtitlesEnabled: mocks.setSubtitlesEnabled,
+  })
+  const useAppStore = (selector: (state: unknown) => unknown) =>
+    selector(getState())
+  useAppStore.getState = getState
+  return { useAppStore }
+})
 
 vi.mock('@/stores/session-store', () => ({
   useSessionStore: (selector: (state: unknown) => unknown) =>

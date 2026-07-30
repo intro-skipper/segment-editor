@@ -65,7 +65,7 @@ export interface MediaSourceInfo {
   /** Full metadata of the primary video stream */
   video?: VideoStreamInfo
   /** All audio streams of the media source, in MediaStream order */
-  audioStreams?: Array<AudioStreamInfo>
+  audioStreams?: ReadonlyArray<AudioStreamInfo>
 }
 
 /**
@@ -95,7 +95,11 @@ export interface CodecCapabilityHints {
  * Actual support is feature detected per browser, see
  * {@link isDirectPlayContainerSupported}.
  */
-export const DIRECT_PLAY_CONTAINERS = ['mp4', 'mkv', 'webm'] as const
+export const DIRECT_PLAY_CONTAINERS: ReadonlyArray<string> = [
+  'mp4',
+  'mkv',
+  'webm',
+]
 
 /** MIME type probed to detect Matroska direct play support. */
 const MATROSKA_MIME_TYPE = 'video/x-matroska'
@@ -143,8 +147,9 @@ export function getCacheSize(): number {
 
 /**
  * H.264 profile_idc values keyed by the profile name Jellyfin reports.
+ * The `| undefined` value type keeps the miss-fallbacks type-required.
  */
-const H264_PROFILE_IDS: Record<string, string> = {
+const H264_PROFILE_IDS: Record<string, string | undefined> = {
   baseline: '42',
   'constrained baseline': '42',
   main: '4D',
@@ -157,7 +162,7 @@ const DEFAULT_H264_PROFILE_ID = '64'
 const DEFAULT_H264_LEVEL_ID = '28'
 
 /** VP9 profile ids keyed by the profile name Jellyfin reports. */
-const VP9_PROFILE_IDS: Record<string, string> = {
+const VP9_PROFILE_IDS: Record<string, string | undefined> = {
   'profile 0': '00',
   'profile 1': '01',
   'profile 2': '02',
@@ -279,7 +284,7 @@ function normalizeAv1SeqLevel(level: number | undefined): number {
  * AV1 profile ids keyed by the profile name Jellyfin reports.
  * Main = 0 (4:2:0), High = 1 (4:4:4), Professional = 2 (4:2:2 / 12-bit).
  */
-const AV1_PROFILE_IDS: Record<string, string> = {
+const AV1_PROFILE_IDS: Record<string, string | undefined> = {
   main: '0',
   high: '1',
   professional: '2',
@@ -396,7 +401,7 @@ export function buildVideoContentType(
  * definition of which audio codecs are direct playable:
  * {@link DIRECT_PLAY_AUDIO_CODECS} is derived from its keys.
  */
-const AUDIO_CODEC_MIME_MAP: Record<string, string> = {
+const AUDIO_CODEC_MIME_MAP: Record<string, string | undefined> = {
   aac: 'audio/mp4; codecs="mp4a.40.2"',
   mp3: 'audio/mpeg',
   opus: 'audio/webm; codecs="opus"',
@@ -453,7 +458,7 @@ function isMkvDirectPlayable(): boolean {
 export function isDirectPlayContainerSupported(container: string): boolean {
   const normalized = container.toLowerCase()
 
-  if (!(DIRECT_PLAY_CONTAINERS as ReadonlyArray<string>).includes(normalized)) {
+  if (!DIRECT_PLAY_CONTAINERS.includes(normalized)) {
     return false
   }
 
@@ -524,7 +529,17 @@ function buildVideoDecodingConfig(
   return config
 }
 
-function buildAudioDecodingConfig(contentType: string, channels?: number) {
+interface AudioDecodingConfig {
+  contentType: string
+  channels: string
+  bitrate: number
+  samplerate: number
+}
+
+function buildAudioDecodingConfig(
+  contentType: string,
+  channels?: number,
+): AudioDecodingConfig {
   return {
     contentType,
     channels: String(Math.round(clampNumber(channels, DEFAULT_AUDIO_CHANNELS))),
@@ -532,6 +547,10 @@ function buildAudioDecodingConfig(contentType: string, channels?: number) {
     samplerate: DEFAULT_AUDIO_SAMPLERATE,
   }
 }
+
+type DecodingConfig =
+  | { type: 'file'; video: VideoDecodingConfig; audio?: undefined }
+  | { type: 'file'; audio: AudioDecodingConfig; video?: undefined }
 
 /**
  * Builds the decoding config for a capability query.
@@ -542,14 +561,14 @@ function buildDecodingConfig(
   type: 'video' | 'audio',
   contentType: string,
   hints: CodecCapabilityHints | undefined,
-) {
+): DecodingConfig {
   return type === 'video'
     ? {
-        type: 'file' as const,
+        type: 'file',
         video: buildVideoDecodingConfig(contentType, hints?.video),
       }
     : {
-        type: 'file' as const,
+        type: 'file',
         audio: buildAudioDecodingConfig(contentType, hints?.channels),
       }
 }
@@ -561,11 +580,6 @@ function buildDecodingConfig(
 function canPlayTypeFallback(contentType: string): boolean {
   const result = probeCanPlayType(contentType)
   return result === 'probably' || result === 'maybe'
-}
-
-function cacheCapability(cacheKey: string, supported: boolean): boolean {
-  capabilityCache.set(cacheKey, supported)
-  return supported
 }
 
 /**
@@ -607,11 +621,11 @@ export async function isCodecSupported(
   const probe = async (): Promise<boolean> => {
     // Safari handles HLS natively, so we can be more permissive
     if (isSafari() && type === 'video') {
-      return cacheCapability(cacheKey, true)
+      return true
     }
 
     if (contentType === null || config === null) {
-      return cacheCapability(cacheKey, false)
+      return false
     }
 
     // Try MediaCapabilities API first
@@ -635,22 +649,23 @@ export async function isCodecSupported(
             video: sdrVideo,
           })
         }
-        return cacheCapability(cacheKey, result.supported)
+        return result.supported
       } catch {
         // Fall through to canPlayType fallback
       }
     }
 
     // Fallback to canPlayType
-    return cacheCapability(cacheKey, canPlayTypeFallback(contentType))
+    return canPlayTypeFallback(contentType)
   }
 
   // Cache the in-flight probe so concurrent callers with the same shape
   // (common when a multi-track item fans out per-track probes) share one
-  // browser round trip; cacheCapability then overwrites the pending entry
-  // with the settled boolean.
+  // browser round trip, then overwrite the pending entry with the settled
+  // boolean at this single write site.
   const pending = probe()
   capabilityCache.set(cacheKey, pending)
+  void pending.then((supported) => capabilityCache.set(cacheKey, supported))
   return pending
 }
 

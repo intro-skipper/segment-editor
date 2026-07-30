@@ -160,6 +160,14 @@ function findItemPreferredAudioStreamIndex(
   return findPreferredAudioStreamIndex(audioTracks, preferredLanguage)
 }
 
+// Read non-reactively: the preference is deliberately consumed only at item
+// boundaries (see the freeze in useRenderPlayer), and handleAudioTrackSelect
+// persists the chosen language after every successful switch — a store
+// subscription would re-render the whole player tree for a value the render
+// ignores.
+const readPreferredAudioLanguage = () =>
+  useAppStore.getState().trackPreferences.preferredAudioLanguage
+
 function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
   switch (type) {
     case 'media_error':
@@ -351,10 +359,6 @@ function useRenderPlayer({
     previousStrategyRef.current = strategy
   }
 
-  const preferredAudioLanguage = useAppStore(
-    (s) => s.trackPreferences.preferredAudioLanguage,
-  )
-
   // Frozen per item: the preference decides only the *initial* strategy and
   // audio stream of a playback session. handleAudioTrackSelect persists the
   // chosen language after every successful switch; recomputing this index
@@ -364,12 +368,18 @@ function useRenderPlayer({
   // instead of the exact track the user just picked).
   const [initialAudioSelection, setInitialAudioSelection] = useState(() => ({
     itemId: item.Id,
-    index: findItemPreferredAudioStreamIndex(item, preferredAudioLanguage),
+    index: findItemPreferredAudioStreamIndex(
+      item,
+      readPreferredAudioLanguage(),
+    ),
   }))
   if (initialAudioSelection.itemId !== item.Id) {
     setInitialAudioSelection({
       itemId: item.Id,
-      index: findItemPreferredAudioStreamIndex(item, preferredAudioLanguage),
+      index: findItemPreferredAudioStreamIndex(
+        item,
+        readPreferredAudioLanguage(),
+      ),
     })
   }
   const preferredAudioStreamIndex = initialAudioSelection.index
@@ -865,12 +875,9 @@ function useRenderPlayer({
   }
 
   const handleAudioTrackSelect = async (index: number) => {
-    let switched = false
-    try {
-      switched = await selectAudioTrack(index)
-    } catch {
-      return
-    }
+    // selectAudioTrack reports failures itself; the catch only shields the
+    // persistence below from an unexpected rejection.
+    const switched = await selectAudioTrack(index).catch(() => false)
     // Persist only what was actually applied: recording a language the switch
     // could not deliver would desync the persisted preference (and every
     // later item's auto-selection) from what is audible.
@@ -884,12 +891,7 @@ function useRenderPlayer({
   }
 
   const handleSubtitleTrackSelect = async (index: number | null) => {
-    let switched = false
-    try {
-      switched = await selectSubtitleTrack(index)
-    } catch {
-      return
-    }
+    const switched = await selectSubtitleTrack(index).catch(() => false)
     if (!switched) return
     if (index === null) {
       setSubtitlesEnabled(false)

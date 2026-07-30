@@ -4,19 +4,25 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
+import type {
+  TrackSwitchResult,
+  applyInitialAudioTrack,
+  switchAudioTrack,
+  switchSubtitleTrack,
+} from '@/services/video/track-switching'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useAppStore } from '@/stores/app-store'
 
 const applyInitialAudioTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
-)
-const switchAudioTrackMock = vi.hoisted(() =>
-  vi.fn((_index: number, _options: { signal?: AbortSignal }) =>
+  vi.fn<typeof applyInitialAudioTrack>(() =>
     Promise.resolve({ success: true }),
   ),
 )
+const switchAudioTrackMock = vi.hoisted(() =>
+  vi.fn<typeof switchAudioTrack>(() => Promise.resolve({ success: true })),
+)
 const switchSubtitleTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
+  vi.fn<typeof switchSubtitleTrack>(() => Promise.resolve({ success: true })),
 )
 const showErrorMock = vi.hoisted(() => vi.fn())
 
@@ -164,7 +170,7 @@ describe('useTrackManager manual track selection', () => {
         message: 'HLS instance not available',
         trackIndex: JAPANESE_INDEX,
       },
-    } as never)
+    })
 
     const { result } = renderTrackManager(createVideo())
 
@@ -205,12 +211,12 @@ describe('useTrackManager manual track selection', () => {
   })
 
   it('rejects a second operation while one is pending', async () => {
-    let resolveSwitch: ((result: unknown) => void) | undefined
+    let resolveSwitch: ((result: TrackSwitchResult) => void) | undefined
     switchAudioTrackMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveSwitch = resolve
-        }) as never,
+        }),
     )
 
     const { result } = renderTrackManager(createVideo())
@@ -248,12 +254,12 @@ describe('useTrackManager manual track selection', () => {
   })
 
   it('admits only one of two selections issued in the same turn', async () => {
-    let resolveSwitch: ((result: unknown) => void) | undefined
+    let resolveSwitch: ((result: TrackSwitchResult) => void) | undefined
     switchAudioTrackMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveSwitch = resolve
-        }) as never,
+        }),
     )
 
     const { result } = renderTrackManager(createVideo())
@@ -288,14 +294,14 @@ describe('useTrackManager manual track selection', () => {
   })
 
   it('aborts a pending switch when the item changes and drops its outcome', async () => {
-    let resolveSwitch: ((result: unknown) => void) | undefined
+    let resolveSwitch: ((result: TrackSwitchResult) => void) | undefined
     let capturedSignal: AbortSignal | undefined
     switchAudioTrackMock.mockImplementation(
       (_index: number, options: { signal?: AbortSignal }) => {
         capturedSignal = options.signal
         return new Promise((resolve) => {
           resolveSwitch = resolve
-        }) as never
+        })
       },
     )
 
@@ -331,12 +337,12 @@ describe('useTrackManager manual track selection', () => {
   })
 
   it('ignores a switch that resolves after unmount', async () => {
-    let resolveSwitch: ((result: unknown) => void) | undefined
+    let resolveSwitch: ((result: TrackSwitchResult) => void) | undefined
     switchAudioTrackMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveSwitch = resolve
-        }) as never,
+        }),
     )
 
     const { result, unmount } = renderTrackManager(createVideo())

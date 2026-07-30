@@ -11,7 +11,7 @@
  * Cache for `canPlayType` probe results, keyed by MIME type.
  * The answer cannot change within a page session, so one probe per type is enough.
  */
-const canPlayTypeCache: Map<string, string> = new Map()
+const canPlayTypeCache: Map<string, CanPlayTypeResult> = new Map()
 
 /**
  * Clears the cached `canPlayType` probe results.
@@ -48,11 +48,11 @@ export function isFirefox(): boolean {
  * @param mimeType - The MIME type to probe (e.g. "video/x-matroska")
  * @returns The raw `canPlayType` result, cached per MIME type
  */
-export function probeCanPlayType(mimeType: string): string {
+export function probeCanPlayType(mimeType: string): CanPlayTypeResult {
   const cached = canPlayTypeCache.get(mimeType)
   if (cached !== undefined) return cached
 
-  let result = ''
+  let result: CanPlayTypeResult = ''
   if (typeof document !== 'undefined') {
     try {
       result = document.createElement('video').canPlayType(mimeType)
@@ -82,4 +82,17 @@ export function supportsNativeAudioTrackSwitching(): boolean {
     typeof HTMLMediaElement !== 'undefined' &&
     'audioTracks' in HTMLMediaElement.prototype
   )
+}
+
+/**
+ * Whether enabling a browser flag could unlock native audio track switching.
+ *
+ * Only Chromium gates the `audioTracks` API behind a flag: Firefox does not
+ * implement it at all and Safari ships it enabled, so an absent API on a
+ * non-Firefox, non-Safari browser is the flagged Chromium case.
+ *
+ * @returns true when suggesting the Chromium flag is useful
+ */
+export function canEnableNativeAudioSwitchingViaBrowserFlag(): boolean {
+  return !supportsNativeAudioTrackSwitching() && !isFirefox() && !isSafari()
 }

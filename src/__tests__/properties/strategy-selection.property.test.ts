@@ -69,9 +69,9 @@ vi.mock('@/services/video/compatibility', async (importOriginal) => {
         const { container, videoCodec, audioCodec } = mediaSource
 
         // Check container
-        const containerSupported = (
-          original.DIRECT_PLAY_CONTAINERS as ReadonlyArray<string>
-        ).includes(container.toLowerCase())
+        const containerSupported = original.DIRECT_PLAY_CONTAINERS.includes(
+          container.toLowerCase(),
+        )
         if (!containerSupported) {
           return {
             canDirectPlay: false,

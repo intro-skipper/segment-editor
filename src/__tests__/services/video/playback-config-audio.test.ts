@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import type * as CompatibilityModule from '@/services/video/compatibility'
 import { extractMediaSourceInfo, getPlaybackConfig } from '@/services/video/api'
 import {
   checkCompatibility,
@@ -23,21 +22,11 @@ vi.mock('@/services/jellyfin', () => ({
 }))
 
 vi.mock('@/services/video/compatibility', async (importOriginal) => {
-  const original = await importOriginal<typeof CompatibilityModule>()
-  const isCodecSupportedMock = vi.fn()
+  const { mockCompatibilityWithProbe } =
+    await import('@/__tests__/helpers/audio-decodability-mock')
   return {
-    ...original,
+    ...(await mockCompatibilityWithProbe(importOriginal)),
     checkCompatibility: vi.fn(),
-    isCodecSupported: isCodecSupportedMock,
-    // Mirrors the real helper's composition through the mocked probe, so the
-    // tests keep the real static allowlist and control the decoder answer.
-    isAudioTrackDecodable: vi.fn(
-      async (track: { codec: string; channels?: number }) =>
-        original.isAudioTrackDirectPlayable(track.codec) &&
-        (await isCodecSupportedMock(track.codec, 'audio', {
-          channels: track.channels,
-        })),
-    ),
   }
 })
 

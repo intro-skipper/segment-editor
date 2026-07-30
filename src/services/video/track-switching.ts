@@ -15,37 +15,6 @@ import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { isAudioTrackDecodable } from '@/services/video/compatibility'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
-/**
- * HTML5 AudioTrack interface (not in standard TypeScript DOM types).
- * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioTrack
- */
-interface AudioTrack {
-  enabled: boolean
-  id: string
-  kind: string
-  label: string
-  language: string
-}
-
-/**
- * HTML5 AudioTrackList interface.
- * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioTrackList
- */
-interface AudioTrackList {
-  readonly length: number
-  [index: number]: AudioTrack
-  getTrackById: (id: string) => AudioTrack | null
-  addEventListener?: (type: string, listener: () => void) => void
-  removeEventListener?: (type: string, listener: () => void) => void
-}
-
-/**
- * Extended HTMLVideoElement with audioTracks property.
- */
-interface HTMLVideoElementWithAudioTracks extends HTMLVideoElement {
-  audioTracks?: AudioTrackList
-}
-
 const SUBTITLE_TRACK_MARKER_ATTR = 'data-segment-editor-track'
 
 function removeManagedSubtitleTracks(videoElement: HTMLVideoElement): void {
@@ -78,7 +47,7 @@ interface TrackSwitchError {
 /**
  * Options for track switching operations.
  */
-interface TrackSwitchOptions {
+export interface TrackSwitchOptions {
   /** Current playback strategy (direct or hls) */
   strategy: PlaybackStrategy
   /** The video element for direct play operations */
@@ -97,15 +66,11 @@ interface TrackSwitchOptions {
   onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
   /** AbortSignal that cancels stale async operations (subtitle load, initial audio apply) */
   signal?: AbortSignal
-}
-
-/**
- * Options for applying the initially selected audio track on playback start.
- */
-export interface InitialAudioTrackOptions extends TrackSwitchOptions {
   /**
    * How long to wait for the native audio track list to populate after
-   * `loadedmetadata`, in milliseconds. Set to 0 to read the list immediately.
+   * `loadedmetadata`, in milliseconds. Defaults to 0 (read the list
+   * immediately); the initial application passes a real wait because it runs
+   * right after `loadedmetadata`, before the browser finishes parsing tracks.
    */
   nativeTrackTimeoutMs?: number
 }
@@ -124,20 +89,25 @@ export interface HlsReloadRequest {
 type JassubAction = 'initialize' | 'dispose'
 
 /**
- * Result of a track switching operation.
+ * Result of a track switching operation. Discriminated on `success`, so a
+ * failure always carries its error and the success-only fields cannot appear
+ * on a failure.
  */
-export interface TrackSwitchResult {
-  /** Whether the switch was successful */
-  success: boolean
-  /** Error information if the switch failed */
-  error?: TrackSwitchError
-  /** Whether a reload was required (direct play fallback) */
-  reloadRequired?: boolean
-  /** JASSUB action for ASS/SSA tracks (initialize or dispose) */
-  jassubAction?: JassubAction
-  /** The subtitle track info when jassubAction is 'initialize' */
-  track?: SubtitleTrackInfo
-}
+export type TrackSwitchResult =
+  | {
+      success: true
+      /** Whether a reload was required (direct play fallback) */
+      reloadRequired?: boolean
+      /** JASSUB action for ASS/SSA tracks (initialize or dispose) */
+      jassubAction?: JassubAction
+      /** The subtitle track info when jassubAction is 'initialize' */
+      track?: SubtitleTrackInfo
+    }
+  | {
+      success: false
+      /** Error information for the failed switch */
+      error: TrackSwitchError
+    }
 
 /**
  * Generates a subtitle delivery URL for fetching external subtitles.
@@ -345,12 +315,6 @@ function enableOnlyNativeAudioTrack(
   }
 }
 
-function getNativeAudioTracks(
-  videoElement: HTMLVideoElement,
-): AudioTrackList | undefined {
-  return (videoElement as HTMLVideoElementWithAudioTracks).audioTracks
-}
-
 /**
  * Tries to activate an audio track through the native AudioTrack API.
  *
@@ -358,9 +322,6 @@ function getNativeAudioTracks(
  * (e.g. DTS): enabling it would play silence, so those switches report
  * failure and the caller transcodes instead.
  *
- * @param waitTimeoutMs - How long to wait for the native track list to
- *   populate before reading it (used for the initial selection, which runs
- *   right after `loadedmetadata`). Defaults to reading the list immediately.
  * @returns true when the native track was enabled, false when the caller
  *   must fall back to an HLS transcode
  */
@@ -368,23 +329,28 @@ async function tryEnableNativeAudioTrack(
   trackIndex: number,
   targetTrack: AudioTrackInfo,
   options: TrackSwitchOptions,
-  waitTimeoutMs = 0,
 ): Promise<boolean> {
-  const nativeAudioTracks = getNativeAudioTracks(options.videoElement)
+  const nativeAudioTracks = options.videoElement.audioTracks
   if (!nativeAudioTracks) {
     return false
   }
+
+  // The decoder probe and the track-list wait are independent, so they run
+  // overlapped; awaiting the probe first keeps the undecodable early-exit
+  // from paying the track-list timeout (the wait self-cleans on timeout or
+  // abort when left behind).
+  const trackListPopulated = waitForNativeAudioTracks(
+    nativeAudioTracks,
+    options.nativeTrackTimeoutMs ?? 0,
+    options.signal,
+  )
 
   const codecDecodable = await isAudioTrackDecodable(targetTrack)
   if (!codecDecodable || options.signal?.aborted) {
     return false
   }
 
-  await waitForNativeAudioTracks(
-    nativeAudioTracks,
-    waitTimeoutMs,
-    options.signal,
-  )
+  await trackListPopulated
 
   // The request went stale while waiting (newer selection, item change,
   // unmount): enabling a track now would fight the newer state.
@@ -428,16 +394,10 @@ async function waitForNativeAudioTracks(
     return
   }
 
-  const addEventListener = nativeAudioTracks.addEventListener
-  const removeEventListener = nativeAudioTracks.removeEventListener
-  if (!addEventListener || !removeEventListener) {
-    return
-  }
-
   await new Promise<void>((resolve) => {
     const finish = () => {
       clearTimeout(timeoutId)
-      removeEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+      nativeAudioTracks.removeEventListener('addtrack', handleAddTrack)
       signal?.removeEventListener('abort', finish)
       resolve()
     }
@@ -447,7 +407,7 @@ async function waitForNativeAudioTracks(
     }
 
     const timeoutId = setTimeout(finish, timeoutMs)
-    addEventListener.call(nativeAudioTracks, 'addtrack', handleAddTrack)
+    nativeAudioTracks.addEventListener('addtrack', handleAddTrack)
     signal?.addEventListener('abort', finish)
   })
 }
@@ -657,21 +617,12 @@ async function switchDirectPlayAudioTrack(
  */
 export async function applyInitialAudioTrack(
   trackIndex: number,
-  options: InitialAudioTrackOptions,
+  options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
   const { strategy, audioTracks, signal } = options
 
   if (strategy !== 'direct' || signal?.aborted) {
     return { success: true }
-  }
-
-  const targetTrack = findTrackByMediaStreamIndex(audioTracks, trackIndex)
-  if (!targetTrack) {
-    return createTrackSwitchError(
-      'track_unavailable',
-      `Audio track with index ${trackIndex} not found`,
-      trackIndex,
-    )
   }
 
   // The container default is already playing; nothing to enable.
@@ -680,21 +631,11 @@ export async function applyInitialAudioTrack(
     return { success: true }
   }
 
-  const enabled = await tryEnableNativeAudioTrack(
-    trackIndex,
-    targetTrack,
-    options,
-    options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
-  )
-  if (enabled) {
-    return { success: true }
-  }
-
-  return reloadHlsAudioTrack(
-    trackIndex,
-    options,
-    DIRECT_PLAY_HLS_FALLBACK_MESSAGES,
-  )
+  return switchDirectPlayAudioTrack(trackIndex, {
+    ...options,
+    nativeTrackTimeoutMs:
+      options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
+  })
 }
 
 /**

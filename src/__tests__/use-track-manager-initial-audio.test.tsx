@@ -5,17 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
+import type {
+  TrackSwitchResult,
+  applyInitialAudioTrack,
+  switchAudioTrack,
+  switchSubtitleTrack,
+} from '@/services/video/track-switching'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { useAppStore } from '@/stores/app-store'
 
 const applyInitialAudioTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
+  vi.fn<typeof applyInitialAudioTrack>(() =>
+    Promise.resolve({ success: true }),
+  ),
 )
 const switchAudioTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
+  vi.fn<typeof switchAudioTrack>(() => Promise.resolve({ success: true })),
 )
 const switchSubtitleTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
+  vi.fn<typeof switchSubtitleTrack>(() => Promise.resolve({ success: true })),
 )
 const showErrorMock = vi.hoisted(() => vi.fn())
 
@@ -151,7 +159,7 @@ describe('useTrackManager initial audio track application', () => {
         message: 'Audio track with index 2 not found',
         trackIndex: JAPANESE_STREAM_INDEX,
       },
-    } as never)
+    })
 
     const video = createVideo(HTMLMediaElement.HAVE_METADATA)
     const { result } = renderTrackManager('direct', video)
@@ -166,12 +174,12 @@ describe('useTrackManager initial audio track application', () => {
   })
 
   it('keeps isLoading true until all overlapping applications settle', async () => {
-    const resolvers: Array<(result: unknown) => void> = []
+    const resolvers: Array<(result: TrackSwitchResult) => void> = []
     applyInitialAudioTrackMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolvers.push(resolve)
-        }) as never,
+        }),
     )
 
     const video = createVideo(HTMLMediaElement.HAVE_METADATA)
@@ -201,12 +209,12 @@ describe('useTrackManager initial audio track application', () => {
   })
 
   it('aborts a pending application on unmount and ignores its stale result', async () => {
-    let resolveApply: ((result: unknown) => void) | undefined
+    let resolveApply: ((result: TrackSwitchResult) => void) | undefined
     applyInitialAudioTrackMock.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveApply = resolve
-        }) as never,
+        }),
     )
 
     const video = createVideo(HTMLMediaElement.HAVE_METADATA)

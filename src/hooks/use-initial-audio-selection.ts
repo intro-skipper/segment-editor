@@ -1,10 +1,9 @@
 import { useEffect, useEffectEvent } from 'react'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type {
-  InitialAudioTrackOptions,
+  TrackSwitchOptions,
   TrackSwitchResult,
 } from '@/services/video/track-switching'
-import type { AudioTrackInfo } from '@/services/video/tracks'
 import { applyInitialAudioTrack } from '@/services/video/track-switching'
 import { runTrackOperation } from '@/services/video/track-operation'
 
@@ -13,13 +12,16 @@ interface UseInitialAudioSelectionOptions {
   videoRef: React.RefObject<HTMLVideoElement | null>
   /** The Jellyfin MediaStream index of the audio track that should play */
   activeAudioIndex: number
-  audioTracks: Array<AudioTrackInfo>
+  hasMultipleAudioTracks: boolean
+  /** Index of the track the container plays by default (undefined when the
+   * item has no audio tracks) */
+  containerDefaultAudioIndex: number | undefined
   /** Changing this restarts the selection (a new item invalidates the applied track) */
   resetKey: string | undefined
   createSwitchOptions: (
     videoElement: HTMLVideoElement,
     signal: AbortSignal,
-  ) => InitialAudioTrackOptions
+  ) => TrackSwitchOptions
   /** Held true while an application runs, so the UI can disable track
    * selection during the (possibly stream-reloading) window */
   setPending: (pending: boolean) => void
@@ -40,15 +42,14 @@ export function useInitialAudioSelection({
   strategy,
   videoRef,
   activeAudioIndex,
-  audioTracks,
+  hasMultipleAudioTracks,
+  containerDefaultAudioIndex,
   resetKey,
   createSwitchOptions,
   setPending,
   onResult,
   onCaughtError,
 }: UseInitialAudioSelectionOptions): void {
-  const hasMultipleAudioTracks = audioTracks.length > 1
-
   const applyInitialAudioSelection = useEffectEvent(
     async (
       video: HTMLVideoElement,
@@ -67,11 +68,23 @@ export function useInitialAudioSelection({
     },
   )
 
+  const confirmDefaultSelection = useEffectEvent((index: number): void => {
+    onResult(index, { success: true })
+  })
+
   useEffect(() => {
     if (strategy !== 'direct' || !hasMultipleAudioTracks) return
 
     const video = videoRef.current
     if (!video) return
+
+    // The container default is already playing: record it as the confirmed
+    // selection without the async no-op round trip (and its pending-flag
+    // renders) the service would run on every playback start otherwise.
+    if (activeAudioIndex === containerDefaultAudioIndex) {
+      confirmDefaultSelection(activeAudioIndex)
+      return
+    }
 
     // Aborts pending applications on cleanup so a stale run cannot enable an
     // outdated track or reload the stream after a newer selection or unmount.
@@ -95,5 +108,12 @@ export function useInitialAudioSelection({
       controller.abort()
       video.removeEventListener('loadedmetadata', applySelection)
     }
-  }, [strategy, hasMultipleAudioTracks, activeAudioIndex, resetKey, videoRef])
+  }, [
+    strategy,
+    hasMultipleAudioTracks,
+    activeAudioIndex,
+    containerDefaultAudioIndex,
+    resetKey,
+    videoRef,
+  ])
 }

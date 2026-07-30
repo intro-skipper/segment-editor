@@ -13,6 +13,7 @@ import type { ComponentProps } from 'react'
 import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto } from '@/types/jellyfin'
+import type * as VideoApiModule from '@/services/video/api'
 import { getPlaybackConfig } from '@/services/video/api'
 import { useAppStore } from '@/stores/app-store'
 
@@ -84,10 +85,11 @@ vi.mock('@/hooks/use-hls-player', () => ({
   }),
 }))
 
-vi.mock('@/services/video/api', () => ({
+vi.mock('@/services/video/api', async (importOriginal) => ({
+  // Keep the real getPlaybackMediaSourceId so the test cannot drift from the
+  // production fallback logic.
+  ...(await importOriginal<typeof VideoApiModule>()),
   getPlaybackConfig: vi.fn(),
-  getPlaybackMediaSourceId: (item: BaseItemDto) =>
-    item.MediaSources?.[0]?.Id ?? item.Id?.replace(/-/g, ''),
   getBestImageUrl: () => null,
   getImageBlurhash: () => undefined,
 }))
@@ -274,12 +276,6 @@ describe('Player audio preference persistence', () => {
   })
 
   it('preserves the natively switched audio track when direct play falls back to HLS on error', async () => {
-    vi.stubGlobal('MediaError', {
-      MEDIA_ERR_ABORTED: 1,
-      MEDIA_ERR_NETWORK: 2,
-      MEDIA_ERR_DECODE: 3,
-      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    })
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
       () => undefined,
     )

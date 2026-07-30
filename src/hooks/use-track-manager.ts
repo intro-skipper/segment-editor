@@ -5,6 +5,7 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type {
   HlsReloadRequest,
+  TrackSwitchOptions,
   TrackSwitchResult,
 } from '@/services/video/track-switching'
 import type {
@@ -15,6 +16,7 @@ import type {
 import {
   extractTracks,
   findPreferredAudioStreamIndex,
+  getContainerDefaultAudioTrack,
 } from '@/services/video/tracks'
 import {
   switchAudioTrack,
@@ -98,7 +100,7 @@ function findPreferredSubtitleIndex(
   return null
 }
 
-const EMPTY_SELECTION: Omit<UserTrackSelectionState, 'key'> = {
+const EMPTY_SELECTION: Readonly<Omit<UserTrackSelectionState, 'key'>> = {
   hasAudioSelection: false,
   audioIndex: 0,
   hasSubtitleSelection: false,
@@ -109,16 +111,20 @@ const EMPTY_SELECTION: Omit<UserTrackSelectionState, 'key'> = {
  * Builds a `setUserSelection` updater that merges `patch` while the selection
  * still belongs to `key` and starts a fresh selection record for `key`
  * otherwise (first selection for an item, or a switch that resolved after the
- * item changed).
+ * item changed). Returns `prev` unchanged when the patch changes no value, so
+ * redundant recordings don't commit a render.
  */
 function buildSelectionUpdater(
   key: string,
   patch: Partial<Omit<UserTrackSelectionState, 'key'>>,
 ): (prev: UserTrackSelectionState) => UserTrackSelectionState {
-  return (prev) =>
-    prev.key === key
-      ? { ...prev, ...patch }
-      : { key, ...EMPTY_SELECTION, ...patch }
+  return (prev) => {
+    if (prev.key !== key) return { key, ...EMPTY_SELECTION, ...patch }
+    const changed = (
+      Object.keys(patch) as Array<keyof Omit<UserTrackSelectionState, 'key'>>
+    ).some((field) => prev[field] !== patch[field])
+    return changed ? { ...prev, ...patch } : prev
+  }
 }
 
 export function useTrackManager({
@@ -204,39 +210,48 @@ export function useTrackManager({
   // through the same `isAudioTrackDecodable` the switch path calls (results
   // are cached per codec/channel shape). Until a probe resolves for this
   // item, the static allowlist below is the interim answer, the same first
-  // gate the switch path applies. The generation counter drops a probe that
-  // resolves after a newer one started, so an older item's result cannot
-  // overwrite the current one.
-  const audioProbeGenerationRef = useRef(0)
-  const probeAudioTrackDecoders = useEffectEvent(async (): Promise<void> => {
-    if (
-      strategy !== 'direct' ||
-      audioTracks.length <= 1 ||
-      !supportsNativeAudioTrackSwitching()
-    ) {
-      return
-    }
+  // gate the switch path applies.
+  // Keyed by the tracks' codec/channel content, not just their count, so a
+  // metadata refresh that swaps codecs in place re-probes instead of serving
+  // the stale decodable set.
+  const audioProbeKey = `${trackResetKey}|${audioTracks
+    .map((track) => `${track.index}:${track.codec}:${track.channels}`)
+    .join(',')}`
+  const probeAudioTrackDecoders = useEffectEvent(
+    async (isStale: () => boolean): Promise<void> => {
+      if (
+        strategy !== 'direct' ||
+        audioTracks.length <= 1 ||
+        !supportsNativeAudioTrackSwitching()
+      ) {
+        return
+      }
 
-    const generation = ++audioProbeGenerationRef.current
-    const key = trackResetKey
-    const results = await Promise.all(
-      audioTracks.map(async (track) => ({
-        index: track.index,
-        decodable: await isAudioTrackDecodable(track),
-      })),
-    )
-    if (audioProbeGenerationRef.current !== generation) return
+      const key = audioProbeKey
+      const results = await Promise.all(
+        audioTracks.map(async (track) => ({
+          index: track.index,
+          decodable: await isAudioTrackDecodable(track),
+        })),
+      )
+      // A newer probe (or unmount) owns the state now; drop this result.
+      if (isStale()) return
 
-    const decodableIndices = new Set<number>()
-    for (const result of results) {
-      if (result.decodable) decodableIndices.add(result.index)
-    }
-    setAudioDecoderProbe({ key, decodableIndices })
-  })
+      const decodableIndices = new Set<number>()
+      for (const result of results) {
+        if (result.decodable) decodableIndices.add(result.index)
+      }
+      setAudioDecoderProbe({ key, decodableIndices })
+    },
+  )
 
   useEffect(() => {
-    void probeAudioTrackDecoders()
-  }, [strategy, trackResetKey])
+    let stale = false
+    void probeAudioTrackDecoders(() => stale)
+    return () => {
+      stale = true
+    }
+  }, [strategy, audioProbeKey])
 
   const preferredAudioIndex = itemId
     ? (findPreferredAudioStreamIndex(audioTracks, preferredAudioLanguage) ?? 0)
@@ -279,8 +294,8 @@ export function useTrackManager({
 
   const createSwitchOptions = (
     videoElement: HTMLVideoElement,
-    signal?: AbortSignal,
-  ) => ({
+    signal: AbortSignal,
+  ): TrackSwitchOptions => ({
     strategy,
     videoElement,
     hlsInstance: hlsRef?.current,
@@ -289,24 +304,38 @@ export function useTrackManager({
     audioTracks,
     subtitleTracks,
     onReloadHls,
-    signal: signal ?? abortControllerRef.current!.signal,
+    signal,
   })
 
   // Toast titles stay localized; the raw (English) service message is only
   // ever the secondary description, matching the use-jassub-renderer
   // convention.
-  const reportTrackSwitchFailure = (result: TrackSwitchResult): void => {
-    if (result.success || !result.error) return
-
-    const detail = result.error.message || null
+  const reportSwitchError = (detail: string | null): void => {
     setError(detail ?? t('player.tracks.error.switchFailed'))
     showError(t('player.tracks.error.switchFailed'), detail ?? undefined)
   }
 
-  const handleCaughtTrackSwitchError = (err: unknown): void => {
-    const detail = err instanceof Error && err.message ? err.message : null
-    setError(detail ?? t('player.tracks.error.switchFailed'))
-    showError(t('player.tracks.error.switchFailed'), detail ?? undefined)
+  const reportCaughtSwitchError = (err: unknown): void => {
+    reportSwitchError(err instanceof Error && err.message ? err.message : null)
+  }
+
+  const containerDefaultAudioIndex =
+    getContainerDefaultAudioTrack(audioTracks)?.index
+
+  // Records what the initial application confirmed, yielding to any audio
+  // selection recorded first: a manual switch that resolved while the initial
+  // application (or its synchronous default confirmation, whose closure may
+  // predate the switch) was still outstanding owns the session, and the
+  // initial result must not clobber it.
+  const recordInitialAudioSelection = (index: number): void => {
+    setUserSelection((prev) =>
+      prev.key === trackResetKey && prev.hasAudioSelection
+        ? prev
+        : buildSelectionUpdater(trackResetKey, {
+            hasAudioSelection: true,
+            audioIndex: index,
+          })(prev),
+    )
   }
 
   // A failed initial application leaves the element playing the container
@@ -314,64 +343,40 @@ export function useTrackManager({
   // reflects what is actually audible, and clicking the preferred track is a
   // real retry instead of dying on the active-index no-op check.
   const confirmFallbackAudioSelection = (): void => {
-    if (audioTracks.length === 0) return
-    const fallbackIndex =
-      audioTracks.find((track) => track.isDefault)?.index ??
-      audioTracks[0].index
-    setUserSelection(
-      buildSelectionUpdater(trackResetKey, {
-        hasAudioSelection: true,
-        audioIndex: fallbackIndex,
-      }),
-    )
+    if (containerDefaultAudioIndex === undefined) return
+    recordInitialAudioSelection(containerDefaultAudioIndex)
   }
 
   useInitialAudioSelection({
     strategy,
     videoRef,
     activeAudioIndex,
-    audioTracks,
+    hasMultipleAudioTracks: audioTracks.length > 1,
+    containerDefaultAudioIndex,
     resetKey: itemId,
     createSwitchOptions,
     setPending: setTrackOperationPending,
     onResult: (index, result) => {
       if (result.success) {
-        setUserSelection(
-          buildSelectionUpdater(trackResetKey, {
-            hasAudioSelection: true,
-            audioIndex: index,
-          }),
-        )
+        recordInitialAudioSelection(index)
       } else {
-        reportTrackSwitchFailure(result)
+        reportSwitchError(result.error.message || null)
         confirmFallbackAudioSelection()
       }
     },
     onCaughtError: (err) => {
-      handleCaughtTrackSwitchError(err)
+      reportCaughtSwitchError(err)
       confirmFallbackAudioSelection()
     },
   })
 
-  const selectAudioTrack = async (index: number): Promise<boolean> => {
-    const video = videoRef.current
-    if (!video) {
-      setError(t('player.tracks.error.noVideo'))
-      return false
-    }
-
-    const track = audioTrackMap.get(index)
-    if (!track) {
-      const errorMsg = t('player.tracks.error.trackNotFound')
-      setError(errorMsg)
-      showError(errorMsg)
-      return false
-    }
-
-    if (index === trackState.activeAudioIndex) {
-      return false
-    }
-
+  // Shared tail of both manual selectors: synchronous admission, the switch
+  // through runTrackOperation, and the success/failure bookkeeping. Resolves
+  // true only when the switch was applied and recorded.
+  const runSelection = async (
+    operation: (signal: AbortSignal) => Promise<TrackSwitchResult>,
+    successPatch: Partial<Omit<UserTrackSelectionState, 'key'>>,
+  ): Promise<boolean> => {
     // Admission must be synchronous: `isTrackOperationPending` is render
     // state, so two selections in the same turn would both read the stale
     // `false`. The counter ref updates before the first operation yields,
@@ -384,28 +389,44 @@ export function useTrackManager({
 
     const signal = abortControllerRef.current!.signal
     let switched = false
-    await runTrackOperation(
-      () => switchAudioTrack(index, createSwitchOptions(video, signal)),
-      {
-        signal,
-        setPending: setTrackOperationPending,
-        onResult: (result) => {
-          if (result.success) {
-            switched = true
-            setUserSelection(
-              buildSelectionUpdater(trackResetKey, {
-                hasAudioSelection: true,
-                audioIndex: index,
-              }),
-            )
-          } else {
-            reportTrackSwitchFailure(result)
-          }
-        },
-        onCaughtError: handleCaughtTrackSwitchError,
+    await runTrackOperation(() => operation(signal), {
+      signal,
+      setPending: setTrackOperationPending,
+      onResult: (result) => {
+        if (result.success) {
+          switched = true
+          setUserSelection(buildSelectionUpdater(trackResetKey, successPatch))
+        } else {
+          reportSwitchError(result.error.message || null)
+        }
       },
-    )
+      onCaughtError: reportCaughtSwitchError,
+    })
     return switched
+  }
+
+  const selectAudioTrack = async (index: number): Promise<boolean> => {
+    const video = videoRef.current
+    if (!video) {
+      setError(t('player.tracks.error.noVideo'))
+      return false
+    }
+
+    if (!audioTrackMap.has(index)) {
+      const errorMsg = t('player.tracks.error.trackNotFound')
+      setError(errorMsg)
+      showError(errorMsg)
+      return false
+    }
+
+    if (index === trackState.activeAudioIndex) {
+      return false
+    }
+
+    return runSelection(
+      (signal) => switchAudioTrack(index, createSwitchOptions(video, signal)),
+      { hasAudioSelection: true, audioIndex: index },
+    )
   }
 
   const selectSubtitleTrack = async (
@@ -433,53 +454,28 @@ export function useTrackManager({
       return false
     }
 
-    // Synchronous admission; see selectAudioTrack.
-    if (pendingOperationCountRef.current > 0) {
-      return false
-    }
-
     if (selectedTrack !== null && requiresJassubRenderer(selectedTrack)) {
       void preloadJassubRenderer().catch(() => {})
     }
 
-    setError(null)
-
-    const signal = abortControllerRef.current!.signal
-    let switched = false
-    await runTrackOperation(
-      () => switchSubtitleTrack(index, createSwitchOptions(video, signal)),
-      {
-        signal,
-        setPending: setTrackOperationPending,
-        onResult: (result) => {
-          if (result.success) {
-            switched = true
-            setUserSelection(
-              buildSelectionUpdater(trackResetKey, {
-                hasSubtitleSelection: true,
-                subtitleIndex: index,
-              }),
-            )
-          } else {
-            reportTrackSwitchFailure(result)
-          }
-        },
-        onCaughtError: handleCaughtTrackSwitchError,
-      },
+    return runSelection(
+      (signal) =>
+        switchSubtitleTrack(index, createSwitchOptions(video, signal)),
+      { hasSubtitleSelection: true, subtitleIndex: index },
     )
-    return switched
   }
 
+  const nativeSwitchingSupported = supportsNativeAudioTrackSwitching()
   const audioTrackSwitchRequiresTranscode = (
     track: AudioTrackInfo,
   ): boolean => {
-    if (!supportsNativeAudioTrackSwitching()) return true
+    if (!nativeSwitchingSupported) return true
     // A track the browser cannot decode (e.g. DTS) transcodes even when the
     // native switching API is available.
     if (!isAudioTrackDirectPlayable(track.codec)) return true
     return (
       audioDecoderProbe !== null &&
-      audioDecoderProbe.key === trackResetKey &&
+      audioDecoderProbe.key === audioProbeKey &&
       !audioDecoderProbe.decodableIndices.has(track.index)
     )
   }

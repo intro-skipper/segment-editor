@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
@@ -5,11 +6,7 @@ import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
-import {
-  isFirefox,
-  isSafari,
-  supportsNativeAudioTrackSwitching,
-} from '@/services/video/capabilities'
+import { canEnableNativeAudioSwitchingViaBrowserFlag } from '@/services/video/capabilities'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,15 +53,20 @@ export const TrackSelector = function TrackSelectorComponent({
   const isDirect = strategy === 'direct'
   const StrategyIcon = isDirect ? Zap : Monitor
   const showTranscodeHint = audioSwitchTranscodeScope === 'all'
-  // Chromium-only: Firefox has no flag for the audioTracks API (it is not
-  // implemented at all) and Safari ships it natively, so the tip would be
-  // misleading on both. It is also pointless when the API is already exposed
-  // and the transcode hint stems from an undecodable codec instead.
+  // Pointless when the API is already exposed and the transcode hint stems
+  // from an undecodable codec instead of the missing API.
   const showChromiumFlagTip =
-    showTranscodeHint &&
-    !supportsNativeAudioTrackSwitching() &&
-    !isFirefox() &&
-    !isSafari()
+    showTranscodeHint && canEnableNativeAudioSwitchingViaBrowserFlag()
+
+  // Associate the hints with the menu so screen readers announce them when
+  // the menu opens; a bare <p> between menu items is skipped by arrow-key
+  // navigation and would leave the transcode warning silent.
+  const transcodeHintId = useId()
+  const flagTipId = useId()
+  const hintIds: Array<string> = []
+  if (audioSwitchTranscodeScope !== 'none') hintIds.push(transcodeHintId)
+  if (showChromiumFlagTip) hintIds.push(flagTipId)
+  const menuDescriptionIds = hintIds.length > 0 ? hintIds.join(' ') : undefined
 
   return (
     <DropdownMenu>
@@ -92,6 +94,7 @@ export const TrackSelector = function TrackSelectorComponent({
         align="start"
         className="min-w-[240px] max-h-[400px] overflow-y-auto"
         container={portalContainer}
+        aria-describedby={menuDescriptionIds}
       >
         {strategy && (
           <>
@@ -161,7 +164,10 @@ export const TrackSelector = function TrackSelectorComponent({
             {/* When only some targets restart the stream (e.g. one DTS
                 track), the blanket copy would be wrong in both directions. */}
             {audioSwitchTranscodeScope !== 'none' && (
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
+              <p
+                id={transcodeHintId}
+                className="px-3 pb-1 text-xs text-muted-foreground"
+              >
                 {showTranscodeHint
                   ? t(
                       'player.tracks.audioSwitchTranscodeHint',
@@ -174,10 +180,13 @@ export const TrackSelector = function TrackSelectorComponent({
               </p>
             )}
             {showChromiumFlagTip && (
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
+              <p
+                id={flagTipId}
+                className="px-3 pb-1 text-xs text-muted-foreground"
+              >
                 {t(
                   'player.tracks.audioSwitchChromiumFlagTip',
-                  'Tip: Chromium browsers can switch audio in place when "Experimental Web Platform features" is enabled in chrome://flags',
+                  'Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags',
                 )}
               </p>
             )}
