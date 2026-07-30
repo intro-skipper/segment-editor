@@ -1,9 +1,9 @@
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import type { ErrorData } from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const { RECOVERY_TIMEOUT_MS } = PLAYER_CONFIG
+const { RECOVERY_TIMEOUT_MS, MEDIA_ERROR_SWAP_WINDOW_MS } = PLAYER_CONFIG
 
 export interface HlsPlayerError {
   type: 'network' | 'media' | 'unknown'
@@ -66,8 +66,16 @@ export function useHlsPlayer({
   const hlsRef = useRef<Hls | null>(null)
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isActiveRef = useRef(true)
+  /** True while a reported error has not been cleared by a success signal yet */
+  const hasPendingErrorRef = useRef(false)
+  const lastMediaRecoveryAtRef = useRef(Number.NEGATIVE_INFINITY)
+  /** Bumped by retry() to tear down and rebuild the Hls instance */
+  const [reloadToken, setReloadToken] = useState(0)
+  /** Position to resume from when retry() rebuilds the instance (-1 = hls.js default) */
+  const retryStartPositionRef = useRef(-1)
 
   const reportError = useEffectEvent((error: HlsPlayerError | null) => {
+    hasPendingErrorRef.current = error !== null
     onError(error)
   })
 
@@ -102,6 +110,7 @@ export function useHlsPlayer({
     }
 
     isActiveRef.current = true
+    lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
 
     reportError(null)
     clearRecoveryTimer(recoveryTimerRef)
@@ -111,7 +120,9 @@ export function useHlsPlayer({
     }
 
     if (Hls.isSupported()) {
-      const hls = new Hls(HLS_CONFIG)
+      const startPosition = retryStartPositionRef.current
+      retryStartPositionRef.current = -1
+      const hls = new Hls({ ...HLS_CONFIG, startPosition })
       hls.attachMedia(video)
 
       const handleRecovery = (
@@ -125,6 +136,8 @@ export function useHlsPlayer({
         reportRecoveryStart()
         recoveryFn()
 
+        // Fallback timer: FRAG_BUFFERED / MANIFEST_PARSED normally end the
+        // recovery state as soon as playback actually makes progress again.
         clearRecoveryTimer(recoveryTimerRef)
         recoveryTimerRef.current = setTimeout(() => {
           if (isActiveRef.current) reportRecoveryEnd()
@@ -144,26 +157,53 @@ export function useHlsPlayer({
             )
             break
           case Hls.ErrorTypes.MEDIA_ERROR:
-            handleRecovery('media', 'player.error.media', () =>
-              hls.recoverMediaError(),
-            )
+            handleRecovery('media', 'player.error.media', () => {
+              const now = performance.now()
+              if (
+                now - lastMediaRecoveryAtRef.current <
+                MEDIA_ERROR_SWAP_WINDOW_MS
+              ) {
+                // Second media error shortly after a recovery attempt:
+                // hls.js docs require swapping the audio codec before retrying.
+                hls.swapAudioCodec()
+              }
+              lastMediaRecoveryAtRef.current = now
+              hls.recoverMediaError()
+            })
             break
           default:
+            // Recoverable via the Retry button, which rebuilds the Hls
+            // instance. Marking it non-recoverable would strand the user on
+            // a permanent error overlay with no way out.
             reportError(
-              createLocalizedError('unknown', 'player.error.unknown', false),
+              createLocalizedError('unknown', 'player.error.unknown', true),
             )
         }
       }
 
-      const handleManifestParsed = () => {
-        if (!isActiveRef.current) return
+      const markPlaybackHealthy = () => {
+        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
         reportError(null)
         clearRecoveryTimer(recoveryTimerRef)
         reportRecoveryEnd()
       }
 
+      const handleFragBuffered = () => {
+        if (!isActiveRef.current || !hasPendingErrorRef.current) return
+        // A fragment appended successfully after an error: playback has
+        // genuinely recovered, so clear the error overlay now instead of
+        // waiting for the blind recovery timer.
+        markPlaybackHealthy()
+      }
+
+      const handleManifestParsed = () => {
+        if (!isActiveRef.current) return
+        markPlaybackHealthy()
+      }
+
       hls.on(Hls.Events.ERROR, handleError)
       hls.on(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
+      hls.on(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
 
       hls.loadSource(videoUrl)
       hlsRef.current = hls
@@ -176,6 +216,7 @@ export function useHlsPlayer({
         }
         hls.off(Hls.Events.ERROR, handleError)
         hls.off(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
+        hls.off(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
         hls.destroy()
         if (hlsRef.current === hls) hlsRef.current = null
       }
@@ -194,11 +235,15 @@ export function useHlsPlayer({
         hlsRef.current = null
       }
     }
-  }, [videoUrl])
+  }, [videoUrl, reloadToken])
 
   const retry = () => {
-    onError(null)
-    hlsRef.current?.loadSource(videoUrl)
+    // Rebuild the Hls instance from scratch: after a fatal error the current
+    // instance (and its MediaSource) may be beyond repair, so reloading the
+    // source on it is not reliable. Resume from the current position.
+    const currentTime = videoRef.current?.currentTime ?? 0
+    retryStartPositionRef.current = currentTime > 0 ? currentTime : -1
+    setReloadToken((token) => token + 1)
   }
 
   return { videoRef, hlsRef, retry }

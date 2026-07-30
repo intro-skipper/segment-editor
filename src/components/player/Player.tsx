@@ -13,7 +13,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
-import { initialPlayerState, playerReducer } from './player-reducer'
+import {
+  initialPlayerState,
+  mapVideoErrorType,
+  playerReducer,
+} from './player-reducer'
 import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
@@ -27,10 +31,7 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
-import type {
-  VideoPlayerError,
-  VideoPlayerErrorType,
-} from '@/hooks/use-video-player'
+import type { VideoPlayerError } from '@/hooks/use-video-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
 import type { PlaybackStrategy } from '@/services/video/api'
@@ -167,17 +168,6 @@ function findItemPreferredAudioStreamIndex(
 // re-render the whole player tree for a value the render ignores.
 const readPreferredAudioLanguage = () =>
   useAppStore.getState().trackPreferences.preferredAudioLanguage
-
-function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
-  switch (type) {
-    case 'media_error':
-      return 'media'
-    case 'network_error':
-      return 'network'
-    default:
-      return 'unknown'
-  }
-}
 
 interface PlayerProps {
   item: BaseItemDto

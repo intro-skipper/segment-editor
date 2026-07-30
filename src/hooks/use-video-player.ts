@@ -52,7 +52,7 @@ interface UseVideoPlayerOptions {
    */
   getCurrentAudioStreamIndex?: () => number | undefined
   jellyfinPlaybackSyncEnabled?: boolean
-  onError?: (error: VideoPlayerError) => void
+  onError?: (error: VideoPlayerError | null) => void
   onStrategyChange?: (strategy: PlaybackStrategy) => void
   onRecoveryStart?: () => void
   onRecoveryEnd?: () => void
@@ -204,18 +204,23 @@ export function useVideoPlayer({
     onStrategyChange?.(newStrategy)
   }
 
+  // Cleared (null) errors reach the consumer too, so its error overlay is
+  // dismissed (e.g. on retry or when a new source starts loading).
+  const reportVideoError = (videoError: VideoPlayerError | null) => {
+    setError(videoError)
+    onError?.(videoError)
+  }
+
   const handleHlsError = (hlsError: HlsPlayerError | null) => {
-    if (hlsError && isActiveRef.current) {
-      const videoError: VideoPlayerError = {
-        type: hlsError.type === 'network' ? 'network_error' : 'media_error',
-        message: hlsError.message,
-        recoverable: hlsError.recoverable,
-      }
-      setError(videoError)
-      onError?.(videoError)
-    } else {
-      setError(null)
-    }
+    reportVideoError(
+      hlsError && isActiveRef.current
+        ? {
+            type: hlsError.type === 'network' ? 'network_error' : 'media_error',
+            message: hlsError.message,
+            recoverable: hlsError.recoverable,
+          }
+        : null,
+    )
   }
 
   const handleHlsRecoveryStart = () => onRecoveryStart?.()
@@ -584,7 +589,7 @@ export function useVideoPlayer({
   }, [strategy, videoUrl, itemId])
 
   const retry = () => {
-    setError(null)
+    reportVideoError(null)
     networkRetryCountRef.current = 0
 
     if (strategy === 'hls') {
