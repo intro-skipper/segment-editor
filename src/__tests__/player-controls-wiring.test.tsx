@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   videoPlayerIsLoading: true,
   videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
-  audioSwitchRequiresTranscode: true,
+  audioSwitchTranscodeScope: 'all' as 'none' | 'some' | 'all',
   segmentSkipMode: 'button',
   segmentSkipModeRevision: 0,
   fullscreenUi: {
@@ -120,7 +120,7 @@ vi.mock('@/hooks/use-track-manager', () => ({
     selectAudioTrack: mocks.selectAudioTrack,
     selectSubtitleTrack: mocks.selectSubtitleTrack,
     isLoading: mocks.trackManagerIsLoading,
-    audioSwitchRequiresTranscode: mocks.audioSwitchRequiresTranscode,
+    audioSwitchTranscodeScope: mocks.audioSwitchTranscodeScope,
   }),
 }))
 
@@ -229,7 +229,7 @@ describe('Player controls wiring', () => {
     mocks.videoPlayerOptions = null
     mocks.trackManagerIsLoading = true
     mocks.videoPlayerIsLoading = true
-    mocks.audioSwitchRequiresTranscode = true
+    mocks.audioSwitchTranscodeScope = 'all'
     mocks.segmentSkipMode = 'button'
     mocks.segmentSkipModeRevision = 0
   })
@@ -270,7 +270,7 @@ describe('Player controls wiring', () => {
     expect(controlsProps.display.mode).toBe('fullscreen')
     expect(controlsProps.trackControls?.state).toBe(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')
-    expect(controlsProps.trackControls?.audioSwitchRequiresTranscode).toBe(true)
+    expect(controlsProps.trackControls?.audioSwitchTranscodeScope).toBe('all')
     expect(controlsProps.settings.subtitleState).toBe('active')
 
     act(() => {
@@ -299,7 +299,7 @@ describe('Player controls wiring', () => {
 
   it('enables track selection wiring after tracks load', async () => {
     mocks.trackManagerIsLoading = false
-    mocks.audioSwitchRequiresTranscode = false
+    mocks.audioSwitchTranscodeScope = 'none'
 
     renderPlayer()
 
@@ -307,9 +307,7 @@ describe('Player controls wiring', () => {
     const controlsProps = surfaceProps.controlsProps
 
     expect(controlsProps.trackControls?.availability).toBe('available')
-    expect(controlsProps.trackControls?.audioSwitchRequiresTranscode).toBe(
-      false,
-    )
+    expect(controlsProps.trackControls?.audioSwitchTranscodeScope).toBe('none')
 
     await act(async () => {
       await controlsProps.trackControls?.onSelectAudio(1)

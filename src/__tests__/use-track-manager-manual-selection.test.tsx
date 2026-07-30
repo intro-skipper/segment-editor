@@ -11,7 +11,9 @@ const applyInitialAudioTrackMock = vi.hoisted(() =>
   vi.fn(() => Promise.resolve({ success: true })),
 )
 const switchAudioTrackMock = vi.hoisted(() =>
-  vi.fn(() => Promise.resolve({ success: true })),
+  vi.fn((_index: number, _options: { signal?: AbortSignal }) =>
+    Promise.resolve({ success: true }),
+  ),
 )
 const switchSubtitleTrackMock = vi.hoisted(() =>
   vi.fn(() => Promise.resolve({ success: true })),
@@ -33,9 +35,9 @@ const JAPANESE_INDEX = 2
 const ENGLISH_COMMENTARY_INDEX = 3
 const SPANISH_SUBTITLE_INDEX = 4
 
-function createItem(): BaseItemDto {
+function createItem(id = 'item-1'): BaseItemDto {
   return {
-    Id: 'item-1',
+    Id: id,
     Name: 'Multi track item',
     MediaSources: [
       {
@@ -79,16 +81,18 @@ function createItem(): BaseItemDto {
 
 function renderTrackManager(video: HTMLVideoElement) {
   const videoRef = { current: video }
-  return renderHook(() =>
-    useTrackManager({
-      item: createItem(),
-      // HLS strategy keeps the initial direct-play application inert so these
-      // tests exercise only the manual selection path.
-      strategy: 'hls',
-      videoRef,
-      t: (key: string) => key,
-      onReloadHls: vi.fn(),
-    }),
+  return renderHook(
+    ({ item }: { item: BaseItemDto }) =>
+      useTrackManager({
+        item,
+        // HLS strategy keeps the initial direct-play application inert so these
+        // tests exercise only the manual selection path.
+        strategy: 'hls',
+        videoRef,
+        t: (key: string) => key,
+        onReloadHls: vi.fn(),
+      }),
+    { initialProps: { item: createItem() } },
   )
 }
 
@@ -241,6 +245,89 @@ describe('useTrackManager manual track selection', () => {
     expect(first).toBe(true)
     expect(result.current.isLoading).toBe(false)
     expect(result.current.trackState.activeAudioIndex).toBe(JAPANESE_INDEX)
+  })
+
+  it('admits only one of two selections issued in the same turn', async () => {
+    let resolveSwitch: ((result: unknown) => void) | undefined
+    switchAudioTrackMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSwitch = resolve
+        }) as never,
+    )
+
+    const { result } = renderTrackManager(createVideo())
+
+    // Both calls run before React commits any state update, so a render-state
+    // guard would admit both. The contract says the second is rejected.
+    let first: Promise<boolean> | undefined
+    let second: Promise<boolean> | undefined
+    act(() => {
+      first = result.current.selectAudioTrack(JAPANESE_INDEX)
+      second = result.current.selectAudioTrack(ENGLISH_COMMENTARY_INDEX)
+    })
+
+    expect(switchAudioTrackMock).toHaveBeenCalledTimes(1)
+    expect(switchAudioTrackMock).toHaveBeenCalledWith(
+      JAPANESE_INDEX,
+      expect.anything(),
+    )
+
+    let firstSwitched = false
+    let secondSwitched = true
+    await act(async () => {
+      resolveSwitch?.({ success: true })
+      firstSwitched = (await first) === true
+      secondSwitched = (await second) === true
+    })
+
+    expect(firstSwitched).toBe(true)
+    expect(secondSwitched).toBe(false)
+    expect(result.current.trackState.activeAudioIndex).toBe(JAPANESE_INDEX)
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it('aborts a pending switch when the item changes and drops its outcome', async () => {
+    let resolveSwitch: ((result: unknown) => void) | undefined
+    let capturedSignal: AbortSignal | undefined
+    switchAudioTrackMock.mockImplementation(
+      (_index: number, options: { signal?: AbortSignal }) => {
+        capturedSignal = options.signal
+        return new Promise((resolve) => {
+          resolveSwitch = resolve
+        }) as never
+      },
+    )
+
+    const { result, rerender } = renderTrackManager(createVideo())
+
+    let pendingSwitch: Promise<boolean> | undefined
+    act(() => {
+      pendingSwitch = result.current.selectAudioTrack(JAPANESE_INDEX)
+    })
+    expect(capturedSignal?.aborted).toBe(false)
+
+    // Navigating to another item must invalidate the in-flight operation: the
+    // service consults this signal before enabling a native track or
+    // reloading HLS, so a still-live signal would let the stale switch act on
+    // the new item's stream.
+    rerender({ item: createItem('item-2') })
+    expect(capturedSignal?.aborted).toBe(true)
+
+    let switched = true
+    await act(async () => {
+      resolveSwitch?.({ success: true })
+      switched = (await pendingSwitch) === true
+    })
+
+    // The stale operation commits nothing: no selection, no error, no toast.
+    expect(switched).toBe(false)
+    expect(result.current.trackState.activeAudioIndex).toBe(
+      DEFAULT_ENGLISH_INDEX,
+    )
+    expect(result.current.error).toBeNull()
+    expect(showErrorMock).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
   })
 
   it('ignores a switch that resolves after unmount', async () => {

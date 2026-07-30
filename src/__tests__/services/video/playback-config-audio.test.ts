@@ -145,6 +145,35 @@ describe('extractMediaSourceInfo stream metadata', () => {
       { index: 0, codec: 'flac', channels: undefined, isDefault: false },
     ])
   })
+
+  it('falls back to the source bitrate when the video stream reports none', () => {
+    // A high-bitrate file with sparse per-stream metadata: probing with the
+    // 10 Mbps default would approve decoders that cannot sustain the real
+    // stream, so the (higher, conservative) mux bitrate has to feed the probe.
+    const info = extractMediaSourceInfo({
+      Id: 'item-high-bitrate',
+      MediaSources: [
+        {
+          Container: 'mkv',
+          Bitrate: 85_000_000,
+          MediaStreams: [
+            { Type: 'Video', Index: 0, Codec: 'hevc', Width: 3840 },
+            { Type: 'Audio', Index: 1, Codec: 'aac' },
+          ],
+        },
+      ],
+    })
+
+    expect(info?.bitrate).toBe(85_000_000)
+    expect(info?.video?.bitrate).toBe(85_000_000)
+  })
+
+  it('prefers the per-stream bitrate over the source bitrate', () => {
+    const info = extractMediaSourceInfo(createMultiAudioItem())
+
+    expect(info?.video?.bitrate).toBe(9_500_000)
+    expect(info?.bitrate).toBe(12_000_000)
+  })
 })
 
 describe('getPlaybackConfig non-default audio track selection', () => {

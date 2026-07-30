@@ -355,10 +355,24 @@ function useRenderPlayer({
     (s) => s.trackPreferences.preferredAudioLanguage,
   )
 
-  const preferredAudioStreamIndex = findItemPreferredAudioStreamIndex(
-    item,
-    preferredAudioLanguage,
-  )
+  // Frozen per item: the preference decides only the *initial* strategy and
+  // audio stream of a playback session. handleAudioTrackSelect persists the
+  // chosen language after every successful switch; recomputing this index
+  // from the live preference would re-key useVideoPlayer's init effect and
+  // tear down/reload the source right after an in-place native switch (and,
+  // with duplicate-language tracks, re-select the first language match
+  // instead of the exact track the user just picked).
+  const [initialAudioSelection, setInitialAudioSelection] = useState(() => ({
+    itemId: item.Id,
+    index: findItemPreferredAudioStreamIndex(item, preferredAudioLanguage),
+  }))
+  if (initialAudioSelection.itemId !== item.Id) {
+    setInitialAudioSelection({
+      itemId: item.Id,
+      index: findItemPreferredAudioStreamIndex(item, preferredAudioLanguage),
+    })
+  }
+  const preferredAudioStreamIndex = initialAudioSelection.index
 
   const {
     videoRef,
@@ -399,7 +413,7 @@ function useRenderPlayer({
     selectAudioTrack,
     selectSubtitleTrack,
     isLoading: isTrackLoading,
-    audioSwitchRequiresTranscode,
+    audioSwitchTranscodeScope,
   } = useTrackManager({
     item,
     strategy,
@@ -905,7 +919,7 @@ function useRenderPlayer({
       state: trackState,
       availability: !hasAnyTracks || isTrackLoading ? 'disabled' : 'available',
       strategy,
-      audioSwitchRequiresTranscode,
+      audioSwitchTranscodeScope,
       onSelectAudio: handleAudioTrackSelect,
       onSelectSubtitle: handleSubtitleTrackSelect,
     },

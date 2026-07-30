@@ -294,6 +294,7 @@
       "selector": "Audio- und Untertitelspuren",
       "noTracks": "Keine Spuren verfügbar",
       "audioSwitchTranscodeHint": "Der Wechsel der Tonspur startet den Stream als Transcode neu",
+      "audioSwitchPartialTranscodeHint": "Der Wechsel zu manchen Tonspuren startet den Stream als Transcode neu",
       "audioSwitchChromiumFlagTip": "Tipp: Chromium-Browser können die Tonspur direkt wechseln, wenn „Experimental Web Platform features“ in chrome://flags aktiviert ist",
       "channels": {
         "mono": "Mono",

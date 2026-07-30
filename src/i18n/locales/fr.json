@@ -227,6 +227,7 @@
       "selector": "Pistes audio et sous-titres",
       "noTracks": "Aucune piste disponible",
       "audioSwitchTranscodeHint": "Changer de piste audio redémarre le flux en transcodage",
+      "audioSwitchPartialTranscodeHint": "Changer vers certaines pistes audio redémarre le flux en transcodage",
       "audioSwitchChromiumFlagTip": "Astuce : les navigateurs Chromium peuvent changer de piste audio sans redémarrage lorsque « Experimental Web Platform features » est activé dans chrome://flags",
       "channels": {
         "mono": "Mono",

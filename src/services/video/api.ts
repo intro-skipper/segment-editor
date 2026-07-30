@@ -301,7 +301,11 @@ export function extractMediaSourceInfo(
       level: videoStream?.Level ?? undefined,
       width: videoStream?.Width ?? undefined,
       height: videoStream?.Height ?? undefined,
-      bitrate: videoStream?.BitRate ?? undefined,
+      // Jellyfin often omits the per-stream bitrate. The source (mux) bitrate
+      // is a conservative upper bound for the video stream, so probing with it
+      // never approves a decoder the real file would overwhelm — unlike the
+      // 10 Mbps default the probe would otherwise assume.
+      bitrate: videoStream?.BitRate ?? source.Bitrate ?? undefined,
       bitDepth: videoStream?.BitDepth ?? undefined,
       videoRange: videoStream?.VideoRange,
       frameRate:

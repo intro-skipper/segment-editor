@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -22,7 +22,10 @@ import {
 } from '@/services/video/track-switching'
 import { runTrackOperation } from '@/services/video/track-operation'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
-import { isAudioTrackDirectPlayable } from '@/services/video/compatibility'
+import {
+  isAudioTrackDirectPlayable,
+  isCodecSupported,
+} from '@/services/video/compatibility'
 import { useInitialAudioSelection } from '@/hooks/use-initial-audio-selection'
 import {
   preloadJassubRenderer,
@@ -51,10 +54,20 @@ interface UseTrackManagerReturn {
   error: string | null
   /**
    * Whether selecting a different audio track will restart the stream as a
-   * transcode instead of switching in place. True only when a direct-played
-   * file has more than one audio track and the browser cannot switch natively.
+   * transcode instead of switching in place, aggregated over the switch
+   * targets (every audio track except the active one) of a direct-played
+   * file: 'all' when every target restarts the stream, 'some' when only
+   * certain tracks do, 'none' when every switch is native (or no in-place
+   * switch question arises, e.g. HLS or a single audio track).
    */
-  audioSwitchRequiresTranscode: boolean
+  audioSwitchTranscodeScope: AudioSwitchTranscodeScope
+}
+
+export type AudioSwitchTranscodeScope = 'none' | 'some' | 'all'
+
+interface AudioDecoderProbeState {
+  key: string
+  decodableIndices: ReadonlySet<number>
 }
 
 interface UserTrackSelectionState {
@@ -131,6 +144,8 @@ export function useTrackManager({
   })
   const [isTrackOperationPending, setIsTrackOperationPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [audioDecoderProbe, setAudioDecoderProbe] =
+    useState<AudioDecoderProbeState | null>(null)
 
   // Operations can overlap despite the entry guards: the initial-audio effect
   // re-applies on every loadedmetadata, and its own HLS-reload fallback fires
@@ -151,13 +166,6 @@ export function useTrackManager({
   const abortControllerRef = useRef<AbortController | null>(null)
   if (abortControllerRef.current === null)
     abortControllerRef.current = new AbortController()
-  useEffect(() => {
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    return () => {
-      controller.abort()
-    }
-  }, [])
 
   const {
     preferredAudioLanguage,
@@ -186,6 +194,61 @@ export function useTrackManager({
   // write invalidate the very selection that caused it (checkmark snapping
   // back to the first track of the same language).
   const trackResetKey = `${itemId ?? ''}|${audioTracks.length}|${subtitleTracks.length}`
+
+  // Rotate the manual-operation controller whenever the item (reset key)
+  // changes, not only on unmount: a switch that is still awaiting its decoder
+  // probe when the user navigates must not enable the old item's native track
+  // or reload the old item's HLS URL after the new item is playing.
+  useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    return () => {
+      controller.abort()
+    }
+  }, [trackResetKey])
+
+  // The transcode hint must agree with the switch decision, so it runs the
+  // same asynchronous decoder probe `tryEnableNativeAudioTrack` uses (the
+  // probe is cached per config, so this costs one MediaCapabilities round
+  // trip per distinct codec/channel shape). Until a probe resolves for this
+  // item, the static allowlist below is the interim answer — the same first
+  // gate the switch path applies. The generation counter drops a probe that
+  // resolves after a newer one started, so an older item's result cannot
+  // overwrite the current one.
+  const audioProbeGenerationRef = useRef(0)
+  const probeAudioTrackDecoders = useEffectEvent(async (): Promise<void> => {
+    if (
+      strategy !== 'direct' ||
+      audioTracks.length <= 1 ||
+      !supportsNativeAudioTrackSwitching()
+    ) {
+      return
+    }
+
+    const generation = ++audioProbeGenerationRef.current
+    const key = trackResetKey
+    const results = await Promise.all(
+      audioTracks.map(async (track) => ({
+        index: track.index,
+        decodable:
+          isAudioTrackDirectPlayable(track.codec) &&
+          (await isCodecSupported(track.codec, 'audio', {
+            channels: track.channels,
+          })),
+      })),
+    )
+    if (audioProbeGenerationRef.current !== generation) return
+
+    const decodableIndices = new Set<number>()
+    for (const result of results) {
+      if (result.decodable) decodableIndices.add(result.index)
+    }
+    setAudioDecoderProbe({ key, decodableIndices })
+  })
+
+  useEffect(() => {
+    void probeAudioTrackDecoders()
+  }, [strategy, trackResetKey])
 
   const preferredAudioIndex = itemId
     ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
@@ -321,7 +384,11 @@ export function useTrackManager({
       return false
     }
 
-    if (isTrackOperationPending) {
+    // Admission must be synchronous: `isTrackOperationPending` is render
+    // state, so two selections in the same turn would both read the stale
+    // `false`. The counter ref updates before the first operation yields,
+    // which rejects the second call instead of running both switches.
+    if (pendingOperationCountRef.current > 0) {
       return false
     }
 
@@ -378,7 +445,8 @@ export function useTrackManager({
       return false
     }
 
-    if (isTrackOperationPending) {
+    // Synchronous admission; see selectAudioTrack.
+    if (pendingOperationCountRef.current > 0) {
       return false
     }
 
@@ -414,18 +482,41 @@ export function useTrackManager({
     return switched
   }
 
+  const audioTrackSwitchRequiresTranscode = (
+    track: AudioTrackInfo,
+  ): boolean => {
+    if (!supportsNativeAudioTrackSwitching()) return true
+    // A track the browser cannot decode (e.g. DTS) transcodes even when the
+    // native switching API is available.
+    if (!isAudioTrackDirectPlayable(track.codec)) return true
+    return (
+      audioDecoderProbe !== null &&
+      audioDecoderProbe.key === trackResetKey &&
+      !audioDecoderProbe.decodableIndices.has(track.index)
+    )
+  }
+
+  // Only tracks the user can actually switch to count: with a DTS track
+  // playing, switching to the sole AAC track is native, so no hint is due.
+  const audioSwitchTargets =
+    strategy === 'direct' && audioTracks.length > 1
+      ? audioTracks.filter((track) => track.index !== activeAudioIndex)
+      : []
+  const transcodingTargetCount = audioSwitchTargets.filter(
+    audioTrackSwitchRequiresTranscode,
+  ).length
+
   return {
     trackState,
     selectAudioTrack,
     selectSubtitleTrack,
     isLoading: isTrackOperationPending,
     error,
-    audioSwitchRequiresTranscode:
-      strategy === 'direct' &&
-      audioTracks.length > 1 &&
-      (!supportsNativeAudioTrackSwitching() ||
-        // A track the browser cannot decode (e.g. DTS) transcodes even when
-        // the native switching API is available.
-        !audioTracks.every((track) => isAudioTrackDirectPlayable(track.codec))),
+    audioSwitchTranscodeScope:
+      transcodingTargetCount === 0
+        ? 'none'
+        : transcodingTargetCount === audioSwitchTargets.length
+          ? 'all'
+          : 'some',
   }
 }
