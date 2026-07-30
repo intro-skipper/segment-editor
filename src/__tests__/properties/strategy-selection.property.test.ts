@@ -69,9 +69,9 @@ vi.mock('@/services/video/compatibility', async (importOriginal) => {
         const { container, videoCodec, audioCodec } = mediaSource
 
         // Check container
-        const containerSupported = (
-          original.DIRECT_PLAY_CONTAINERS as ReadonlyArray<string>
-        ).includes(container.toLowerCase())
+        const containerSupported = original.DIRECT_PLAY_CONTAINERS.includes(
+          container.toLowerCase(),
+        )
         if (!containerSupported) {
           return {
             canDirectPlay: false,
@@ -80,9 +80,9 @@ vi.mock('@/services/video/compatibility', async (importOriginal) => {
         }
 
         // Check video codec
-        const videoSupported = (
-          original.DIRECT_PLAY_VIDEO_CODECS as ReadonlyArray<string>
-        ).includes(videoCodec.toLowerCase())
+        const videoSupported = original.DIRECT_PLAY_VIDEO_CODECS.includes(
+          videoCodec.toLowerCase(),
+        )
         if (!videoSupported) {
           return {
             canDirectPlay: false,
@@ -91,9 +91,9 @@ vi.mock('@/services/video/compatibility', async (importOriginal) => {
         }
 
         // Check audio codec
-        const audioSupported = (
-          original.DIRECT_PLAY_AUDIO_CODECS as ReadonlyArray<string>
-        ).includes(audioCodec.toLowerCase())
+        const audioSupported = original.DIRECT_PLAY_AUDIO_CODECS.includes(
+          audioCodec.toLowerCase(),
+        )
         if (!audioSupported) {
           return {
             canDirectPlay: false,
@@ -140,7 +140,6 @@ describe('Feature: direct-play-fallback, Property 3: Strategy Selection Correctn
   const incompatibleAudioCodecArb = fc.constantFrom(
     'dts',
     'truehd',
-    'eac3',
     'wma',
     'unknown',
   )

@@ -5,7 +5,7 @@
  * @module services/video/tracks
  */
 
-import { getLanguageName } from '@/lib/language-utils'
+import { getLanguageName, languagesMatch } from '@/lib/language-utils'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // ============================================================================
@@ -159,6 +159,50 @@ type JellyfinMediaStream = NonNullable<
 // ============================================================================
 // Track Extraction Functions
 // ============================================================================
+
+/**
+ * Returns the audio track the container plays by default: the one flagged
+ * default, or the first track when no flag is set.
+ *
+ * This is the single definition of "default audio track". Both the playback
+ * strategy decision (`getPlaybackConfig`) and the initial native track
+ * application (`applyInitialAudioTrack`) resolve it through here, so they
+ * cannot disagree about which track direct play starts on.
+ *
+ * @param audioTracks - Audio streams in MediaStream order
+ */
+export function getContainerDefaultAudioTrack<
+  T extends { isDefault?: boolean },
+>(audioTracks: ReadonlyArray<T>): T | undefined {
+  return audioTracks.find((track) => track.isDefault) ?? audioTracks[0]
+}
+
+/**
+ * Resolves the audio track a playback session should start on: the first
+ * track matching the preferred language, else the container default via
+ * {@link getContainerDefaultAudioTrack}, else undefined when the item has no
+ * audio tracks.
+ *
+ * This is the single definition of "initial audio selection". The playback
+ * strategy decision (`Player` → `getPlaybackConfig`) and the track manager's
+ * active-track state must both derive from it so the strategy and the applied
+ * track can never disagree.
+ *
+ * @returns The Jellyfin MediaStream index of the track, or undefined
+ */
+export function findPreferredAudioStreamIndex(
+  audioTracks: ReadonlyArray<AudioTrackInfo>,
+  preferredLanguage: string | null,
+): number | undefined {
+  if (preferredLanguage) {
+    const preferredTrack = audioTracks.find((track) =>
+      languagesMatch(track.language, preferredLanguage),
+    )
+    if (preferredTrack) return preferredTrack.index
+  }
+
+  return getContainerDefaultAudioTrack(audioTracks)?.index
+}
 
 /**
  * Extracts audio and subtitle track information from a Jellyfin media item.

@@ -1,8 +1,16 @@
 import type { BaseItemDto, ImageType } from '@/types/jellyfin'
-import type { MediaSourceInfo } from '@/services/video/compatibility'
+import type {
+  AudioStreamInfo,
+  MediaSourceInfo,
+} from '@/services/video/compatibility'
 import { JELLYFIN_CONFIG } from '@/lib/constants'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
-import { checkCompatibility } from '@/services/video/compatibility'
+import {
+  checkCompatibility,
+  isAudioTrackDecodable,
+} from '@/services/video/compatibility'
+import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
+import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { createPlaySessionId } from '@/services/video/session'
 
 interface VideoStreamOptions {
@@ -267,22 +275,75 @@ export function extractMediaSourceInfo(
   const mediaStreams = source.MediaStreams ?? []
 
   const videoStream = mediaStreams.find((s) => s.Type === 'Video')
-  const audioStream = mediaStreams.find((s) => s.Type === 'Audio')
+  const audioStreams = mediaStreams.filter((s) => s.Type === 'Audio')
 
   const container = source.Container ?? ''
   const videoCodec = videoStream?.Codec ?? ''
-  const audioCodec = audioStream?.Codec ?? ''
 
   if (!container || !videoCodec) {
     return null
   }
+
+  const audioStreamInfos: Array<AudioStreamInfo> = audioStreams.map(
+    (stream, position) => ({
+      index: stream.Index ?? position,
+      codec: stream.Codec ?? '',
+      channels: stream.Channels ?? undefined,
+      isDefault: stream.IsDefault ?? false,
+    }),
+  )
+  // The codec that gates direct play is the container-default track's (the
+  // stream the browser starts on), resolved through the shared helper so this
+  // flat field cannot drift from the audioStreams-based decisions.
+  const audioCodec =
+    getContainerDefaultAudioTrack(audioStreamInfos)?.codec ?? ''
 
   return {
     container,
     videoCodec,
     audioCodec,
     bitrate: source.Bitrate ?? undefined,
+    video: {
+      codec: videoCodec,
+      profile: videoStream?.Profile ?? undefined,
+      level: videoStream?.Level ?? undefined,
+      width: videoStream?.Width ?? undefined,
+      height: videoStream?.Height ?? undefined,
+      // Jellyfin often omits the per-stream bitrate. The source (mux) bitrate
+      // is a conservative upper bound for the video stream, so probing with it
+      // never approves a decoder the real file would overwhelm — unlike the
+      // 10 Mbps default the probe would otherwise assume.
+      bitrate: videoStream?.BitRate ?? source.Bitrate ?? undefined,
+      bitDepth: videoStream?.BitDepth ?? undefined,
+      videoRange: videoStream?.VideoRange,
+      frameRate:
+        videoStream?.AverageFrameRate ??
+        videoStream?.RealFrameRate ??
+        undefined,
+    },
+    audioStreams: audioStreamInfos,
   }
+}
+
+/**
+ * Whether the requested audio stream can be selected natively during direct
+ * play: the browser must expose the HTML `audioTracks` API and be able to
+ * decode that specific track (see {@link isAudioTrackDecodable}).
+ */
+async function canStartDirectPlayWithAudioTrack(
+  mediaSourceInfo: MediaSourceInfo | null,
+  audioStreamIndex: number | undefined,
+): Promise<boolean> {
+  if (audioStreamIndex === undefined) return false
+  if (!supportsNativeAudioTrackSwitching()) return false
+
+  const targetStream: AudioStreamInfo | undefined =
+    mediaSourceInfo?.audioStreams?.find(
+      (stream) => stream.index === audioStreamIndex,
+    )
+  if (!targetStream) return false
+
+  return isAudioTrackDecodable(targetStream)
 }
 
 export async function getPlaybackConfig(
@@ -305,28 +366,40 @@ export async function getPlaybackConfig(
   }
 
   const mediaSourceInfo = extractMediaSourceInfo(item)
-
-  const compatibility = await checkCompatibility(mediaSourceInfo)
-
-  const container = mediaSourceInfo?.container
   const mediaSourceId = getPlaybackMediaSourceId(item)
 
-  const needsNonDefaultAudio =
-    audioStreamIndex !== undefined &&
-    isNonFirstAudioTrack(item, audioStreamIndex)
+  // `forceHls` discards the compatibility answer, so the probe (up to two
+  // MediaCapabilities round trips) is skipped entirely on the transcode
+  // fallback path, which runs while playback is already broken.
+  if (!forceHls) {
+    const needsNonDefaultAudio =
+      audioStreamIndex !== undefined &&
+      isNonDefaultAudioTrack(mediaSourceInfo, audioStreamIndex)
 
-  if (compatibility.canDirectPlay && !needsNonDefaultAudio && !forceHls) {
-    const url = getDirectPlayUrl({
-      itemId: item.Id,
-      mediaSourceId,
-      startTimeTicks,
-      container,
-    })
+    // A non-default audio track only forces a transcode when the browser
+    // cannot select that track natively on the direct-played file. Both
+    // checks probe independent codec shapes, so they run concurrently rather
+    // than paying two serial MediaCapabilities round trips on playback start.
+    const [canDirectPlayRequestedAudio, compatibility] = await Promise.all([
+      needsNonDefaultAudio
+        ? canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
+        : true,
+      checkCompatibility(mediaSourceInfo),
+    ])
 
-    return {
-      strategy: 'direct',
-      url,
-      startTime,
+    if (canDirectPlayRequestedAudio && compatibility.canDirectPlay) {
+      const url = getDirectPlayUrl({
+        itemId: item.Id,
+        mediaSourceId,
+        startTimeTicks,
+        container: mediaSourceInfo?.container,
+      })
+
+      return {
+        strategy: 'direct',
+        url,
+        startTime,
+      }
     }
   }
 
@@ -347,22 +420,22 @@ export async function getPlaybackConfig(
   }
 }
 
-function isNonFirstAudioTrack(
-  item: BaseItemDto,
+/**
+ * Whether the requested audio stream differs from the track the container
+ * plays by default. Resolved through the shared
+ * {@link getContainerDefaultAudioTrack}, so the strategy decision and the
+ * initial native track application cannot disagree on what "default" means.
+ */
+function isNonDefaultAudioTrack(
+  mediaSourceInfo: MediaSourceInfo | null,
   audioStreamIndex: number,
 ): boolean {
-  const mediaSources = item.MediaSources
-  if (!mediaSources?.length) {
+  const defaultStream = getContainerDefaultAudioTrack(
+    mediaSourceInfo?.audioStreams ?? [],
+  )
+  if (!defaultStream) {
     return false
   }
 
-  const mediaStreams = mediaSources[0].MediaStreams ?? []
-
-  const firstAudioStream = mediaStreams.find((s) => s.Type === 'Audio')
-
-  if (!firstAudioStream) {
-    return false
-  }
-
-  return firstAudioStream.Index !== audioStreamIndex
+  return defaultStream.index !== audioStreamIndex
 }
