@@ -4,24 +4,18 @@
  * (intro-skipper/segment-editor-plugin#7: error overlay never disappeared
  * after playback recovered).
  *
- * Wires useVideoPlayer (with the real useHlsPlayer) to the real playerReducer
- * exactly like Player.tsx does, and drives hls.js events through a fake.
+ * useVideoPlayer (with the real useHlsPlayer) owns the error/recovery state
+ * the overlay renders from; these tests observe the hook's returned state
+ * directly and drive hls.js events through a fake.
  */
 
 import { act, render, waitFor } from '@testing-library/react'
-import { useEffect, useReducer } from 'react'
+import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/hooks/use-video-player'
-import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import { useVideoPlayer } from '@/hooks/use-video-player'
-import {
-  initialPlayerState,
-  mapVideoErrorType,
-  playerReducer,
-} from '@/components/player/player-reducer'
-import type { PlayerState } from '@/components/player/player-reducer'
 import { getPlaybackConfig } from '@/services/video/api'
 import type * as VideoApiModule from '@/services/video/api'
 
@@ -118,46 +112,26 @@ vi.mock('@/services/video/transcode-session', () => ({
   stopActiveEncodingKeepalive: vi.fn(),
 }))
 
-const observed: { state: PlayerState; retry: () => void } = {
-  state: initialPlayerState,
+const observed: {
+  error: VideoPlayerError | null
+  isRecovering: boolean
+  retry: () => void
+} = {
+  error: null,
+  isRecovering: false,
   retry: () => {},
 }
 
-/** Replicates the error/recovery wiring between Player.tsx and useVideoPlayer. */
+/** Exposes the hook state Player.tsx renders the overlays from. */
 function Harness({ item }: { item: BaseItemDto }) {
-  const [state, dispatch] = useReducer(playerReducer, initialPlayerState)
-
-  const handleVideoError = (error: VideoPlayerError | null) => {
-    if (error) {
-      const hlsError: HlsPlayerError = {
-        type: mapVideoErrorType(error.type),
-        message: error.message,
-        recoverable: error.recoverable,
-      }
-      dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
-    } else {
-      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
-    }
-  }
-
-  const player = useVideoPlayer({
+  const { error, isRecovering, retry, videoRef } = useVideoPlayer({
     item,
-    onError: handleVideoError,
-    onStrategyChange: () => {
-      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
-    },
-    onRecoveryStart: () => {
-      dispatch({ type: 'RECOVERY_START' })
-    },
-    onRecoveryEnd: () => {
-      dispatch({ type: 'RECOVERY_END' })
-    },
     t: (key: string) => key,
   })
-  const { retry, videoRef } = player
 
   useEffect(() => {
-    observed.state = state
+    observed.error = error
+    observed.isRecovering = isRecovering
     observed.retry = retry
   })
 
@@ -170,7 +144,7 @@ function Harness({ item }: { item: BaseItemDto }) {
 
 /** Mirrors PlayerSurface's overlay conditions. */
 function errorOverlayVisible() {
-  return Boolean(observed.state.playerError && !observed.state.isRecovering)
+  return Boolean(observed.error && !observed.isRecovering)
 }
 
 function emitHlsEvent(hls: FakeHlsInstance, event: string, data?: unknown) {
@@ -225,16 +199,16 @@ describe('HLS error recovery overlay lifecycle', () => {
     const { hls } = await renderPlayingHarness()
 
     emitHlsEvent(hls, 'hlsError', fatalMediaError)
-    expect(observed.state.playerError).not.toBeNull()
-    expect(observed.state.isRecovering).toBe(true)
+    expect(observed.error).not.toBeNull()
+    expect(observed.isRecovering).toBe(true)
     expect(hls.recoverCalls).toBe(1)
 
     // Playback resumes: a fragment appends successfully well before the
     // fallback recovery timer would have fired.
     emitHlsEvent(hls, 'hlsFragBuffered')
 
-    expect(observed.state.playerError).toBeNull()
-    expect(observed.state.isRecovering).toBe(false)
+    expect(observed.error).toBeNull()
+    expect(observed.isRecovering).toBe(false)
     expect(errorOverlayVisible()).toBe(false)
   })
 
@@ -243,14 +217,14 @@ describe('HLS error recovery overlay lifecycle', () => {
     vi.useFakeTimers()
 
     emitHlsEvent(hls, 'hlsError', fatalMediaError)
-    expect(observed.state.isRecovering).toBe(true)
+    expect(observed.isRecovering).toBe(true)
 
     act(() => {
       vi.advanceTimersByTime(2100)
     })
 
-    expect(observed.state.playerError).toBeNull()
-    expect(observed.state.isRecovering).toBe(false)
+    expect(observed.error).toBeNull()
+    expect(observed.isRecovering).toBe(false)
   })
 
   it('keeps unknown fatal errors recoverable and rebuilds the player on retry', async () => {
@@ -258,7 +232,7 @@ describe('HLS error recovery overlay lifecycle', () => {
 
     emitHlsEvent(hls, 'hlsError', fatalOtherError)
     expect(errorOverlayVisible()).toBe(true)
-    expect(observed.state.playerError?.recoverable).toBe(true)
+    expect(observed.error?.recoverable).toBe(true)
 
     const video = utils.container.querySelector('video')!
     Object.defineProperty(video, 'currentTime', {
@@ -272,7 +246,7 @@ describe('HLS error recovery overlay lifecycle', () => {
     })
 
     // The overlay clears immediately on retry...
-    expect(observed.state.playerError).toBeNull()
+    expect(observed.error).toBeNull()
     expect(errorOverlayVisible()).toBe(false)
 
     // ...and a fresh Hls instance reloads the source from the same position.
@@ -293,7 +267,7 @@ describe('HLS error recovery overlay lifecycle', () => {
     emitHlsEvent(hls, 'hlsFragBuffered')
 
     expect(errorOverlayVisible()).toBe(false)
-    expect(observed.state.playerError).toBeNull()
+    expect(observed.error).toBeNull()
   })
 
   it('swaps the audio codec when media errors repeat within the swap window', async () => {

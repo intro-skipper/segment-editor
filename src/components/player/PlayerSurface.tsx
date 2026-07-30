@@ -20,7 +20,7 @@ import type { VideoFitMode } from './use-fullscreen-player-ui'
 import type { PlayerControlsProps } from './PlayerControls'
 import type { NativeCaptionTrack } from './caption-tracks'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { HlsPlayerError } from '@/hooks/use-hls-player'
+import type { VideoPlayerError } from '@/hooks/use-video-player'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -49,7 +49,7 @@ interface PlayerSurfaceVideoState {
 }
 
 interface PlayerSurfacePlaybackState {
-  error: HlsPlayerError | null
+  error: VideoPlayerError | null
   isRecovering: boolean
   strategy: PlaybackStrategy
   isVideoLoading: boolean
@@ -159,7 +159,7 @@ function PlayerVideoButton({
 }
 
 interface PlayerErrorOverlayProps {
-  error: HlsPlayerError
+  error: VideoPlayerError
   strategy: PlaybackStrategy
   isFullscreen: boolean
   onRetry: () => void
@@ -186,7 +186,7 @@ function PlayerErrorOverlay({
         aria-hidden="true"
       />
       <p className="text-lg font-medium mb-2">{error.message}</p>
-      {strategy === 'direct' && error.type === 'media' ? (
+      {strategy === 'direct' && error.type === 'media_error' ? (
         <p className="text-sm text-muted-foreground mb-2">
           {t('player.error.directPlayFailed')}
         </p>

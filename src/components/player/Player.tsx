@@ -13,11 +13,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
-import {
-  initialPlayerState,
-  mapVideoErrorType,
-  playerReducer,
-} from './player-reducer'
+import { initialPlayerState, playerReducer } from './player-reducer'
 import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
@@ -31,8 +27,6 @@ import type {
   MediaSegmentDto,
   MediaSegmentType,
 } from '@/types/jellyfin'
-import type { VideoPlayerError } from '@/hooks/use-video-player'
-import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getBestImageUrl } from '@/services/video/api'
@@ -234,8 +228,6 @@ function useRenderPlayer({
     volume,
     isMuted,
     skipTimeIndex,
-    playerError,
-    isRecovering,
     subtitleOffset,
     playbackSpeedIndex,
   } = state
@@ -323,22 +315,7 @@ function useRenderPlayer({
   const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
 
-  const handleVideoError = (error: VideoPlayerError | null) => {
-    if (error) {
-      const hlsError: HlsPlayerError = {
-        type: mapVideoErrorType(error.type),
-        message: error.message,
-        recoverable: error.recoverable,
-      }
-      dispatch({ type: 'ERROR_STATE', error: hlsError, isRecovering: false })
-    } else {
-      dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
-    }
-  }
-
   const handleStrategyChange = (strategy: PlaybackStrategy) => {
-    dispatch({ type: 'ERROR_STATE', error: null, isRecovering: false })
-
     if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
       showNotification({
         type: 'info',
@@ -361,6 +338,8 @@ function useRenderPlayer({
     hlsRef,
     strategy,
     isLoading: isVideoLoading,
+    error: playerError,
+    isRecovering,
     retry: handleRetry,
     reloadHlsWithUrl,
   } = useVideoPlayer({
@@ -376,14 +355,7 @@ function useRenderPlayer({
       findItemPreferredAudioStreamIndex(item, readPreferredAudioLanguage()),
     getCurrentAudioStreamIndex: () => currentAudioStreamIndexRef.current,
     jellyfinPlaybackSyncEnabled,
-    onError: handleVideoError,
     onStrategyChange: handleStrategyChange,
-    onRecoveryStart: () => {
-      dispatch({ type: 'RECOVERY_START' })
-    },
-    onRecoveryEnd: () => {
-      dispatch({ type: 'RECOVERY_END' })
-    },
     t,
   })
 

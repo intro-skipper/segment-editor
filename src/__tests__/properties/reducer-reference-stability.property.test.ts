@@ -28,8 +28,6 @@ const playerStateArb = fc.record({
   volume: fc.float({ min: 0, max: 1, noNaN: true }),
   isMuted: fc.boolean(),
   skipTimeIndex: fc.integer({ min: 0, max: SKIP_TIMES.length - 1 }),
-  playerError: fc.constant(null),
-  isRecovering: fc.boolean(),
 }) as fc.Arbitrary<PlayerState>
 
 describe('Reducer Reference Stability', () => {
@@ -279,43 +277,6 @@ describe('Reducer Reference Stability', () => {
   })
 
   /**
-   * Property: ERROR_STATE always returns new reference (error state changes are always significant)
-   */
-  it('returns new reference for ERROR_STATE action', () => {
-    fc.assert(
-      fc.property(playerStateArb, fc.boolean(), (state, isRecovering) => {
-        const action: PlayerAction = {
-          type: 'ERROR_STATE',
-          error: null,
-          isRecovering,
-        }
-        const result = playerReducer(state, action)
-        // ERROR_STATE always creates new object (no optimization for error state)
-        return (
-          result !== state ||
-          (result.playerError === null && result.isRecovering === isRecovering)
-        )
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: RECOVERY_START always returns new reference
-   */
-  it('returns new reference for RECOVERY_START action', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = { type: 'RECOVERY_START' }
-        const result = playerReducer(state, action)
-        // RECOVERY_START always creates new object
-        return result !== state || result.isRecovering === true
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
    * Property: State values are preserved for unchanged fields
    * When an action changes one field, all other fields should remain unchanged.
    */
@@ -337,9 +298,7 @@ describe('Reducer Reference Stability', () => {
             result.buffered === state.buffered &&
             result.volume === state.volume &&
             result.isMuted === state.isMuted &&
-            result.skipTimeIndex === state.skipTimeIndex &&
-            result.playerError === state.playerError &&
-            result.isRecovering === state.isRecovering
+            result.skipTimeIndex === state.skipTimeIndex
           )
         },
       ),

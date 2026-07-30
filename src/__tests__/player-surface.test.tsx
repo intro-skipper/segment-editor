@@ -306,7 +306,7 @@ describe('PlayerSurface', () => {
 
   it('rounds the error overlay only in windowed mode', () => {
     const error = {
-      type: 'media',
+      type: 'media_error',
       message: 'Playback failed',
       recoverable: false,
     } as const
@@ -366,7 +366,7 @@ describe('PlayerSurface', () => {
           playback: {
             onRetry,
             error: {
-              type: 'media',
+              type: 'media_error',
               message: 'Playback failed',
               recoverable: true,
             },

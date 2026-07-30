@@ -3,8 +3,6 @@
  * Extracted for testability and separation of concerns.
  */
 
-import type { HlsPlayerError } from '@/hooks/use-hls-player'
-import type { VideoPlayerErrorType } from '@/hooks/use-video-player'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
 const {
@@ -26,8 +24,6 @@ export interface PlayerState {
   volume: number
   isMuted: boolean
   skipTimeIndex: number
-  playerError: HlsPlayerError | null
-  isRecovering: boolean
   /** User-configured subtitle offset in seconds (positive = delay, negative = advance) */
   subtitleOffset: number
   /** Current index into PLAYBACK_SPEEDS array */
@@ -42,27 +38,10 @@ export type PlayerAction =
   | { type: 'PLAY_STATE'; isPlaying: boolean }
   | { type: 'VOLUME_CHANGE'; volume: number; isMuted: boolean }
   | { type: 'SKIP_TIME_CHANGE'; skipTimeIndex: number }
-  | { type: 'ERROR_STATE'; error: HlsPlayerError | null; isRecovering: boolean }
-  | { type: 'RECOVERY_START' }
-  | { type: 'RECOVERY_END' }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
   | { type: 'CYCLE_SPEED'; direction: 1 | -1 }
   | { type: 'SET_SPEED'; speedIndex: number }
-
-/** Maps useVideoPlayer error types onto the reducer's HlsPlayerError taxonomy. */
-export function mapVideoErrorType(
-  type: VideoPlayerErrorType,
-): HlsPlayerError['type'] {
-  switch (type) {
-    case 'media_error':
-      return 'media'
-    case 'network_error':
-      return 'network'
-    default:
-      return 'unknown'
-  }
-}
 
 export const initialPlayerState: PlayerState = {
   isPlaying: false,
@@ -72,8 +51,6 @@ export const initialPlayerState: PlayerState = {
   volume: 1,
   isMuted: false,
   skipTimeIndex: DEFAULT_SKIP_TIME_INDEX,
-  playerError: null,
-  isRecovering: false,
   subtitleOffset: 0,
   playbackSpeedIndex: DEFAULT_PLAYBACK_SPEED_INDEX,
 }
@@ -116,24 +93,6 @@ export function playerReducer(
       return state.skipTimeIndex === action.skipTimeIndex
         ? state
         : { ...state, skipTimeIndex: action.skipTimeIndex }
-
-    case 'ERROR_STATE':
-      return state.playerError === action.error &&
-        state.isRecovering === action.isRecovering
-        ? state
-        : {
-            ...state,
-            playerError: action.error,
-            isRecovering: action.isRecovering,
-          }
-
-    case 'RECOVERY_START':
-      return state.isRecovering ? state : { ...state, isRecovering: true }
-
-    case 'RECOVERY_END':
-      return !state.isRecovering && state.playerError === null
-        ? state
-        : { ...state, isRecovering: false, playerError: null }
 
     case 'CYCLE_SKIP': {
       const newIndex = Math.max(
