@@ -175,12 +175,16 @@ function PlayerErrorOverlay({
 
   return (
     <div
+      role="alert"
       className={cn(
         'absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white',
         !isFullscreen && 'rounded-2xl',
       )}
     >
-      <AlertTriangle className="size-12 text-destructive mb-4" />
+      <AlertTriangle
+        className="size-12 text-destructive mb-4"
+        aria-hidden="true"
+      />
       <p className="text-lg font-medium mb-2">{error.message}</p>
       {strategy === 'direct' && error.type === 'media' ? (
         <p className="text-sm text-muted-foreground mb-2">
