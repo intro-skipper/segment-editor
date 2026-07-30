@@ -24,10 +24,20 @@ vi.mock('@/services/jellyfin', () => ({
 
 vi.mock('@/services/video/compatibility', async (importOriginal) => {
   const original = await importOriginal<typeof CompatibilityModule>()
+  const isCodecSupportedMock = vi.fn()
   return {
     ...original,
     checkCompatibility: vi.fn(),
-    isCodecSupported: vi.fn(),
+    isCodecSupported: isCodecSupportedMock,
+    // Mirrors the real helper's composition through the mocked probe, so the
+    // tests keep the real static allowlist and control the decoder answer.
+    isAudioTrackDecodable: vi.fn(
+      async (track: { codec: string; channels?: number }) =>
+        original.isAudioTrackDirectPlayable(track.codec) &&
+        (await isCodecSupportedMock(track.codec, 'audio', {
+          channels: track.channels,
+        })),
+    ),
   }
 })
 

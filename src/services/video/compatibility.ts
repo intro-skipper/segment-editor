@@ -114,10 +114,12 @@ const DEFAULT_AUDIO_SAMPLERATE = 48_000
 // ============================================================================
 
 /**
- * Cache for browser codec capability results.
+ * Cache for browser codec capability results. Holds the settled boolean, or
+ * the in-flight probe promise so concurrent lookups for the same shape share
+ * one browser round trip.
  * Key format: `${type}:${configSignature}`
  */
-const capabilityCache: Map<string, boolean> = new Map()
+const capabilityCache: Map<string, boolean | Promise<boolean>> = new Map()
 
 /**
  * Clears the capability cache.
@@ -602,44 +604,54 @@ export async function isCodecSupported(
     return cached
   }
 
-  // Safari handles HLS natively, so we can be more permissive
-  if (isSafari() && type === 'video') {
-    return cacheCapability(cacheKey, true)
-  }
-
-  if (contentType === null || config === null) {
-    return cacheCapability(cacheKey, false)
-  }
-
-  // Try MediaCapabilities API first
-  if (typeof navigator !== 'undefined' && 'mediaCapabilities' in navigator) {
-    try {
-      let result: MediaCapabilitiesDecodingInfo
-      try {
-        result = await navigator.mediaCapabilities.decodingInfo(config)
-      } catch (err) {
-        // The HDR dictionary members are Chromium-only; retry the plain SDR
-        // shape before giving up on MediaCapabilities.
-        if (config.video?.transferFunction === undefined) throw err
-        const {
-          transferFunction: _tf,
-          colorGamut: _cg,
-          hdrMetadataType: _hdr,
-          ...sdrVideo
-        } = config.video
-        result = await navigator.mediaCapabilities.decodingInfo({
-          type: 'file',
-          video: sdrVideo,
-        })
-      }
-      return cacheCapability(cacheKey, result.supported)
-    } catch {
-      // Fall through to canPlayType fallback
+  const probe = async (): Promise<boolean> => {
+    // Safari handles HLS natively, so we can be more permissive
+    if (isSafari() && type === 'video') {
+      return cacheCapability(cacheKey, true)
     }
+
+    if (contentType === null || config === null) {
+      return cacheCapability(cacheKey, false)
+    }
+
+    // Try MediaCapabilities API first
+    if (typeof navigator !== 'undefined' && 'mediaCapabilities' in navigator) {
+      try {
+        let result: MediaCapabilitiesDecodingInfo
+        try {
+          result = await navigator.mediaCapabilities.decodingInfo(config)
+        } catch (err) {
+          // The HDR dictionary members are Chromium-only; retry the plain SDR
+          // shape before giving up on MediaCapabilities.
+          if (config.video?.transferFunction === undefined) throw err
+          const {
+            transferFunction: _tf,
+            colorGamut: _cg,
+            hdrMetadataType: _hdr,
+            ...sdrVideo
+          } = config.video
+          result = await navigator.mediaCapabilities.decodingInfo({
+            type: 'file',
+            video: sdrVideo,
+          })
+        }
+        return cacheCapability(cacheKey, result.supported)
+      } catch {
+        // Fall through to canPlayType fallback
+      }
+    }
+
+    // Fallback to canPlayType
+    return cacheCapability(cacheKey, canPlayTypeFallback(contentType))
   }
 
-  // Fallback to canPlayType
-  return cacheCapability(cacheKey, canPlayTypeFallback(contentType))
+  // Cache the in-flight probe so concurrent callers with the same shape
+  // (common when a multi-track item fans out per-track probes) share one
+  // browser round trip; cacheCapability then overwrites the pending entry
+  // with the settled boolean.
+  const pending = probe()
+  capabilityCache.set(cacheKey, pending)
+  return pending
 }
 
 // ============================================================================
@@ -654,19 +666,38 @@ function isVideoCodecInList(codec: string): boolean {
 }
 
 /**
- * Checks whether a single audio track can be decoded during direct play.
+ * Checks whether a single audio track's codec is on the direct-play
+ * allowlist.
  *
- * This is the synchronous, list-based variant used by the audio track
- * switching paths: they run inside a user interaction and must not block on
- * the async MediaCapabilities probe. Whether the file as a whole can direct
- * play stays the responsibility of {@link checkCompatibility}, which only ever
- * looks at the first audio stream.
+ * This is the synchronous first gate of {@link isAudioTrackDecodable}, and
+ * the interim answer for UI paths that cannot block on the async decoder
+ * probe.
  *
  * @param codec - The audio codec of the track (e.g. "aac", "dts")
- * @returns true when the browser can decode the track without transcoding
  */
 export function isAudioTrackDirectPlayable(codec: string): boolean {
   return DIRECT_PLAY_AUDIO_CODECS.includes(codec.toLowerCase())
+}
+
+/**
+ * Whether the browser can decode a single audio track during direct play.
+ * The allowlist check filters known-untranscodable codecs (e.g. DTS)
+ * synchronously; the MediaCapabilities probe then catches codecs that are on
+ * the list but have no decoder in this browser build (e.g. E-AC-3 on Chromium
+ * variants without proprietary codecs).
+ *
+ * The playback strategy decision, the native track switch, and the transcode
+ * hint all resolve through here, so they cannot disagree about which tracks
+ * transcode.
+ */
+export async function isAudioTrackDecodable(track: {
+  codec: string
+  channels?: number
+}): Promise<boolean> {
+  return (
+    isAudioTrackDirectPlayable(track.codec) &&
+    (await isCodecSupported(track.codec, 'audio', { channels: track.channels }))
+  )
 }
 
 /**

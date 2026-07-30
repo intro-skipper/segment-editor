@@ -7,8 +7,7 @@ import { JELLYFIN_CONFIG } from '@/lib/constants'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import {
   checkCompatibility,
-  isAudioTrackDirectPlayable,
-  isCodecSupported,
+  isAudioTrackDecodable,
 } from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
@@ -280,15 +279,24 @@ export function extractMediaSourceInfo(
 
   const container = source.Container ?? ''
   const videoCodec = videoStream?.Codec ?? ''
-  // The codec that gates direct play is the container-default track's (the
-  // stream the browser starts on), not necessarily the first audio stream.
-  const defaultAudioStream =
-    audioStreams.find((s) => s.IsDefault) ?? audioStreams[0]
-  const audioCodec = defaultAudioStream?.Codec ?? ''
 
   if (!container || !videoCodec) {
     return null
   }
+
+  const audioStreamInfos: Array<AudioStreamInfo> = audioStreams.map(
+    (stream, position) => ({
+      index: stream.Index ?? position,
+      codec: stream.Codec ?? '',
+      channels: stream.Channels ?? undefined,
+      isDefault: stream.IsDefault ?? false,
+    }),
+  )
+  // The codec that gates direct play is the container-default track's (the
+  // stream the browser starts on), resolved through the shared helper so this
+  // flat field cannot drift from the audioStreams-based decisions.
+  const audioCodec =
+    getContainerDefaultAudioTrack(audioStreamInfos)?.codec ?? ''
 
   return {
     container,
@@ -313,22 +321,14 @@ export function extractMediaSourceInfo(
         videoStream?.RealFrameRate ??
         undefined,
     },
-    audioStreams: audioStreams.map((stream, position) => ({
-      index: stream.Index ?? position,
-      codec: stream.Codec ?? '',
-      channels: stream.Channels ?? undefined,
-      isDefault: stream.IsDefault ?? false,
-    })),
+    audioStreams: audioStreamInfos,
   }
 }
 
 /**
  * Whether the requested audio stream can be selected natively during direct
  * play: the browser must expose the HTML `audioTracks` API and be able to
- * decode that specific track. The list check filters known-untranscodable
- * codecs (e.g. DTS) cheaply; the MediaCapabilities probe then catches codecs
- * that are on the list but missing a decoder in this browser build (e.g.
- * E-AC-3 on Chromium variants without proprietary codecs).
+ * decode that specific track (see {@link isAudioTrackDecodable}).
  */
 async function canStartDirectPlayWithAudioTrack(
   mediaSourceInfo: MediaSourceInfo | null,
@@ -343,11 +343,7 @@ async function canStartDirectPlayWithAudioTrack(
     )
   if (!targetStream) return false
 
-  if (!isAudioTrackDirectPlayable(targetStream.codec)) return false
-
-  return isCodecSupported(targetStream.codec, 'audio', {
-    channels: targetStream.channels,
-  })
+  return isAudioTrackDecodable(targetStream)
 }
 
 export async function getPlaybackConfig(
@@ -380,19 +376,18 @@ export async function getPlaybackConfig(
       audioStreamIndex !== undefined &&
       isNonDefaultAudioTrack(mediaSourceInfo, audioStreamIndex)
 
-    // A non-default audio track only forces a transcode when the browser cannot
-    // select that track natively on the direct-played file.
-    const canDirectPlayRequestedAudio =
-      !needsNonDefaultAudio ||
-      (await canStartDirectPlayWithAudioTrack(
-        mediaSourceInfo,
-        audioStreamIndex,
-      ))
+    // A non-default audio track only forces a transcode when the browser
+    // cannot select that track natively on the direct-played file. Both
+    // checks probe independent codec shapes, so they run concurrently rather
+    // than paying two serial MediaCapabilities round trips on playback start.
+    const [canDirectPlayRequestedAudio, compatibility] = await Promise.all([
+      needsNonDefaultAudio
+        ? canStartDirectPlayWithAudioTrack(mediaSourceInfo, audioStreamIndex)
+        : true,
+      checkCompatibility(mediaSourceInfo),
+    ])
 
-    if (
-      canDirectPlayRequestedAudio &&
-      (await checkCompatibility(mediaSourceInfo)).canDirectPlay
-    ) {
+    if (canDirectPlayRequestedAudio && compatibility.canDirectPlay) {
       const url = getDirectPlayUrl({
         itemId: item.Id,
         mediaSourceId,

@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type Hls from 'hls.js'
+import type * as CompatibilityModule from '@/services/video/compatibility'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import {
   switchAudioTrack,
@@ -33,12 +34,11 @@ vi.mock('@/services/jellyfin', () => ({
 // make every codec look undecodable. Resolve decodability from the
 // direct-play list instead so the native-switch paths stay testable.
 vi.mock('@/services/video/compatibility', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@/services/video/compatibility')>()
+  const original = await importOriginal<typeof CompatibilityModule>()
   return {
     ...original,
-    isCodecSupported: vi.fn(async (codec: string) =>
-      original.isAudioTrackDirectPlayable(codec),
+    isAudioTrackDecodable: vi.fn(async (track: { codec: string }) =>
+      original.isAudioTrackDirectPlayable(track.codec),
     ),
   }
 })

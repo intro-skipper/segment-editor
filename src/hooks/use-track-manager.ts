@@ -23,8 +23,8 @@ import {
 import { runTrackOperation } from '@/services/video/track-operation'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
 import {
+  isAudioTrackDecodable,
   isAudioTrackDirectPlayable,
-  isCodecSupported,
 } from '@/services/video/compatibility'
 import { useInitialAudioSelection } from '@/hooks/use-initial-audio-selection'
 import {
@@ -76,13 +76,6 @@ interface UserTrackSelectionState {
   audioIndex: number
   hasSubtitleSelection: boolean
   subtitleIndex: number | null
-}
-
-function findPreferredAudioIndex(
-  audioTracks: Array<AudioTrackInfo>,
-  preferredLanguage: string | null,
-): number {
-  return findPreferredAudioStreamIndex(audioTracks, preferredLanguage) ?? 0
 }
 
 function findPreferredSubtitleIndex(
@@ -207,11 +200,10 @@ export function useTrackManager({
     }
   }, [trackResetKey])
 
-  // The transcode hint must agree with the switch decision, so it runs the
-  // same asynchronous decoder probe `tryEnableNativeAudioTrack` uses (the
-  // probe is cached per config, so this costs one MediaCapabilities round
-  // trip per distinct codec/channel shape). Until a probe resolves for this
-  // item, the static allowlist below is the interim answer — the same first
+  // The transcode hint must agree with the switch decision, so it resolves
+  // through the same `isAudioTrackDecodable` the switch path calls (results
+  // are cached per codec/channel shape). Until a probe resolves for this
+  // item, the static allowlist below is the interim answer, the same first
   // gate the switch path applies. The generation counter drops a probe that
   // resolves after a newer one started, so an older item's result cannot
   // overwrite the current one.
@@ -230,11 +222,7 @@ export function useTrackManager({
     const results = await Promise.all(
       audioTracks.map(async (track) => ({
         index: track.index,
-        decodable:
-          isAudioTrackDirectPlayable(track.codec) &&
-          (await isCodecSupported(track.codec, 'audio', {
-            channels: track.channels,
-          })),
+        decodable: await isAudioTrackDecodable(track),
       })),
     )
     if (audioProbeGenerationRef.current !== generation) return
@@ -251,7 +239,7 @@ export function useTrackManager({
   }, [strategy, trackResetKey])
 
   const preferredAudioIndex = itemId
-    ? findPreferredAudioIndex(audioTracks, preferredAudioLanguage)
+    ? (findPreferredAudioStreamIndex(audioTracks, preferredAudioLanguage) ?? 0)
     : 0
 
   const preferredSubtitleIndex = itemId

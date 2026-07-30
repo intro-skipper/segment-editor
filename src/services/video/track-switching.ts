@@ -12,10 +12,7 @@ import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { getVideoStreamUrl } from '@/services/video/api'
 import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
-import {
-  isAudioTrackDirectPlayable,
-  isCodecSupported,
-} from '@/services/video/compatibility'
+import { isAudioTrackDecodable } from '@/services/video/compatibility'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
 
 /**
@@ -374,16 +371,11 @@ async function tryEnableNativeAudioTrack(
   waitTimeoutMs = 0,
 ): Promise<boolean> {
   const nativeAudioTracks = getNativeAudioTracks(options.videoElement)
-  if (!nativeAudioTracks || !isAudioTrackDirectPlayable(targetTrack.codec)) {
+  if (!nativeAudioTracks) {
     return false
   }
 
-  // The list check above filters known-untranscodable codecs cheaply; this
-  // probe catches codecs that are on the list but have no decoder in this
-  // browser build (e.g. E-AC-3 on Chromium without proprietary codecs).
-  const codecDecodable = await isCodecSupported(targetTrack.codec, 'audio', {
-    channels: targetTrack.channels,
-  })
+  const codecDecodable = await isAudioTrackDecodable(targetTrack)
   if (!codecDecodable || options.signal?.aborted) {
     return false
   }
@@ -488,6 +480,13 @@ async function reloadHlsAudioTrack(
   options: TrackSwitchOptions,
   messages: HlsReloadMessages,
 ): Promise<TrackSwitchResult> {
+  // A stale request (newer selection, item change, unmount) must not restart
+  // the stream as a transcode for an outdated index. The no-op success is
+  // discarded along with the rest of the aborted operation's result.
+  if (options.signal?.aborted) {
+    return { success: true }
+  }
+
   const { itemId, mediaSourceId, onReloadHls } = options
 
   if (!itemId) {
@@ -630,12 +629,6 @@ async function switchDirectPlayAudioTrack(
     return { success: true }
   }
 
-  // A stale switch (newer selection, item change, unmount) must not restart
-  // the stream as a transcode for an outdated index.
-  if (options.signal?.aborted) {
-    return { success: true }
-  }
-
   // Strategy 2: Fall back to HLS transcoding with selected audio track
   // This is the only way to switch audio in Chrome/Firefox for direct play content
   return reloadHlsAudioTrack(
@@ -694,11 +687,6 @@ export async function applyInitialAudioTrack(
     options.nativeTrackTimeoutMs ?? NATIVE_AUDIO_TRACK_TIMEOUT_MS,
   )
   if (enabled) {
-    return { success: true }
-  }
-
-  // A stale application must not reload the stream for an outdated index.
-  if (signal?.aborted) {
     return { success: true }
   }
 

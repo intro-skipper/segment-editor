@@ -56,9 +56,6 @@ export const TrackSelector = function TrackSelectorComponent({
   const isDirect = strategy === 'direct'
   const StrategyIcon = isDirect ? Zap : Monitor
   const showTranscodeHint = audioSwitchTranscodeScope === 'all'
-  // Some targets switch natively while others (e.g. one DTS track) restart
-  // the stream, so the blanket copy would be wrong in both directions.
-  const showPartialTranscodeHint = audioSwitchTranscodeScope === 'some'
   // Chromium-only: Firefox has no flag for the audioTracks API (it is not
   // implemented at all) and Safari ships it natively, so the tip would be
   // misleading on both. It is also pointless when the API is already exposed
@@ -161,20 +158,19 @@ export const TrackSelector = function TrackSelectorComponent({
               )
             })}
 
-            {showTranscodeHint && (
+            {/* When only some targets restart the stream (e.g. one DTS
+                track), the blanket copy would be wrong in both directions. */}
+            {audioSwitchTranscodeScope !== 'none' && (
               <p className="px-3 pb-1 text-xs text-muted-foreground">
-                {t(
-                  'player.tracks.audioSwitchTranscodeHint',
-                  'Switching audio restarts the stream as a transcode',
-                )}
-              </p>
-            )}
-            {showPartialTranscodeHint && (
-              <p className="px-3 pb-1 text-xs text-muted-foreground">
-                {t(
-                  'player.tracks.audioSwitchPartialTranscodeHint',
-                  'Switching to some audio tracks restarts the stream as a transcode',
-                )}
+                {showTranscodeHint
+                  ? t(
+                      'player.tracks.audioSwitchTranscodeHint',
+                      'Switching audio restarts the stream as a transcode',
+                    )
+                  : t(
+                      'player.tracks.audioSwitchPartialTranscodeHint',
+                      'Switching to some audio tracks restarts the stream as a transcode',
+                    )}
               </p>
             )}
             {showChromiumFlagTip && (

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
+import type * as CompatibilityModule from '@/services/video/compatibility'
 import { useTrackManager } from '@/hooks/use-track-manager'
 import { isCodecSupported } from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
@@ -26,10 +27,21 @@ vi.mock('@/services/video/capabilities', () => ({
 // Keep the real static allowlist (aac passes, dts is rejected) and mock only
 // the asynchronous decoder probe, mirroring the two gates of the switch path.
 vi.mock('@/services/video/compatibility', async (importOriginal) => {
-  const original = await importOriginal<object>()
+  const original = await importOriginal<typeof CompatibilityModule>()
+  const isCodecSupportedMock = vi.fn(
+    (_codec: string, _type?: string, _hints?: { channels?: number }) =>
+      Promise.resolve(true),
+  )
   return {
     ...original,
-    isCodecSupported: vi.fn(() => Promise.resolve(true)),
+    isCodecSupported: isCodecSupportedMock,
+    isAudioTrackDecodable: vi.fn(
+      async (track: { codec: string; channels?: number }) =>
+        original.isAudioTrackDirectPlayable(track.codec) &&
+        (await isCodecSupportedMock(track.codec, 'audio', {
+          channels: track.channels,
+        })),
+    ),
   }
 })
 
