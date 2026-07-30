@@ -3,14 +3,7 @@ import Hls from 'hls.js'
 import type { ErrorData } from 'hls.js'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const { RECOVERY_TIMEOUT_MS } = PLAYER_CONFIG
-
-/**
- * When a second fatal media error arrives within this window after a
- * recoverMediaError() attempt, hls.js documentation prescribes calling
- * swapAudioCodec() before retrying recovery.
- */
-const MEDIA_ERROR_SWAP_WINDOW_MS = 3000
+const { RECOVERY_TIMEOUT_MS, MEDIA_ERROR_SWAP_WINDOW_MS } = PLAYER_CONFIG
 
 export interface HlsPlayerError {
   type: 'network' | 'media' | 'unknown'
@@ -78,10 +71,11 @@ export function useHlsPlayer({
   const lastMediaRecoveryAtRef = useRef(Number.NEGATIVE_INFINITY)
   /** Bumped by retry() to tear down and rebuild the Hls instance */
   const [reloadToken, setReloadToken] = useState(0)
-  /** Position to resume from when retry() rebuilds the instance */
-  const retryStartPositionRef = useRef<number | null>(null)
+  /** Position to resume from when retry() rebuilds the instance (-1 = hls.js default) */
+  const retryStartPositionRef = useRef(-1)
 
   const reportError = useEffectEvent((error: HlsPlayerError | null) => {
+    hasPendingErrorRef.current = error !== null
     onError(error)
   })
 
@@ -116,7 +110,6 @@ export function useHlsPlayer({
     }
 
     isActiveRef.current = true
-    hasPendingErrorRef.current = false
     lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
 
     reportError(null)
@@ -127,13 +120,9 @@ export function useHlsPlayer({
     }
 
     if (Hls.isSupported()) {
-      const retryStartPosition = retryStartPositionRef.current
-      retryStartPositionRef.current = null
-      const hls = new Hls(
-        retryStartPosition !== null && retryStartPosition > 0
-          ? { ...HLS_CONFIG, startPosition: retryStartPosition }
-          : HLS_CONFIG,
-      )
+      const startPosition = retryStartPositionRef.current
+      retryStartPositionRef.current = -1
+      const hls = new Hls({ ...HLS_CONFIG, startPosition })
       hls.attachMedia(video)
 
       const handleRecovery = (
@@ -143,7 +132,6 @@ export function useHlsPlayer({
       ) => {
         if (!isActiveRef.current) return
 
-        hasPendingErrorRef.current = true
         reportError(createLocalizedError(type, msgKey, true))
         reportRecoveryStart()
         recoveryFn()
@@ -187,11 +175,17 @@ export function useHlsPlayer({
             // Recoverable via the Retry button, which rebuilds the Hls
             // instance. Marking it non-recoverable would strand the user on
             // a permanent error overlay with no way out.
-            hasPendingErrorRef.current = true
             reportError(
               createLocalizedError('unknown', 'player.error.unknown', true),
             )
         }
+      }
+
+      const markPlaybackHealthy = () => {
+        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
+        reportError(null)
+        clearRecoveryTimer(recoveryTimerRef)
+        reportRecoveryEnd()
       }
 
       const handleFragBuffered = () => {
@@ -199,20 +193,12 @@ export function useHlsPlayer({
         // A fragment appended successfully after an error: playback has
         // genuinely recovered, so clear the error overlay now instead of
         // waiting for the blind recovery timer.
-        hasPendingErrorRef.current = false
-        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
-        reportError(null)
-        clearRecoveryTimer(recoveryTimerRef)
-        reportRecoveryEnd()
+        markPlaybackHealthy()
       }
 
       const handleManifestParsed = () => {
         if (!isActiveRef.current) return
-        hasPendingErrorRef.current = false
-        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
-        reportError(null)
-        clearRecoveryTimer(recoveryTimerRef)
-        reportRecoveryEnd()
+        markPlaybackHealthy()
       }
 
       hls.on(Hls.Events.ERROR, handleError)
@@ -252,11 +238,11 @@ export function useHlsPlayer({
   }, [videoUrl, reloadToken])
 
   const retry = () => {
-    onError(null)
     // Rebuild the Hls instance from scratch: after a fatal error the current
     // instance (and its MediaSource) may be beyond repair, so reloading the
     // source on it is not reliable. Resume from the current position.
-    retryStartPositionRef.current = videoRef.current?.currentTime ?? null
+    const currentTime = videoRef.current?.currentTime ?? 0
+    retryStartPositionRef.current = currentTime > 0 ? currentTime : -1
     setReloadToken((token) => token + 1)
   }
 

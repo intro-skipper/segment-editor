@@ -13,23 +13,21 @@ import { useEffect, useReducer } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import type {
-  VideoPlayerError,
-  VideoPlayerErrorType,
-} from '@/hooks/use-video-player'
+import type { VideoPlayerError } from '@/hooks/use-video-player'
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import {
   initialPlayerState,
+  mapVideoErrorType,
   playerReducer,
 } from '@/components/player/player-reducer'
 import type { PlayerState } from '@/components/player/player-reducer'
 import { getPlaybackConfig } from '@/services/video/api'
+import type * as VideoApiModule from '@/services/video/api'
 
 type Listener = (event: string, data: unknown) => void
 
 interface FakeHlsInstance {
-  listeners: Map<string, Set<Listener>>
   destroyed: boolean
   loadedUrls: Array<string>
   recoverCalls: number
@@ -52,7 +50,6 @@ vi.mock('hls.js', () => {
     static ErrorTypes = {
       NETWORK_ERROR: 'networkError',
       MEDIA_ERROR: 'mediaError',
-      OTHER_ERROR: 'otherError',
     }
     static isSupported = () => true
 
@@ -98,10 +95,11 @@ vi.mock('hls.js', () => {
   return { default: FakeHls }
 })
 
-vi.mock('@/services/video/api', () => ({
+vi.mock('@/services/video/api', async (importOriginal) => ({
+  // Keep the real getPlaybackMediaSourceId so the test cannot drift from the
+  // production fallback logic.
+  ...(await importOriginal<typeof VideoApiModule>()),
   getPlaybackConfig: vi.fn(),
-  getPlaybackMediaSourceId: (item: BaseItemDto) =>
-    item.MediaSources?.[0]?.Id ?? item.Id?.replace(/-/g, ''),
 }))
 
 vi.mock('@/services/video/playback-session', () => ({
@@ -119,17 +117,6 @@ vi.mock('@/services/video/transcode-session', () => ({
   stopActiveEncoding: vi.fn().mockResolvedValue(undefined),
   stopActiveEncodingKeepalive: vi.fn(),
 }))
-
-function mapVideoErrorType(type: VideoPlayerErrorType): HlsPlayerError['type'] {
-  switch (type) {
-    case 'media_error':
-      return 'media'
-    case 'network_error':
-      return 'network'
-    default:
-      return 'unknown'
-  }
-}
 
 const observed: { state: PlayerState; retry: () => void } = {
   state: initialPlayerState,
@@ -186,6 +173,12 @@ function errorOverlayVisible() {
   return Boolean(observed.state.playerError && !observed.state.isRecovering)
 }
 
+function emitHlsEvent(hls: FakeHlsInstance, event: string, data?: unknown) {
+  act(() => {
+    hls.emit(event, data)
+  })
+}
+
 const HLS_URL = 'https://jellyfin.example/Videos/item-1/master.m3u8'
 
 async function renderPlayingHarness() {
@@ -207,9 +200,7 @@ async function renderPlayingHarness() {
     expect(hlsState.instances.at(-1)?.loadedUrls).toContain(HLS_URL)
   })
   const hls = hlsState.instances.at(-1)!
-  act(() => {
-    hls.emit('hlsManifestParsed')
-  })
+  emitHlsEvent(hls, 'hlsManifestParsed')
   return { utils, hls }
 }
 
@@ -232,20 +223,15 @@ describe('HLS error recovery overlay lifecycle', () => {
 
   it('clears the error state as soon as a fragment buffers after recovery', async () => {
     const { hls } = await renderPlayingHarness()
-    vi.useFakeTimers()
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(observed.state.playerError).not.toBeNull()
     expect(observed.state.isRecovering).toBe(true)
     expect(hls.recoverCalls).toBe(1)
 
     // Playback resumes: a fragment appends successfully well before the
     // fallback recovery timer would have fired.
-    act(() => {
-      hls.emit('hlsFragBuffered')
-    })
+    emitHlsEvent(hls, 'hlsFragBuffered')
 
     expect(observed.state.playerError).toBeNull()
     expect(observed.state.isRecovering).toBe(false)
@@ -256,9 +242,7 @@ describe('HLS error recovery overlay lifecycle', () => {
     const { hls } = await renderPlayingHarness()
     vi.useFakeTimers()
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(observed.state.isRecovering).toBe(true)
 
     act(() => {
@@ -272,9 +256,7 @@ describe('HLS error recovery overlay lifecycle', () => {
   it('keeps unknown fatal errors recoverable and rebuilds the player on retry', async () => {
     const { hls, utils } = await renderPlayingHarness()
 
-    act(() => {
-      hls.emit('hlsError', fatalOtherError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalOtherError)
     expect(errorOverlayVisible()).toBe(true)
     expect(observed.state.playerError?.recoverable).toBe(true)
 
@@ -305,14 +287,10 @@ describe('HLS error recovery overlay lifecycle', () => {
   it('clears a stuck unknown error once fragments buffer again', async () => {
     const { hls } = await renderPlayingHarness()
 
-    act(() => {
-      hls.emit('hlsError', fatalOtherError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalOtherError)
     expect(errorOverlayVisible()).toBe(true)
 
-    act(() => {
-      hls.emit('hlsFragBuffered')
-    })
+    emitHlsEvent(hls, 'hlsFragBuffered')
 
     expect(errorOverlayVisible()).toBe(false)
     expect(observed.state.playerError).toBeNull()
@@ -321,15 +299,11 @@ describe('HLS error recovery overlay lifecycle', () => {
   it('swaps the audio codec when media errors repeat within the swap window', async () => {
     const { hls } = await renderPlayingHarness()
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(hls.swapAudioCodecCalls).toBe(0)
     expect(hls.recoverCalls).toBe(1)
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(hls.swapAudioCodecCalls).toBe(1)
     expect(hls.recoverCalls).toBe(2)
   })
@@ -337,20 +311,14 @@ describe('HLS error recovery overlay lifecycle', () => {
   it('does not swap the audio codec for a new media error after a successful recovery', async () => {
     const { hls } = await renderPlayingHarness()
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(hls.recoverCalls).toBe(1)
 
     // Playback genuinely recovers: the swap window must reset so the next
     // independent media error does not needlessly swap a working audio track.
-    act(() => {
-      hls.emit('hlsFragBuffered')
-    })
+    emitHlsEvent(hls, 'hlsFragBuffered')
 
-    act(() => {
-      hls.emit('hlsError', fatalMediaError)
-    })
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(hls.swapAudioCodecCalls).toBe(0)
     expect(hls.recoverCalls).toBe(2)
   })

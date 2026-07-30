@@ -4,6 +4,7 @@
  */
 
 import type { HlsPlayerError } from '@/hooks/use-hls-player'
+import type { VideoPlayerErrorType } from '@/hooks/use-video-player'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
 const {
@@ -48,6 +49,20 @@ export type PlayerAction =
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
   | { type: 'CYCLE_SPEED'; direction: 1 | -1 }
   | { type: 'SET_SPEED'; speedIndex: number }
+
+/** Maps useVideoPlayer error types onto the reducer's HlsPlayerError taxonomy. */
+export function mapVideoErrorType(
+  type: VideoPlayerErrorType,
+): HlsPlayerError['type'] {
+  switch (type) {
+    case 'media_error':
+      return 'media'
+    case 'network_error':
+      return 'network'
+    default:
+      return 'unknown'
+  }
+}
 
 export const initialPlayerState: PlayerState = {
   isPlaying: false,

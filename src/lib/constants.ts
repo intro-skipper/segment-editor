@@ -35,6 +35,11 @@ export const PLAYER_CONFIG = {
   DEFAULT_PLAYBACK_SPEED_INDEX: 3,
   /** Recovery timeout in milliseconds */
   RECOVERY_TIMEOUT_MS: 2000,
+  /**
+   * A repeat fatal media error within this window after a recoverMediaError()
+   * attempt triggers swapAudioCodec() first, per hls.js recovery guidance.
+   */
+  MEDIA_ERROR_SWAP_WINDOW_MS: 3000,
   /** Color extraction timeout in milliseconds */
   COLOR_EXTRACTION_TIMEOUT_MS: 5000,
   /** Resize debounce delay in milliseconds */
