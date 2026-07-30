@@ -925,7 +925,6 @@ function useRenderPlayer({
       playback={{
         error: playerError,
         isRecovering,
-        strategy,
         isVideoLoading,
         onRetry: handleRetry,
       }}

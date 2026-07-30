@@ -14,13 +14,12 @@ const {
 
 /**
  * Player state managed by reducer.
- * Simplified to focus on playback state only - HLS management moved to useHlsPlayer.
+ * Holds user-facing playback controls state; timeline data (current time,
+ * duration, buffered) lives in Player's dedicated timeline store, and HLS
+ * management in useHlsPlayer.
  */
 export interface PlayerState {
   isPlaying: boolean
-  currentTime: number
-  duration: number
-  buffered: number
   volume: number
   isMuted: boolean
   skipTimeIndex: number
@@ -32,9 +31,6 @@ export interface PlayerState {
 
 /** Consolidated action types for better efficiency */
 export type PlayerAction =
-  | { type: 'PLAYBACK_UPDATE'; currentTime: number }
-  | { type: 'MEDIA_LOADED'; duration: number }
-  | { type: 'BUFFER_UPDATE'; buffered: number }
   | { type: 'PLAY_STATE'; isPlaying: boolean }
   | { type: 'VOLUME_CHANGE'; volume: number; isMuted: boolean }
   | { type: 'SKIP_TIME_CHANGE'; skipTimeIndex: number }
@@ -45,9 +41,6 @@ export type PlayerAction =
 
 export const initialPlayerState: PlayerState = {
   isPlaying: false,
-  currentTime: 0,
-  duration: 0,
-  buffered: 0,
   volume: 1,
   isMuted: false,
   skipTimeIndex: DEFAULT_SKIP_TIME_INDEX,
@@ -64,21 +57,6 @@ export function playerReducer(
   action: PlayerAction,
 ): PlayerState {
   switch (action.type) {
-    case 'PLAYBACK_UPDATE':
-      return state.currentTime === action.currentTime
-        ? state
-        : { ...state, currentTime: action.currentTime }
-
-    case 'MEDIA_LOADED':
-      return state.duration === action.duration
-        ? state
-        : { ...state, duration: action.duration }
-
-    case 'BUFFER_UPDATE':
-      return state.buffered === action.buffered
-        ? state
-        : { ...state, buffered: action.buffered }
-
     case 'PLAY_STATE':
       return state.isPlaying === action.isPlaying
         ? state

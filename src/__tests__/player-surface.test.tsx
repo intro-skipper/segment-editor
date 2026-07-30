@@ -120,7 +120,6 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
     playback: {
       error: null,
       isRecovering: false,
-      strategy: 'direct',
       isVideoLoading: false,
       onRetry: vi.fn(),
       ...overrides.playback,
@@ -377,7 +376,8 @@ describe('PlayerSurface', () => {
     )
 
     expect(screen.getByText('Playback failed')).toBeTruthy()
-    expect(screen.getByText('player.error.directPlayFailed')).toBeTruthy()
+    // The overlay must not repeat the failure message as a separate hint line.
+    expect(screen.queryByText('player.error.directPlayFailed')).toBe(null)
     expect(screen.queryByRole('button', { name: 'Skip type:Intro' })).toBe(null)
 
     fireEvent.click(screen.getByRole('button', { name: 'player.retry' }))

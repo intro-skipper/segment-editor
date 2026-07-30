@@ -1,21 +1,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import type { ErrorData } from 'hls.js'
+import type { VideoPlayerError } from '@/services/video/playback-error'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
 const { RECOVERY_TIMEOUT_MS, MEDIA_ERROR_SWAP_WINDOW_MS } = PLAYER_CONFIG
 
-export interface HlsPlayerError {
-  type: 'network' | 'media' | 'unknown'
-  message: string
-  recoverable: boolean
-}
-
 interface UseHlsPlayerOptions {
   videoUrl: string
-  onError: (error: HlsPlayerError | null) => void
+  onError: (error: VideoPlayerError | null) => void
   onRecoveryStart: () => void
-  onRecoveryEnd: () => void
   t: (key: string) => string
 }
 
@@ -35,17 +29,6 @@ const HLS_CONFIG = {
   abrEwmaDefaultEstimate: 500000,
 } as const
 
-const createError = (
-  type: HlsPlayerError['type'],
-  msgKey: string,
-  t: (key: string) => string,
-  recoverable: boolean,
-): HlsPlayerError => ({
-  type,
-  message: t(msgKey),
-  recoverable,
-})
-
 function clearRecoveryTimer(
   recoveryTimerRef: React.RefObject<ReturnType<typeof setTimeout> | null>,
 ) {
@@ -59,7 +42,6 @@ export function useHlsPlayer({
   videoUrl,
   onError,
   onRecoveryStart,
-  onRecoveryEnd,
   t,
 }: UseHlsPlayerOptions): UseHlsPlayerReturn {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -74,7 +56,7 @@ export function useHlsPlayer({
   /** Position to resume from when retry() rebuilds the instance (-1 = hls.js default) */
   const retryStartPositionRef = useRef(-1)
 
-  const reportError = useEffectEvent((error: HlsPlayerError | null) => {
+  const reportError = useEffectEvent((error: VideoPlayerError | null) => {
     hasPendingErrorRef.current = error !== null
     onError(error)
   })
@@ -83,16 +65,24 @@ export function useHlsPlayer({
     onRecoveryStart()
   })
 
-  const reportRecoveryEnd = useEffectEvent(() => {
-    onRecoveryEnd()
+  // Blind fallback-timer expiry: clear the consumer-visible error without
+  // treating it as a success signal — hasPendingErrorRef stays true so a
+  // later FRAG_BUFFERED still resets the media-swap window via
+  // markPlaybackHealthy.
+  const reportRecoveryTimedOut = useEffectEvent(() => {
+    onError(null)
   })
 
   const createLocalizedError = useEffectEvent(
     (
-      type: HlsPlayerError['type'],
+      type: VideoPlayerError['type'],
       msgKey: string,
       recoverable: boolean,
-    ): HlsPlayerError => createError(type, msgKey, t, recoverable),
+    ): VideoPlayerError => ({
+      type,
+      message: t(msgKey),
+      recoverable,
+    }),
   )
 
   useEffect(() => {
@@ -102,10 +92,7 @@ export function useHlsPlayer({
     if (!video || !videoUrl) {
       isActiveRef.current = false
       return () => {
-        if (recoveryTimer.current) {
-          clearTimeout(recoveryTimer.current)
-          recoveryTimer.current = null
-        }
+        clearRecoveryTimer(recoveryTimer)
       }
     }
 
@@ -126,7 +113,7 @@ export function useHlsPlayer({
       hls.attachMedia(video)
 
       const handleRecovery = (
-        type: 'network' | 'media',
+        type: 'network_error' | 'media_error',
         msgKey: string,
         recoveryFn: () => void,
       ) => {
@@ -136,11 +123,12 @@ export function useHlsPlayer({
         reportRecoveryStart()
         recoveryFn()
 
-        // Fallback timer: FRAG_BUFFERED / MANIFEST_PARSED normally end the
-        // recovery state as soon as playback actually makes progress again.
+        // Fallback timer: FRAG_BUFFERED / MANIFEST_PARSED normally clear the
+        // error as soon as playback actually makes progress again; this timer
+        // clears it blindly if neither signal arrives in time.
         clearRecoveryTimer(recoveryTimerRef)
         recoveryTimerRef.current = setTimeout(() => {
-          if (isActiveRef.current) reportRecoveryEnd()
+          if (isActiveRef.current) reportRecoveryTimedOut()
         }, RECOVERY_TIMEOUT_MS)
       }
 
@@ -152,12 +140,12 @@ export function useHlsPlayer({
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            handleRecovery('network', 'player.error.network', () =>
+            handleRecovery('network_error', 'player.error.network', () =>
               hls.startLoad(),
             )
             break
           case Hls.ErrorTypes.MEDIA_ERROR:
-            handleRecovery('media', 'player.error.media', () => {
+            handleRecovery('media_error', 'player.error.media', () => {
               const now = performance.now()
               if (
                 now - lastMediaRecoveryAtRef.current <
@@ -176,7 +164,11 @@ export function useHlsPlayer({
             // instance. Marking it non-recoverable would strand the user on
             // a permanent error overlay with no way out.
             reportError(
-              createLocalizedError('unknown', 'player.error.unknown', true),
+              createLocalizedError(
+                'unknown_error',
+                'player.error.unknown',
+                true,
+              ),
             )
         }
       }
@@ -185,7 +177,6 @@ export function useHlsPlayer({
         lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
         reportError(null)
         clearRecoveryTimer(recoveryTimerRef)
-        reportRecoveryEnd()
       }
 
       const handleFragBuffered = () => {
@@ -210,10 +201,7 @@ export function useHlsPlayer({
 
       return () => {
         isActiveRef.current = false
-        if (recoveryTimer.current) {
-          clearTimeout(recoveryTimer.current)
-          recoveryTimer.current = null
-        }
+        clearRecoveryTimer(recoveryTimer)
         hls.off(Hls.Events.ERROR, handleError)
         hls.off(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
         hls.off(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
@@ -226,10 +214,7 @@ export function useHlsPlayer({
 
     return () => {
       isActiveRef.current = false
-      if (recoveryTimer.current) {
-        clearTimeout(recoveryTimer.current)
-        recoveryTimer.current = null
-      }
+      clearRecoveryTimer(recoveryTimer)
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null

@@ -22,9 +22,6 @@ const { SKIP_TIMES, PLAYBACK_SPEEDS } = PLAYER_CONFIG
 /** Arbitrary for generating valid PlayerState */
 const playerStateArb: fc.Arbitrary<PlayerState> = fc.record({
   isPlaying: fc.boolean(),
-  currentTime: fc.float({ min: 0, max: 10000, noNaN: true }),
-  duration: fc.float({ min: 0, max: 10000, noNaN: true }),
-  buffered: fc.float({ min: 0, max: 10000, noNaN: true }),
   volume: fc.float({ min: 0, max: 1, noNaN: true }),
   isMuted: fc.boolean(),
   skipTimeIndex: fc.integer({ min: 0, max: SKIP_TIMES.length - 1 }),
@@ -33,101 +30,6 @@ const playerStateArb: fc.Arbitrary<PlayerState> = fc.record({
 })
 
 describe('Reducer Reference Stability', () => {
-  /**
-   * Property: PLAYBACK_UPDATE returns same reference when currentTime unchanged
-   */
-  it('returns same reference for PLAYBACK_UPDATE with unchanged currentTime', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'PLAYBACK_UPDATE',
-          currentTime: state.currentTime,
-        }
-        const result = playerReducer(state, action)
-        return result === state
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: PLAYBACK_UPDATE returns new reference when currentTime changes
-   */
-  it('returns new reference for PLAYBACK_UPDATE with changed currentTime', () => {
-    fc.assert(
-      fc.property(
-        playerStateArb,
-        fc.float({ min: 0, max: 10000, noNaN: true }),
-        (state, newTime) => {
-          fc.pre(newTime !== state.currentTime)
-          const action: PlayerAction = {
-            type: 'PLAYBACK_UPDATE',
-            currentTime: newTime,
-          }
-          const result = playerReducer(state, action)
-          return result !== state && result.currentTime === newTime
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: MEDIA_LOADED returns same reference when duration unchanged
-   */
-  it('returns same reference for MEDIA_LOADED with unchanged duration', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'MEDIA_LOADED',
-          duration: state.duration,
-        }
-        const result = playerReducer(state, action)
-        return result === state
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: MEDIA_LOADED returns new reference when duration changes
-   */
-  it('returns new reference for MEDIA_LOADED with changed duration', () => {
-    fc.assert(
-      fc.property(
-        playerStateArb,
-        fc.float({ min: 0, max: 10000, noNaN: true }),
-        (state, newDuration) => {
-          fc.pre(newDuration !== state.duration)
-          const action: PlayerAction = {
-            type: 'MEDIA_LOADED',
-            duration: newDuration,
-          }
-          const result = playerReducer(state, action)
-          return result !== state && result.duration === newDuration
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: BUFFER_UPDATE returns same reference when buffered unchanged
-   */
-  it('returns same reference for BUFFER_UPDATE with unchanged buffered', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'BUFFER_UPDATE',
-          buffered: state.buffered,
-        }
-        const result = playerReducer(state, action)
-        return result === state
-      }),
-      { numRuns: 100 },
-    )
-  })
-
   /**
    * Property: PLAY_STATE returns same reference when isPlaying unchanged
    */
@@ -286,22 +188,20 @@ describe('Reducer Reference Stability', () => {
     fc.assert(
       fc.property(
         playerStateArb,
-        fc.float({ min: 0, max: 10000, noNaN: true }),
-        (state, newTime) => {
-          fc.pre(newTime !== state.currentTime)
+        fc.float({ min: -30, max: 30, noNaN: true }),
+        (state, newOffset) => {
+          fc.pre(newOffset !== state.subtitleOffset)
           const action: PlayerAction = {
-            type: 'PLAYBACK_UPDATE',
-            currentTime: newTime,
+            type: 'SUBTITLE_OFFSET_CHANGE',
+            offset: newOffset,
           }
           const result = playerReducer(state, action)
           return (
             result.isPlaying === state.isPlaying &&
-            result.duration === state.duration &&
-            result.buffered === state.buffered &&
             result.volume === state.volume &&
             result.isMuted === state.isMuted &&
             result.skipTimeIndex === state.skipTimeIndex &&
-            result.subtitleOffset === state.subtitleOffset &&
+            result.subtitleOffset === newOffset &&
             result.playbackSpeedIndex === state.playbackSpeedIndex
           )
         },

@@ -9,7 +9,7 @@ import type { ComponentProps, SyntheticEvent } from 'react'
 import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
-import type { VideoPlayerError } from '@/hooks/use-video-player'
+import type { VideoPlayerError } from '@/services/video/playback-error'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
@@ -264,7 +264,6 @@ describe('Player controls wiring', () => {
     expect(surfaceProps.playback).toMatchObject({
       isVideoLoading: true,
       isRecovering: false,
-      strategy: 'direct',
     })
     expect(surfaceProps.playback.error).toBe(null)
     expect(surfaceProps.segmentSkip).toBeNull()

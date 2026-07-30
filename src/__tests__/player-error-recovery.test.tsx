@@ -178,7 +178,7 @@ describe('HLS error recovery overlay lifecycle', () => {
     const { hls } = await renderPlayingHarness()
 
     emitHlsEvent(hls, 'hlsError', fatalMediaError)
-    expect(latest.error).not.toBeNull()
+    expect(latest.error?.type).toBe('media_error')
     expect(latest.isRecovering).toBe(true)
     expect(hls.recoverCalls).toBe(1)
 
@@ -209,7 +209,7 @@ describe('HLS error recovery overlay lifecycle', () => {
     const { hls, utils } = await renderPlayingHarness()
 
     emitHlsEvent(hls, 'hlsError', fatalOtherError)
-    expect(latest.error).not.toBeNull()
+    expect(latest.error?.type).toBe('unknown_error')
     expect(latest.isRecovering).toBe(false)
     expect(latest.error?.recoverable).toBe(true)
 
@@ -268,6 +268,27 @@ describe('HLS error recovery overlay lifecycle', () => {
 
     // Playback genuinely recovers: the swap window must reset so the next
     // independent media error does not needlessly swap a working audio track.
+    emitHlsEvent(hls, 'hlsFragBuffered')
+
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
+    expect(hls.swapAudioCodecCalls).toBe(0)
+    expect(hls.recoverCalls).toBe(2)
+  })
+
+  it('still resets the swap window when a fragment buffers after the recovery timer expired', async () => {
+    const { hls } = await renderPlayingHarness()
+    vi.useFakeTimers()
+
+    emitHlsEvent(hls, 'hlsError', fatalMediaError)
+
+    // The blind fallback timer clears the visible error, but it is not a
+    // success signal — the swap window must stay armed until playback
+    // genuinely progresses.
+    act(() => {
+      vi.advanceTimersByTime(2100)
+    })
+    expect(latest.error).toBeNull()
+
     emitHlsEvent(hls, 'hlsFragBuffered')
 
     emitHlsEvent(hls, 'hlsError', fatalMediaError)

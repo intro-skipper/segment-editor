@@ -14,26 +14,16 @@ import {
 } from '@/services/video/api'
 import type { HlsReloadRequest } from '@/services/video/track-switching'
 import type { PlaybackState } from '@/services/video/playback-state'
+import type {
+  VideoPlayerError,
+  VideoPlayerErrorType,
+} from '@/services/video/playback-error'
 import { createPlaySessionId } from '@/services/video/session'
 import { secondsToTicks } from '@/lib/time-utils'
 import { useHlsPlayer } from '@/hooks/use-hls-player'
-import type { HlsPlayerError } from '@/hooks/use-hls-player'
 import { useJellyfinSession } from '@/hooks/use-jellyfin-session'
 import type { JellyfinSessionDescriptor } from '@/hooks/use-jellyfin-session'
 import { usePlaybackStatePreservation } from '@/hooks/use-playback-state-preservation'
-
-type VideoPlayerErrorType =
-  | 'media_error'
-  | 'network_error'
-  | 'source_error'
-  | 'unknown_error'
-
-export interface VideoPlayerError {
-  type: VideoPlayerErrorType
-  message: string
-  recoverable: boolean
-  originalError?: Error
-}
 
 interface UseVideoPlayerOptions {
   item: BaseItemDto | null
@@ -220,35 +210,14 @@ export function useVideoPlayer({
     setIsRecovering(false)
   }
 
-  const handleHlsError = (hlsError: HlsPlayerError | null) => {
-    reportVideoError(
-      hlsError && isActiveRef.current
-        ? {
-            type:
-              hlsError.type === 'network'
-                ? 'network_error'
-                : hlsError.type === 'media'
-                  ? 'media_error'
-                  : 'unknown_error',
-            message: hlsError.message,
-            recoverable: hlsError.recoverable,
-          }
-        : null,
-    )
+  const handleHlsError = (hlsError: VideoPlayerError | null) => {
+    reportVideoError(hlsError && isActiveRef.current ? hlsError : null)
   }
-
-  const handleHlsRecoveryStart = () => setIsRecovering(true)
-  // Recovery ending means playback is healthy, including via the fallback
-  // recovery timer in useHlsPlayer, which reports only the end - so the
-  // error must be cleared here or a recovered session would keep showing
-  // the stale error overlay.
-  const handleHlsRecoveryEnd = () => reportVideoError(null)
 
   const hlsPlayer = useHlsPlayer({
     videoUrl: strategy === 'hls' ? videoUrl : '',
     onError: handleHlsError,
-    onRecoveryStart: handleHlsRecoveryStart,
-    onRecoveryEnd: handleHlsRecoveryEnd,
+    onRecoveryStart: () => setIsRecovering(true),
     t,
   })
 
@@ -403,13 +372,12 @@ export function useVideoPlayer({
 
   const handleInitPlaybackFailure = useEffectEvent(
     (err: unknown, failedItemId: string) => {
-      const videoError: VideoPlayerError = {
+      console.error('[Player] Init playback failed:', err)
+      reportVideoError({
         type: 'unknown_error',
         message: t('player.error.unknown'),
         recoverable: false,
-        originalError: err instanceof Error ? err : undefined,
-      }
-      reportVideoError(videoError)
+      })
       setLoadedItemId(failedItemId)
     },
   )

@@ -20,8 +20,7 @@ import type { VideoFitMode } from './use-fullscreen-player-ui'
 import type { PlayerControlsProps } from './PlayerControls'
 import type { NativeCaptionTrack } from './caption-tracks'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { VideoPlayerError } from '@/hooks/use-video-player'
-import type { PlaybackStrategy } from '@/services/video/api'
+import type { VideoPlayerError } from '@/services/video/playback-error'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -51,7 +50,6 @@ interface PlayerSurfaceVideoState {
 interface PlayerSurfacePlaybackState {
   error: VideoPlayerError | null
   isRecovering: boolean
-  strategy: PlaybackStrategy
   isVideoLoading: boolean
   onRetry: () => void
 }
@@ -160,14 +158,12 @@ function PlayerVideoButton({
 
 interface PlayerErrorOverlayProps {
   error: VideoPlayerError
-  strategy: PlaybackStrategy
   isFullscreen: boolean
   onRetry: () => void
 }
 
 function PlayerErrorOverlay({
   error,
-  strategy,
   isFullscreen,
   onRetry,
 }: PlayerErrorOverlayProps) {
@@ -186,11 +182,6 @@ function PlayerErrorOverlay({
         aria-hidden="true"
       />
       <p className="text-lg font-medium mb-2">{error.message}</p>
-      {strategy === 'direct' && error.type === 'media_error' ? (
-        <p className="text-sm text-muted-foreground mb-2">
-          {t('player.error.directPlayFailed')}
-        </p>
-      ) : null}
       {error.recoverable ? (
         <Button
           variant="outline"
@@ -366,7 +357,6 @@ export function PlayerSurface({
         {playback.error && !playback.isRecovering ? (
           <PlayerErrorOverlay
             error={playback.error}
-            strategy={playback.strategy}
             isFullscreen={fullscreen.isFullscreen}
             onRetry={playback.onRetry}
           />
