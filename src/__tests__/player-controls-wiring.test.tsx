@@ -17,11 +17,7 @@ type PlayerProps = ComponentProps<typeof Player>
 
 const mocks = vi.hoisted(() => ({
   playerSurfaceProps: [] as Array<unknown>,
-  videoPlayerError: null as null | {
-    type: string
-    message: string
-    recoverable: boolean
-  },
+  videoPlayerError: null as VideoPlayerError | null,
   setShowVideoPlayer: vi.fn(),
   setPreferredAudioLanguage: vi.fn(),
   setPreferredSubtitleLanguage: vi.fn(),
@@ -101,7 +97,7 @@ vi.mock('@/hooks/useBlobUrl', () => ({
 
 vi.mock('@/hooks/use-video-player', () => ({
   useVideoPlayer: () => ({
-    videoRef: mocks.videoRef ?? { current: mocks.videoElement },
+    videoRef: mocks.videoRef,
     hlsRef: { current: null },
     strategy: 'direct',
     isLoading: mocks.videoPlayerIsLoading,
@@ -213,16 +209,20 @@ function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
   }
 }
 
-function renderPlayer(overrides: Partial<PlayerProps> = {}) {
-  return render(
+function playerElement(overrides: Partial<PlayerProps> = {}) {
+  return (
     <Player
       item={createItem()}
       frameStepSeconds={1 / 24}
       onCreateSegment={vi.fn()}
       onUpdateSegmentTimestamp={vi.fn()}
       {...overrides}
-    />,
+    />
   )
+}
+
+function renderPlayer(overrides: Partial<PlayerProps> = {}) {
+  return render(playerElement(overrides))
 }
 
 describe('Player controls wiring', () => {
@@ -289,14 +289,7 @@ describe('Player controls wiring', () => {
       recoverable: true,
     }
     mocks.videoPlayerError = mediaError
-    utils.rerender(
-      <Player
-        item={createItem()}
-        frameStepSeconds={1 / 24}
-        onCreateSegment={vi.fn()}
-        onUpdateSegmentTimestamp={vi.fn()}
-      />,
-    )
+    utils.rerender(playerElement())
 
     surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
     expect(surfaceProps.playback.error).toEqual(mediaError)

@@ -358,6 +358,7 @@ function useRenderPlayer({
     onStrategyChange: handleStrategyChange,
     t,
   })
+  const hasPlayerError = playerError !== null
 
   const {
     setPreferredAudioLanguage,
@@ -929,7 +930,7 @@ function useRenderPlayer({
         onRetry: handleRetry,
       }}
       segmentSkip={
-        segmentSkipMode === 'button' && playerError === null && !isVideoLoading
+        segmentSkipMode === 'button' && !hasPlayerError && !isVideoLoading
           ? activeSkipSegment
             ? { segment: activeSkipSegment, onSkipSegment: handleSkipSegment }
             : null

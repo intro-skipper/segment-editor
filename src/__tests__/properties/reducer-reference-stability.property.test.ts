@@ -17,10 +17,10 @@ import {
 } from '@/components/player/player-reducer'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const { SKIP_TIMES } = PLAYER_CONFIG
+const { SKIP_TIMES, PLAYBACK_SPEEDS } = PLAYER_CONFIG
 
 /** Arbitrary for generating valid PlayerState */
-const playerStateArb = fc.record({
+const playerStateArb: fc.Arbitrary<PlayerState> = fc.record({
   isPlaying: fc.boolean(),
   currentTime: fc.float({ min: 0, max: 10000, noNaN: true }),
   duration: fc.float({ min: 0, max: 10000, noNaN: true }),
@@ -28,7 +28,9 @@ const playerStateArb = fc.record({
   volume: fc.float({ min: 0, max: 1, noNaN: true }),
   isMuted: fc.boolean(),
   skipTimeIndex: fc.integer({ min: 0, max: SKIP_TIMES.length - 1 }),
-}) as fc.Arbitrary<PlayerState>
+  subtitleOffset: fc.float({ min: -30, max: 30, noNaN: true }),
+  playbackSpeedIndex: fc.integer({ min: 0, max: PLAYBACK_SPEEDS.length - 1 }),
+})
 
 describe('Reducer Reference Stability', () => {
   /**
@@ -298,7 +300,9 @@ describe('Reducer Reference Stability', () => {
             result.buffered === state.buffered &&
             result.volume === state.volume &&
             result.isMuted === state.isMuted &&
-            result.skipTimeIndex === state.skipTimeIndex
+            result.skipTimeIndex === state.skipTimeIndex &&
+            result.subtitleOffset === state.subtitleOffset &&
+            result.playbackSpeedIndex === state.playbackSpeedIndex
           )
         },
       ),
