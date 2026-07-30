@@ -22,7 +22,7 @@ import { useJellyfinSession } from '@/hooks/use-jellyfin-session'
 import type { JellyfinSessionDescriptor } from '@/hooks/use-jellyfin-session'
 import { usePlaybackStatePreservation } from '@/hooks/use-playback-state-preservation'
 
-export type VideoPlayerErrorType =
+type VideoPlayerErrorType =
   | 'media_error'
   | 'network_error'
   | 'source_error'
@@ -52,10 +52,7 @@ interface UseVideoPlayerOptions {
    */
   getCurrentAudioStreamIndex?: () => number | undefined
   jellyfinPlaybackSyncEnabled?: boolean
-  onError?: (error: VideoPlayerError | null) => void
   onStrategyChange?: (strategy: PlaybackStrategy) => void
-  onRecoveryStart?: () => void
-  onRecoveryEnd?: () => void
   t: (key: string) => string
 }
 
@@ -65,6 +62,7 @@ interface UseVideoPlayerReturn {
   strategy: PlaybackStrategy
   isLoading: boolean
   error: VideoPlayerError | null
+  isRecovering: boolean
   retry: () => void
   videoUrl: string
   reloadHlsWithUrl: (reload: HlsReloadRequest) => Promise<void>
@@ -139,10 +137,7 @@ export function useVideoPlayer({
   getInitialAudioStreamIndex,
   getCurrentAudioStreamIndex,
   jellyfinPlaybackSyncEnabled = false,
-  onError,
   onStrategyChange,
-  onRecoveryStart,
-  onRecoveryEnd,
   t,
 }: UseVideoPlayerOptions): UseVideoPlayerReturn {
   'use memo'
@@ -150,6 +145,7 @@ export function useVideoPlayer({
   const [strategy, setStrategy] = useState<PlaybackStrategy>('hls')
   const [videoUrl, setVideoUrl] = useState('')
   const [error, setError] = useState<VideoPlayerError | null>(null)
+  const [isRecovering, setIsRecovering] = useState(false)
   const [loadedItemId, setLoadedItemId] = useState<string | undefined>(
     undefined,
   )
@@ -204,18 +200,36 @@ export function useVideoPlayer({
     onStrategyChange?.(newStrategy)
   }
 
-  // Cleared (null) errors reach the consumer too, so its error overlay is
-  // dismissed (e.g. on retry or when a new source starts loading).
+  // Single owner of the error state the consumer renders from. Reporting or
+  // clearing an error also resets the recovery flag; for recoverable fatal
+  // HLS errors useHlsPlayer re-raises it via onRecoveryStart in the same
+  // batch, so only non-recoverable errors actually clear the spinner. The
+  // previous reference is kept when the contents are unchanged so repeated
+  // identical errors (e.g. hls.js re-emitting a fatal network error per
+  // retry) cannot re-render the player tree.
   const reportVideoError = (videoError: VideoPlayerError | null) => {
-    setError(videoError)
-    onError?.(videoError)
+    setError((previous) =>
+      previous &&
+      videoError &&
+      previous.type === videoError.type &&
+      previous.message === videoError.message &&
+      previous.recoverable === videoError.recoverable
+        ? previous
+        : videoError,
+    )
+    setIsRecovering(false)
   }
 
   const handleHlsError = (hlsError: HlsPlayerError | null) => {
     reportVideoError(
       hlsError && isActiveRef.current
         ? {
-            type: hlsError.type === 'network' ? 'network_error' : 'media_error',
+            type:
+              hlsError.type === 'network'
+                ? 'network_error'
+                : hlsError.type === 'media'
+                  ? 'media_error'
+                  : 'unknown_error',
             message: hlsError.message,
             recoverable: hlsError.recoverable,
           }
@@ -223,8 +237,12 @@ export function useVideoPlayer({
     )
   }
 
-  const handleHlsRecoveryStart = () => onRecoveryStart?.()
-  const handleHlsRecoveryEnd = () => onRecoveryEnd?.()
+  const handleHlsRecoveryStart = () => setIsRecovering(true)
+  // Recovery ending means playback is healthy, including via the fallback
+  // recovery timer in useHlsPlayer, which reports only the end - so the
+  // error must be cleared here or a recovered session would keep showing
+  // the stale error overlay.
+  const handleHlsRecoveryEnd = () => reportVideoError(null)
 
   const hlsPlayer = useHlsPlayer({
     videoUrl: strategy === 'hls' ? videoUrl : '',
@@ -306,7 +324,7 @@ export function useVideoPlayer({
       if (isCurrentHlsRequest()) {
         const hlsUrl = config.strategy === 'hls' ? config.url : ''
 
-        setError(null)
+        reportVideoError(null)
         updateStrategy('hls')
         setVideoUrl(hlsUrl || config.url)
         setJellyfinSessionIdentity(
@@ -344,8 +362,7 @@ export function useVideoPlayer({
     const videoError = createErrorFromMediaError(mediaError, t)
 
     if (videoError.type === 'media_error') {
-      setError(videoError)
-      onError?.(videoError)
+      reportVideoError(videoError)
       await switchToHls(requestId)
       return
     }
@@ -357,14 +374,12 @@ export function useVideoPlayer({
         return
       }
 
-      setError(videoError)
-      onError?.(videoError)
+      reportVideoError(videoError)
       await switchToHls(requestId)
       return
     }
 
-    setError(videoError)
-    onError?.(videoError)
+    reportVideoError(videoError)
     await switchToHls(requestId)
   })
 
@@ -373,7 +388,7 @@ export function useVideoPlayer({
       config: { strategy: PlaybackStrategy; url: string },
       initializedItemId: string,
     ) => {
-      setError(null)
+      reportVideoError(null)
       updateStrategy(config.strategy)
       setVideoUrl(config.url)
       setLoadedItemId(initializedItemId)
@@ -394,9 +409,8 @@ export function useVideoPlayer({
         recoverable: false,
         originalError: err instanceof Error ? err : undefined,
       }
-      setError(videoError)
+      reportVideoError(videoError)
       setLoadedItemId(failedItemId)
-      onError?.(videoError)
     },
   )
 
@@ -633,7 +647,7 @@ export function useVideoPlayer({
       if (!isCurrentReloadRequest()) return
     }
 
-    setError(null)
+    reportVideoError(null)
 
     if (currentStrategyRef.current === 'direct') {
       // Mark the switch as intentional so handleDirectPlayError ignores the
@@ -671,7 +685,11 @@ export function useVideoPlayer({
   const activeHlsRef = strategy === 'hls' ? hlsPlayer.hlsRef : emptyHlsRef
 
   const isLoading = !!itemId && loadedItemId !== itemId
-  const effectiveError = !itemId || isLoading ? null : error
+  // Fault state is scoped to a loaded session so a torn-down session's
+  // error or recovery flag can never leak into a new item's load window.
+  const hasLoadedSession = !!itemId && !isLoading
+  const effectiveError = hasLoadedSession ? error : null
+  const effectiveIsRecovering = hasLoadedSession && isRecovering
   const effectiveVideoUrl = !itemId ? '' : videoUrl
 
   return {
@@ -680,6 +698,7 @@ export function useVideoPlayer({
     strategy,
     isLoading,
     error: effectiveError,
+    isRecovering: effectiveIsRecovering,
     retry,
     videoUrl: effectiveVideoUrl,
     reloadHlsWithUrl,

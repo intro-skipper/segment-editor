@@ -17,9 +17,7 @@ type PlayerProps = ComponentProps<typeof Player>
 
 const mocks = vi.hoisted(() => ({
   playerSurfaceProps: [] as Array<unknown>,
-  videoPlayerOptions: null as null | {
-    onError?: (error: unknown) => void
-  },
+  videoPlayerError: null as VideoPlayerError | null,
   setShowVideoPlayer: vi.fn(),
   setPreferredAudioLanguage: vi.fn(),
   setPreferredSubtitleLanguage: vi.fn(),
@@ -98,17 +96,16 @@ vi.mock('@/hooks/useBlobUrl', () => ({
 }))
 
 vi.mock('@/hooks/use-video-player', () => ({
-  useVideoPlayer: (options: unknown) => {
-    mocks.videoPlayerOptions = options as typeof mocks.videoPlayerOptions
-    return {
-      videoRef: mocks.videoRef ?? { current: mocks.videoElement },
-      hlsRef: { current: null },
-      strategy: 'direct',
-      isLoading: mocks.videoPlayerIsLoading,
-      retry: mocks.retry,
-      reloadHlsWithUrl: vi.fn(),
-    }
-  },
+  useVideoPlayer: () => ({
+    videoRef: mocks.videoRef,
+    hlsRef: { current: null },
+    strategy: 'direct',
+    isLoading: mocks.videoPlayerIsLoading,
+    error: mocks.videoPlayerError,
+    isRecovering: false,
+    retry: mocks.retry,
+    reloadHlsWithUrl: vi.fn(),
+  }),
 }))
 
 vi.mock('@/components/player/use-fullscreen-player-ui', () => ({
@@ -212,16 +209,20 @@ function createSegment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
   }
 }
 
-function renderPlayer(overrides: Partial<PlayerProps> = {}) {
-  return render(
+function playerElement(overrides: Partial<PlayerProps> = {}) {
+  return (
     <Player
       item={createItem()}
       frameStepSeconds={1 / 24}
       onCreateSegment={vi.fn()}
       onUpdateSegmentTimestamp={vi.fn()}
       {...overrides}
-    />,
+    />
   )
+}
+
+function renderPlayer(overrides: Partial<PlayerProps> = {}) {
+  return render(playerElement(overrides))
 }
 
 describe('Player controls wiring', () => {
@@ -230,7 +231,7 @@ describe('Player controls wiring', () => {
     mocks.playerSurfaceProps = []
     mocks.videoElement = document.createElement('video')
     mocks.videoRef = { current: mocks.videoElement }
-    mocks.videoPlayerOptions = null
+    mocks.videoPlayerError = null
     mocks.trackManagerIsLoading = true
     mocks.videoPlayerIsLoading = true
     mocks.audioSwitchTranscodeScope = 'all'
@@ -243,7 +244,7 @@ describe('Player controls wiring', () => {
   })
 
   it('passes Player state, handlers, and render groups through to PlayerSurface', () => {
-    renderPlayer()
+    const utils = renderPlayer()
 
     let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
     expect(surfaceProps.fullscreen).toMatchObject({
@@ -287,16 +288,11 @@ describe('Player controls wiring', () => {
       message: 'Playback failed',
       recoverable: true,
     }
-    act(() => {
-      mocks.videoPlayerOptions?.onError?.(mediaError)
-    })
+    mocks.videoPlayerError = mediaError
+    utils.rerender(playerElement())
 
     surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
-    expect(surfaceProps.playback.error).toEqual({
-      type: 'media',
-      message: 'Playback failed',
-      recoverable: true,
-    })
+    expect(surfaceProps.playback.error).toEqual(mediaError)
     surfaceProps.playback.onRetry()
     expect(mocks.retry).toHaveBeenCalledTimes(1)
   })
