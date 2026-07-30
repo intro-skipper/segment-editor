@@ -64,6 +64,20 @@ API keys can be created in Jellyfin: Dashboard -> API Keys.
 > In standalone mode, credentials are stored in the browser via `localStorage` (`segment-editor-api`).
 > Treat API keys as secrets.
 
+### Playback tips
+
+When a file with multiple audio tracks is direct-played, switching the audio track normally requires
+restarting the stream as a transcode, because most browsers do not expose the HTML `audioTracks` API.
+
+- **Safari** supports native in-place audio switching out of the box.
+- **Chromium browsers (Chrome, Edge, ...)** ship the API behind a flag. Enabling
+  "Experimental Web Platform features" in `chrome://flags` (or launching with
+  `--enable-blink-features=AudioVideoTracks`) lets the player switch audio in place without
+  interrupting playback. Note that the chrome://flags route enables a broader set of experimental
+  features browser-wide; if the native switch fails for a particular file, the player automatically
+  falls back to the transcode restart.
+- **Firefox** does not implement the API; audio switching always uses the transcode fallback.
+
 ## Development
 
 Prereqs: Node.js (LTS) and `pnpm` (see `package.json` -> `packageManager`).

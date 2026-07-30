@@ -89,6 +89,20 @@ Object.defineProperty(globalThis, 'navigator', {
   writable: true,
 })
 
+// jsdom does not implement MediaError; the numeric constants come from the
+// HTML spec. Defined via plain property (not vi.stubGlobal) so a test's
+// vi.unstubAllGlobals() cannot remove it.
+Object.defineProperty(globalThis, 'MediaError', {
+  value: {
+    MEDIA_ERR_ABORTED: 1,
+    MEDIA_ERR_NETWORK: 2,
+    MEDIA_ERR_DECODE: 3,
+    MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+  },
+  writable: true,
+  configurable: true,
+})
+
 // Mock crypto.randomUUID - generates proper UUID v4 format
 let uuidCounter = 0
 function generateMockUUID(): string {

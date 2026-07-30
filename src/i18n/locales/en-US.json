@@ -293,6 +293,9 @@
       "unknown": "Unknown",
       "selector": "Audio and subtitle tracks",
       "noTracks": "No tracks available",
+      "audioSwitchTranscodeHint": "Switching audio restarts the stream as a transcode",
+      "audioSwitchPartialTranscodeHint": "Switching to some audio tracks restarts the stream as a transcode",
+      "audioSwitchChromiumFlagTip": "Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags",
       "channels": {
         "mono": "Mono",
         "stereo": "Stereo",

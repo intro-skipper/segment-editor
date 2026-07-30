@@ -10,6 +10,7 @@ import { Player } from '@/components/player/Player'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/hooks/use-video-player'
+import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 type PlayerProps = ComponentProps<typeof Player>
@@ -25,8 +26,8 @@ const mocks = vi.hoisted(() => ({
   setSubtitlesEnabled: vi.fn(),
   setPlayerVolume: vi.fn(),
   setPlayerMuted: vi.fn(),
-  selectAudioTrack: vi.fn(() => Promise.resolve(undefined)),
-  selectSubtitleTrack: vi.fn(() => Promise.resolve(undefined)),
+  selectAudioTrack: vi.fn(() => Promise.resolve(true)),
+  selectSubtitleTrack: vi.fn(() => Promise.resolve(true)),
   resizeJassub: vi.fn(),
   setJassubUserOffset: vi.fn(),
   retry: vi.fn(),
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   videoPlayerIsLoading: true,
   videoRef: null as null | { current: HTMLVideoElement | null },
   trackManagerIsLoading: true,
+  audioSwitchTranscodeScope: 'all' as AudioSwitchTranscodeScope,
   segmentSkipMode: 'button',
   segmentSkipModeRevision: 0,
   fullscreenUi: {
@@ -119,6 +121,7 @@ vi.mock('@/hooks/use-track-manager', () => ({
     selectAudioTrack: mocks.selectAudioTrack,
     selectSubtitleTrack: mocks.selectSubtitleTrack,
     isLoading: mocks.trackManagerIsLoading,
+    audioSwitchTranscodeScope: mocks.audioSwitchTranscodeScope,
   }),
 }))
 
@@ -153,21 +156,24 @@ vi.mock('@/services/video/api', async (importOriginal) => {
   }
 })
 
-vi.mock('@/stores/app-store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      segmentSkipMode: mocks.segmentSkipMode,
-      segmentSkipModeRevision: mocks.segmentSkipModeRevision,
-      jellyfinPlaybackSyncEnabled: false,
-      trackPreferences: {
-        preferredAudioLanguage: 'eng',
-      },
-      setShowVideoPlayer: mocks.setShowVideoPlayer,
-      setPreferredAudioLanguage: mocks.setPreferredAudioLanguage,
-      setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
-      setSubtitlesEnabled: mocks.setSubtitlesEnabled,
-    }),
-}))
+vi.mock('@/stores/app-store', () => {
+  const getState = () => ({
+    segmentSkipMode: mocks.segmentSkipMode,
+    segmentSkipModeRevision: mocks.segmentSkipModeRevision,
+    jellyfinPlaybackSyncEnabled: false,
+    trackPreferences: {
+      preferredAudioLanguage: 'eng',
+    },
+    setShowVideoPlayer: mocks.setShowVideoPlayer,
+    setPreferredAudioLanguage: mocks.setPreferredAudioLanguage,
+    setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
+    setSubtitlesEnabled: mocks.setSubtitlesEnabled,
+  })
+  const useAppStore = (selector: (state: unknown) => unknown) =>
+    selector(getState())
+  useAppStore.getState = getState
+  return { useAppStore }
+})
 
 vi.mock('@/stores/session-store', () => ({
   useSessionStore: (selector: (state: unknown) => unknown) =>
@@ -227,6 +233,7 @@ describe('Player controls wiring', () => {
     mocks.videoPlayerOptions = null
     mocks.trackManagerIsLoading = true
     mocks.videoPlayerIsLoading = true
+    mocks.audioSwitchTranscodeScope = 'all'
     mocks.segmentSkipMode = 'button'
     mocks.segmentSkipModeRevision = 0
   })
@@ -267,6 +274,7 @@ describe('Player controls wiring', () => {
     expect(controlsProps.display.mode).toBe('fullscreen')
     expect(controlsProps.trackControls?.state).toBe(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')
+    expect(controlsProps.trackControls?.audioSwitchTranscodeScope).toBe('all')
     expect(controlsProps.settings.subtitleState).toBe('active')
 
     act(() => {
@@ -295,6 +303,7 @@ describe('Player controls wiring', () => {
 
   it('enables track selection wiring after tracks load', async () => {
     mocks.trackManagerIsLoading = false
+    mocks.audioSwitchTranscodeScope = 'none'
 
     renderPlayer()
 
@@ -302,6 +311,7 @@ describe('Player controls wiring', () => {
     const controlsProps = surfaceProps.controlsProps
 
     expect(controlsProps.trackControls?.availability).toBe('available')
+    expect(controlsProps.trackControls?.audioSwitchTranscodeScope).toBe('none')
 
     await act(async () => {
       await controlsProps.trackControls?.onSelectAudio(1)

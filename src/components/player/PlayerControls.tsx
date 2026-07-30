@@ -21,6 +21,7 @@ import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { TrackState } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
+import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -53,6 +54,8 @@ export interface PlayerControlsProps {
     state: TrackState
     availability: 'available' | 'disabled'
     strategy?: PlaybackStrategy
+    /** Which audio switch targets restart the stream as a transcode */
+    audioSwitchTranscodeScope?: AudioSwitchTranscodeScope
     onSelectAudio: (index: number) => void
     onSelectSubtitle: (index: number | null) => void
   }
@@ -204,6 +207,7 @@ export function PlayerControls({
             onSelectAudio={trackControls.onSelectAudio}
             onSelectSubtitle={trackControls.onSelectSubtitle}
             strategy={trackControls.strategy}
+            audioSwitchTranscodeScope={trackControls.audioSwitchTranscodeScope}
             disabled={trackControls.availability === 'disabled'}
             portalContainer={portalContainer}
           />

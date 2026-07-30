@@ -38,6 +38,13 @@ export interface VideoPlayerError {
 interface UseVideoPlayerOptions {
   item: BaseItemDto | null
   preferredAudioStreamIndex?: number
+  /**
+   * Returns the audio stream index the session is currently playing (the
+   * initial selection or a later native switch). The direct-play error
+   * fallback reads it lazily through this getter so the live value never
+   * becomes an initialization dependency.
+   */
+  getCurrentAudioStreamIndex?: () => number | undefined
   jellyfinPlaybackSyncEnabled?: boolean
   onError?: (error: VideoPlayerError) => void
   onStrategyChange?: (strategy: PlaybackStrategy) => void
@@ -124,6 +131,7 @@ function getActiveVideoElementFromRefs(
 export function useVideoPlayer({
   item,
   preferredAudioStreamIndex,
+  getCurrentAudioStreamIndex,
   jellyfinPlaybackSyncEnabled = false,
   onError,
   onStrategyChange,
@@ -232,16 +240,29 @@ export function useVideoPlayer({
     flushPostCommitStart()
   }, [jellyfinSession])
 
+  // The hook's staleness invariant, shared by every async flow that mutates
+  // playback state: capture the request id when the flow starts, then re-check
+  // after every await and drop the flow instead of touching newer state.
+  const isCurrentPlaybackRequest = (requestId: number) => () =>
+    isActiveRef.current &&
+    playbackRequestIdRef.current === requestId &&
+    itemRef.current?.Id === itemId
+
   const switchToHls = async (requestId?: number) => {
-    const resolvedRequestId = requestId ?? playbackRequestIdRef.current
-    const isCurrentHlsRequest = () =>
-      isActiveRef.current &&
-      playbackRequestIdRef.current === resolvedRequestId &&
-      itemRef.current?.Id === itemId
+    const isCurrentHlsRequest = isCurrentPlaybackRequest(
+      requestId ?? playbackRequestIdRef.current,
+    )
 
     if (!itemId || !mediaSourceId || !isCurrentHlsRequest()) return
 
     const currentItem = itemRef.current!
+
+    // The forced-HLS fallback must keep the track the user is hearing: a
+    // direct session that started on (or natively switched to) a non-default
+    // track would otherwise restart on the container default while the track
+    // menu still shows the old selection.
+    const fallbackAudioStreamIndex =
+      getCurrentAudioStreamIndex?.() ?? preferredAudioStreamIndex
 
     // Capture direct-play position before preserving state and stopping status.
     // After updateStrategy('hls') the active video element becomes the HLS element
@@ -260,7 +281,7 @@ export function useVideoPlayer({
       const config = await getPlaybackConfig(
         currentItem,
         undefined,
-        undefined,
+        fallbackAudioStreamIndex,
         true,
         hlsPlaySessionId,
       )
@@ -549,10 +570,21 @@ export function useVideoPlayer({
   }: HlsReloadRequest) => {
     if (!itemId || !mediaSourceId) return
 
+    // An HLS audio reload races item navigation: once the awaits below are in
+    // flight, rotating the track manager's abort controller can no longer
+    // cancel this callback, so re-check the playback request/item after every
+    // await and drop the reload instead of overwriting the newly loaded
+    // item's source.
+    const isCurrentReloadRequest = isCurrentPlaybackRequest(
+      playbackRequestIdRef.current,
+    )
+    if (!isCurrentReloadRequest()) return
+
     const activeVideo = getActiveVideoElement()
     const activePositionTicks = secondsToTicks(activeVideo?.currentTime ?? 0)
     preservation.capture(activeVideo, itemId)
     await jellyfin.stopPlaybackStatus()
+    if (!isCurrentReloadRequest()) return
 
     const previousHlsPlaySessionId =
       jellyfinSessionIdentity?.strategy === 'hls'
@@ -563,6 +595,7 @@ export function useVideoPlayer({
       previousHlsPlaySessionId !== nextHlsPlaySessionId
     ) {
       await jellyfin.stopPreviousEncoding(previousHlsPlaySessionId)
+      if (!isCurrentReloadRequest()) return
     }
 
     setError(null)
