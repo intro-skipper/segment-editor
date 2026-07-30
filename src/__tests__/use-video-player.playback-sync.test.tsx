@@ -95,6 +95,7 @@ function createItem(id = 'item-1'): BaseItemDto {
 type RenderVideoPlayerProps = {
   item: BaseItemDto
   jellyfinPlaybackSyncEnabled: boolean
+  getInitialAudioStreamIndex?: () => number | undefined
   onStrategyChange?: (strategy: PlaybackStrategy) => void
 }
 
@@ -106,6 +107,10 @@ function renderVideoPlayer(options?: RenderVideoPlayerOptions) {
     jellyfinPlaybackSyncEnabled: options?.jellyfinPlaybackSyncEnabled ?? false,
   }
 
+  if (options?.getInitialAudioStreamIndex !== undefined) {
+    initialProps.getInitialAudioStreamIndex = options.getInitialAudioStreamIndex
+  }
+
   if (options?.onStrategyChange !== undefined) {
     initialProps.onStrategyChange = options.onStrategyChange
   }
@@ -114,11 +119,13 @@ function renderVideoPlayer(options?: RenderVideoPlayerOptions) {
     ({
       item,
       jellyfinPlaybackSyncEnabled,
+      getInitialAudioStreamIndex,
       onStrategyChange,
     }: RenderVideoPlayerProps) =>
       useVideoPlayer({
         item,
         jellyfinPlaybackSyncEnabled,
+        getInitialAudioStreamIndex,
         onStrategyChange,
         t: (key) => key,
       }),
@@ -126,6 +133,65 @@ function renderVideoPlayer(options?: RenderVideoPlayerOptions) {
       initialProps,
     },
   )
+}
+
+/**
+ * Mocks a direct-play start whose error fallback is forced to HLS: the load
+ * stub, the three-session id chain, and a getPlaybackConfig that embeds the
+ * requested AudioStreamIndex in the forced-HLS URL.
+ */
+function mockDirectPlayThenForcedHlsFallback() {
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
+    () => undefined,
+  )
+  vi.mocked(createPlaySessionId)
+    .mockReturnValueOnce('unused-initial-hls-session')
+    .mockReturnValueOnce('direct-session-1')
+    .mockReturnValueOnce('hls-fallback-session')
+  vi.mocked(getPlaybackConfig).mockImplementation(
+    async (_item, _startTimeTicks, audioStreamIndex, forceHls, sessionId) =>
+      forceHls
+        ? {
+            strategy: 'hls' as const,
+            url: `https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=${sessionId}&AudioStreamIndex=${audioStreamIndex}`,
+          }
+        : {
+            strategy: 'direct' as const,
+            url: 'https://jellyfin.example/Videos/item-1/stream',
+          },
+  )
+}
+
+/** Renders a session that initialized on audio index 2. */
+function renderAudioFallbackHarness(options?: {
+  getCurrentAudioStreamIndex?: () => number | undefined
+}) {
+  let player!: ReturnType<typeof useVideoPlayer>
+  function Harness() {
+    player = useVideoPlayer({
+      item: createItem(),
+      getInitialAudioStreamIndex: () => 2,
+      getCurrentAudioStreamIndex: options?.getCurrentAudioStreamIndex,
+      t: (key) => key,
+    })
+    return (
+      <video ref={player.videoRef}>
+        <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
+      </video>
+    )
+  }
+  const { container } = render(<Harness />)
+  return { container, getPlayer: () => player }
+}
+
+function dispatchDirectPlayError(video: HTMLVideoElement) {
+  Object.defineProperty(video, 'error', {
+    configurable: true,
+    value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
+  })
+  act(() => {
+    video.dispatchEvent(new Event('error'))
+  })
 }
 
 describe('useVideoPlayer Jellyfin playback sync', () => {
@@ -185,12 +251,6 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
   })
 
   it('uses a generated HLS play session when direct play falls back to HLS', async () => {
-    vi.stubGlobal('MediaError', {
-      MEDIA_ERR_ABORTED: 1,
-      MEDIA_ERR_NETWORK: 2,
-      MEDIA_ERR_DECODE: 3,
-      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    })
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
       () => undefined,
     )
@@ -236,14 +296,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       expect(video.src).toContain('/Videos/item-1/stream')
     })
 
-    Object.defineProperty(video, 'error', {
-      configurable: true,
-      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
-    })
-
-    act(() => {
-      video.dispatchEvent(new Event('error'))
-    })
+    dispatchDirectPlayError(video)
 
     await waitFor(() => {
       expect(getPlaybackConfig).toHaveBeenCalledWith(
@@ -256,12 +309,6 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     })
   })
   it('preserves direct-play position when synced direct play falls back to HLS', async () => {
-    vi.stubGlobal('MediaError', {
-      MEDIA_ERR_ABORTED: 1,
-      MEDIA_ERR_NETWORK: 2,
-      MEDIA_ERR_DECODE: 3,
-      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    })
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
       () => undefined,
     )
@@ -316,14 +363,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     directVideo!.currentTime = 42
     vi.mocked(startPlaybackStatus).mockClear()
 
-    Object.defineProperty(directVideo, 'error', {
-      configurable: true,
-      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
-    })
-
-    act(() => {
-      directVideo!.dispatchEvent(new Event('error'))
-    })
+    dispatchDirectPlayError(directVideo!)
 
     await waitFor(() => {
       expect(startPlaybackStatus).toHaveBeenCalledWith({
@@ -1338,43 +1378,12 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
   })
 
   it('threads the current audio stream index into the forced-HLS error fallback', async () => {
-    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
-      () => undefined,
-    )
-    vi.mocked(createPlaySessionId)
-      .mockReturnValueOnce('unused-initial-hls-session')
-      .mockReturnValueOnce('direct-session-1')
-      .mockReturnValueOnce('hls-fallback-session')
-    vi.mocked(getPlaybackConfig).mockImplementation(
-      async (_item, _startTimeTicks, audioStreamIndex, forceHls, sessionId) =>
-        forceHls
-          ? {
-              strategy: 'hls' as const,
-              url: `https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=${sessionId}&AudioStreamIndex=${audioStreamIndex}`,
-            }
-          : {
-              strategy: 'direct' as const,
-              url: 'https://jellyfin.example/Videos/item-1/stream',
-            },
-    )
+    mockDirectPlayThenForcedHlsFallback()
 
     let currentAudioStreamIndex = 2
-    let player!: ReturnType<typeof useVideoPlayer>
-    function Harness() {
-      player = useVideoPlayer({
-        item: createItem(),
-        preferredAudioStreamIndex: 2,
-        getCurrentAudioStreamIndex: () => currentAudioStreamIndex,
-        t: (key) => key,
-      })
-      return (
-        <video ref={player.videoRef}>
-          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
-        </video>
-      )
-    }
-
-    const { container } = render(<Harness />)
+    const { container, getPlayer } = renderAudioFallbackHarness({
+      getCurrentAudioStreamIndex: () => currentAudioStreamIndex,
+    })
 
     await waitFor(() => {
       expect(getPlaybackConfig).toHaveBeenCalledWith(
@@ -1394,13 +1403,7 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     // A native in-session switch moved the session off the initial track.
     currentAudioStreamIndex = 3
 
-    Object.defineProperty(video, 'error', {
-      configurable: true,
-      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
-    })
-    act(() => {
-      video.dispatchEvent(new Event('error'))
-    })
+    dispatchDirectPlayError(video)
 
     await waitFor(() => {
       expect(getPlaybackConfig).toHaveBeenCalledWith(
@@ -1412,59 +1415,21 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       )
     })
     await waitFor(() => {
-      expect(player.videoUrl).toContain('AudioStreamIndex=3')
+      expect(getPlayer().videoUrl).toContain('AudioStreamIndex=3')
     })
   })
 
-  it('falls back to the initial preferred audio index when no current-index getter is provided', async () => {
-    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
-      () => undefined,
-    )
-    vi.mocked(createPlaySessionId)
-      .mockReturnValueOnce('unused-initial-hls-session')
-      .mockReturnValueOnce('direct-session-1')
-      .mockReturnValueOnce('hls-fallback-session')
-    vi.mocked(getPlaybackConfig).mockImplementation(
-      async (_item, _startTimeTicks, audioStreamIndex, forceHls, sessionId) =>
-        forceHls
-          ? {
-              strategy: 'hls' as const,
-              url: `https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=${sessionId}&AudioStreamIndex=${audioStreamIndex}`,
-            }
-          : {
-              strategy: 'direct' as const,
-              url: 'https://jellyfin.example/Videos/item-1/stream',
-            },
-    )
+  it("falls back to the session's initial audio index when no current-index getter is provided", async () => {
+    mockDirectPlayThenForcedHlsFallback()
 
-    let player!: ReturnType<typeof useVideoPlayer>
-    function Harness() {
-      player = useVideoPlayer({
-        item: createItem(),
-        preferredAudioStreamIndex: 2,
-        t: (key) => key,
-      })
-      return (
-        <video ref={player.videoRef}>
-          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
-        </video>
-      )
-    }
-
-    const { container } = render(<Harness />)
+    const { container, getPlayer } = renderAudioFallbackHarness()
 
     const video = container.querySelector('video')!
     await waitFor(() => {
       expect(video.src).toContain('/Videos/item-1/stream')
     })
 
-    Object.defineProperty(video, 'error', {
-      configurable: true,
-      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
-    })
-    act(() => {
-      video.dispatchEvent(new Event('error'))
-    })
+    dispatchDirectPlayError(video)
 
     await waitFor(() => {
       expect(getPlaybackConfig).toHaveBeenCalledWith(
@@ -1476,7 +1441,50 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       )
     })
     await waitFor(() => {
-      expect(player.videoUrl).toContain('AudioStreamIndex=2')
+      expect(getPlayer().videoUrl).toContain('AudioStreamIndex=2')
+    })
+  })
+
+  it('resolves the initial audio index per initialization, not per render', async () => {
+    const { rerender } = renderVideoPlayer({
+      getInitialAudioStreamIndex: () => 2,
+    })
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        2,
+        false,
+        'hls-session-1',
+      )
+    })
+
+    // A changed preference mid-session must not re-initialize playback.
+    rerender({
+      item: createItem(),
+      jellyfinPlaybackSyncEnabled: false,
+      getInitialAudioStreamIndex: () => 5,
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(getPlaybackConfig).toHaveBeenCalledTimes(1)
+
+    // The next initialization resolves the getter fresh.
+    rerender({
+      item: createItem('item-2'),
+      jellyfinPlaybackSyncEnabled: false,
+      getInitialAudioStreamIndex: () => 5,
+    })
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-2' }),
+        undefined,
+        5,
+        false,
+        'hls-session-1',
+      )
     })
   })
 

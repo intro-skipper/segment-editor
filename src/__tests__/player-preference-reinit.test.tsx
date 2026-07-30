@@ -248,8 +248,9 @@ describe('Player audio preference persistence', () => {
       )
     })
 
-    // Freezing the in-session index must not freeze the preference itself:
-    // the next item still initializes from the persisted language.
+    // Reading the preference only at initialization must not freeze the
+    // preference itself: the next item still initializes from the persisted
+    // language.
     const nextItem = { ...createItem(), Id: 'item-2' }
     nextItem.MediaSources = [
       { ...createItem().MediaSources![0], Id: 'source-2' },
@@ -324,7 +325,8 @@ describe('Player audio preference persistence', () => {
     })
 
     // The forced-HLS fallback restarts on the exact track the user is
-    // hearing, not the container default the frozen initial index points at.
+    // hearing, not the container default the session's initial index points
+    // at.
     await waitFor(() => {
       expect(getPlaybackConfig).toHaveBeenCalledWith(
         expect.objectContaining({ Id: 'item-1' }),

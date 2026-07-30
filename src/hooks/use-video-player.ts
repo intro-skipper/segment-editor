@@ -37,7 +37,13 @@ export interface VideoPlayerError {
 
 interface UseVideoPlayerOptions {
   item: BaseItemDto | null
-  preferredAudioStreamIndex?: number
+  /**
+   * Called once per playback initialization (item or media source change) to
+   * resolve the audio stream index the new session should start on. Read
+   * lazily so a changed preference can never re-key the init effect
+   * mid-session — it only applies to the next initialization.
+   */
+  getInitialAudioStreamIndex?: () => number | undefined
   /**
    * Returns the audio stream index the session is currently playing (the
    * initial selection or a later native switch). The direct-play error
@@ -130,7 +136,7 @@ function getActiveVideoElementFromRefs(
 
 export function useVideoPlayer({
   item,
-  preferredAudioStreamIndex,
+  getInitialAudioStreamIndex,
   getCurrentAudioStreamIndex,
   jellyfinPlaybackSyncEnabled = false,
   onError,
@@ -144,7 +150,9 @@ export function useVideoPlayer({
   const [strategy, setStrategy] = useState<PlaybackStrategy>('hls')
   const [videoUrl, setVideoUrl] = useState('')
   const [error, setError] = useState<VideoPlayerError | null>(null)
-  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined)
+  const [loadedItemId, setLoadedItemId] = useState<string | undefined>(
+    undefined,
+  )
   const [jellyfinSessionIdentity, setJellyfinSessionIdentity] =
     useState<JellyfinSessionIdentity | null>(null)
 
@@ -163,6 +171,11 @@ export function useVideoPlayer({
   const currentStrategyRef = useRef<PlaybackStrategy>('hls')
   /** Guards against error handler firing during intentional strategy switches (e.g. audio track switch) */
   const intentionalSwitchRef = useRef(false)
+  /**
+   * The audio index the current session was initialized with. The forced-HLS
+   * fallback uses it when no live current-index getter is provided.
+   */
+  const initialAudioStreamIndexRef = useRef<number | undefined>(undefined)
   const pendingPostCommitStartRef =
     useRef<PostCommitPlaybackStatusStart | null>(null)
 
@@ -262,7 +275,7 @@ export function useVideoPlayer({
     // track would otherwise restart on the container default while the track
     // menu still shows the old selection.
     const fallbackAudioStreamIndex =
-      getCurrentAudioStreamIndex?.() ?? preferredAudioStreamIndex
+      getCurrentAudioStreamIndex?.() ?? initialAudioStreamIndexRef.current
 
     // Capture direct-play position before preserving state and stopping status.
     // After updateStrategy('hls') the active video element becomes the HLS element
@@ -353,17 +366,17 @@ export function useVideoPlayer({
   const handleInitPlaybackSuccess = useEffectEvent(
     (
       config: { strategy: PlaybackStrategy; url: string },
-      loadedItemId: string,
+      initializedItemId: string,
     ) => {
       setError(null)
       updateStrategy(config.strategy)
       setVideoUrl(config.url)
-      setLoadedKey(`${loadedItemId}:${preferredAudioStreamIndex ?? ''}`)
+      setLoadedItemId(initializedItemId)
       if (
         config.strategy === 'hls' &&
-        preservation.getPreserved(loadedItemId)
+        preservation.getPreserved(initializedItemId)
       ) {
-        preservation.scheduleHlsRestore(hlsPlayer.videoRef, loadedItemId)
+        preservation.scheduleHlsRestore(hlsPlayer.videoRef, initializedItemId)
       }
     },
   )
@@ -377,7 +390,7 @@ export function useVideoPlayer({
         originalError: err instanceof Error ? err : undefined,
       }
       setError(videoError)
-      setLoadedKey(`${failedItemId}:${preferredAudioStreamIndex ?? ''}`)
+      setLoadedItemId(failedItemId)
       onError?.(videoError)
     },
   )
@@ -436,8 +449,7 @@ export function useVideoPlayer({
       return
     }
 
-    const currentLoadedKey = `${itemId ?? ''}:${preferredAudioStreamIndex ?? ''}`
-    if (loadedKey === currentLoadedKey) {
+    if (loadedItemId === itemId) {
       void jellyfin.startPlaybackStatus()
     }
   })
@@ -445,6 +457,19 @@ export function useVideoPlayer({
   useEffect(() => {
     syncPlaybackStatus()
   }, [jellyfinPlaybackSyncEnabled])
+
+  // The initial-audio getter is deliberately non-reactive: it decides only
+  // what a new session starts on, so it is resolved once per initialization
+  // and a changed preference applies to the next one. The effect event reads
+  // the latest getter without making its (per-render) identity an init-effect
+  // dependency. The `?.()` also has to stay out of initPlayback's try block:
+  // React Compiler 1.x cannot lower optional chaining inside a try/catch
+  // (see the note in track-operation.ts).
+  const resolveInitialAudioStreamIndex = useEffectEvent(() => {
+    const initialAudioStreamIndex = getInitialAudioStreamIndex?.()
+    initialAudioStreamIndexRef.current = initialAudioStreamIndex
+    return initialAudioStreamIndex
+  })
 
   useEffect(() => {
     if (!itemId) {
@@ -463,12 +488,14 @@ export function useVideoPlayer({
       const currentItem = itemRef.current
       if (currentItem === null || currentItem.Id !== itemId) return
 
+      const initialAudioStreamIndex = resolveInitialAudioStreamIndex()
+
       try {
         const hlsPlaySessionId = createPlaySessionId()
         const config = await getPlaybackConfig(
           currentItem,
           undefined,
-          preferredAudioStreamIndex,
+          initialAudioStreamIndex,
           false,
           hlsPlaySessionId,
         )
@@ -501,9 +528,12 @@ export function useVideoPlayer({
     void initPlayback()
 
     return () => {
-      // Capture current playback state before teardown so position and play state
-      // survive when the effect re-runs (e.g. preferredAudioStreamIndex changed
-      // after an audio track switch). Without this, the re-init starts from 0.
+      // Capture current playback state before teardown so position and play
+      // state survive a same-item re-init (mediaSourceId can change while the
+      // item stays). A same-mount A→B→A navigation can also restore A, though
+      // only while B's session never advanced past 0 — the preservation slot
+      // is single and B's cleanup overwrites it otherwise. Without this, the
+      // re-init starts from 0.
       capturePlaybackStateIfNeeded(itemId)
 
       isActiveRef.current = false
@@ -516,7 +546,7 @@ export function useVideoPlayer({
       clearHlsRestoreSubscription()
       stopPlaybackStatus()
     }
-  }, [itemId, mediaSourceId, preferredAudioStreamIndex])
+  }, [itemId, mediaSourceId])
 
   useEffect(() => {
     if (strategy !== 'direct' || !videoUrl) return
@@ -635,10 +665,7 @@ export function useVideoPlayer({
   const activeVideoRef = strategy === 'hls' ? hlsPlayer.videoRef : videoRef
   const activeHlsRef = strategy === 'hls' ? hlsPlayer.hlsRef : emptyHlsRef
 
-  const itemKey = itemId
-    ? `${itemId}:${preferredAudioStreamIndex ?? ''}`
-    : undefined
-  const isLoading = !!itemKey && loadedKey !== itemKey
+  const isLoading = !!itemId && loadedItemId !== itemId
   const effectiveError = !itemId || isLoading ? null : error
   const effectiveVideoUrl = !itemId ? '' : videoUrl
 

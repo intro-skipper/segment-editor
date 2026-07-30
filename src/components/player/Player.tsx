@@ -161,10 +161,10 @@ function findItemPreferredAudioStreamIndex(
 }
 
 // Read non-reactively: the preference is deliberately consumed only at item
-// boundaries (see the freeze in useRenderPlayer), and handleAudioTrackSelect
-// persists the chosen language after every successful switch — a store
-// subscription would re-render the whole player tree for a value the render
-// ignores.
+// boundaries (useVideoPlayer resolves getInitialAudioStreamIndex once per
+// playback initialization), and handleAudioTrackSelect persists the chosen
+// language after every successful switch — a store subscription would
+// re-render the whole player tree for a value the render ignores.
 const readPreferredAudioLanguage = () =>
   useAppStore.getState().trackPreferences.preferredAudioLanguage
 
@@ -359,36 +359,11 @@ function useRenderPlayer({
     previousStrategyRef.current = strategy
   }
 
-  // Frozen per item: the preference decides only the *initial* strategy and
-  // audio stream of a playback session. handleAudioTrackSelect persists the
-  // chosen language after every successful switch; recomputing this index
-  // from the live preference would re-key useVideoPlayer's init effect and
-  // tear down/reload the source right after an in-place native switch (and,
-  // with duplicate-language tracks, re-select the first language match
-  // instead of the exact track the user just picked).
-  const [initialAudioSelection, setInitialAudioSelection] = useState(() => ({
-    itemId: item.Id,
-    index: findItemPreferredAudioStreamIndex(
-      item,
-      readPreferredAudioLanguage(),
-    ),
-  }))
-  if (initialAudioSelection.itemId !== item.Id) {
-    setInitialAudioSelection({
-      itemId: item.Id,
-      index: findItemPreferredAudioStreamIndex(
-        item,
-        readPreferredAudioLanguage(),
-      ),
-    })
-  }
-  const preferredAudioStreamIndex = initialAudioSelection.index
-
   // The exact track this session is currently playing (initial selection or
   // a later native switch). useVideoPlayer's direct-play error fallback reads
-  // it through this ref so the live value never re-keys the init effect (see
-  // the freeze comment above), yet a forced-HLS fallback still restarts on
-  // the track the user is hearing instead of the container default.
+  // it through this ref so the live value never becomes an initialization
+  // input, yet a forced-HLS fallback still restarts on the track the user is
+  // hearing instead of the container default.
   const currentAudioStreamIndexRef = useRef<number | undefined>(undefined)
 
   const {
@@ -400,7 +375,15 @@ function useRenderPlayer({
     reloadHlsWithUrl,
   } = useVideoPlayer({
     item,
-    preferredAudioStreamIndex,
+    // Resolved once per playback initialization: the preference decides only
+    // the *initial* strategy and audio stream of a session.
+    // handleAudioTrackSelect persists the chosen language after every
+    // successful switch; applying it mid-session would tear down and reload
+    // the source right after an in-place native switch (and, with
+    // duplicate-language tracks, re-select the first language match instead
+    // of the exact track the user just picked).
+    getInitialAudioStreamIndex: () =>
+      findItemPreferredAudioStreamIndex(item, readPreferredAudioLanguage()),
     getCurrentAudioStreamIndex: () => currentAudioStreamIndexRef.current,
     jellyfinPlaybackSyncEnabled,
     onError: handleVideoError,
