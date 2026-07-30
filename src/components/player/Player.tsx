@@ -374,6 +374,15 @@ function useRenderPlayer({
   }
   const preferredAudioStreamIndex = initialAudioSelection.index
 
+  // The exact track this session is currently playing (initial selection or
+  // a later native switch). useVideoPlayer's direct-play error fallback reads
+  // it through this ref so the live value never re-keys the init effect (see
+  // the freeze comment above), yet a forced-HLS fallback still restarts on
+  // the track the user is hearing instead of the container default.
+  const currentAudioStreamIndexRef = useRef<number | undefined>(
+    preferredAudioStreamIndex,
+  )
+
   const {
     videoRef,
     hlsRef,
@@ -384,6 +393,7 @@ function useRenderPlayer({
   } = useVideoPlayer({
     item,
     preferredAudioStreamIndex,
+    getCurrentAudioStreamIndex: () => currentAudioStreamIndexRef.current,
     jellyfinPlaybackSyncEnabled,
     onError: handleVideoError,
     onStrategyChange: handleStrategyChange,
@@ -421,6 +431,10 @@ function useRenderPlayer({
     hlsRef,
     t,
     onReloadHls: reloadHlsWithUrl,
+  })
+
+  useLayoutEffect(() => {
+    currentAudioStreamIndexRef.current = trackState.activeAudioIndex
   })
 
   const activeSubtitleTrack =

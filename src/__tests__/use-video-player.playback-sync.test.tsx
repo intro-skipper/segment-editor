@@ -1336,4 +1336,228 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       expect.objectContaining({ playMethod: 'Transcode' }),
     )
   })
+
+  it('threads the current audio stream index into the forced-HLS error fallback', async () => {
+    vi.stubGlobal('MediaError', {
+      MEDIA_ERR_ABORTED: 1,
+      MEDIA_ERR_NETWORK: 2,
+      MEDIA_ERR_DECODE: 3,
+      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
+      () => undefined,
+    )
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-initial-hls-session')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValueOnce('hls-fallback-session')
+    vi.mocked(getPlaybackConfig).mockImplementation(
+      async (_item, _startTimeTicks, audioStreamIndex, forceHls, sessionId) =>
+        forceHls
+          ? {
+              strategy: 'hls' as const,
+              url: `https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=${sessionId}&AudioStreamIndex=${audioStreamIndex}`,
+            }
+          : {
+              strategy: 'direct' as const,
+              url: 'https://jellyfin.example/Videos/item-1/stream',
+            },
+    )
+
+    let currentAudioStreamIndex = 2
+    let player!: ReturnType<typeof useVideoPlayer>
+    function Harness() {
+      player = useVideoPlayer({
+        item: createItem(),
+        preferredAudioStreamIndex: 2,
+        getCurrentAudioStreamIndex: () => currentAudioStreamIndex,
+        t: (key) => key,
+      })
+      return <video ref={player.videoRef} />
+    }
+
+    const { container } = render(<Harness />)
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        2,
+        false,
+        'unused-initial-hls-session',
+      )
+    })
+
+    const video = container.querySelector('video')!
+    await waitFor(() => {
+      expect(video.src).toContain('/Videos/item-1/stream')
+    })
+
+    // A native in-session switch moved the session off the initial track.
+    currentAudioStreamIndex = 3
+
+    Object.defineProperty(video, 'error', {
+      configurable: true,
+      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
+    })
+    act(() => {
+      video.dispatchEvent(new Event('error'))
+    })
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        3,
+        true,
+        'hls-fallback-session',
+      )
+    })
+    await waitFor(() => {
+      expect(player.videoUrl).toContain('AudioStreamIndex=3')
+    })
+  })
+
+  it('falls back to the initial preferred audio index when no current-index getter is provided', async () => {
+    vi.stubGlobal('MediaError', {
+      MEDIA_ERR_ABORTED: 1,
+      MEDIA_ERR_NETWORK: 2,
+      MEDIA_ERR_DECODE: 3,
+      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
+      () => undefined,
+    )
+    vi.mocked(createPlaySessionId)
+      .mockReturnValueOnce('unused-initial-hls-session')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValueOnce('hls-fallback-session')
+    vi.mocked(getPlaybackConfig).mockImplementation(
+      async (_item, _startTimeTicks, audioStreamIndex, forceHls, sessionId) =>
+        forceHls
+          ? {
+              strategy: 'hls' as const,
+              url: `https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=${sessionId}&AudioStreamIndex=${audioStreamIndex}`,
+            }
+          : {
+              strategy: 'direct' as const,
+              url: 'https://jellyfin.example/Videos/item-1/stream',
+            },
+    )
+
+    let player!: ReturnType<typeof useVideoPlayer>
+    function Harness() {
+      player = useVideoPlayer({
+        item: createItem(),
+        preferredAudioStreamIndex: 2,
+        t: (key) => key,
+      })
+      return <video ref={player.videoRef} />
+    }
+
+    const { container } = render(<Harness />)
+
+    const video = container.querySelector('video')!
+    await waitFor(() => {
+      expect(video.src).toContain('/Videos/item-1/stream')
+    })
+
+    Object.defineProperty(video, 'error', {
+      configurable: true,
+      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
+    })
+    act(() => {
+      video.dispatchEvent(new Event('error'))
+    })
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        2,
+        true,
+        'hls-fallback-session',
+      )
+    })
+    await waitFor(() => {
+      expect(player.videoUrl).toContain('AudioStreamIndex=2')
+    })
+  })
+
+  it('drops an in-flight HLS audio reload when the item changes before it resumes', async () => {
+    vi.mocked(createPlaySessionId)
+      .mockReset()
+      .mockReturnValueOnce('unused-hls-init')
+      .mockReturnValueOnce('direct-session-1')
+      .mockReturnValue('item-2-hls-session')
+    vi.mocked(getPlaybackConfig).mockImplementation(async (item) =>
+      item.Id === 'item-1'
+        ? {
+            strategy: 'direct' as const,
+            url: 'https://jellyfin.example/Videos/item-1/stream',
+          }
+        : {
+            strategy: 'hls' as const,
+            url: 'https://jellyfin.example/Videos/item-2/master.m3u8?PlaySessionId=item-2-hls-session',
+          },
+    )
+
+    const { result, rerender } = renderVideoPlayer({
+      item: createItem('item-1'),
+      jellyfinPlaybackSyncEnabled: true,
+    })
+
+    await waitFor(() => {
+      expect(result.current.strategy).toBe('direct')
+    })
+
+    const directVideo = document.createElement('video')
+    directVideo.currentTime = 30
+    result.current.videoRef.current = directVideo
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playSessionId: 'direct-session-1',
+          playMethod: 'DirectPlay',
+        }),
+      )
+    })
+
+    // Hold the reload's status cleanup so the item can change while the
+    // already-started callback is suspended mid-await.
+    const stopDeferred = createDeferred()
+    vi.mocked(stopPlaybackStatus).mockReturnValue(stopDeferred.promise)
+
+    let staleReload!: Promise<void>
+    act(() => {
+      staleReload = result.current.reloadHlsWithUrl({
+        url: 'https://jellyfin.example/Videos/item-1/master.m3u8?PlaySessionId=stale-hls-session&AudioStreamIndex=2',
+        playSessionId: 'stale-hls-session',
+      })
+    })
+
+    rerender({
+      item: createItem('item-2'),
+      jellyfinPlaybackSyncEnabled: true,
+    })
+
+    await waitFor(() => {
+      expect(result.current.videoUrl).toContain('/Videos/item-2/')
+    })
+
+    await act(async () => {
+      stopDeferred.resolve()
+      await staleReload
+    })
+
+    // The released reload must not overwrite the newly loaded item's source
+    // or session with the previous item's audio-switch URL.
+    expect(result.current.videoUrl).toContain('/Videos/item-2/')
+    expect(result.current.videoUrl).not.toContain('stale-hls-session')
+    expect(result.current.strategy).toBe('hls')
+    expect(startPlaybackStatus).not.toHaveBeenCalledWith(
+      expect.objectContaining({ playSessionId: 'stale-hls-session' }),
+    )
+  })
 })

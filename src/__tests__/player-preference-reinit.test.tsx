@@ -173,6 +173,8 @@ describe('Player audio preference persistence', () => {
 
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     useAppStore.getState().setPreferredAudioLanguage(null)
   })
 
@@ -269,5 +271,72 @@ describe('Player audio preference persistence', () => {
       false,
       'session-1',
     )
+  })
+
+  it('preserves the natively switched audio track when direct play falls back to HLS on error', async () => {
+    vi.stubGlobal('MediaError', {
+      MEDIA_ERR_ABORTED: 1,
+      MEDIA_ERR_NETWORK: 2,
+      MEDIA_ERR_DECODE: 3,
+      MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+    })
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
+      () => undefined,
+    )
+
+    render(
+      <Player
+        item={createItem()}
+        frameStepSeconds={1 / 24}
+        onCreateSegment={vi.fn()}
+        onUpdateSegmentTimestamp={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledTimes(1)
+    })
+    expect(getPlaybackConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({ Id: 'item-1' }),
+      undefined,
+      ENGLISH_INDEX,
+      false,
+      'session-1',
+    )
+
+    // One successful native in-place switch moves the session off the
+    // container default without reinitializing playback.
+    await act(async () => {
+      await latestSurfaceProps().controlsProps.trackControls?.onSelectAudio(
+        JAPANESE_INDEX,
+      )
+    })
+    await waitFor(() => {
+      expect(
+        latestSurfaceProps().controlsProps.trackControls?.state
+          .activeAudioIndex,
+      ).toBe(JAPANESE_INDEX)
+    })
+
+    const video = latestSurfaceProps().videoRef.current!
+    Object.defineProperty(video, 'error', {
+      configurable: true,
+      value: { code: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED },
+    })
+    act(() => {
+      video.dispatchEvent(new Event('error'))
+    })
+
+    // The forced-HLS fallback restarts on the exact track the user is
+    // hearing, not the container default the frozen initial index points at.
+    await waitFor(() => {
+      expect(getPlaybackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ Id: 'item-1' }),
+        undefined,
+        JAPANESE_INDEX,
+        true,
+        'session-1',
+      )
+    })
   })
 })
