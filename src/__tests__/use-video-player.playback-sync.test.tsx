@@ -1373,7 +1373,11 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         getCurrentAudioStreamIndex: () => currentAudioStreamIndex,
         t: (key) => key,
       })
-      return <video ref={player.videoRef} />
+      return (
+        <video ref={player.videoRef}>
+          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
+        </video>
+      )
     }
 
     const { container } = render(<Harness />)
@@ -1452,7 +1456,11 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         preferredAudioStreamIndex: 2,
         t: (key) => key,
       })
-      return <video ref={player.videoRef} />
+      return (
+        <video ref={player.videoRef}>
+          <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
+        </video>
+      )
     }
 
     const { container } = render(<Harness />)

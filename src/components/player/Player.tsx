@@ -379,9 +379,7 @@ function useRenderPlayer({
   // it through this ref so the live value never re-keys the init effect (see
   // the freeze comment above), yet a forced-HLS fallback still restarts on
   // the track the user is hearing instead of the container default.
-  const currentAudioStreamIndexRef = useRef<number | undefined>(
-    preferredAudioStreamIndex,
-  )
+  const currentAudioStreamIndexRef = useRef<number | undefined>(undefined)
 
   const {
     videoRef,
@@ -435,7 +433,7 @@ function useRenderPlayer({
 
   useLayoutEffect(() => {
     currentAudioStreamIndexRef.current = trackState.activeAudioIndex
-  })
+  }, [trackState.activeAudioIndex])
 
   const activeSubtitleTrack =
     trackState.activeSubtitleIndex === null

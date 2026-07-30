@@ -240,12 +240,18 @@ export function useVideoPlayer({
     flushPostCommitStart()
   }, [jellyfinSession])
 
+  // The hook's staleness invariant, shared by every async flow that mutates
+  // playback state: capture the request id when the flow starts, then re-check
+  // after every await and drop the flow instead of touching newer state.
+  const isCurrentPlaybackRequest = (requestId: number) => () =>
+    isActiveRef.current &&
+    playbackRequestIdRef.current === requestId &&
+    itemRef.current?.Id === itemId
+
   const switchToHls = async (requestId?: number) => {
-    const resolvedRequestId = requestId ?? playbackRequestIdRef.current
-    const isCurrentHlsRequest = () =>
-      isActiveRef.current &&
-      playbackRequestIdRef.current === resolvedRequestId &&
-      itemRef.current?.Id === itemId
+    const isCurrentHlsRequest = isCurrentPlaybackRequest(
+      requestId ?? playbackRequestIdRef.current,
+    )
 
     if (!itemId || !mediaSourceId || !isCurrentHlsRequest()) return
 
@@ -569,11 +575,9 @@ export function useVideoPlayer({
     // cancel this callback, so re-check the playback request/item after every
     // await and drop the reload instead of overwriting the newly loaded
     // item's source.
-    const requestId = playbackRequestIdRef.current
-    const isCurrentReloadRequest = () =>
-      isActiveRef.current &&
-      playbackRequestIdRef.current === requestId &&
-      itemRef.current?.Id === itemId
+    const isCurrentReloadRequest = isCurrentPlaybackRequest(
+      playbackRequestIdRef.current,
+    )
     if (!isCurrentReloadRequest()) return
 
     const activeVideo = getActiveVideoElement()
