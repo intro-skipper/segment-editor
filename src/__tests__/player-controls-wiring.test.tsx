@@ -18,6 +18,7 @@ type PlayerProps = ComponentProps<typeof Player>
 const mocks = vi.hoisted(() => ({
   playerSurfaceProps: [] as Array<unknown>,
   videoPlayerError: null as VideoPlayerError | null,
+  videoPlayerIsRecovering: false,
   setShowVideoPlayer: vi.fn(),
   setPreferredAudioLanguage: vi.fn(),
   setPreferredSubtitleLanguage: vi.fn(),
@@ -102,7 +103,7 @@ vi.mock('@/hooks/use-video-player', () => ({
     strategy: 'direct',
     isLoading: mocks.videoPlayerIsLoading,
     error: mocks.videoPlayerError,
-    isRecovering: false,
+    isRecovering: mocks.videoPlayerIsRecovering,
     retry: mocks.retry,
     reloadHlsWithUrl: vi.fn(),
   }),
@@ -232,6 +233,7 @@ describe('Player controls wiring', () => {
     mocks.videoElement = document.createElement('video')
     mocks.videoRef = { current: mocks.videoElement }
     mocks.videoPlayerError = null
+    mocks.videoPlayerIsRecovering = false
     mocks.trackManagerIsLoading = true
     mocks.videoPlayerIsLoading = true
     mocks.audioSwitchTranscodeScope = 'all'
@@ -289,10 +291,12 @@ describe('Player controls wiring', () => {
       recoverable: true,
     }
     mocks.videoPlayerError = mediaError
+    mocks.videoPlayerIsRecovering = true
     utils.rerender(playerElement())
 
     surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
     expect(surfaceProps.playback.error).toEqual(mediaError)
+    expect(surfaceProps.playback.isRecovering).toBe(true)
     surfaceProps.playback.onRetry()
     expect(mocks.retry).toHaveBeenCalledTimes(1)
   })
