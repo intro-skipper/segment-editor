@@ -21,6 +21,9 @@ export const API_CONFIG = {
   SEGMENT_TIMEOUT_MS: 15000,
 } as const
 
+/** Resize debounce delay in milliseconds. */
+const RESIZE_DEBOUNCE_MS = 100
+
 /**
  * Player configuration constants.
  */
@@ -42,8 +45,14 @@ export const PLAYER_CONFIG = {
   MEDIA_ERROR_SWAP_WINDOW_MS: 3000,
   /** Color extraction timeout in milliseconds */
   COLOR_EXTRACTION_TIMEOUT_MS: 5000,
-  /** Resize debounce delay in milliseconds */
-  RESIZE_DEBOUNCE_MS: 100,
+  RESIZE_DEBOUNCE_MS,
+  /**
+   * Settle delay before measuring the video after a fullscreen transition,
+   * derived from the debounce so the measurement always lands after it, the
+   * transition fires ResizeObserver ticks of its own, and the video must be
+   * measured after the layout stops moving.
+   */
+  FULLSCREEN_RESIZE_DELAY_MS: RESIZE_DEBOUNCE_MS + 50,
   /** Video metadata wait timeout in milliseconds */
   VIDEO_METADATA_TIMEOUT_MS: 15_000,
   /** Fullscreen controls auto-hide delay in milliseconds */

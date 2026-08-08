@@ -124,13 +124,9 @@ function createWrapper() {
   }
 }
 
-function setupMockFetchForSave(savedSegments: Array<MediaSegmentDto>): void {
-  let callIndex = 0
-  jellyfinFetchJsonMock.mockImplementation(() => {
-    const segment = savedSegments[callIndex % savedSegments.length]
-    callIndex++
-    return Promise.resolve(segment)
-  })
+function setupMockFetchForSave(): void {
+  // Create and delete both answer 200 with an empty body, like the real
+  // Intro-Skipper endpoints; the client echoes the posted segment itself.
   jellyfinFetchEmptyMock.mockResolvedValue(undefined)
 }
 
@@ -167,7 +163,7 @@ describe('Segment Save Reload', () => {
           jellyfinFetchEmptyMock.mockClear()
 
           const itemId = segments[0].ItemId
-          setupMockFetchForSave(segments)
+          setupMockFetchForSave()
 
           const { queryClient, wrapper } = createWrapper()
 

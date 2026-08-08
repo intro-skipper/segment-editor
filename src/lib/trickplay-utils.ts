@@ -175,7 +175,10 @@ export function buildTrickplayTileUrl(
   const params = new URLSearchParams()
   params.set('mediaSourceId', mediaSourceId)
   if (apiKey) {
-    params.set('api_key', apiKey)
+    // Modern auth query parameter, matching what buildApiUrl sends for every
+    // other URL-authenticated media request. Jellyfin 12 ignores the legacy
+    // `api_key` form unless EnableLegacyAuthorization is turned back on.
+    params.set('ApiKey', apiKey)
   }
 
   return `${baseUrl}/Videos/${itemId}/Trickplay/${width}/${tileIndex}.jpg?${params.toString()}`

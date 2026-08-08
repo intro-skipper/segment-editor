@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { useEpisodes } from '@/services/items/queries'
-import { useSegments } from '@/services/segments/queries'
+import { NO_ITEMS, useEpisodes } from '@/services/items/queries'
+import { NO_SEGMENTS, useSegments } from '@/services/segments/queries'
 import { useInView } from '@/hooks/use-in-view'
 import { ItemImage } from '@/components/media/ItemImage'
 import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
@@ -115,7 +115,7 @@ function EpisodeSegmentTimeline({
     <div ref={ref} className="mt-2 md:mt-2.5">
       {!isError && (
         <SegmentTimeline
-          segments={segments ?? []}
+          segments={segments ?? NO_SEGMENTS}
           runtimeSeconds={runtimeSeconds}
           isLoading={isPending}
         />
@@ -209,7 +209,7 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
   const navigate = useNavigate({ from: '/series/$itemId' })
 
   const {
-    data: episodes = [],
+    data: episodes = NO_ITEMS,
     isLoading,
     error,
     refetch,

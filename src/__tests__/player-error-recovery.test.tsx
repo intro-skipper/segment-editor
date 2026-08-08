@@ -11,6 +11,7 @@
 
 import { act, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useEffect } from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useVideoPlayer } from '@/hooks/use-video-player'
@@ -110,17 +111,27 @@ vi.mock('@/services/video/transcode-session', () => ({
   stopActiveEncodingKeepalive: vi.fn(),
 }))
 
-/** The hook state Player.tsx renders the overlays from, as of the last render. */
+/** The hook state Player.tsx renders the overlays from, as of the last commit. */
 let latest: ReturnType<typeof useVideoPlayer>
 
 function Harness({ item }: { item: BaseItemDto }) {
-  latest = useVideoPlayer({
+  const player = useVideoPlayer({
     item,
     t: (key: string) => key,
   })
+  // Destructured to a binding before JSX: React Compiler's ref-in-render
+  // validation rejects the inline `player.videoRef` member read, but accepts
+  // a destructured ref passed as a ref prop - the same shape Player.tsx uses.
+  const { videoRef } = player
+
+  // Publish after commit, not during render: render must stay pure, and the
+  // overlays these tests assert on are the ones the committed UI shows.
+  useEffect(() => {
+    latest = player
+  })
 
   return (
-    <video ref={latest.videoRef} muted>
+    <video ref={videoRef} muted>
       <track kind="captions" />
     </video>
   )
@@ -167,6 +178,10 @@ const fatalOtherError = { type: 'otherError', details: 'muxError', fatal: true }
 describe('HLS error recovery overlay lifecycle', () => {
   beforeEach(() => {
     hlsState.instances.length = 0
+    // Only assigned once a render commits, so clear it: a harness that never
+    // commits must fail on `latest`, not assert against the previous test's
+    // (unmounted) player. Also drops that player's video element for the GC.
+    latest = undefined as unknown as ReturnType<typeof useVideoPlayer>
   })
 
   afterEach(() => {

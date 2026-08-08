@@ -11,6 +11,13 @@ import { selectValidAuth, useApiStore } from '@/stores'
 import { segmentsKeys } from './query-keys'
 
 /**
+ * Stable default for an unresolved segments query (`data` while the query is
+ * disabled or loading). An inline `= []` default at the call site allocates a
+ * new array identity every render, defeating memoization keyed on the data.
+ */
+export const NO_SEGMENTS: Array<MediaSegmentDto> = []
+
+/**
  * Options for the useSegments hook.
  */
 interface UseSegmentsOptions {

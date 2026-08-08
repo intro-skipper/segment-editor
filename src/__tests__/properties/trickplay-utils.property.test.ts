@@ -288,7 +288,7 @@ describe('trickplay-utils', () => {
         'source-456',
         'my-api-key',
       )
-      expect(url).toContain('api_key=my-api-key')
+      expect(url).toContain('ApiKey=my-api-key')
       expect(url).toContain('mediaSourceId=source-456')
       expect(url).toContain('/Trickplay/320/5.jpg')
     })

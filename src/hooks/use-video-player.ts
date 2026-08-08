@@ -241,9 +241,14 @@ export function useVideoPlayer({
     void jellyfin.startPlaybackStatus(postCommitStart.positionTicksOverride)
   })
 
+  // Every pendingPostCommitStartRef write is paired with a
+  // setJellyfinSessionIdentity call, so the identity state is the real trigger.
+  // Depending on the derived jellyfinSession object instead would also fire on
+  // a syncEnabled toggle, and re-fire on every render wherever the compiler is
+  // not applied (tests), because that object is rebuilt during render.
   useEffect(() => {
     flushPostCommitStart()
-  }, [jellyfinSession])
+  }, [jellyfinSessionIdentity])
 
   // The hook's staleness invariant, shared by every async flow that mutates
   // playback state: capture the request id when the flow starts, then re-check

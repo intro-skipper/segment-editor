@@ -204,10 +204,10 @@ export function SegmentSlider({
     end: segment.EndTicks ?? 0,
   })
   const stableRangeRef = React.useRef<SegmentRange>(stableRange)
+  // Left null for the sync layout effect below to seed on mount. Writing the
+  // first snapshot during render would leak into fibers React replays or
+  // discards.
   const lastSyncedPropsRef = React.useRef<SegmentSyncSnapshot | null>(null)
-  if (lastSyncedPropsRef.current === null) {
-    lastSyncedPropsRef.current = getSegmentSyncSnapshot(segment)
-  }
   const isDraggingRef = React.useRef<'start' | 'end' | null>(null)
   const pointerCaptureTargetRef = React.useRef<HTMLElement | null>(null)
   const pointerIdRef = React.useRef<number | null>(null)
@@ -299,6 +299,14 @@ export function SegmentSlider({
 
   React.useLayoutEffect(() => {
     if (isDraggingRef.current || activeInputRef.current !== null) return
+
+    // Mount: stableRange and the form above were both initialized from this
+    // same segment, so seed the snapshot instead of syncing. Falling through
+    // would reset the form before first paint, once per slider in the list.
+    if (lastSyncedPropsRef.current === null) {
+      lastSyncedPropsRef.current = getSegmentSyncSnapshot(segment)
+      return
+    }
 
     syncSegmentProps(
       segment,

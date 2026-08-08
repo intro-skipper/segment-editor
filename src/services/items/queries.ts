@@ -1,7 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import type { PagedItemsResult } from '@/services/items/api'
-import type { BaseItemKind, VirtualFolderInfo } from '@/types/jellyfin'
+import type {
+  BaseItemDto,
+  BaseItemKind,
+  VirtualFolderInfo,
+} from '@/types/jellyfin'
 import {
   getAlbums,
   getCollections,
@@ -19,6 +23,13 @@ import {
   itemsKeys,
   seriesKeys,
 } from './query-keys'
+
+/**
+ * Stable default for an unresolved items query (`data` while the query is
+ * disabled or loading). An inline `= []` default at the call site allocates a
+ * new array identity every render, defeating memoization keyed on the data.
+ */
+export const NO_ITEMS: Array<BaseItemDto> = []
 
 interface UseEntityOptions {
   enabled?: boolean

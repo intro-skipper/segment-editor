@@ -37,6 +37,12 @@ interface UseJassubRendererReturn {
 const VIDEO_METADATA_SOFT_TIMEOUT_MS = 15_000
 const VIDEO_METADATA_HARD_TIMEOUT_MS = 60_000
 
+interface PendingResize {
+  timer: ReturnType<typeof setTimeout>
+  /** Timestamp this resize is due to run at, so a later one is never pulled in. */
+  deadline: number
+}
+
 function waitForVideoMetadata(
   video: HTMLVideoElement,
   signal?: AbortSignal,
@@ -108,17 +114,17 @@ function getErrorMessage(error: unknown, t: (key: string) => string): string {
 }
 
 function clearResizeTimer(
-  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  resizeTimerRef: React.MutableRefObject<PendingResize | null>,
 ) {
   if (resizeTimerRef.current) {
-    clearTimeout(resizeTimerRef.current)
+    clearTimeout(resizeTimerRef.current.timer)
     resizeTimerRef.current = null
   }
 }
 
 function teardownJassubRenderer(
   rendererRef: React.MutableRefObject<JassubRendererResult | null>,
-  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  resizeTimerRef: React.MutableRefObject<PendingResize | null>,
 ) {
   clearResizeTimer(resizeTimerRef)
   rendererRef.current?.destroy()
@@ -126,13 +132,23 @@ function teardownJassubRenderer(
 }
 
 function scheduleRendererResize(
-  resizeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  resizeTimerRef: React.MutableRefObject<PendingResize | null>,
   rendererRef: React.MutableRefObject<JassubRendererResult | null>,
   videoRef: React.RefObject<HTMLVideoElement | null>,
   prevVideoRef: React.MutableRefObject<HTMLVideoElement | null>,
+  delayMs: number = PLAYER_CONFIG.RESIZE_DEBOUNCE_MS,
 ) {
-  if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current)
-  resizeTimerRef.current = setTimeout(() => {
+  const deadline = Date.now() + delayMs
+  const pending = resizeTimerRef.current
+
+  // Debounce forward only. A fullscreen transition fires ResizeObserver ticks
+  // while the layout is still animating; letting their shorter delay replace
+  // the pending settle deadline would measure the video mid-transition.
+  if (pending && pending.deadline > deadline) return
+  if (pending) clearTimeout(pending.timer)
+
+  const timer = setTimeout(() => {
+    resizeTimerRef.current = null
     const renderer = rendererRef.current
     if (!renderer) return
 
@@ -148,14 +164,16 @@ function scheduleRendererResize(
     if (video !== prevVideoRef.current) return
 
     try {
-      // resize() posts to the JASSUB web worker — the worker may still reject
+      // resize() posts to the JASSUB web worker, the worker may still reject
       // asynchronously if it reads stale dimensions, so swallow the rejection.
       // The next resize after JASSUB is re-created will recover.
       void Promise.resolve(renderer.instance.resize()).catch(() => {})
     } catch (resizeError) {
       void resizeError
     }
-  }, PLAYER_CONFIG.RESIZE_DEBOUNCE_MS)
+  }, delayMs)
+
+  resizeTimerRef.current = { timer, deadline }
 }
 
 export function useJassubRenderer({
@@ -174,10 +192,12 @@ export function useJassubRenderer({
   const { isActive, isLoading, error } = rendererState
 
   const rendererRef = useRef<JassubRendererResult | null>(null)
+  // Mirrored in refs, not read from props, because setUserOffset below is a
+  // public handler: it runs outside any Effect, so it cannot call an Effect
+  // Event, and its own writes are the newer value until the prop catches up.
   const userOffsetRef = useRef(userOffset)
   const transcodingRef = useRef(transcodingOffsetTicks)
-  const itemRef = useRef(item)
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resizeTimerRef = useRef<PendingResize | null>(null)
   const prevActiveTrackRef = useRef(activeTrack)
   const prevItemIdRef = useRef(item?.Id)
   const prevVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -189,9 +209,6 @@ export function useJassubRenderer({
   useLayoutEffect(() => {
     transcodingRef.current = transcodingOffsetTicks
   }, [transcodingOffsetTicks])
-  useLayoutEffect(() => {
-    itemRef.current = item
-  }, [item])
 
   const itemId = item?.Id
 
@@ -203,6 +220,26 @@ export function useJassubRenderer({
     userOffsetRef.current = offset
     rendererRef.current?.setTimeOffset(transcodingRef.current, offset)
   }
+
+  // `item` and `transcodingOffsetTicks` are read when the renderer is actually
+  // created, not captured when the effect ran. Neither may re-run setup, only
+  // itemId does, but a renderer built from a stale item would carry the wrong
+  // subtitle URLs, so the read has to be non-reactive rather than absent.
+  const createRendererForTrack = useEffectEvent(
+    (
+      video: HTMLVideoElement,
+      track: SubtitleTrackInfo,
+      signal: AbortSignal,
+    ): Promise<JassubRendererResult> =>
+      createJassubRenderer({
+        video,
+        track,
+        item: item!,
+        transcodingOffsetTicks,
+        userOffset: userOffsetRef.current,
+        signal,
+      }),
+  )
 
   const reportInitError = useEffectEvent((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err)
@@ -256,17 +293,11 @@ export function useJassubRenderer({
         ])
 
         if (initTokenRef.current === initToken) {
-          const currentItem = itemRef.current
-          const currentOffset = transcodingRef.current
-
-          const result = await createJassubRenderer({
+          const result = await createRendererForTrack(
             video,
-            track: activeTrack,
-            item: currentItem!,
-            transcodingOffsetTicks: currentOffset,
-            userOffset: userOffsetRef.current,
-            signal: initAbortController.signal,
-          })
+            activeTrack,
+            initAbortController.signal,
+          )
 
           if (initTokenRef.current === initToken) {
             rendererRef.current = result
@@ -298,25 +329,28 @@ export function useJassubRenderer({
     const video = videoRef.current
     if (!video || !isActive || !needsJassubNow) return
 
-    const observer = new ResizeObserver(() => {
+    const schedule = (delayMs?: number) => {
       scheduleRendererResize(
         resizeTimerRef,
         rendererRef,
         videoRef,
         prevVideoRef,
+        delayMs,
       )
+    }
+
+    const observer = new ResizeObserver(() => {
+      schedule()
     })
     observer.observe(video)
 
-    const onFullscreen = () =>
-      setTimeout(() => {
-        scheduleRendererResize(
-          resizeTimerRef,
-          rendererRef,
-          videoRef,
-          prevVideoRef,
-        )
-      }, 150)
+    // Routed through the same resizeTimerRef the cleanup below clears, rather
+    // than a second setTimeout of its own: a fullscreen toggle just before
+    // unmount would otherwise leave a timer this effect no longer owns, which
+    // then allocates a further resize timer after teardown.
+    const onFullscreen = () => {
+      schedule(PLAYER_CONFIG.FULLSCREEN_RESIZE_DELAY_MS)
+    }
     document.addEventListener('fullscreenchange', onFullscreen)
 
     return () => {

@@ -8,6 +8,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useEffect } from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useJellyfinSession } from '@/hooks/use-jellyfin-session'
@@ -168,14 +169,20 @@ function renderAudioFallbackHarness(options?: {
 }) {
   let player!: ReturnType<typeof useVideoPlayer>
   function Harness() {
-    player = useVideoPlayer({
+    const current = useVideoPlayer({
       item: createItem(),
       getInitialAudioStreamIndex: () => 2,
       getCurrentAudioStreamIndex: options?.getCurrentAudioStreamIndex,
       t: (key) => key,
     })
+    const { videoRef } = current
+    // Publish after commit, not during render: reassigning the closed-over
+    // variable in the render body is a side effect the compiler rejects.
+    useEffect(() => {
+      player = current
+    })
     return (
-      <video ref={player.videoRef}>
+      <video ref={videoRef}>
         <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
       </video>
     )
@@ -272,8 +279,9 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         item: createItem(),
         t: (key) => key,
       })
+      const { videoRef } = player
       return (
-        <video ref={player.videoRef}>
+        <video ref={videoRef}>
           <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
         </video>
       )
@@ -332,11 +340,12 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
         jellyfinPlaybackSyncEnabled: true,
         t: (key) => key,
       })
+      const { videoRef } = player
       return (
         <video
           key={player.strategy}
           data-strategy={player.strategy}
-          ref={player.videoRef}
+          ref={videoRef}
         >
           <track kind="captions" label="Captions" src="data:text/vtt,WEBVTT" />
         </video>

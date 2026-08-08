@@ -150,7 +150,7 @@ export function useTrackManager({
   // re-applies on every loadedmetadata, and its own HLS-reload fallback fires
   // one mid-operation. A bare boolean would clear when the FIRST overlapping
   // operation finishes, unlocking the track menu while another is still in
-  // flight — so count acquisitions and only drop the flag at zero. Ref writes
+  // flight, so count acquisitions and only drop the flag at zero. Ref writes
   // happen only inside operations (event/effect contexts), never during
   // render.
   const pendingOperationCountRef = useRef(0)
@@ -218,13 +218,13 @@ export function useTrackManager({
     .map((track) => `${track.index}:${track.codec}:${track.channels}`)
     .join(',')}`
   const probeAudioTrackDecoders = useEffectEvent(
-    async (isStale: () => boolean): Promise<void> => {
+    async (): Promise<AudioDecoderProbeState | null> => {
       if (
         strategy !== 'direct' ||
         audioTracks.length <= 1 ||
         !supportsNativeAudioTrackSwitching()
       ) {
-        return
+        return null
       }
 
       const key = audioProbeKey
@@ -234,20 +234,28 @@ export function useTrackManager({
           decodable: await isAudioTrackDecodable(track),
         })),
       )
-      // A newer probe (or unmount) owns the state now; drop this result.
-      if (isStale()) return
 
       const decodableIndices = new Set<number>()
       for (const result of results) {
         if (result.decodable) decodableIndices.add(result.index)
       }
-      setAudioDecoderProbe({ key, decodableIndices })
+      return { key, decodableIndices }
     },
   )
 
   useEffect(() => {
     let stale = false
-    void probeAudioTrackDecoders(() => stale)
+    probeAudioTrackDecoders()
+      .then((probe) => {
+        // A newer probe (or unmount) owns the state now; drop this result.
+        if (probe !== null && !stale) setAudioDecoderProbe(probe)
+      })
+      // A rejected probe (mediaCapabilities throwing) leaves the static
+      // allowlist as the answer for this item, which is a usable fallback,
+      // but log it instead of dropping it into an unhandled rejection.
+      .catch((probeError: unknown) => {
+        console.error('[TrackManager] Audio decoder probe failed:', probeError)
+      })
     return () => {
       stale = true
     }

@@ -15,7 +15,7 @@ import type {
   SegmentUpdate,
   TimestampUpdate,
 } from '@/types/segment'
-import { useSegments } from '@/services/segments/queries'
+import { NO_SEGMENTS, useSegments } from '@/services/segments/queries'
 import { useBatchSaveSegments } from '@/services/segments/mutations'
 import { useAppStore } from '@/stores/app-store'
 import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
@@ -58,6 +58,51 @@ import { SegmentLoadingState } from '@/components/ui/segment-loading-state'
 const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',
   containIntrinsicSize: '0 280px',
+}
+
+/**
+ * One row of the segment list.
+ *
+ * The row lives inside a `.map()`, which React Compiler cannot cache per item,
+ * so its own component boundary is what gives each row a cache keyed on its
+ * own props. Without it, any list-level change (a new active index, an edit to
+ * one segment) re-renders every SegmentSlider in the list. Props are
+ * destructured rather than spread so the compiler tracks them field by field.
+ */
+function SegmentListRow({
+  segment,
+  index,
+  isActive,
+  runtimeSeconds,
+  frameStepSeconds,
+  onUpdate,
+  onDelete,
+  onEdit,
+  onChangeType,
+  onPlayerTimestamp,
+  onSetActive,
+  getPlayerTime,
+  onCopyAllAsJson,
+}: React.ComponentProps<typeof SegmentSlider>) {
+  return (
+    <div style={SEGMENT_VIRTUALIZATION_STYLE}>
+      <SegmentSlider
+        segment={segment}
+        index={index}
+        isActive={isActive}
+        runtimeSeconds={runtimeSeconds}
+        frameStepSeconds={frameStepSeconds}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onEdit={onEdit}
+        onChangeType={onChangeType}
+        onPlayerTimestamp={onPlayerTimestamp}
+        onSetActive={onSetActive}
+        getPlayerTime={getPlayerTime}
+        onCopyAllAsJson={onCopyAllAsJson}
+      />
+    </div>
+  )
 }
 
 /** Pre-computed platform-aware shortcut display for the save button title */
@@ -222,7 +267,7 @@ function useRenderPlayerEditor({
 
   const batchSaveMutation = useBatchSaveSegments()
 
-  const { data: serverSegments = [], isLoading: isLoadingSegments } =
+  const { data: serverSegments = NO_SEGMENTS, isLoading: isLoadingSegments } =
     useSegments(item.Id ?? '', {
       enabled: fetchSegments && !!item.Id,
     })
@@ -408,7 +453,11 @@ function useRenderPlayerEditor({
   }
 
   const handleRequestDeleteSegment = (index: number) => {
-    const segment = editingSegments[index] as MediaSegmentDto | undefined
+    // Read via the ref: reading `editingSegments` here would give the handler a
+    // new identity on every edit, cache-missing every SegmentListRow below.
+    const segment = editingSegmentsRef.current[index] as
+      | MediaSegmentDto
+      | undefined
     if (segment === undefined) return
     setPendingDelete({ id: segment.Id, type: segment.Type, index })
   }
@@ -434,6 +483,13 @@ function useRenderPlayerEditor({
       () => setPlayerTimestamp(undefined),
       100,
     )
+  }
+
+  const handleSetActiveIndex = (nextActiveIndex: number) => {
+    setEditingState((previous) => ({
+      ...previous,
+      activeIndex: nextActiveIndex,
+    }))
   }
 
   const handleOpenEditDialog = (index: number) => {
@@ -718,28 +774,22 @@ function useRenderPlayerEditor({
         ) : (
           <div className="space-y-3 pb-2">
             {editingSegments.map((segment, index) => (
-              <div key={segment.Id} style={SEGMENT_VIRTUALIZATION_STYLE}>
-                <SegmentSlider
-                  segment={segment}
-                  index={index}
-                  isActive={index === activeIndex}
-                  runtimeSeconds={runtimeSeconds}
-                  frameStepSeconds={frameStepSeconds}
-                  onUpdate={handleUpdateSegment}
-                  onDelete={handleRequestDeleteSegment}
-                  onEdit={handleOpenEditDialog}
-                  onChangeType={handleChangeSegmentType}
-                  onPlayerTimestamp={handlePlayerTimestamp}
-                  onSetActive={(nextActiveIndex) =>
-                    setEditingState((previous) => ({
-                      ...previous,
-                      activeIndex: nextActiveIndex,
-                    }))
-                  }
-                  getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
-                  onCopyAllAsJson={handleCopyAllAsJson}
-                />
-              </div>
+              <SegmentListRow
+                key={segment.Id}
+                segment={segment}
+                index={index}
+                isActive={index === activeIndex}
+                runtimeSeconds={runtimeSeconds}
+                frameStepSeconds={frameStepSeconds}
+                onUpdate={handleUpdateSegment}
+                onDelete={handleRequestDeleteSegment}
+                onEdit={handleOpenEditDialog}
+                onChangeType={handleChangeSegmentType}
+                onPlayerTimestamp={handlePlayerTimestamp}
+                onSetActive={handleSetActiveIndex}
+                getPlayerTime={showVideoPlayer ? getPlayerTime : undefined}
+                onCopyAllAsJson={handleCopyAllAsJson}
+              />
             ))}
           </div>
         )}

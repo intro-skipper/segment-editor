@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { useEpisodes, useSeasons } from '@/services/items/queries'
+import { NO_ITEMS, useEpisodes, useSeasons } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
 import {
@@ -354,11 +354,11 @@ export default function EpisodeSwitcher({
   const [overrideSeasonId, setOverrideSeasonId] = useState<string | null>(null)
   const selectedSeasonId = overrideSeasonId ?? currentSeasonId ?? null
 
-  const { data: seasons = [] } = useSeasons(seriesId ?? '', {
+  const { data: seasons = NO_ITEMS } = useSeasons(seriesId ?? '', {
     enabled: open && !!seriesId,
   })
   const {
-    data: episodes = [],
+    data: episodes = NO_ITEMS,
     isLoading,
     isError,
   } = useEpisodes(seriesId ?? '', selectedSeasonId ?? '', {

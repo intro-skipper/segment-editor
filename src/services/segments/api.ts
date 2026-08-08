@@ -14,7 +14,7 @@ import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { RetryOptions } from '@/lib/retry-utils'
 import type { ApiOptions } from '@/services/jellyfin'
 import { getRequestConfig, withApi } from '@/services/jellyfin'
-import { jellyfinFetchEmpty, jellyfinFetchJson } from '@/services/jellyfin/http'
+import { jellyfinFetchEmpty } from '@/services/jellyfin/http'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
 import { API_CONFIG } from '@/lib/constants'
@@ -130,19 +130,26 @@ async function createSegment(
     const query = new URLSearchParams({
       providerId: DEFAULT_SEGMENT_PROVIDER_ID,
     })
+    // Built once outside the retry so every attempt posts the same payload
+    // (toServerSegment generates an Id when the segment has none).
+    const serverSegment = toServerSegment(segment)
 
     return withSegmentRetry(async () => {
-      const data = await jellyfinFetchJson<MediaSegmentDto>({
+      // Intro-Skipper's create endpoint replies 200 with an empty body, so
+      // the created segment cannot be read from the response. Echo back what
+      // was posted - the endpoint is create-or-replace, so that is exactly
+      // what the server stored.
+      await jellyfinFetchEmpty({
         accessToken: apis.api.accessToken,
         baseUrl: apis.api.basePath,
-        body: toServerSegment(segment),
+        body: serverSegment,
         endpoint,
         method: 'POST',
         query,
         signal: options?.signal,
         timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
       })
-      return toUiSegment(data)
+      return toUiSegment(serverSegment)
     }, options)
   }, options)
 
