@@ -179,12 +179,9 @@ export function useTrackManager({
     })),
   )
 
-  const { audioTracks, subtitleTracks } = (() => {
-    if (!item) {
-      return { audioTracks: [], subtitleTracks: [] }
-    }
-    return extractTracks(item)
-  })()
+  // Identity-stable per item: extractTracks caches its result on the item
+  // object, which the JASSUB init effect depends on (see tracks.ts).
+  const { audioTracks, subtitleTracks } = extractTracks(item)
 
   const itemId = item?.Id ?? undefined
 

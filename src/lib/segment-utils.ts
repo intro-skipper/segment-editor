@@ -11,6 +11,29 @@ export const sortSegmentsByStart = (
   b: MediaSegmentDto,
 ): number => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)
 
+const sortedSegmentsCache = new WeakMap<
+  Array<MediaSegmentDto>,
+  Array<MediaSegmentDto>
+>()
+
+/**
+ * Identity-stable sorted view: the same input array always returns the same
+ * sorted array. React Compiler 1.0.0 does not cache `.toSorted()` calls in
+ * compiled components (verified in its emitted output), and PlayerEditor's
+ * row handlers key on the result's identity - a fresh array per render
+ * cache-missed every SegmentListRow. Safe because query data is immutable
+ * (TanStack structural sharing keeps the input array's identity per fetch).
+ */
+export const getSegmentsSortedByStart = (
+  segments: Array<MediaSegmentDto>,
+): Array<MediaSegmentDto> => {
+  const cached = sortedSegmentsCache.get(segments)
+  if (cached) return cached
+  const sorted = segments.toSorted(sortSegmentsByStart)
+  sortedSegmentsCache.set(segments, sorted)
+  return sorted
+}
+
 const compareStrings = (a: string, b: string): number =>
   a < b ? -1 : a > b ? 1 : 0
 

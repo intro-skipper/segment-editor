@@ -223,16 +223,34 @@ export function findPreferredAudioStreamIndex(
  * // subtitleTracks[0].index = 3, subtitleTracks[0].relativeIndex = 0
  * ```
  */
+const EMPTY_TRACK_RESULT: TrackExtractionResult = {
+  audioTracks: [],
+  subtitleTracks: [],
+}
+
+/**
+ * Cache keyed on the item object, so the same item always yields the same
+ * result object. Callers key effects and memoization on the returned track
+ * identities, and React Compiler 1.0.0 does not cache this call in compiled
+ * hooks/components (verified in its emitted output) - re-extracting per
+ * render re-created the JASSUB renderer in a loop. Do not remove without
+ * re-verifying that compiled callers cache the call themselves.
+ */
+const trackExtractionCache = new WeakMap<
+  Pick<BaseItemDto, 'MediaSources'>,
+  TrackExtractionResult
+>()
+
 export function extractTracks(
   item: Pick<BaseItemDto, 'MediaSources'> | null | undefined,
 ): TrackExtractionResult {
-  const emptyResult: TrackExtractionResult = {
-    audioTracks: [],
-    subtitleTracks: [],
+  if (!item?.MediaSources?.length) {
+    return EMPTY_TRACK_RESULT
   }
 
-  if (!item?.MediaSources?.length) {
-    return emptyResult
+  const cached = trackExtractionCache.get(item)
+  if (cached) {
+    return cached
   }
 
   // Use the first media source (primary source)
@@ -256,7 +274,9 @@ export function extractTracks(
     }
   }
 
-  return { audioTracks, subtitleTracks }
+  const result: TrackExtractionResult = { audioTracks, subtitleTracks }
+  trackExtractionCache.set(item, result)
+  return result
 }
 
 /**

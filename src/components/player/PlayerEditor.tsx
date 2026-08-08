@@ -23,6 +23,7 @@ import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import {
   areSegmentListsEqual,
   generateUUID,
+  getSegmentsSortedByStart,
   resolveSegmentIndex,
   sortSegmentsByStart,
 } from '@/lib/segment-utils'
@@ -272,7 +273,10 @@ function useRenderPlayerEditor({
       enabled: fetchSegments && !!item.Id,
     })
 
-  const sortedServerSegments = serverSegments.toSorted(sortSegmentsByStart)
+  // Identity-stable per query result: a fresh `.toSorted()` array each
+  // render would give updateEditingSegments (and so every row handler) a new
+  // identity, cache-missing every SegmentListRow (see segment-utils.ts).
+  const sortedServerSegments = getSegmentsSortedByStart(serverSegments)
 
   const [{ localEditingSegments, activeIndex }, setEditingState] =
     React.useState<EditingState>({
