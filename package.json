@@ -31,7 +31,7 @@
     "hls.js": "^1.6.16",
     "i18next": "^26.3.6",
     "jassub": "2.5.11",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.28.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.11",
