@@ -11,7 +11,6 @@ import {
   getHlsSegmentApi,
   getLibraryApi,
   getLibraryStructureApi,
-  getMediaSegmentsApi,
   getPlaystateApi,
   getPluginsApi,
   getSearchApi,
@@ -170,7 +169,6 @@ function createTypedApis(api: Api): TypedApis {
     videosApi: getVideosApi(api),
     tvShowsApi: getTvShowsApi(api),
     pluginsApi: getPluginsApi(api),
-    mediaSegmentsApi: getMediaSegmentsApi(api),
     searchApi: getSearchApi(api),
     playstateApi: getPlaystateApi(api),
   }

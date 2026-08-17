@@ -11,7 +11,6 @@ import type {
   getLibraryApi,
   getLibraryStructureApi,
   getHlsSegmentApi,
-  getMediaSegmentsApi,
   getPlaystateApi,
   getPluginsApi,
   getSearchApi,
@@ -41,7 +40,6 @@ export interface TypedApis {
   videosApi: ReturnType<typeof getVideosApi>
   tvShowsApi: ReturnType<typeof getTvShowsApi>
   pluginsApi: ReturnType<typeof getPluginsApi>
-  mediaSegmentsApi: ReturnType<typeof getMediaSegmentsApi>
   searchApi: ReturnType<typeof getSearchApi>
   playstateApi: ReturnType<typeof getPlaystateApi>
 }

@@ -651,8 +651,13 @@ const server = http.createServer(async (req, res) => {
     return json(res, { Items: segs, TotalRecordCount: segs.length })
   }
 
-  // Segment provider write API (intro-skipper style)
+  // Segment editor API (intro-skipper style). The editor reads here rather than through
+  // /MediaSegments, whose response the real server shapes for playback.
   m = /^\/MediaSegmentsApi\/([0-9a-f-]+)$/i.exec(p)
+  if (m && req.method === 'GET') {
+    const segs = segmentsByItem.get(m[1].replace(/-/g, '')) ?? []
+    return json(res, { Items: segs, TotalRecordCount: segs.length })
+  }
   if (m && req.method === 'POST') {
     let body = ''
     req.on('data', (c) => (body += c))

@@ -13,8 +13,8 @@
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { RetryOptions } from '@/lib/retry-utils'
 import type { ApiOptions } from '@/services/jellyfin'
-import { getRequestConfig, withApi } from '@/services/jellyfin'
-import { jellyfinFetchEmpty } from '@/services/jellyfin/http'
+import { withApi } from '@/services/jellyfin'
+import { jellyfinFetchEmpty, jellyfinFetchJson } from '@/services/jellyfin/http'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
 import { generateUUID } from '@/lib/segment-utils'
 import { API_CONFIG } from '@/lib/constants'
@@ -95,6 +95,13 @@ const withSegmentRetry = <T>(
   options?: ApiOptions,
 ): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
+/**
+ * Reads an item's segments through Intro-Skipper's editor endpoint rather than Jellyfin's
+ * `/MediaSegments/{itemId}`. The core endpoint shapes its response for playback: Intro-Skipper's
+ * first-episode filter strips intros from season premieres, and Jellyfin hides segments whose
+ * provider the library has disabled. Authoring needs the stored truth, so it must not read a
+ * response that has been filtered for players.
+ */
 export async function getSegmentsById(
   itemId: string,
   options?: ApiOptions,
@@ -102,10 +109,14 @@ export async function getSegmentsById(
   if (!itemId) return []
 
   const result = await withApi(async (apis) => {
-    const { data } = await apis.mediaSegmentsApi.getItemSegments(
-      { itemId },
-      getRequestConfig(options, API_CONFIG.SEGMENT_TIMEOUT_MS),
-    )
+    const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
+      accessToken: apis.api.accessToken,
+      baseUrl: apis.api.basePath,
+      endpoint: buildSegmentEndpoint(encodeUrlParam(itemId)),
+      method: 'GET',
+      signal: options?.signal,
+      timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+    })
     const segments = data.Items ?? []
 
     const validation = MediaSegmentArraySchema.safeParse(segments)

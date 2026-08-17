@@ -26,7 +26,6 @@ const mockApis = {
   imageApi: {},
   videosApi: {},
   pluginsApi: {},
-  mediaSegmentsApi: {},
   systemApi: {},
   api: {
     accessToken: 'test-token',

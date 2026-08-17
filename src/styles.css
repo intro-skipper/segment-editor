@@ -644,13 +644,15 @@ body {
   transform: translate(-50%, -50%);
 }
 
+/* Deliberately no will-change here: these transitions only run for
+   --duration-fast on hover/active, but will-change would hold a compositor
+   layer for both handles of every segment slider for the whole session. */
 .segment-handle-visual {
   transition:
     filter var(--duration-fast) var(--ease-out-expo),
     box-shadow var(--duration-fast) ease,
     transform var(--duration-fast) ease;
   border-radius: 2px;
-  will-change: transform, filter;
 }
 
 .segment-handle:hover + .segment-handle-visual {
@@ -732,25 +734,44 @@ kbd {
   box-shadow: 0 1px 0 var(--border);
 }
 
-/* Loading skeleton shimmer */
+/* Loading skeleton shimmer. The sweep animates transform on a composited
+   ::after overlay; animating background-position instead repaints the whole
+   element every frame, and this animation is infinite so that cost never
+   stops. */
 @keyframes skeleton-shimmer {
-  0% {
-    background-position: -200% 0;
+  from {
+    transform: translateX(-100%);
   }
-  100% {
-    background-position: 200% 0;
+  to {
+    transform: translateX(100%);
   }
 }
 
 .skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    var(--muted) 25%,
-    oklch(from var(--muted) calc(l + 0.05) c h) 50%,
-    var(--muted) 75%
+    transparent,
+    oklch(from var(--muted) calc(l + 0.05) c h),
+    transparent
   );
-  background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* The global reduced-motion rule clamps animations to a single 0.01ms run,
+   which would park the highlight mid-element. Drop the sweep entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer::after {
+    content: none;
+  }
 }
 
 /* Video player aspect ratio container */
