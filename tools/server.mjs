@@ -651,12 +651,14 @@ const server = http.createServer(async (req, res) => {
     return json(res, { Items: segs, TotalRecordCount: segs.length })
   }
 
-  // Segment editor API (intro-skipper style). The editor reads here rather than through
-  // /MediaSegments, whose response the real server shapes for playback.
+  // Segment editor API (intro-skipper style). Writes only, mirroring every released plugin:
+  // the route is registered for POST and DELETE, so a GET answers 405. Serving a GET here
+  // instead let commit 3a3de4e point the editor's read at a route no real server has
+  // (segment-editor-plugin issue #17). The unfiltered editor read arrives with Phase 1 of
+  // docs/plans/plugin-api-integration.md, which specifies a bare EditorSegmentDto[] body.
   m = /^\/MediaSegmentsApi\/([0-9a-f-]+)$/i.exec(p)
   if (m && req.method === 'GET') {
-    const segs = segmentsByItem.get(m[1].replace(/-/g, '')) ?? []
-    return json(res, { Items: segs, TotalRecordCount: segs.length })
+    return json(res, { error: 'Method Not Allowed' }, 405)
   }
   if (m && req.method === 'POST') {
     let body = ''

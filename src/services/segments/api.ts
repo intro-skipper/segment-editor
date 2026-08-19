@@ -85,9 +85,13 @@ const validateForDelete = (segment: MediaSegmentDto): boolean => {
 // API Operations (Using withApi Pattern Consistently)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Builds segment API endpoint path with proper encoding */
+/** Builds the Intro-Skipper write endpoint path with proper encoding */
 const buildSegmentEndpoint = (path: string): string =>
   `MediaSegmentsApi/${path}`
+
+/** Builds Jellyfin's core segment endpoint path (reads only; writes go to the plugin) */
+const buildCoreSegmentEndpoint = (path: string): string =>
+  `MediaSegments/${path}`
 
 /** Executes segment mutation with retry logic */
 const withSegmentRetry = <T>(
@@ -96,11 +100,18 @@ const withSegmentRetry = <T>(
 ): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
 /**
- * Reads an item's segments through Intro-Skipper's editor endpoint rather than Jellyfin's
- * `/MediaSegments/{itemId}`. The core endpoint shapes its response for playback: Intro-Skipper's
- * first-episode filter strips intros from season premieres, and Jellyfin hides segments whose
- * provider the library has disabled. Authoring needs the stored truth, so it must not read a
- * response that has been filtered for players.
+ * Reads an item's segments from Jellyfin's core endpoint.
+ *
+ * That response is shaped for playback: Intro-Skipper's first-episode filter strips intros from
+ * season premieres, and Jellyfin hides segments whose provider the library has disabled, so a
+ * saved premiere intro is invisible here (segment-editor-plugin issue #16).
+ *
+ * Reading Intro-Skipper's unfiltered `GET MediaSegmentsApi/{itemId}` instead is Phase 1 of
+ * docs/plans/plugin-api-integration.md and waits on the Phase 0 capability probe. Two traps make
+ * the swap unsafe without it: no released plugin serves that route, so it answers 405 and every
+ * read fails (issue #17), and the implementation on the plugin's `expand-segment-editor-workflows`
+ * branch returns a bare array rather than this `{ Items }` envelope, which would parse as zero
+ * segments and feed an empty delete baseline into `batchSaveSegments`.
  */
 export async function getSegmentsById(
   itemId: string,
@@ -112,7 +123,7 @@ export async function getSegmentsById(
     const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
       accessToken: apis.api.accessToken,
       baseUrl: apis.api.basePath,
-      endpoint: buildSegmentEndpoint(encodeUrlParam(itemId)),
+      endpoint: buildCoreSegmentEndpoint(encodeUrlParam(itemId)),
       method: 'GET',
       signal: options?.signal,
       timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
