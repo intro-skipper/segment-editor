@@ -107,10 +107,12 @@ describe('jellyfin http helper', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       (_url, init) =>
         new Promise((_resolve, reject) => {
-          const signal = init?.signal as AbortSignal | undefined
-          signal?.addEventListener('abort', () => reject(signal.reason), {
-            once: true,
-          })
+          const signal = init?.signal
+          if (signal instanceof AbortSignal) {
+            signal.addEventListener('abort', () => reject(signal.reason), {
+              once: true,
+            })
+          }
         }),
     )
 

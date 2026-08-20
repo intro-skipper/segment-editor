@@ -25,10 +25,17 @@ function buildUrl(baseUrl: string, endpoint: string, query?: URLSearchParams) {
   return `${base}/${path}${qs ? `?${qs}` : ''}`
 }
 
+/** An abort signal for one request, plus its teardown and timeout verdict. */
+interface RequestSignal {
+  signal?: AbortSignal
+  cleanup: () => void
+  didTimeout: () => boolean
+}
+
 function createRequestSignal(
   callerSignal: AbortSignal | undefined,
   timeout: number | undefined,
-): { signal?: AbortSignal; cleanup: () => void; didTimeout: () => boolean } {
+): RequestSignal {
   if (!callerSignal && timeout == null) {
     return { cleanup: () => {}, didTimeout: () => false }
   }
@@ -70,6 +77,9 @@ async function readJson<T>(response: Response): Promise<T> {
   }
 
   try {
+    // SAFETY: the response body is unvalidated here by design — `T` is the
+    // shape the calling service declares, and each caller validates it with
+    // its own schema before the value reaches the rest of the app.
     return JSON.parse(text) as T
   } catch (error) {
     throw new AppError(
@@ -108,7 +118,11 @@ async function jellyfinRequest<T>(options: RequestOptions): Promise<T> {
     )
 
     if (!response.ok) throw AppError.fromStatus(response.status)
-    if (!expectJson) return undefined as T
+    if (!expectJson) {
+      // SAFETY: callers that pass `expectJson: false` declare `T` as void or
+      // undefined, because these Jellyfin endpoints answer with an empty body.
+      return undefined as T
+    }
 
     return await readJson<T>(response)
   } catch (error) {

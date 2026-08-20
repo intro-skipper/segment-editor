@@ -28,7 +28,7 @@ interface UseInitialAudioSelectionOptions {
   /** Receives the index the application targeted and its outcome; on failure
    * the element is still playing the container default track */
   onResult: (index: number, result: TrackSwitchResult) => void
-  onCaughtError: (err: unknown) => void
+  onCaughtError: (cause: unknown) => void
 }
 
 /**

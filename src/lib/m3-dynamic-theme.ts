@@ -54,7 +54,7 @@ export function buildDynamicThemeVars(
     hexFromArgb(role.getArgb(scheme))
   const M = MaterialDynamicColors
 
-  const vars: DynamicThemeVars = {
+  const vars = {
     '--background': color(M.surface),
     '--foreground': color(M.onSurface),
     '--card': color(M.surfaceContainerLow),
@@ -72,7 +72,7 @@ export function buildDynamicThemeVars(
     '--border': color(M.outlineVariant),
     '--input': color(M.outlineVariant),
     '--ring': color(M.primary),
-  }
+  } satisfies DynamicThemeVars
 
   schemeCache.set(key, vars)
   return vars

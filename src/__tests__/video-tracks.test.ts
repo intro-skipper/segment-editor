@@ -4,6 +4,29 @@ import {
   extractTracks,
   findPreferredAudioStreamIndex,
 } from '@/services/video/tracks'
+import type { BaseItemDto } from '@/types/jellyfin'
+
+/**
+ * One media stream as Jellyfin actually sends it. The generated client type
+ * declares Index, IsDefault and IsExternal as plain optionals, but the server
+ * emits explicit nulls for them.
+ */
+interface WireMediaStream {
+  Type?: string | null
+  Index?: number | null
+  Language?: string | null
+  DisplayTitle?: string | null
+  Codec?: string | null
+  Channels?: number | null
+  IsDefault?: boolean | null
+  IsExternal?: boolean | null
+  DeliveryUrl?: string | null
+}
+
+/** The slice of an item carrying those streams. */
+interface WireItem {
+  MediaSources?: Array<{ MediaStreams?: Array<WireMediaStream> | null }> | null
+}
 
 describe('extractTracks null-tolerant Jellyfin input', () => {
   it('returns empty tracks for missing, null, or empty media sources', () => {
@@ -33,7 +56,7 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
   })
 
   it('normalizes nullable stream fields and DeliveryUrl null', () => {
-    const result = extractTracks({
+    const item: WireItem = {
       MediaSources: [
         {
           MediaStreams: [
@@ -59,7 +82,12 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
           ],
         },
       ],
-    } as unknown as Parameters<typeof extractTracks>[0])
+    }
+
+    // SAFETY: the server sends explicit nulls for Index, IsDefault and
+    // IsExternal, which the generated client type declares as plain optionals;
+    // normalising those nulls is exactly what this test covers.
+    const result = extractTracks(item as BaseItemDto)
 
     expect(result.audioTracks).toEqual([
       {

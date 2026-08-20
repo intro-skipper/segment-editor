@@ -129,9 +129,9 @@ function SegmentEditDialogContent({
   }
 
   React.useLayoutEffect(() => {
-    triggerRef.current = open
-      ? (document.activeElement as HTMLElement)
-      : triggerRef.current
+    const active = document.activeElement
+    triggerRef.current =
+      open && active instanceof HTMLElement ? active : triggerRef.current
   }, [open])
 
   const handleSave = () => {
@@ -205,9 +205,12 @@ function SegmentEditDialogContent({
                   <div className="sm:col-span-3">
                     <Select
                       value={String(field.state.value)}
-                      onValueChange={(value) =>
-                        value && field.handleChange(value as MediaSegmentType)
-                      }
+                      onValueChange={(value) => {
+                        // The Select renders only SEGMENT_TYPES, so matching
+                        // recovers the domain type without asserting it.
+                        const type = SEGMENT_TYPES.find((it) => it === value)
+                        if (type) field.handleChange(type)
+                      }}
                     >
                       <SelectTrigger id="segment-type">
                         <SelectValue />

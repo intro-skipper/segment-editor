@@ -5,6 +5,10 @@
  * Tokens, API keys, and other sensitive data are never exposed in error messages.
  */
 
+import { z } from 'zod'
+
+import { lookup } from './utils'
+
 import type { ErrorInfo } from 'react'
 import type { ZodError } from 'zod'
 
@@ -58,48 +62,72 @@ const NETWORK_CODES = new Set([
   'ERR_NETWORK',
 ])
 
-const getProp = <T>(e: unknown, key: string): T | undefined =>
-  e && typeof e === 'object' && key in e
-    ? (e as Record<string, T>)[key]
-    : undefined
+/**
+ * The diagnostic fields HTTP clients and the platform attach to thrown values.
+ * Every field falls back to undefined so one off-type field cannot discard the
+ * others. Decoding is not free, so the entry points below decode once and
+ * thread the result through every predicate.
+ */
+const ThrownErrorSchema = z.object({
+  code: z.string().optional().catch(undefined),
+  status: z.number().optional().catch(undefined),
+  response: z
+    .object({ status: z.number().optional().catch(undefined) })
+    .optional()
+    .catch(undefined),
+})
 
-const getCode = (e: unknown) => getProp<string>(e, 'code')
-const getStatus = (e: unknown) =>
-  getProp<{ status?: number }>(e, 'response')?.status ??
-  getProp<number>(e, 'status')
+type ThrownError = z.infer<typeof ThrownErrorSchema>
 
-export const isAbortError = (e: unknown): boolean =>
-  (e instanceof DOMException && e.name === 'AbortError') ||
-  getCode(e) === 'ERR_CANCELED'
+/** A caught value carrying none of the fields we know how to read. */
+const OPAQUE_THROWN: ThrownError = {}
 
-const isTimeoutError = (e: unknown): boolean => getCode(e) === 'ECONNABORTED'
-
-const isNetworkError = (e: unknown): boolean => {
-  const code = getCode(e)
-  return typeof code === 'string' && NETWORK_CODES.has(code)
+/** Decodes a caught value into the error fields this module understands. */
+const parseThrown = (cause: unknown): ThrownError => {
+  const parsed = ThrownErrorSchema.safeParse(cause)
+  return parsed.success ? parsed.data : OPAQUE_THROWN
 }
 
-export const isRecoverableError = (e: unknown): boolean => {
-  if (isAbortError(e)) return false
+/** Axios reports the status on a nested response; fetch wrappers hoist it. */
+const getStatus = (thrown: ThrownError): number | undefined =>
+  thrown.response?.status ?? thrown.status
 
-  const status = getStatus(e)
+const isAborted = (cause: unknown, thrown: ThrownError): boolean =>
+  (cause instanceof DOMException && cause.name === 'AbortError') ||
+  thrown.code === 'ERR_CANCELED'
+
+const isTimeout = (thrown: ThrownError): boolean =>
+  thrown.code === 'ECONNABORTED'
+
+const isNetwork = (thrown: ThrownError): boolean =>
+  thrown.code !== undefined && NETWORK_CODES.has(thrown.code)
+
+const isRecoverable = (cause: unknown, thrown: ThrownError): boolean => {
+  if (isAborted(cause, thrown)) return false
+
+  const status = getStatus(thrown)
   if (status !== undefined) return status >= 500 || status === 429
 
-  const code = getCode(e)
-  if (code === ErrorCodes.TIMEOUT || code === ErrorCodes.NETWORK_ERROR) {
+  if (
+    thrown.code === ErrorCodes.TIMEOUT ||
+    thrown.code === ErrorCodes.NETWORK_ERROR
+  ) {
     return true
   }
 
-  if (isTimeoutError(e) || isNetworkError(e)) return true
+  if (isTimeout(thrown) || isNetwork(thrown)) return true
 
-  return e instanceof AppError && e.recoverable === true
+  return cause instanceof AppError && cause.recoverable
 }
 
+export const isAbortError = (cause: unknown): boolean =>
+  isAborted(cause, parseThrown(cause))
+
+export const isRecoverableError = (cause: unknown): boolean =>
+  isRecoverable(cause, parseThrown(cause))
+
 // HTTP status mapping
-const STATUS_MAP: Record<
-  number,
-  { code: ErrorCode; message: string; recoverable: boolean }
-> = {
+const STATUS_MAP = {
   401: {
     code: ErrorCodes.UNAUTHORIZED,
     message: 'Authentication required',
@@ -120,7 +148,10 @@ const STATUS_MAP: Record<
     message: 'Too many requests',
     recoverable: true,
   },
-}
+} satisfies Record<
+  number,
+  { code: ErrorCode; message: string; recoverable: boolean }
+>
 
 export class AppError extends Error {
   readonly name = 'AppError'
@@ -130,64 +161,66 @@ export class AppError extends Error {
     public readonly code: ErrorCode,
     public readonly recoverable = false,
     public readonly status?: number,
-    public readonly originalError?: unknown,
+    cause?: unknown,
   ) {
-    super(message)
+    super(message, { cause })
   }
 
-  static from(error: unknown, context?: string): AppError {
-    if (error instanceof AppError) return error
+  static from(cause: unknown, context?: string): AppError {
+    if (cause instanceof AppError) return cause
 
-    if (isAbortError(error))
+    // Decoded once here and threaded through every check below; `from` runs on
+    // every retry decision, so a parse per predicate is not affordable.
+    const thrown = parseThrown(cause)
+
+    if (isAborted(cause, thrown))
       return new AppError(
         'Request cancelled',
         ErrorCodes.CANCELLED,
         false,
         undefined,
-        error,
+        cause,
       )
-    if (isTimeoutError(error))
+    if (isTimeout(thrown))
       return new AppError(
         'Request timed out',
         ErrorCodes.TIMEOUT,
         true,
         undefined,
-        error,
+        cause,
       )
-    if (isNetworkError(error))
+    if (isNetwork(thrown))
       return new AppError(
         'Network connection failed',
         ErrorCodes.NETWORK_ERROR,
         true,
         undefined,
-        error,
+        cause,
       )
 
-    const status = getStatus(error)
-    if (status !== undefined) return AppError.fromStatus(status, error)
+    const status = getStatus(thrown)
+    if (status !== undefined) return AppError.fromStatus(status, cause)
 
     // Security: Sanitize error message to prevent credential leakage
-    const msg = getErrorMessage(error)
+    const msg = getErrorMessage(cause)
     return new AppError(
       context ? `${context}: ${msg}` : msg,
       ErrorCodes.UNKNOWN,
-      isRecoverableError(error),
+      isRecoverable(cause, thrown),
       undefined,
-      error,
+      cause,
     )
   }
 
-  static fromStatus(status: number, originalError?: unknown): AppError {
-    const mapped = STATUS_MAP[status] as
-      | (typeof STATUS_MAP)[keyof typeof STATUS_MAP]
-      | undefined
+  static fromStatus(status: number, cause?: unknown): AppError {
+    const mapped = lookup(STATUS_MAP, status)
     if (mapped)
       return new AppError(
         mapped.message,
         mapped.code,
         mapped.recoverable,
         status,
-        originalError,
+        cause,
       )
     if (status >= 500)
       return new AppError(
@@ -195,7 +228,7 @@ export class AppError extends Error {
         ErrorCodes.SERVER_ERROR,
         true,
         status,
-        originalError,
+        cause,
       )
     if (status >= 400)
       return new AppError(
@@ -203,14 +236,14 @@ export class AppError extends Error {
         ErrorCodes.VALIDATION_ERROR,
         false,
         status,
-        originalError,
+        cause,
       )
     return new AppError(
       'Unexpected response',
       ErrorCodes.UNKNOWN,
       false,
       status,
-      originalError,
+      cause,
     )
   }
 
@@ -220,12 +253,12 @@ export class AppError extends Error {
     new AppError('API not available', ErrorCodes.API_UNAVAILABLE, true)
 }
 
-const getErrorMessage = (error: unknown): string => {
+const getErrorMessage = (cause: unknown): string => {
   const rawMessage =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
+    cause instanceof Error
+      ? cause.message
+      : typeof cause === 'string'
+        ? cause
         : 'An unexpected error occurred'
   // Security: Sanitize error message to prevent credential leakage
   return sanitizeErrorMessage(rawMessage)
@@ -237,7 +270,6 @@ const getErrorMessage = (error: unknown): string => {
 
 interface ErrorLogContext {
   component?: string
-  context?: Record<string, unknown>
   action?: string
   severity?: 'low' | 'medium' | 'high' | 'critical'
 }

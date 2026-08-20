@@ -11,15 +11,18 @@ import {
   useConnectionValidationStore,
   usePluginMode,
 } from '@/hooks/use-connection-init'
+import type * as JellyfinModule from '@/services/jellyfin'
 import { useApiStore } from '@/stores/api-store'
 
-const testConnectionWithCredentials = vi.fn()
+// Hoisted so the vi.mock factory below, which runs first, can reference it.
+const testConnectionWithCredentials = vi.hoisted(() =>
+  vi.fn<typeof JellyfinModule.testConnectionWithCredentials>(),
+)
 
 vi.mock('@/services/jellyfin', () => ({
   getPluginCredentials: () => null,
   isPluginMode: () => false,
-  testConnectionWithCredentials: (...args: Array<unknown>): Promise<unknown> =>
-    testConnectionWithCredentials(...args) as never,
+  testConnectionWithCredentials,
 }))
 
 describe('useConnectionInit (standalone)', () => {

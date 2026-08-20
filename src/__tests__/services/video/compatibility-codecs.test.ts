@@ -214,7 +214,7 @@ describe('per-track audio playability', () => {
 })
 
 describe('checkCompatibility decoding configs', () => {
-  const decodingInfo = vi.fn(async (_config?: unknown) => ({
+  const decodingInfo = vi.fn(async (_config?: MediaDecodingConfiguration) => ({
     supported: true,
     smooth: true,
     powerEfficient: true,
@@ -415,12 +415,11 @@ describe('checkCompatibility decoding configs', () => {
 
     expect(supported).toBe(true)
     expect(decodingInfo).toHaveBeenCalledTimes(2)
-    const retryConfig = decodingInfo.mock.calls[1][0] as {
-      video: Record<string, unknown>
-    }
-    expect(retryConfig.video.transferFunction).toBeUndefined()
-    expect(retryConfig.video.hdrMetadataType).toBeUndefined()
-    expect(retryConfig.video.colorGamut).toBeUndefined()
+    const retryVideo = decodingInfo.mock.calls[1][0]?.video
+    expect(retryVideo).toBeDefined()
+    expect(retryVideo?.transferFunction).toBeUndefined()
+    expect(retryVideo?.hdrMetadataType).toBeUndefined()
+    expect(retryVideo?.colorGamut).toBeUndefined()
   })
 
   it('buckets bitrates to whole Mbps in the capability cache key', async () => {

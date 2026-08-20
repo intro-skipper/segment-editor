@@ -9,6 +9,7 @@ import type { MediaSegmentDto } from '@/types/jellyfin'
 import { MediaSegmentType } from '@/types/jellyfin'
 import { generateUUID } from '@/lib/segment-utils'
 import { secondsToTicks, ticksToSeconds } from '@/lib/time-utils'
+import { lookup } from '@/lib/utils'
 
 export interface EdlEntry {
   start: number
@@ -23,20 +24,20 @@ export enum EdlAction {
   Commercial = 3,
 }
 
-const EDL_TO_SEGMENT: Record<EdlAction, MediaSegmentType> = {
+const EDL_TO_SEGMENT = {
   [EdlAction.Cut]: MediaSegmentType.Intro,
   [EdlAction.Mute]: MediaSegmentType.Outro,
   [EdlAction.Scene]: MediaSegmentType.Preview,
   [EdlAction.Commercial]: MediaSegmentType.Commercial,
-}
+} satisfies Record<EdlAction, MediaSegmentType>
 
-const SEGMENT_TO_EDL: Partial<Record<MediaSegmentType, EdlAction>> = {
+const SEGMENT_TO_EDL = {
   [MediaSegmentType.Intro]: EdlAction.Cut,
   [MediaSegmentType.Outro]: EdlAction.Cut,
   [MediaSegmentType.Preview]: EdlAction.Scene,
   [MediaSegmentType.Recap]: EdlAction.Scene,
   [MediaSegmentType.Commercial]: EdlAction.Commercial,
-}
+} satisfies Partial<Record<MediaSegmentType, EdlAction>>
 
 export function edlEntryToSegment(
   entry: EdlEntry,
@@ -61,7 +62,8 @@ export function segmentToEdlEntry(segment: MediaSegmentDto): EdlEntry {
     start: ticksToSeconds(segment.StartTicks),
     end: ticksToSeconds(segment.EndTicks),
     action:
-      SEGMENT_TO_EDL[segment.Type ?? MediaSegmentType.Intro] ?? EdlAction.Cut,
+      lookup(SEGMENT_TO_EDL, segment.Type ?? MediaSegmentType.Intro) ??
+      EdlAction.Cut,
   }
 }
 

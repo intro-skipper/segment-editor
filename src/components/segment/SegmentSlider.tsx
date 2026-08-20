@@ -329,7 +329,7 @@ export function SegmentSlider({
   const duration = localEnd - localStart
 
   const frameStep =
-    typeof frameStepSeconds === 'number' &&
+    frameStepSeconds !== undefined &&
     Number.isFinite(frameStepSeconds) &&
     frameStepSeconds > 0
       ? frameStepSeconds
@@ -368,27 +368,27 @@ export function SegmentSlider({
     return didCommit
   }
 
-  const handleStartPointerDown = (e: React.PointerEvent) => {
+  const handleStartPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     e.preventDefault()
     e.stopPropagation()
     isDraggingRef.current = 'start'
     hasLocalRangeDirtyRef.current = false
     onSetActive(index)
 
-    const captureTarget = e.currentTarget as HTMLElement
+    const captureTarget = e.currentTarget
     captureTarget.setPointerCapture(e.pointerId)
     pointerCaptureTargetRef.current = captureTarget
     pointerIdRef.current = e.pointerId
   }
 
-  const handleEndPointerDown = (e: React.PointerEvent) => {
+  const handleEndPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     e.preventDefault()
     e.stopPropagation()
     isDraggingRef.current = 'end'
     hasLocalRangeDirtyRef.current = false
     onSetActive(index)
 
-    const captureTarget = e.currentTarget as HTMLElement
+    const captureTarget = e.currentTarget
     captureTarget.setPointerCapture(e.pointerId)
     pointerCaptureTargetRef.current = captureTarget
     pointerIdRef.current = e.pointerId

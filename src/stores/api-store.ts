@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { z } from 'zod'
 
 export type AuthMethod = 'apiKey' | 'userPass'
 
@@ -37,6 +38,18 @@ const initialState: ApiState = {
   userId: undefined,
   username: undefined,
 }
+
+/**
+ * The persisted connection slice, decoded on rehydrate. Fields written by an
+ * older build fall back to their defaults rather than entering the store raw.
+ */
+const PersistedApiSchema = z.object({
+  serverAddress: z.string().catch(''),
+  apiKey: z.string().optional().catch(undefined),
+  authMethod: z.enum(['apiKey', 'userPass']).catch('apiKey'),
+  userId: z.string().optional().catch(undefined),
+  username: z.string().optional().catch(undefined),
+})
 
 /** Sanitizes API key by trimming whitespace */
 const sanitizeKey = (val: string | undefined): string | undefined =>
@@ -82,14 +95,17 @@ export const useApiStore = create<ApiStore>()(
         username,
       }),
       merge: (persisted, current) => {
-        const p = persisted as Partial<ApiState> | null
+        const decoded = PersistedApiSchema.safeParse(persisted)
+        if (!decoded.success) return current
+
+        const p = decoded.data
         return {
           ...current,
-          serverAddress: p?.serverAddress?.trim() ?? '',
-          apiKey: sanitizeKey(p?.apiKey),
-          authMethod: p?.authMethod ?? 'apiKey',
-          userId: p?.userId,
-          username: p?.username,
+          serverAddress: p.serverAddress.trim(),
+          apiKey: sanitizeKey(p.apiKey),
+          authMethod: p.authMethod,
+          userId: p.userId,
+          username: p.username,
         }
       },
     },

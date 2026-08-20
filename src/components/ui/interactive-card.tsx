@@ -18,6 +18,10 @@ export const InteractiveCard = function InteractiveCardComponent({
   'aria-label': ariaLabel,
   ...props
 }: InteractiveCardProps) {
+  // Applied before `style` so a caller-supplied delay still wins.
+  const animationStyle: React.CSSProperties | undefined =
+    animate && animationDelay ? { animationDelay } : undefined
+
   return (
     <button
       type="button"
@@ -30,10 +34,7 @@ export const InteractiveCard = function InteractiveCardComponent({
         animate && 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
         className,
       )}
-      style={{
-        ...(animate && animationDelay ? { animationDelay } : {}),
-        ...style,
-      }}
+      style={{ ...animationStyle, ...style }}
       {...props}
     >
       {children}

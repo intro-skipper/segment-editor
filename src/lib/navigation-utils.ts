@@ -60,13 +60,13 @@ type PlayerItemKind = (typeof PLAYER_ITEM_KINDS)[number]
 function isContainerItemKind(
   itemType: BaseItemDto['Type'],
 ): itemType is ContainerItemKind {
-  return CONTAINER_ITEM_KINDS.includes(itemType as ContainerItemKind)
+  return CONTAINER_ITEM_KINDS.some((kind) => kind === itemType)
 }
 
 function isPlayerItemKind(
   itemType: BaseItemDto['Type'],
 ): itemType is PlayerItemKind {
-  return PLAYER_ITEM_KINDS.includes(itemType as PlayerItemKind)
+  return PLAYER_ITEM_KINDS.some((kind) => kind === itemType)
 }
 
 function getPlayerNavigationRoute(itemId: string): NavigationRoute {
@@ -167,7 +167,8 @@ export function navigateToMediaItem(
 }
 
 export function preloadMediaRoute(
-  preloadRoute: (options: NavigationRoute) => Promise<unknown>,
+  /** The router's preload call; its result is intentionally unused. */
+  preloadRoute: (options: NavigationRoute) => void,
   item: BaseItemDto,
 ): void {
   if (!item.Id) {
@@ -175,5 +176,5 @@ export function preloadMediaRoute(
   }
 
   const route = getNavigationRoute(item)
-  void preloadRoute(route)
+  preloadRoute(route)
 }

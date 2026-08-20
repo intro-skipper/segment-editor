@@ -85,12 +85,12 @@ describe('Feature: direct-play-fallback, Property 1: Compatibility Evaluation Co
 
           // Result should always be defined
           expect(result).toBeDefined()
-          expect(typeof result.canDirectPlay).toBe('boolean')
+          expect(result.canDirectPlay).toBeTypeOf('boolean')
 
           // If can't direct play, reason should be provided
           if (!result.canDirectPlay) {
             expect(result.reason).toBeDefined()
-            expect(typeof result.reason).toBe('string')
+            expect(result.reason).toBeTypeOf('string')
           }
 
           return true
@@ -263,7 +263,7 @@ describe('Feature: direct-play-fallback, Property 1: Compatibility Evaluation Co
           // All variations should produce consistent results
           // (either all pass or all fail based on browser support)
           expect(result).toBeDefined()
-          expect(typeof result.canDirectPlay).toBe('boolean')
+          expect(result.canDirectPlay).toBeTypeOf('boolean')
 
           return true
         },

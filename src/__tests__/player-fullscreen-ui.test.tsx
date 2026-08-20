@@ -58,19 +58,33 @@ function flushNextAnimationFrame() {
   })
 }
 
+/** The mouse-event members handleVideoInteraction reads. */
+type MouseInteraction = Pick<MouseEvent, 'detail' | 'target'>
+
+/** The touch-event members handleVideoInteraction reads. */
+type TouchInteraction = Pick<TouchEvent, 'preventDefault' | 'target'> & {
+  changedTouches: unknown
+}
+
 function createMouseInteraction(target: HTMLElement, detail = 1): MouseEvent {
-  return { target, detail } as unknown as MouseEvent
+  const interaction: MouseInteraction = { target, detail }
+  // SAFETY: handleVideoInteraction reads only `target`, `detail`, and the
+  // absence of `changedTouches`; no other member is reachable on this path.
+  return interaction as MouseEvent
 }
 
 function createTouchInteraction(
   target: HTMLElement,
   preventDefault = vi.fn(),
 ): TouchEvent {
-  return {
+  const interaction: TouchInteraction = {
     target,
     changedTouches: [{}],
     preventDefault,
-  } as unknown as TouchEvent
+  }
+  // SAFETY: the touch branch reads only `target`, the presence of
+  // `changedTouches`, and calls `preventDefault`.
+  return interaction as TouchEvent
 }
 
 describe('useFullscreenPlayerUi', () => {

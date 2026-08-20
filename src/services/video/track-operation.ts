@@ -23,7 +23,7 @@ export async function runTrackOperation(
     signal: AbortSignal
     setPending: (pending: boolean) => void
     onResult: (result: TrackSwitchResult) => void
-    onCaughtError: (error: unknown) => void
+    onCaughtError: (cause: unknown) => void
   },
 ): Promise<void> {
   handlers.setPending(true)

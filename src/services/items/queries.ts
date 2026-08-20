@@ -35,7 +35,7 @@ interface UseEntityOptions {
   enabled?: boolean
 }
 
-interface UseItemsOptions {
+export interface UseItemsOptions {
   parentId: string
   nameFilter?: string
   includeMediaStreams?: boolean

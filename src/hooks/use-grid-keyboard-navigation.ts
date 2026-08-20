@@ -6,6 +6,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { lookup } from '@/lib/utils'
+
 interface UseGridKeyboardNavigationOptions {
   itemCount: number
   columns: number
@@ -40,12 +42,7 @@ interface UseGridKeyboardNavigationReturn {
 }
 
 /** Navigation key handlers mapped to index calculations */
-const NAV_KEYS: Partial<
-  Record<
-    string,
-    (cur: number, cols: number, count: number, ctrl: boolean) => number
-  >
-> = {
+const NAV_KEYS = {
   ArrowRight: (cur, _, count) => Math.min(cur + 1, count - 1),
   ArrowLeft: (cur) => Math.max(cur - 1, 0),
   ArrowDown: (cur, cols, count) => Math.min(cur + cols, count - 1),
@@ -57,7 +54,10 @@ const NAV_KEYS: Partial<
       : Math.min(Math.floor(cur / cols) * cols + cols - 1, count - 1),
   PageDown: (cur, cols, count) => Math.min(cur + cols * 3, count - 1),
   PageUp: (cur, cols) => Math.max(cur - cols * 3, 0),
-}
+} satisfies Record<
+  string,
+  (cur: number, cols: number, count: number, ctrl: boolean) => number
+>
 
 /** Max retry attempts to focus an element after scrolling it into view */
 const FOCUS_RETRY_MAX = 5
@@ -183,7 +183,7 @@ export function useGridKeyboardNavigation({
       return
     }
 
-    const handler = NAV_KEYS[e.key]
+    const handler = lookup(NAV_KEYS, e.key)
     if (!handler) return
 
     const current = validFocusedIndex < 0 ? 0 : validFocusedIndex

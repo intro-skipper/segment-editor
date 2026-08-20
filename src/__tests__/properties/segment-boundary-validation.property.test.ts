@@ -128,12 +128,19 @@ const negativeEndSegmentArb: fc.Arbitrary<MediaSegmentDto> = fc.record({
  * Simulates slider handle drag behavior.
  * When dragging, the system clamps values to maintain the invariant.
  */
+/** The segment bounds a drag settles on, and whether they stay ordered. */
+interface DragResult {
+  start: number
+  end: number
+  valid: boolean
+}
+
 function simulateSliderDrag(
   segment: MediaSegmentDto,
   handle: 'start' | 'end',
   newValue: number,
   runtimeSeconds: number,
-): { start: number; end: number; valid: boolean } {
+): DragResult {
   const currentStart = segment.StartTicks ?? 0
   const currentEnd = segment.EndTicks ?? 0
   const minGap = 0.1 // Minimum gap between start and end

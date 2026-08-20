@@ -3,6 +3,9 @@
  */
 
 import { cleanup, render, screen } from '@testing-library/react'
+import { asElement } from './helpers/dom'
+import { resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
@@ -13,19 +16,10 @@ import { formatCompactTime } from '@/lib/time-utils'
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
-    t: (_key: string, fallbackOrOptions?: string | Record<string, unknown>) => {
+    t: (key: string, fallbackOrOptions?: TranslationArg) => {
       // Prove type-label localization is wired without translating every key
-      if (_key === 'segmentType.Recap') return 'Zusammenfassung'
-      if (typeof fallbackOrOptions === 'string') return fallbackOrOptions
-      if (fallbackOrOptions && typeof fallbackOrOptions === 'object') {
-        const { defaultValue, ...params } = fallbackOrOptions
-        let text = typeof defaultValue === 'string' ? defaultValue : _key
-        for (const [name, value] of Object.entries(params)) {
-          text = text.replace(`{{${name}}}`, String(value))
-        }
-        return text
-      }
-      return _key
+      if (key === 'segmentType.Recap') return 'Zusammenfassung'
+      return resolveTranslation(key, fallbackOrOptions)
     },
   }),
 }))
@@ -78,7 +72,9 @@ describe('SegmentTimeline', () => {
       name: 'Segments: Intro 0:00 – 1:30, Outro 20:00 – 24:00',
     })
 
-    const regions = Array.from(timeline.children) as Array<HTMLElement>
+    const regions = Array.from(timeline.children).map((child) =>
+      asElement(child, HTMLElement),
+    )
     expect(regions).toHaveLength(2)
 
     expect(regions[0].style.left).toBe('0%')
@@ -96,7 +92,9 @@ describe('SegmentTimeline', () => {
     )
 
     const timeline = screen.getByRole('img')
-    const regions = Array.from(timeline.children) as Array<HTMLElement>
+    const regions = Array.from(timeline.children).map((child) =>
+      asElement(child, HTMLElement),
+    )
     expect(regions).toHaveLength(1)
     expect(regions[0].style.width).toBe('0.8%')
   })
@@ -113,7 +111,9 @@ describe('SegmentTimeline', () => {
       name: 'Segments: Zusammenfassung 0:10 – 1:00',
     })
 
-    const regions = Array.from(timeline.children) as Array<HTMLElement>
+    const regions = Array.from(timeline.children).map((child) =>
+      asElement(child, HTMLElement),
+    )
     expect(regions[0].title).toBe('Zusammenfassung 0:10 – 1:00')
   })
 
@@ -144,7 +144,9 @@ describe('SegmentTimeline', () => {
     )
 
     const timeline = screen.getByRole('img')
-    const regions = Array.from(timeline.children) as Array<HTMLElement>
+    const regions = Array.from(timeline.children).map((child) =>
+      asElement(child, HTMLElement),
+    )
     expect(regions).toHaveLength(2)
     expect(regions[0].style.width).toBe('10%')
     expect(regions[1].style.left).toBe('90%')

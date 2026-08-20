@@ -19,11 +19,16 @@ function createStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
   }
 }
 
+/** The preload-event members the reload handler reads. */
+type PreloadEvent = Pick<VitePreloadErrorEvent, 'payload' | 'preventDefault'>
+
 function createPreloadEvent(): VitePreloadErrorEvent {
-  return {
+  const event: PreloadEvent = {
     payload: new Error('Failed to fetch dynamically imported module'),
     preventDefault: vi.fn(),
-  } as unknown as VitePreloadErrorEvent
+  }
+  // SAFETY: the handler reads `payload` and calls `preventDefault` only.
+  return event as VitePreloadErrorEvent
 }
 
 describe('vite preload error handling', () => {
@@ -113,7 +118,7 @@ describe('vite preload error handling', () => {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
       } else {
-        delete (globalThis as { window?: unknown }).window
+        Reflect.deleteProperty(globalThis, 'window')
       }
     }
   })
@@ -199,7 +204,7 @@ describe('vite preload error handling', () => {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
       } else {
-        delete (globalThis as { window?: unknown }).window
+        Reflect.deleteProperty(globalThis, 'window')
       }
       vi.useRealTimers()
     }
@@ -269,7 +274,7 @@ describe('vite preload error handling', () => {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
       } else {
-        delete (globalThis as { window?: unknown }).window
+        Reflect.deleteProperty(globalThis, 'window')
       }
       vi.useRealTimers()
     }

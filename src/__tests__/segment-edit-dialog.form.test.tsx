@@ -3,6 +3,10 @@
  */
 
 import * as React from 'react'
+import { asElement } from './helpers/dom'
+import { lookup } from '@/lib/utils'
+import { resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 import {
   cleanup,
   fireEvent,
@@ -15,9 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
 
-const clipboardWriteTextMock = vi.fn()
+const clipboardWriteTextMock = vi.fn<(text: string) => Promise<void>>()
 
-const translations: Record<string, string> = {
+const translations = {
   close: 'Close',
   'editor.saveSegment': 'Save segment',
   'editor.slider.title': 'Segment details',
@@ -33,8 +37,8 @@ const translations: Record<string, string> = {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
-    t: (key: string, fallback?: string) =>
-      translations[key] ?? (typeof fallback === 'string' ? fallback : key),
+    t: (key: string, fallback?: TranslationArg) =>
+      lookup(translations, key) ?? resolveTranslation(key, fallback),
   }),
 }))
 
@@ -138,8 +142,11 @@ describe('SegmentEditDialog TanStack Form migration', () => {
 
     await screen.findByText('Start time must be less than end time')
 
-    const saveButton = screen.getByRole('button', { name: 'Save segment' })
-    expect((saveButton as HTMLButtonElement).disabled).toBe(true)
+    const saveButton = asElement(
+      screen.getByRole('button', { name: 'Save segment' }),
+      HTMLButtonElement,
+    )
+    expect(saveButton.disabled).toBe(true)
     fireEvent.click(saveButton)
     expect(onSave).not.toHaveBeenCalled()
   })
@@ -179,9 +186,12 @@ describe('SegmentEditDialog TanStack Form migration', () => {
   it('resets to the new segment values when reopening after prop changes', async () => {
     render(<SegmentEditDialogHarness />)
 
-    const startInput = screen.getByLabelText('Start')
+    const startInput = asElement(
+      screen.getByLabelText('Start'),
+      HTMLInputElement,
+    )
     fireEvent.change(startInput, { target: { value: '12' } })
-    expect((startInput as HTMLInputElement).value).toBe('12')
+    expect(startInput.value).toBe('12')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
     fireEvent.click(screen.getByRole('button', { name: 'Load second segment' }))
@@ -217,9 +227,10 @@ describe('SegmentEditDialog TanStack Form migration', () => {
       expect(clipboardWriteTextMock).toHaveBeenCalledTimes(1)
     })
 
-    const copiedSegments = JSON.parse(
-      clipboardWriteTextMock.mock.calls[0]?.[0] as string,
-    ) as Array<MediaSegmentDto>
+    // The waitFor above already proved the clipboard was written once.
+    const copiedSegments: Array<MediaSegmentDto> = JSON.parse(
+      clipboardWriteTextMock.mock.calls[0][0],
+    )
     expect(copiedSegments[0]?.StartTicks).toBe(segment.StartTicks)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))

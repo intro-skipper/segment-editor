@@ -1,28 +1,6 @@
 import type { BaseItemDto } from '@/types/jellyfin'
 
 /**
- * Creates authorization headers for Jellyfin API requests.
- * Returns an object with Authorization header if token is provided,
- * otherwise returns an empty object.
- *
- * @param token - The access token (can be null, undefined, or empty string)
- * @returns Object with Authorization header or empty object
- *
- * @example
- * getAuthHeaders('my-token') // => { Authorization: 'MediaBrowser Token="my-token"' }
- * getAuthHeaders(null) // => {}
- * getAuthHeaders('') // => {}
- */
-export function getAuthHeaders(
-  token: string | null | undefined,
-): Record<string, string> {
-  if (token && token.length > 0) {
-    return { Authorization: `MediaBrowser Token="${token}"` }
-  }
-  return {}
-}
-
-/**
  * Formats an episode label in S1E2 format.
  * Returns null if item is null or lacks episode information.
  *

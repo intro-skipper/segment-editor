@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import { asElement } from './helpers/dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -78,7 +79,7 @@ describe('Pagination', () => {
       name: 'Previous page',
     })
     expect(previousButton).toBeInstanceOf(HTMLButtonElement)
-    expect((previousButton as HTMLButtonElement).disabled).toBe(true)
+    expect(asElement(previousButton, HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.click(previousButton)
 

@@ -142,6 +142,8 @@ describe('getSegmentRegions', () => {
     const futureType: MediaSegmentDto = {
       Id: 'seg-future',
       ItemId: 'item-1',
+      // SAFETY: modelling a segment type this client build predates, which is
+      // exactly the out-of-contract value the fallback colour exists for.
       Type: 'HolidaySpecial' as MediaSegmentType,
       StartTicks: 10,
       EndTicks: 60,
@@ -153,6 +155,7 @@ describe('getSegmentRegions', () => {
   })
 
   it('resolves helper colors safely for unknown types', () => {
+    // SAFETY: as above, a segment type newer than this client build.
     const futureType = 'HolidaySpecial' as MediaSegmentType
 
     expect(getSegmentColor(futureType)).toBe('bg-segment-unknown')

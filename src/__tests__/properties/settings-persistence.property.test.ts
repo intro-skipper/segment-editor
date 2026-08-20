@@ -97,7 +97,7 @@ describe('Settings Persistence Round-Trip', () => {
         expect(stored).not.toBeNull()
 
         const parsed = JSON.parse(stored!)
-        const restored = parsed.state as AppSettings
+        const restored: AppSettings = parsed.state
 
         expect(restored.theme).toBe(settings.theme)
         expect(restored.monochrome).toBe(settings.monochrome)
@@ -130,7 +130,7 @@ describe('Settings Persistence Round-Trip', () => {
         expect(stored).not.toBeNull()
 
         const parsed = JSON.parse(stored!)
-        const restored = parsed.state as ApiSettings
+        const restored: ApiSettings = parsed.state
 
         expect(restored.serverAddress).toBe(settings.serverAddress)
         expect(restored.apiKey).toBeUndefined()
@@ -146,9 +146,9 @@ describe('Settings Persistence Round-Trip', () => {
       fc.property(themeArb, (theme) => {
         const initialState = {
           state: {
-            theme: 'auto' as Theme,
+            theme: 'auto' satisfies Theme,
             monochrome: false,
-            locale: 'en-US' as Locale,
+            locale: 'en-US' satisfies Locale,
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
@@ -179,9 +179,9 @@ describe('Settings Persistence Round-Trip', () => {
       fc.property(localeArb, (locale) => {
         const initialState = {
           state: {
-            theme: 'auto' as Theme,
+            theme: 'auto' satisfies Theme,
             monochrome: false,
-            locale: 'en-US' as Locale,
+            locale: 'en-US' satisfies Locale,
             showVideoPlayer: true,
             enableEdl: false,
             enableChapter: false,
@@ -226,7 +226,7 @@ describe('Settings Persistence Round-Trip', () => {
           const finalSettings = settingsSequence[settingsSequence.length - 1]
           const stored = localStorage.getItem(APP_STORAGE_KEY)
           const parsed = JSON.parse(stored!)
-          const restored = parsed.state as AppSettings
+          const restored: AppSettings = parsed.state
 
           expect(restored.theme).toBe(finalSettings.theme)
           expect(restored.monochrome).toBe(finalSettings.monochrome)
@@ -247,8 +247,8 @@ describe('Settings Persistence Round-Trip', () => {
 
   it('defaults playback sync to disabled during app settings migration', async () => {
     const previousState = {
-      theme: 'auto' as Theme,
-      locale: 'en-US' as Locale,
+      theme: 'auto' satisfies Theme,
+      locale: 'en-US' satisfies Locale,
       showVideoPlayer: true,
       enableEdl: false,
       enableChapter: false,
@@ -266,8 +266,8 @@ describe('Settings Persistence Round-Trip', () => {
 
   it('defaults monochrome to disabled during app settings migration', async () => {
     const previousState = {
-      theme: 'auto' as Theme,
-      locale: 'en-US' as Locale,
+      theme: 'auto' satisfies Theme,
+      locale: 'en-US' satisfies Locale,
       showVideoPlayer: true,
       enableEdl: false,
       enableChapter: false,
@@ -286,9 +286,9 @@ describe('Settings Persistence Round-Trip', () => {
 
   it('preserves enabled monochrome during app settings migration', async () => {
     const previousState = {
-      theme: 'auto' as Theme,
+      theme: 'auto' satisfies Theme,
       monochrome: true,
-      locale: 'en-US' as Locale,
+      locale: 'en-US' satisfies Locale,
       showVideoPlayer: true,
       enableEdl: false,
       enableChapter: false,
@@ -307,8 +307,8 @@ describe('Settings Persistence Round-Trip', () => {
 
   it('preserves enabled playback sync during app settings migration', async () => {
     const previousState = {
-      theme: 'auto' as Theme,
-      locale: 'en-US' as Locale,
+      theme: 'auto' satisfies Theme,
+      locale: 'en-US' satisfies Locale,
       showVideoPlayer: true,
       enableEdl: false,
       enableChapter: false,

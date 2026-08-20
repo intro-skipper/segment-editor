@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { z } from 'zod'
 import { persist } from 'zustand/middleware'
 
 export type Theme = 'auto' | 'dark' | 'light'
@@ -88,6 +89,16 @@ const detectBrowserLocale = (): ResolvedLocale => {
   return 'en-US'
 }
 
+/**
+ * Persisted app state as older builds wrote it. Only the fields migrations
+ * touch are decoded; every other key is preserved untouched.
+ */
+const LegacyPersistedAppSchema = z.looseObject({
+  segmentSkipMode: z.string().optional().catch(undefined),
+  jellyfinPlaybackSyncEnabled: z.boolean().optional().catch(undefined),
+  monochrome: z.boolean().optional().catch(undefined),
+})
+
 const initialState: AppState = {
   theme: 'auto',
   monochrome: false,
@@ -157,19 +168,27 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'segment-editor-app',
       version: 3,
-      migrate: (persistedState: unknown, version: number) => {
-        if (typeof persistedState !== 'object' || persistedState === null) {
-          return persistedState
-        }
-        let state = persistedState as Record<string, unknown>
+      migrate: (persistedState, version) => {
+        const decoded = LegacyPersistedAppSchema.safeParse(persistedState)
+        if (!decoded.success) return persistedState
+
+        // Decoding re-adds a declared key as `undefined` when the stored value
+        // was absent or off-type. Those keys have to go: the merge that follows
+        // would otherwise overwrite a good default with `undefined`.
+        const state: Record<string, unknown> = Object.fromEntries(
+          Object.entries(decoded.data).filter(
+            ([, value]) => value !== undefined,
+          ),
+        )
+
         if (state.segmentSkipMode === 'auto') {
-          state = { ...state, segmentSkipMode: 'skip' }
+          state.segmentSkipMode = 'skip'
         }
-        if (version < 2 && !('jellyfinPlaybackSyncEnabled' in state)) {
-          state = { ...state, jellyfinPlaybackSyncEnabled: false }
+        if (version < 2 && state.jellyfinPlaybackSyncEnabled === undefined) {
+          state.jellyfinPlaybackSyncEnabled = false
         }
-        if (version < 3 && !('monochrome' in state)) {
-          state = { ...state, monochrome: false }
+        if (version < 3 && state.monochrome === undefined) {
+          state.monochrome = false
         }
         return state
       },

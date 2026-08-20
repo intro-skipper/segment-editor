@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TFunction } from 'i18next'
 
-import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 import {
   getMediaItemLabel,
@@ -14,7 +12,7 @@ describe('getMediaItemLabel', () => {
       (key: string, options: { name: string }) => `${key}:${options.name}`,
     )
 
-    const label = getMediaItemLabel(t as unknown as TFunction, {
+    const label = getMediaItemLabel(t, {
       Name: 'Blade Runner',
       ProductionYear: 1982,
       Type: BaseItemKind.Movie,
@@ -31,10 +29,9 @@ describe('getMediaItemLabel', () => {
       (key: string, options: { name: string }) => `${key}:${options.name}`,
     )
 
-    const label = getMediaItemLabel(
-      t as unknown as TFunction,
-      { Type: 'UnknownType' } as unknown as BaseItemDto,
-    )
+    // Folder is a real kind the label map does not cover, so it exercises
+    // the same fallback as a type this client has never seen.
+    const label = getMediaItemLabel(t, { Type: BaseItemKind.Folder })
 
     expect(label).toBe('accessibility.mediaCard.play:Unknown')
     expect(t).toHaveBeenCalledWith('accessibility.mediaCard.play', {
@@ -44,8 +41,8 @@ describe('getMediaItemLabel', () => {
 })
 
 describe('getSeriesCountLabel', () => {
-  const t = ((key: string, options: { count: number }) =>
-    `${key}:${options.count}`) as unknown as TFunction
+  const t = (key: string, options: { count: number }) =>
+    `${key}:${options.count}`
 
   it('shows the season count for multi-season series', () => {
     const label = getSeriesCountLabel(t, {

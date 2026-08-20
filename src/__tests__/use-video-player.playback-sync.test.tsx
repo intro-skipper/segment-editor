@@ -27,11 +27,15 @@ import {
   stopActiveEncodingKeepalive,
 } from '@/services/video/transcode-session'
 
-const hlsMocks = vi.hoisted(() => ({
-  videoRef: { current: null as HTMLVideoElement | null },
-  hlsRef: { current: null },
-  retry: vi.fn(),
-}))
+/** The ref the hook hands back, which tests populate with a real element. */
+interface VideoElementRef {
+  current: HTMLVideoElement | null
+}
+
+const hlsMocks = vi.hoisted(() => {
+  const videoRef: VideoElementRef = { current: null }
+  return { videoRef, hlsRef: { current: null }, retry: vi.fn() }
+})
 
 vi.mock('@/hooks/use-hls-player', () => ({
   useHlsPlayer: vi.fn(() => ({
@@ -65,18 +69,21 @@ vi.mock('@/services/video/transcode-session', () => ({
   stopActiveEncodingKeepalive: vi.fn(),
 }))
 
-function createDeferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void
+/** A promise plus the handle that settles it, for ordering async steps. */
+interface Deferred<T> {
+  promise: Promise<T>
+  resolve: (value: T) => void
+}
+
+function createDeferred(): Deferred<void> {
+  let resolve!: (value: void) => void
   const promise = new Promise<void>((res) => {
     resolve = res
   })
   return { promise, resolve }
 }
 
-function createDeferredValue<T>(): {
-  promise: Promise<T>
-  resolve: (value: T) => void
-} {
+function createDeferredValue<T>(): Deferred<T> {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
     resolve = res

@@ -5,7 +5,6 @@
  * @module services/video/track-switching
  */
 
-import type Hls from 'hls.js'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
@@ -14,6 +13,18 @@ import { createPlaySessionId } from '@/services/video/session'
 import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { isAudioTrackDecodable } from '@/services/video/compatibility'
 import { requiresJassubRenderer } from '@/services/video/subtitle'
+
+/**
+ * The hls.js surface this module drives. Declaring it structurally keeps the
+ * dependency to the members track switching actually touches, so callers and
+ * tests supply those rather than a whole Hls instance.
+ */
+export interface HlsTrackController {
+  audioTracks: Array<{ lang?: string; name?: string }>
+  audioTrack: number
+  subtitleTracks: Array<unknown>
+  subtitleTrack: number
+}
 
 const SUBTITLE_TRACK_MARKER_ATTR = 'data-segment-editor-track'
 
@@ -53,7 +64,7 @@ export interface TrackSwitchOptions {
   /** The video element for direct play operations */
   videoElement: HTMLVideoElement
   /** HLS.js instance for HLS mode operations */
-  hlsInstance?: Hls | null
+  hlsInstance?: HlsTrackController | null
   /** Audio tracks for index mapping (required for HLS mode) */
   audioTracks?: Array<AudioTrackInfo>
   /** Subtitle tracks for index mapping (required for HLS mode) */
@@ -507,7 +518,7 @@ async function reloadHlsAudioTrack(
  */
 function switchHlsAudioTrack(
   trackIndex: number,
-  hlsInstance: Hls | null | undefined,
+  hlsInstance: HlsTrackController | null | undefined,
   audioTracks?: Array<AudioTrackInfo>,
 ): TrackSwitchResult {
   if (!hlsInstance) {
@@ -649,7 +660,7 @@ export async function applyInitialAudioTrack(
  */
 function switchHlsSubtitleTrack(
   trackIndex: number | null,
-  hlsInstance: Hls | null | undefined,
+  hlsInstance: HlsTrackController | null | undefined,
   subtitleTracks?: Array<SubtitleTrackInfo>,
 ): TrackSwitchResult {
   if (!hlsInstance) {

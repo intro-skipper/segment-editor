@@ -1,12 +1,24 @@
-type ValidationContainer = {
-  fields?: Record<string, unknown>
-  form?: Record<string, unknown>
-  message?: string
-}
+import { z } from 'zod'
 
-function isValidationContainer(value: unknown): value is ValidationContainer {
-  return typeof value === 'object' && value !== null
-}
+/**
+ * A nested collection of error nodes. TanStack Form keys them by field name,
+ * but Standard Schema issues arrive as a plain list, so both shapes decode
+ * here and `Object.values` reads either one.
+ */
+const ErrorCollectionSchema = z
+  .union([z.array(z.unknown()), z.record(z.string(), z.unknown())])
+  .optional()
+  .catch(undefined)
+
+/**
+ * One node of TanStack Form's error tree. Nested collections are decoded
+ * lazily as the walk reaches them, so only the fields read here are described.
+ */
+const ValidationContainerSchema = z.object({
+  fields: ErrorCollectionSchema,
+  form: ErrorCollectionSchema,
+  message: z.string().optional().catch(undefined),
+})
 
 /**
  * Extracts the first human-readable validation message from TanStack Form
@@ -22,8 +34,10 @@ export function getFirstValidationMessage(
 
   while (queue.length > 0) {
     const current = queue.shift()
-    if (typeof current === 'string' && current.trim()) {
-      return current
+
+    if (typeof current === 'string') {
+      if (current.trim()) return current
+      continue
     }
 
     if (Array.isArray(current)) {
@@ -31,18 +45,19 @@ export function getFirstValidationMessage(
       continue
     }
 
-    if (!isValidationContainer(current)) continue
+    const container = ValidationContainerSchema.safeParse(current)
+    if (!container.success) continue
 
-    if (typeof current.message === 'string' && current.message.trim()) {
-      return current.message
+    if (container.data.message?.trim()) {
+      return container.data.message
     }
 
-    if (current.fields) {
-      queue.unshift(...Object.values(current.fields))
+    if (container.data.fields) {
+      queue.unshift(...Object.values(container.data.fields))
     }
 
-    if (current.form) {
-      queue.unshift(...Object.values(current.form))
+    if (container.data.form) {
+      queue.unshift(...Object.values(container.data.form))
     }
   }
 

@@ -21,8 +21,9 @@ const mockApis = {
 }
 
 vi.mock('@/services/jellyfin', () => ({
-  withApi: vi.fn(async (fn: (apis: typeof mockApis) => Promise<unknown>) =>
-    fn(mockApis),
+  withApi: vi.fn(
+    async <TResult>(fn: (apis: typeof mockApis) => Promise<TResult>) =>
+      fn(mockApis),
   ),
 }))
 

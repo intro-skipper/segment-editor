@@ -65,7 +65,7 @@ const requireValidId = (id: string, name: string): void => {
 }
 
 /** Validates required parameter */
-const requireParam = (value: unknown, name: string): void => {
+const requireParam = (value: string | null | undefined, name: string): void => {
   if (!value) throw AppError.validation(`${name} is required`)
 }
 

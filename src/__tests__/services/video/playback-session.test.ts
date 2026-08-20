@@ -31,6 +31,8 @@ describe('playback-session status helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(withApi).mockImplementation(async (callback) => {
+      // SAFETY: withApi hands its callback the full Jellyfin API set, but
+      // this path reaches only the single API stubbed below.
       await callback({
         playstateApi: {
           reportPlaybackStart,

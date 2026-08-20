@@ -102,10 +102,9 @@ describe('areSegmentListsEqual', () => {
   })
 
   it('treats missing elements as unequal instead of throwing', () => {
-    const withUndefined = [
-      segment(),
-      undefined,
-    ] as unknown as Array<MediaSegmentDto>
+    // SAFETY: the list deliberately breaks its own element contract — the
+    // point of the test is that comparison reports inequality, not throws.
+    const withUndefined = [segment(), undefined] as Array<MediaSegmentDto>
     const complete = [segment(), segment({ Id: 'segment-2' })]
 
     expect(areSegmentListsEqual(withUndefined, complete)).toBe(false)

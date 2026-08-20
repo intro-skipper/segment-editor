@@ -83,7 +83,7 @@ export function findBestServer(
 // Display Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SCORE_DISPLAY: Record<RecommendedServerInfoScore, ScoreDisplay> = {
+const SCORE_DISPLAY = {
   [RecommendedServerInfoScore.GREAT]: {
     label: 'Excellent',
     variant: 'success',
@@ -91,7 +91,7 @@ const SCORE_DISPLAY: Record<RecommendedServerInfoScore, ScoreDisplay> = {
   [RecommendedServerInfoScore.GOOD]: { label: 'Good', variant: 'success' },
   [RecommendedServerInfoScore.OK]: { label: 'Fair', variant: 'warning' },
   [RecommendedServerInfoScore.BAD]: { label: 'Poor', variant: 'error' },
-}
+} satisfies Record<RecommendedServerInfoScore, ScoreDisplay>
 
 export const getScoreDisplay = (
   score: RecommendedServerInfoScore,

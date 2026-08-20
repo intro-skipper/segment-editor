@@ -26,7 +26,7 @@ function createMockVideoElement(
     readyState: 4, // HAVE_ENOUGH_DATA
   }
 
-  const mockVideo = {
+  const mockVideo: VideoStateSurface = {
     get currentTime() {
       return state.currentTime
     },
@@ -60,8 +60,22 @@ function createMockVideoElement(
     }),
   }
 
-  return mockVideo as unknown as HTMLVideoElement
+  // SAFETY: the fallback path reads and writes only VideoStateSurface; the
+  // rest of HTMLVideoElement is unreachable in this property.
+  return mockVideo as HTMLVideoElement
 }
+
+/** The video members the direct-play fallback reads and writes. */
+type VideoStateSurface = Pick<
+  HTMLVideoElement,
+  | 'currentTime'
+  | 'muted'
+  | 'pause'
+  | 'paused'
+  | 'play'
+  | 'readyState'
+  | 'volume'
+>
 
 describe('Feature: direct-play-fallback, Property 5: State Preservation Round-Trip', () => {
   beforeEach(() => {

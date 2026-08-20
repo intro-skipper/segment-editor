@@ -11,8 +11,8 @@ export interface SegmentTimeIndex {
   rangeById: Map<string, SegmentTimeRange>
 }
 
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value)
+const isFiniteNumber = (value: number | null | undefined): value is number =>
+  value !== null && value !== undefined && Number.isFinite(value)
 
 // NOTE: Segment query layer (`services/segments/api.ts`) maps server ticks to
 // UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).

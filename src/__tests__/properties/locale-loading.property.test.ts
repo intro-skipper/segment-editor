@@ -17,12 +17,21 @@ import enUS from '@/i18n/locales/en-US.json'
 import de from '@/i18n/locales/de.json'
 import fr from '@/i18n/locales/fr.json'
 
+/** A node in a translation resource tree: a leaf string or a nested group. */
+type TranslationNode = string | { [key: string]: TranslationNode }
+
+/** True when a node has children to descend into. */
+const isTranslationGroup = (
+  node: TranslationNode | undefined,
+): node is { [key: string]: TranslationNode } =>
+  node !== undefined && node instanceof Object
+
 // Map locales to their translation files
-const localeTranslations: Record<SupportedLocale, Record<string, unknown>> = {
+const localeTranslations = {
   'en-US': enUS,
   de: de,
   fr: fr,
-}
+} satisfies Record<SupportedLocale, TranslationNode>
 
 // Sample translation keys to verify (covering different sections)
 const sampleTranslationKeys = [
@@ -48,13 +57,19 @@ const supportedLocaleArb = fc.constantFrom<SupportedLocale>(...supportedLocales)
 /**
  * Helper to get nested value from object using dot notation
  */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  return path.split('.').reduce((current, key) => {
-    if (current && typeof current === 'object' && key in current) {
-      return (current as Record<string, unknown>)[key]
-    }
-    return undefined
-  }, obj as unknown)
+function getNestedValue(
+  node: TranslationNode,
+  path: string,
+): TranslationNode | undefined {
+  return path
+    .split('.')
+    .reduce<TranslationNode | undefined>(
+      (current, key) =>
+        isTranslationGroup(current) && key in current
+          ? current[key]
+          : undefined,
+      node,
+    )
 }
 
 describe('Locale Loading and Application', () => {
@@ -146,7 +161,7 @@ describe('Locale Loading and Application', () => {
           // Translation should not be the key itself (which indicates missing translation)
           // and should be a non-empty string
           expect(translation).not.toBe(key)
-          expect(typeof translation).toBe('string')
+          expect(translation).toBeTypeOf('string')
           expect(translation.length).toBeGreaterThan(0)
 
           return true
@@ -201,7 +216,7 @@ describe('Locale Loading and Application', () => {
         changeLocale('auto')
 
         // The resulting language should be one of the supported locales
-        expect(supportedLocales).toContain(i18n.language as SupportedLocale)
+        expect(supportedLocales).toContain(i18n.language)
 
         return true
       }),

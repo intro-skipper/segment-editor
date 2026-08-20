@@ -12,9 +12,16 @@ const seasonId = '00000000-0000-0000-0000-000000000003'
 
 const itemId = '00000000-0000-0000-0000-000000000002'
 
+/** The navigate() argument these assertions compare against. */
+interface ExpectedRoute {
+  to: string
+  params?: Record<string, string>
+  search?: Record<string, string | undefined>
+}
+
 function expectNavigationForItem(
   item: BaseItemDto,
-  expectedRoute: unknown,
+  expectedRoute: ExpectedRoute,
 ): void {
   const navigate = vi.fn().mockResolvedValue(undefined)
 
@@ -96,6 +103,8 @@ describe('navigation-utils', () => {
 
   it('opens unknown item kinds using the unhandled item kind route', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    // SAFETY: newer servers report item kinds this client build does not
+    // know; the route fallback exists precisely for those values.
     const unknownType = 'SomeUnknownKind' as BaseItemKind
 
     expectNavigationForItem(

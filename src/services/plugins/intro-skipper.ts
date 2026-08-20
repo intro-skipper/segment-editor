@@ -9,6 +9,10 @@
  * }
  */
 
+import { z } from 'zod'
+
+import { lookup } from '@/lib/utils'
+
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import {
   getSegmentFormDefaults,
@@ -20,34 +24,76 @@ type IntroSkipperEventType = 'SKIP_INTRO' | 'SKIP_RECAP' | 'END_CREDITS'
 
 type IntroSkipperExportEventType = 'Intro' | 'Recap' | 'Outro'
 
-interface IntroSkipperInterval {
-  startTimeMs?: number
-  endTimeMs?: number
+/** An undecoded node of the clipboard JSON tree. */
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Array<JsonValue>
+  | JsonRecord
+
+interface JsonRecord {
+  [key: string]: JsonValue
 }
 
-interface IntroSkipperEvent {
-  startTimeMs?: number
-  endTimeMs?: number
-  eventType?: string
-  intervals?: Array<IntroSkipperInterval>
+/** True when a JSON node is an object, the only shape worth descending into. */
+const isJsonRecord = (value: JsonValue): value is JsonRecord =>
+  value !== null && !Array.isArray(value) && value instanceof Object
+
+/**
+ * A single plugin event. Every field falls back to undefined instead of
+ * failing the event, so one malformed timing skips just that entry — matching
+ * how exporters emit partial records.
+ */
+const IntroSkipperEventSchema = z.object({
+  startTimeMs: z.number().finite().optional().catch(undefined),
+  endTimeMs: z.number().finite().optional().catch(undefined),
+  eventType: z.string().optional().catch(undefined),
+})
+
+type IntroSkipperEvent = z.infer<typeof IntroSkipperEventSchema>
+
+const SecondsBasedMarkerSchema = z.object({
+  start: z.number().finite().optional().catch(undefined),
+  end: z.number().finite().optional().catch(undefined),
+})
+
+/** The alternative payload keyed by marker name rather than an event list. */
+const SecondsBasedMarkersSchema = z
+  .object({
+    intro: SecondsBasedMarkerSchema.optional().catch(undefined),
+    recap: SecondsBasedMarkerSchema.optional().catch(undefined),
+    credits: SecondsBasedMarkerSchema.optional().catch(undefined),
+    preview: SecondsBasedMarkerSchema.optional().catch(undefined),
+  })
+  .catch({})
+
+type SecondsBasedMarker = z.infer<typeof SecondsBasedMarkerSchema>
+
+/** Marker names that mark a payload as seconds-based rather than event-based. */
+const MARKER_KEYS = ['intro', 'credits', 'preview', 'recap'] as const
+
+/**
+ * Exporters wrap the event list at varying depths; cap the descent. Arrays
+ * spend a level of their own during the search, so the cap is set at twice the
+ * deepest object nesting worth supporting.
+ */
+const MAX_SEARCH_DEPTH = 24
+
+interface IntroSkipperImportOptions {
+  itemId: string
+  /** Runtime of the item, used to close out open-ended credits markers. */
+  maxDurationSeconds?: number
 }
 
-interface IntroSkipperPayload {
-  events?: Array<IntroSkipperEvent>
-}
-
-interface SecondsBasedMarker {
-  start?: number
-  end?: number
-  type?: string
-}
-
-interface SecondsBasedMarkersPayload {
-  intro?: SecondsBasedMarker
-  recap?: SecondsBasedMarker
-  credits?: SecondsBasedMarker
-  preview?: SecondsBasedMarker
-  [key: string]: unknown
+/** Outcome of decoding one clipboard payload into importable segments. */
+interface IntroSkipperImportResult {
+  segments: Array<MediaSegmentDto>
+  skipped: number
+  /** Event types the payload used that this importer does not recognise. */
+  unknownTypes: Array<string>
+  error?: string
 }
 
 interface IntroSkipperExportEvent {
@@ -58,20 +104,15 @@ interface IntroSkipperExportEvent {
 
 type IntroSkipperExportPayload = Array<IntroSkipperExportEvent>
 
-const EVENT_TYPE_TO_SEGMENT_TYPE: Record<
-  IntroSkipperEventType,
-  MediaSegmentType
-> = {
+const EVENT_TYPE_TO_SEGMENT_TYPE = {
   SKIP_INTRO: 'Intro',
   SKIP_RECAP: 'Recap',
   END_CREDITS: 'Outro',
-}
+} satisfies Record<IntroSkipperEventType, MediaSegmentType>
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-const isNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value)
+/** True for a duration the caller actually knows. */
+const isUsableDuration = (seconds: number | undefined): seconds is number =>
+  seconds !== undefined && Number.isFinite(seconds) && seconds > 0
 
 const msToSeconds = (ms: number): number => ms / 1000
 const secondsToMs = (seconds: number): number => Math.round(seconds * 1000)
@@ -79,40 +120,38 @@ const secondsToMs = (seconds: number): number => Math.round(seconds * 1000)
 const getEventTimingMs = (
   event: IntroSkipperEvent,
   options?: {
-    eventType?: unknown
+    eventType?: string
     maxDurationSeconds?: number
   },
 ): { startMs: number; endMs: number } | null => {
   // Intentionally ignore `intervals` for import.
-  const startMsRaw = event.startTimeMs
-  if (!isNumber(startMsRaw)) return null
+  const startMs = event.startTimeMs
+  if (startMs === undefined) return null
 
-  const endMsRaw = event.endTimeMs
+  const endMs = event.endTimeMs
 
   // END_CREDITS typically runs until media end; if duration is known, use it.
-  if (!isNumber(endMsRaw)) {
-    const normalizedType =
-      typeof options?.eventType === 'string'
-        ? options.eventType.trim().toUpperCase()
-        : ''
+  if (endMs === undefined) {
+    const normalizedType = options?.eventType?.trim().toUpperCase() ?? ''
     const maxDurationSeconds = options?.maxDurationSeconds
 
     if (
       normalizedType === 'END_CREDITS' &&
-      isNumber(maxDurationSeconds) &&
-      maxDurationSeconds > 0
+      isUsableDuration(maxDurationSeconds)
     ) {
-      return { startMs: startMsRaw, endMs: maxDurationSeconds * 1000 }
+      return { startMs, endMs: maxDurationSeconds * 1000 }
     }
 
-    return { startMs: startMsRaw, endMs: startMsRaw + 1000 }
+    return { startMs, endMs: startMs + 1000 }
   }
 
-  return { startMs: startMsRaw, endMs: endMsRaw }
+  return { startMs, endMs }
 }
 
-const getEventSegmentType = (eventType: unknown): MediaSegmentType | null => {
-  if (typeof eventType !== 'string') return null
+const getEventSegmentType = (
+  eventType: string | undefined,
+): MediaSegmentType | null => {
+  if (eventType === undefined) return null
   const normalized = eventType.trim().toUpperCase()
 
   // Support importing both Intro Skipper event types and MediaSegmentType strings
@@ -120,48 +159,36 @@ const getEventSegmentType = (eventType: unknown): MediaSegmentType | null => {
   if (normalized === 'RECAP') return 'Recap'
   if (normalized === 'OUTRO') return 'Outro'
 
-  if (normalized in EVENT_TYPE_TO_SEGMENT_TYPE) {
-    return EVENT_TYPE_TO_SEGMENT_TYPE[normalized as IntroSkipperEventType]
+  return lookup(EVENT_TYPE_TO_SEGMENT_TYPE, normalized) ?? null
+}
+
+const looksLikeSingleEventObject = (value: JsonRecord): boolean =>
+  'startTimeMs' in value || 'endTimeMs' in value || 'eventType' in value
+
+/** Finds the first `events` array anywhere in the payload, depth-first. */
+const findNestedEventsArray = (
+  value: JsonValue,
+  depth = 0,
+): Array<JsonValue> | null => {
+  if (depth > MAX_SEARCH_DEPTH) return null
+
+  // An array holds no `events` key of its own, but its elements may.
+  if (Array.isArray(value)) {
+    for (const element of value) {
+      const found = findNestedEventsArray(element, depth + 1)
+      if (found) return found
+    }
+    return null
   }
 
-  return null
-}
+  if (!isJsonRecord(value)) return null
 
-const looksLikeSingleEventObject = (value: unknown): boolean => {
-  if (!isRecord(value)) return false
-  return 'startTimeMs' in value || 'endTimeMs' in value || 'eventType' in value
-}
-
-const findNestedEventsArray = (
-  value: unknown,
-  options?: { maxDepth?: number; depth?: number },
-): Array<IntroSkipperEvent> | null => {
-  const maxDepth = options?.maxDepth ?? 12
-  const depth = options?.depth ?? 0
-  if (depth > maxDepth) return null
-
-  if (!isRecord(value)) return null
-
-  const direct = (value as IntroSkipperPayload).events
+  const direct = value.events
   if (Array.isArray(direct)) return direct
 
   for (const child of Object.values(value)) {
-    if (Array.isArray(child)) {
-      // Recurse into array elements (in case objects are nested inside)
-      for (const element of child) {
-        const found = findNestedEventsArray(element, {
-          maxDepth,
-          depth: depth + 1,
-        })
-        if (found) return found
-      }
-      continue
-    }
-
-    if (isRecord(child)) {
-      const found = findNestedEventsArray(child, { maxDepth, depth: depth + 1 })
-      if (found) return found
-    }
+    const found = findNestedEventsArray(child, depth + 1)
+    if (found) return found
   }
 
   return null
@@ -175,16 +202,8 @@ const findNestedEventsArray = (
  */
 export function introSkipperClipboardTextToSegments(
   text: string,
-  options: {
-    itemId: string
-    maxDurationSeconds?: number
-  },
-): {
-  segments: Array<MediaSegmentDto>
-  skipped: number
-  unknownTypes: Array<string>
-  error?: string
-} {
+  options: IntroSkipperImportOptions,
+): IntroSkipperImportResult {
   if (!text.trim())
     return {
       segments: [],
@@ -193,7 +212,7 @@ export function introSkipperClipboardTextToSegments(
       error: 'Clipboard is empty',
     }
 
-  let parsed: unknown
+  let parsed: JsonValue
   try {
     parsed = JSON.parse(text)
   } catch {
@@ -208,32 +227,26 @@ export function introSkipperClipboardTextToSegments(
   // Alternative format: seconds-based markers object
   // Example:
   // { "intro": {"start": 392, "end": 483}, "credits": {"start": 1331, "end": 1422}, "preview": {...} }
-  if (isRecord(parsed)) {
-    const markers = parsed as SecondsBasedMarkersPayload
-    const hasKnownKey =
-      'intro' in markers ||
-      'credits' in markers ||
-      'preview' in markers ||
-      'recap' in markers
-
-    if (hasKnownKey) {
+  if (isJsonRecord(parsed)) {
+    if (MARKER_KEYS.some((key) => key in parsed)) {
+      // Decoding a record cannot reject: `.catch` on the schema itself, and on
+      // every field, guarantees a value. Gating the branch on the decode
+      // instead would silently reroute a marker payload to the event path.
+      const markers = SecondsBasedMarkersSchema.parse(parsed)
       const markerToSegment = (
         marker: SecondsBasedMarker | undefined,
         type: MediaSegmentType,
       ): MediaSegmentDto | null => {
         if (!marker) return null
-        if (!isNumber(marker.start)) return null
 
         const startSeconds = marker.start
-        const endSecondsRaw = marker.end
-        const endSeconds = isNumber(endSecondsRaw)
-          ? endSecondsRaw
-          : type === 'Outro' &&
-              typeof options.maxDurationSeconds === 'number' &&
-              Number.isFinite(options.maxDurationSeconds) &&
-              options.maxDurationSeconds > 0
+        if (startSeconds === undefined) return null
+
+        const endSeconds =
+          marker.end ??
+          (type === 'Outro' && isUsableDuration(options.maxDurationSeconds)
             ? options.maxDurationSeconds
-            : startSeconds + 1
+            : startSeconds + 1)
 
         const segment: MediaSegmentDto = {
           Id: generateUUID(),
@@ -256,7 +269,7 @@ export function introSkipperClipboardTextToSegments(
         markerToSegment(markers.preview, 'Preview'),
       ]
 
-      const segments = candidates.filter(Boolean) as Array<MediaSegmentDto>
+      const segments = candidates.filter((entry) => entry !== null)
       const skipped = candidates.length - segments.length
 
       return {
@@ -270,16 +283,14 @@ export function introSkipperClipboardTextToSegments(
   }
 
   // `events` is optional: accept wrapper object, raw array, or a single event object
-  const events: Array<IntroSkipperEvent> | null = Array.isArray(parsed)
-    ? (parsed as Array<IntroSkipperEvent>)
-    : isRecord(parsed)
+  const eventNodes: Array<JsonValue> | null = Array.isArray(parsed)
+    ? parsed
+    : isJsonRecord(parsed)
       ? (findNestedEventsArray(parsed) ??
-        (looksLikeSingleEventObject(parsed)
-          ? ([parsed] as Array<IntroSkipperEvent>)
-          : null))
+        (looksLikeSingleEventObject(parsed) ? [parsed] : null))
       : null
 
-  if (!events) {
+  if (!eventNodes) {
     return {
       segments: [],
       skipped: 0,
@@ -292,7 +303,14 @@ export function introSkipperClipboardTextToSegments(
   const unknownTypesSet = new Set<string>()
   let skipped = 0
 
-  for (const event of events) {
+  for (const node of eventNodes) {
+    const decoded = IntroSkipperEventSchema.safeParse(node)
+    if (!decoded.success) {
+      skipped += 1
+      continue
+    }
+
+    const event = decoded.data
     const type = getEventSegmentType(event.eventType)
     const timing = getEventTimingMs(event, {
       eventType: event.eventType,
@@ -302,9 +320,8 @@ export function introSkipperClipboardTextToSegments(
     if (!type) {
       skipped += 1
       // Track unknown event types for user feedback
-      if (typeof event.eventType === 'string' && event.eventType.trim()) {
-        unknownTypesSet.add(event.eventType.trim())
-      }
+      const rawType = event.eventType?.trim()
+      if (rawType) unknownTypesSet.add(rawType)
       continue
     }
 

@@ -7,7 +7,7 @@ export interface RetryOptions {
   baseDelay?: number
   maxDelay?: number
   signal?: AbortSignal
-  shouldRetry?: (error: unknown) => boolean
+  shouldRetry?: (cause: unknown) => boolean
 }
 
 /** Calculates exponential backoff delay with jitter */

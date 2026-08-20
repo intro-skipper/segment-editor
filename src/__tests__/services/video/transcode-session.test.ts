@@ -25,6 +25,8 @@ describe('transcode-session active encoding cleanup', () => {
     vi.clearAllMocks()
     vi.mocked(getDeviceId).mockReturnValue('device-1')
     vi.mocked(withApi).mockImplementation(async (callback) => {
+      // SAFETY: withApi hands its callback the full Jellyfin API set, but
+      // this path reaches only the single API stubbed below.
       await callback({
         hlsSegmentApi: { stopEncodingProcess },
       } as never)

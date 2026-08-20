@@ -26,7 +26,7 @@ function createItemWithVideoFrameRate(frameRate: number): BaseItemDto {
         ],
       },
     ],
-  } as unknown as BaseItemDto
+  }
 }
 
 describe('player timing utilities', () => {

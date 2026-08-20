@@ -24,11 +24,11 @@ const VIEW_TRANSITION_ABORT_PATTERNS = [
   /transition was skipped/i,
 ]
 
-export function isViewTransitionAbortError(reason: unknown): boolean {
-  if (!(reason instanceof DOMException)) return false
-  if (reason.name !== 'AbortError') return false
+export function isViewTransitionAbortError(cause: unknown): boolean {
+  if (!(cause instanceof DOMException)) return false
+  if (cause.name !== 'AbortError') return false
   return VIEW_TRANSITION_ABORT_PATTERNS.some((pattern) =>
-    pattern.test(reason.message),
+    pattern.test(cause.message),
   )
 }
 

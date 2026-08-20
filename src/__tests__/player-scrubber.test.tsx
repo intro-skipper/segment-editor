@@ -3,6 +3,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { asElement } from './helpers/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PlayerScrubber } from '@/components/player/PlayerScrubber'
@@ -29,22 +30,22 @@ describe('PlayerScrubber', () => {
       />,
     )
 
-    const range = screen.getByRole('slider', {
-      name: 'Video progress',
-    }) as HTMLInputElement
+    const range = asElement(
+      screen.getByRole('slider', { name: 'Video progress' }),
+      HTMLInputElement,
+    )
 
     expect(range.min).toBe('0')
     expect(range.max).toBe('65')
     expect(range.value).toBe('65')
     expect(range.getAttribute('aria-valuetext')).toBe('01:05.000 of 01:05.000')
 
-    const track = range.nextElementSibling as HTMLDivElement | null
-    if (!track) throw new Error('Expected scrubber track after range input')
-    const bufferedBar = track.firstElementChild as HTMLElement | null
-    const progressBar = track.lastElementChild as HTMLElement | null
+    const track = asElement(range.nextElementSibling, HTMLDivElement)
+    const bufferedBar = asElement(track.firstElementChild, HTMLElement)
+    const progressBar = asElement(track.lastElementChild, HTMLElement)
 
-    expect(bufferedBar?.style.width).toBe('100%')
-    expect(progressBar?.style.width).toBe('100%')
+    expect(bufferedBar.style.width).toBe('100%')
+    expect(progressBar.style.width).toBe('100%')
   })
 
   it('falls back to zero bounds for non-finite media times', () => {
@@ -56,9 +57,10 @@ describe('PlayerScrubber', () => {
       />,
     )
 
-    const range = screen.getByRole('slider', {
-      name: 'Video progress',
-    }) as HTMLInputElement
+    const range = asElement(
+      screen.getByRole('slider', { name: 'Video progress' }),
+      HTMLInputElement,
+    )
 
     expect(range.max).toBe('0')
     expect(range.value).toBe('0')

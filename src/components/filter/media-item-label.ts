@@ -1,20 +1,27 @@
-import type { TFunction } from 'i18next'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
+import { lookup } from '@/lib/utils'
 
-const MEDIA_ITEM_LABEL_KEY_MAP: Record<string, string> = {
+const MEDIA_ITEM_LABEL_KEY_MAP = {
   [BaseItemKind.Series]: 'accessibility.mediaCard.viewSeries',
   [BaseItemKind.MusicArtist]: 'accessibility.mediaCard.viewArtist',
   [BaseItemKind.MusicAlbum]: 'accessibility.mediaCard.viewAlbum',
   [BaseItemKind.Movie]: 'accessibility.mediaCard.playMovie',
   [BaseItemKind.Episode]: 'accessibility.mediaCard.playEpisode',
-}
+} satisfies Partial<Record<BaseItemKind, string>>
 
-export function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
+/** The translate call these labels make: a key plus its interpolation values. */
+type TranslateWith<TParams> = (key: string, options: TParams) => string
+
+export function getMediaItemLabel(
+  t: TranslateWith<{ name: string }>,
+  item: BaseItemDto,
+): string {
   const name = item.Name ?? 'Unknown'
   const year = item.ProductionYear ? ` (${item.ProductionYear})` : ''
   const labelKey =
-    MEDIA_ITEM_LABEL_KEY_MAP[item.Type ?? ''] ?? 'accessibility.mediaCard.play'
+    lookup(MEDIA_ITEM_LABEL_KEY_MAP, item.Type ?? '') ??
+    'accessibility.mediaCard.play'
 
   return t(labelKey, { name: `${name}${year}` })
 }
@@ -26,7 +33,7 @@ export function getMediaItemLabel(t: TFunction, item: BaseItemDto): string {
  * or when the server did not provide counts.
  */
 export function getSeriesCountLabel(
-  t: TFunction,
+  t: TranslateWith<{ count: number }>,
   item: BaseItemDto,
 ): string | null {
   if (item.Type !== BaseItemKind.Series) return null

@@ -224,17 +224,12 @@ describe('useTrackManager initial audio track application', () => {
       expect(applyInitialAudioTrackMock).toHaveBeenCalled()
     })
 
-    const options = (
-      applyInitialAudioTrackMock.mock.calls[0] as unknown as [
-        number,
-        { signal: AbortSignal },
-      ]
-    )[1]
-    expect(options.signal).toBeInstanceOf(AbortSignal)
-    expect(options.signal.aborted).toBe(false)
+    const { signal } = applyInitialAudioTrackMock.mock.calls[0][1]
+    expect(signal).toBeInstanceOf(AbortSignal)
+    expect(signal?.aborted).toBe(false)
 
     unmount()
-    expect(options.signal.aborted).toBe(true)
+    expect(signal?.aborted).toBe(true)
 
     await act(async () => {
       resolveApply?.({

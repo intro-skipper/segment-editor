@@ -45,6 +45,12 @@ function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   )
 }
 
+/** A scrubber coordinate: the seek time and its pixel offset. */
+interface ScrubberPosition {
+  time: number
+  position: number
+}
+
 interface ChapterMarker {
   name: string
   position: number
@@ -233,9 +239,7 @@ function useScrubberInteraction({
     return rect
   }
 
-  const getPositionFromClientX = (
-    clientX: number,
-  ): { time: number; position: number } => {
+  const getPositionFromClientX = (clientX: number): ScrubberPosition => {
     if (safeDuration <= 0) {
       return { time: 0, position: 0 }
     }
@@ -296,7 +300,9 @@ function useScrubberInteraction({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault()
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    // `Element`, not `HTMLElement`: pointer capture is defined on Element, so
+    // an SVG child of the track has to capture too or the drag stops tracking.
+    if (e.target instanceof Element) e.target.setPointerCapture(e.pointerId)
     refreshScrubberRect()
     isDraggingRef.current = true
     const { time } = getPositionFromClientX(e.clientX)
@@ -313,7 +319,9 @@ function useScrubberInteraction({
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    if (e.target instanceof Element) {
+      e.target.releasePointerCapture(e.pointerId)
+    }
     isDraggingRef.current = false
     scrubberRectRef.current = null
 

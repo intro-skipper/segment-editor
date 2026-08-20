@@ -10,12 +10,11 @@ import { Settings2 } from 'lucide-react'
 
 import { SelectSettingsSection } from '../primitives/SelectSettingsSection'
 import type { SelectOption } from '../primitives/SettingsSelect'
-import type { PageSize } from '@/stores/session-store'
-import { PAGE_SIZE_OPTIONS, useSessionStore } from '@/stores/session-store'
-
-function isPageSize(value: number): value is PageSize {
-  return PAGE_SIZE_OPTIONS.includes(value as PageSize)
-}
+import {
+  PAGE_SIZE_OPTIONS,
+  PageSizeSchema,
+  useSessionStore,
+} from '@/stores/session-store'
 
 export function PageSizeSection() {
   const pageSize = useSessionStore((s) => s.pageSize)
@@ -27,9 +26,9 @@ export function PageSizeSection() {
   }))
 
   const handleChange = (value: string) => {
-    const parsedValue = Number(value)
-    if (Number.isFinite(parsedValue) && isPageSize(parsedValue)) {
-      setPageSize(parsedValue)
+    const parsed = PageSizeSchema.safeParse(Number(value))
+    if (parsed.success) {
+      setPageSize(parsed.data)
     }
   }
 

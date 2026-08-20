@@ -173,17 +173,14 @@ export const VIEWPORT_BREAKPOINTS = {
  * Segment color configuration - single source of truth.
  * Maps segment types to their CSS variable and Tailwind class names.
  */
-export const SEGMENT_COLORS: Record<
-  MediaSegmentType,
-  { css: string; bg: string }
-> = {
+export const SEGMENT_COLORS = {
   Intro: { css: 'var(--segment-intro)', bg: 'bg-segment-intro' },
   Outro: { css: 'var(--segment-outro)', bg: 'bg-segment-outro' },
   Preview: { css: 'var(--segment-preview)', bg: 'bg-segment-preview' },
   Recap: { css: 'var(--segment-recap)', bg: 'bg-segment-recap' },
   Commercial: { css: 'var(--segment-commercial)', bg: 'bg-segment-commercial' },
   Unknown: { css: 'var(--segment-unknown)', bg: 'bg-segment-unknown' },
-} as const
+} as const satisfies Record<MediaSegmentType, { css: string; bg: string }>
 
 /** Default segment color for unknown/undefined types */
 export const DEFAULT_SEGMENT_COLOR = SEGMENT_COLORS.Unknown

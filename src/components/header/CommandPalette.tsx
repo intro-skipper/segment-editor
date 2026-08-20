@@ -19,7 +19,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useItems } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
-import { cn } from '@/lib/utils'
+import { cn, lookup } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { BaseItemKind } from '@/types/jellyfin'
 
@@ -31,13 +31,11 @@ const SEARCH_RESULT_LIMIT = 80
 const SEARCH_DEBOUNCE_MS = 140
 const MIN_SEARCH_LENGTH = 1
 const VIRTUAL_OVERSCAN = 4
-const EXCLUDED_ITEM_TYPE_LOOKUP: Record<string, true> = {
-  [BaseItemKind.Episode]: true,
-  [BaseItemKind.Season]: true,
-}
-const EXCLUDED_ITEM_TYPES = Object.keys(
-  EXCLUDED_ITEM_TYPE_LOOKUP,
-) as Array<BaseItemKind>
+const EXCLUDED_ITEM_TYPES: Array<BaseItemKind> = [
+  BaseItemKind.Episode,
+  BaseItemKind.Season,
+]
+const EXCLUDED_ITEM_TYPE_LOOKUP = new Set(EXCLUDED_ITEM_TYPES)
 
 interface CommandPaletteProps {
   open: boolean
@@ -95,13 +93,13 @@ function commandPaletteReducer(
   }
 }
 
-const ITEM_ICONS: Partial<Record<BaseItemKind, typeof Film>> = {
+const ITEM_ICONS = {
   [BaseItemKind.Movie]: Film,
   [BaseItemKind.Series]: Tv,
   [BaseItemKind.MusicArtist]: Mic2,
   [BaseItemKind.MusicAlbum]: Mic2,
   [BaseItemKind.Audio]: Mic2,
-}
+} satisfies Partial<Record<BaseItemKind, typeof Film>>
 
 function SearchResultItem({
   item,
@@ -118,7 +116,7 @@ function SearchResultItem({
   onSelect: (item: BaseItemDto) => void
   onIntent: (item: BaseItemDto) => void
 }) {
-  const Icon = (item.Type && ITEM_ICONS[item.Type]) ?? Film
+  const Icon = (item.Type && lookup(ITEM_ICONS, item.Type)) ?? Film
   const selectResult = () => {
     onSelect(item)
   }
@@ -246,7 +244,7 @@ export default function CommandPalette({
   const resultItems = excludedItemTypes
     ? queriedItems.filter(
         (item) =>
-          item.Type === undefined || !(item.Type in EXCLUDED_ITEM_TYPE_LOOKUP),
+          item.Type === undefined || !EXCLUDED_ITEM_TYPE_LOOKUP.has(item.Type),
       )
     : queriedItems
 
@@ -311,7 +309,10 @@ export default function CommandPalette({
 
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {
-      triggerRef.current = document.activeElement as HTMLElement
+      const active = document.activeElement
+      // Keep the previous trigger when focus sits on a non-HTML element (an
+      // inline SVG control, or null mid-transition) so close still restores it.
+      if (active instanceof HTMLElement) triggerRef.current = active
     }
 
     if (!isOpen) {

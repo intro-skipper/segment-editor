@@ -6,6 +6,7 @@
  */
 
 import { getLanguageName, languagesMatch } from '@/lib/language-utils'
+import { lookup } from '@/lib/utils'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // ============================================================================
@@ -101,7 +102,7 @@ export interface TrackState {
  * Mapping of subtitle codec names to human-readable format names.
  * Used for displaying subtitle format in the track selector UI.
  */
-const SUBTITLE_FORMATS: Record<string, string> = {
+const SUBTITLE_FORMATS = {
   srt: 'SRT',
   subrip: 'SRT',
   ass: 'ASS',
@@ -122,7 +123,7 @@ const SUBTITLE_FORMATS: Record<string, string> = {
  * Mapping of channel counts to human-readable labels.
  * Used for displaying audio channel configuration in the track selector UI.
  */
-const CHANNEL_LABELS: Record<number, string> = {
+const CHANNEL_LABELS = {
   1: 'Mono',
   2: 'Stereo',
   6: '5.1',
@@ -318,7 +319,8 @@ function extractSubtitleTrack(
 ): SubtitleTrackInfo {
   const language = stream.Language ?? null
   const codec = stream.Codec?.toLowerCase() ?? ''
-  const format = SUBTITLE_FORMATS[codec] ?? (codec.toUpperCase() || 'Unknown')
+  const format =
+    lookup(SUBTITLE_FORMATS, codec) ?? (codec.toUpperCase() || 'Unknown')
 
   return {
     index: stream.Index ?? 0,
@@ -359,7 +361,8 @@ function formatAudioTrackLabel(track: {
   channels: number
 }): string {
   const languageName = getLanguageName(track.language)
-  const channelLabel = CHANNEL_LABELS[track.channels] ?? `${track.channels}ch`
+  const channelLabel =
+    lookup(CHANNEL_LABELS, track.channels) ?? `${track.channels}ch`
 
   return `${languageName} - ${track.codec} ${channelLabel}`
 }
