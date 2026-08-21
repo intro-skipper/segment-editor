@@ -39,8 +39,16 @@ function getFrameStepSeconds(item: BaseItemDto): number | undefined {
   const mediaStreams = item.MediaSources?.[0]?.MediaStreams
   if (!Array.isArray(mediaStreams)) return undefined
 
-  // Only the first video stream carries the item's frame rate.
-  const videoStream = mediaStreams.find((stream) => stream.Type === 'Video')
+  // Only the first video stream carries the item's frame rate. The elements
+  // are no more trustworthy than the array, so the predicate takes them as
+  // `unknown` rather than reading `.Type` off whatever the server sent.
+  const videoStream = mediaStreams.find(
+    (stream: unknown) =>
+      typeof stream === 'object' &&
+      stream !== null &&
+      'Type' in stream &&
+      stream.Type === 'Video',
+  )
   if (!videoStream) return undefined
 
   const decoded = FrameRateStreamSchema.safeParse(videoStream)

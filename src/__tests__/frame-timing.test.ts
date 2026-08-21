@@ -122,6 +122,16 @@ describe('player timing utilities', () => {
     expect(resolveFrameStepSeconds({})).toBeCloseTo(DEFAULT_FRAME_STEP, 9)
   })
 
+  it('resolves frame step past a null media stream element', () => {
+    // Parsed rather than written as a literal because the SDK types say a
+    // stream is always an object. The payload is server-supplied, so it is
+    // not, and reading `.Type` off the null element used to throw.
+    const item: BaseItemDto = JSON.parse(
+      '{"MediaSources":[{"MediaStreams":[null,{"Type":"Video","RealFrameRate":25}]}]}',
+    )
+    expect(resolveFrameStepSeconds(item)).toBeCloseTo(1 / 25, 9)
+  })
+
   it('cheatsheet step frame and speed hotkeys match PLAYER_HOTKEYS', () => {
     const stepFrameHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
       (entry) => entry.labelKey === 'shortcuts.stepFrameBackForward',
