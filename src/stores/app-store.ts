@@ -92,9 +92,16 @@ const detectBrowserLocale = (): ResolvedLocale => {
 /**
  * Persisted app state as older builds wrote it. Only the fields migrations
  * touch are decoded; every other key is preserved untouched.
+ *
+ * `segmentSkipMode` decodes `'auto'` alongside the current modes because that
+ * is the legacy spelling the migration below rewrites. Narrowing it to the
+ * three live modes would catch `'auto'` to a default and lose the rewrite.
  */
 const LegacyPersistedAppSchema = z.looseObject({
-  segmentSkipMode: z.string().optional().catch(undefined),
+  segmentSkipMode: z
+    .enum(['button', 'skip', 'disabled', 'auto'])
+    .optional()
+    .catch(undefined),
   jellyfinPlaybackSyncEnabled: z.boolean().optional().catch(undefined),
   monochrome: z.boolean().optional().catch(undefined),
 })

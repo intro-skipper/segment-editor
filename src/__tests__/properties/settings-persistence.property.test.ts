@@ -325,6 +325,32 @@ describe('Settings Persistence Round-Trip', () => {
     expect(useAppStore.getState().jellyfinPlaybackSyncEnabled).toBe(true)
   })
 
+  it('rewrites the legacy auto skip mode to skip during migration', async () => {
+    // Rehydrate merges over live state, so start from the default the way a
+    // fresh load would; otherwise a leftover value could pass for a migration.
+    useAppStore.setState({ segmentSkipMode: 'button' })
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: { segmentSkipMode: 'auto' }, version: 1 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().segmentSkipMode).toBe('skip')
+  })
+
+  it('drops an off-union skip mode instead of storing it', async () => {
+    useAppStore.setState({ segmentSkipMode: 'button' })
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({ state: { segmentSkipMode: 'nonsense' }, version: 1 }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState().segmentSkipMode).toBe('button')
+  })
+
   it('persists playback sync setter updates immediately', () => {
     localStorage.removeItem(APP_STORAGE_KEY)
 
