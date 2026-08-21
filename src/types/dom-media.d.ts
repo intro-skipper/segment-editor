@@ -25,3 +25,14 @@ interface AudioTrackList extends EventTarget {
 interface HTMLMediaElement {
   readonly audioTracks?: AudioTrackList
 }
+
+/**
+ * iOS Safari's video-only fullscreen entry point. No other engine implements
+ * it, and iPhone Safari has no element fullscreen API at all, so this is the
+ * only way to go fullscreen there. Optional to model that absence.
+ *
+ * @see https://developer.apple.com/documentation/webkitjs/htmlvideoelement
+ */
+interface HTMLVideoElement {
+  readonly webkitEnterFullscreen?: () => void
+}

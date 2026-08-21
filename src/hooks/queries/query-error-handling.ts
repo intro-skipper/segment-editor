@@ -17,9 +17,9 @@ export const createQueryKey = <T extends ReadonlyArray<unknown>>(
 
 export const shouldRetryQuery = (
   failureCount: number,
-  error: unknown,
+  cause: unknown,
 ): boolean =>
-  AppError.from(error).recoverable && failureCount < API_CONFIG.MAX_RETRIES
+  AppError.from(cause).recoverable && failureCount < API_CONFIG.MAX_RETRIES
 
 export const getRetryDelay = (attempt: number): number =>
   calculateBackoffDelay(
@@ -29,10 +29,10 @@ export const getRetryDelay = (attempt: number): number =>
   )
 
 export const handleQueryError = (
-  error: unknown,
+  cause: unknown,
   context?: { queryKey?: QueryKey; operation?: string },
 ): void => {
-  const { code, message, status, recoverable } = AppError.from(error)
+  const { code, message, status, recoverable } = AppError.from(cause)
   console.error(`[Query] ${context?.operation ?? 'Query'} failed:`, {
     code,
     message,

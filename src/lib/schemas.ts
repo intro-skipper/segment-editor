@@ -89,10 +89,12 @@ const SearchInputSchema = z
   .max(200, 'Search query too long')
   .transform((val) => val.trim())
 
-export const isValidItemId = (id: unknown): id is string =>
+export const isValidItemId = (id: string | null | undefined): id is string =>
   ItemIdSchema.safeParse(id).success
 
-export const sanitizeSearchInput = (input: unknown): string => {
+export const sanitizeSearchInput = (
+  input: string | null | undefined,
+): string => {
   const result = SearchInputSchema.safeParse(input)
   return result.success ? result.data : ''
 }

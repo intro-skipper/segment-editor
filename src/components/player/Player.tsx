@@ -722,11 +722,7 @@ function useRenderPlayer({
     // container.requestFullscreen() would throw synchronously. Fall back to
     // the native video fullscreen player instead.
     const video = videoRef.current
-    if (
-      video &&
-      'webkitEnterFullscreen' in video &&
-      typeof video.webkitEnterFullscreen === 'function'
-    ) {
+    if (video?.webkitEnterFullscreen) {
       try {
         video.webkitEnterFullscreen()
       } catch {

@@ -27,6 +27,11 @@ afterEach(() => {
   clearBlobCache()
 })
 
+/** The single prop the blob-url hook harness re-renders with. */
+interface BlobUrlProps {
+  url: string | null
+}
+
 describe('useBlobUrl', () => {
   it('promotes cached blob URLs outside render', async () => {
     blobCache.set(cachedUrl, 'blob:cached')
@@ -57,10 +62,10 @@ describe('useBlobUrl', () => {
     )
     blobCache.set(cachedUrl, 'blob:cached')
 
-    const initialProps: { url: string | null } = { url: cachedUrl }
+    const initialProps: BlobUrlProps = { url: cachedUrl }
 
     const { result, rerender } = renderHook(
-      ({ url }: { url: string | null }) => useBlobUrl(url),
+      ({ url }: BlobUrlProps) => useBlobUrl(url),
       { initialProps },
     )
 

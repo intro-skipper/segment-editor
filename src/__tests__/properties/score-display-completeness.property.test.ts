@@ -58,7 +58,7 @@ describe('Score Display Mapping Completeness', () => {
         const display = getScoreDisplay(score)
 
         // Label should be a non-empty string
-        expect(typeof display.label).toBe('string')
+        expect(display.label).toBeTypeOf('string')
         expect(display.label.length).toBeGreaterThan(0)
         expect(display.label.trim().length).toBeGreaterThan(0)
 

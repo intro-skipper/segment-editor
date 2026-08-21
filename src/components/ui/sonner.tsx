@@ -52,6 +52,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
         ),
       }}
       style={
+        // SAFETY: CSSProperties declares no index signature for custom
+        // properties, but React forwards `--*` keys to the DOM untouched.
         {
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',

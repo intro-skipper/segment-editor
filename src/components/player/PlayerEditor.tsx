@@ -32,7 +32,7 @@ import {
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
-import { cn } from '@/lib/utils'
+import { cn, elementAt } from '@/lib/utils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -211,10 +211,16 @@ function findInsertionIndex(
   return low
 }
 
+/** A re-sorted segment list plus where the edited segment landed in it. */
+interface SortedSegmentEdit {
+  nextSegments: Array<MediaSegmentDto>
+  insertedIndex: number
+}
+
 function insertSegmentSorted(
   segments: ReadonlyArray<MediaSegmentDto>,
   segment: MediaSegmentDto,
-): { nextSegments: Array<MediaSegmentDto>; insertedIndex: number } {
+): SortedSegmentEdit {
   const insertedIndex = findInsertionIndex(segments, segment)
   const nextSegments = [...segments]
   nextSegments.splice(insertedIndex, 0, segment)
@@ -224,7 +230,7 @@ function insertSegmentSorted(
 function replaceSegmentSorted(
   segments: ReadonlyArray<MediaSegmentDto>,
   updatedSegment: MediaSegmentDto,
-): { nextSegments: Array<MediaSegmentDto>; insertedIndex: number } {
+): SortedSegmentEdit {
   if (!updatedSegment.Id) {
     const nextSegments = segments.toSorted(sortSegmentsByStart)
     return { nextSegments, insertedIndex: 0 }
@@ -400,7 +406,7 @@ function useRenderPlayerEditor({
       if (segments.length === 0) return null
 
       const targetIndex = data.index ?? currentActiveIndex
-      const segment = segments[targetIndex] as MediaSegmentDto | undefined
+      const segment = elementAt(segments, targetIndex)
       if (segment === undefined) return null
 
       const updatedSegment: MediaSegmentDto = {
@@ -439,7 +445,7 @@ function useRenderPlayerEditor({
 
   const handleChangeSegmentType = (index: number, type: MediaSegmentType) => {
     updateEditingSegments((segments) => {
-      const segment = segments[index] as MediaSegmentDto | undefined
+      const segment = elementAt(segments, index)
       if (!segment || segment.Type === type) return null
 
       const { nextSegments, insertedIndex } = replaceSegmentSorted(segments, {
@@ -459,9 +465,7 @@ function useRenderPlayerEditor({
   const handleRequestDeleteSegment = (index: number) => {
     // Read via the ref: reading `editingSegments` here would give the handler a
     // new identity on every edit, cache-missing every SegmentListRow below.
-    const segment = editingSegmentsRef.current[index] as
-      | MediaSegmentDto
-      | undefined
+    const segment = elementAt(editingSegmentsRef.current, index)
     if (segment === undefined) return
     setPendingDelete({ id: segment.Id, type: segment.Type, index })
   }

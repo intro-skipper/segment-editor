@@ -4,11 +4,12 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useArtworkColor } from '@/hooks/use-artwork-color'
+import type * as ConstantsModule from '@/lib/constants'
 import { blobCache } from '@/lib/cache-manager'
 import { useAppStore } from '@/stores/app-store'
 
 vi.mock('@/lib/constants', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>()
+  const actual = await importOriginal<typeof ConstantsModule>()
   return {
     ...actual,
     CACHE_CONFIG: {
@@ -66,18 +67,32 @@ async function completeImage(
   })
 }
 
+/** The 2D-context members the artwork sampler touches. */
+type CanvasSampler = Pick<CanvasRenderingContext2D, 'drawImage'> & {
+  getImageData: (
+    ...args: Parameters<CanvasRenderingContext2D['getImageData']>
+  ) => { data: Uint8ClampedArray }
+}
+
 beforeEach(() => {
   imageInstances.length = 0
   blobCache.clear()
   useAppStore.getState().setMonochrome(false)
 
   vi.stubGlobal('Image', MockImage)
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+  // jsdom ships no ImageData, so the sampler's return is described
+  // structurally rather than constructed.
+  const context: CanvasSampler = {
     drawImage: vi.fn(),
     getImageData: vi.fn(() => ({
       data: new Uint8ClampedArray([255, 0, 0, 255]),
     })),
-  } as unknown as CanvasRenderingContext2D)
+  }
+  // SAFETY: the artwork sampler calls only drawImage and getImageData on the
+  // 2D context; nothing else on the interface is reached.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as CanvasRenderingContext2D,
+  )
 })
 
 afterEach(() => {

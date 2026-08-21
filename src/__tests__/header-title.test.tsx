@@ -11,13 +11,16 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { cleanup, render, screen } from '@testing-library/react'
+import { resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { BaseItemKind } from '@/types/jellyfin'
 import Header from '@/components/Header'
+import { lookup } from '@/lib/utils'
 
-const itemsById: Record<string, BaseItemDto> = {
+const itemsById = {
   'movie-1': {
     Id: 'movie-1',
     Name: 'Inception',
@@ -47,12 +50,8 @@ const itemsById: Record<string, BaseItemDto> = {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
-    t: (key: string, fallback?: string | { defaultValue?: string }) => {
-      if (typeof fallback === 'string') return fallback
-      if (typeof fallback === 'object' && fallback.defaultValue)
-        return fallback.defaultValue
-      return key
-    },
+    t: (key: string, fallback?: TranslationArg) =>
+      resolveTranslation(key, fallback),
   }),
 }))
 
@@ -61,14 +60,23 @@ vi.mock('@tanstack/react-hotkeys', () => ({
   useHotkey: vi.fn(),
 }))
 
-const collectionsRef: {
-  current: Array<{ ItemId?: string | null; Name?: string | null }>
-} = { current: [] }
+/** The collection rows the header reads for its breadcrumb. */
+interface CollectionRow {
+  ItemId?: string | null
+  Name?: string | null
+}
+
+/** Mutable holder so each test can swap the collections the mock returns. */
+interface CollectionsRef {
+  current: Array<CollectionRow>
+}
+
+const collectionsRef: CollectionsRef = { current: [] }
 
 vi.mock('@/services/items/queries', () => ({
   useCollections: () => ({ data: collectionsRef.current }),
   useItem: (itemId: string, opts?: { enabled?: boolean }) => ({
-    data: (opts?.enabled ?? true) ? itemsById[itemId] : undefined,
+    data: (opts?.enabled ?? true) ? lookup(itemsById, itemId) : undefined,
   }),
 }))
 
@@ -122,8 +130,8 @@ function renderHeaderAt(initialPath: string) {
     history: createMemoryHistory({ initialEntries: [initialPath] }),
   })
 
-  // The generated app route tree owns the registered router type; this test
-  // harness intentionally uses a minimal local tree.
+  // SAFETY: the generated app route tree owns the registered router type;
+  // this harness intentionally mounts a minimal local tree instead.
   render(<RouterProvider router={router as never} />)
 }
 

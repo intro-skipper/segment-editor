@@ -2,7 +2,6 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type Hls from 'hls.js'
 import type { AudioTrackInfo, SubtitleTrackInfo } from '@/services/video/tracks'
 import {
   switchAudioTrack,
@@ -71,10 +70,15 @@ interface TestNativeAudioTrack {
   language: string
 }
 
-function createNativeAudioTracks(languages: Array<string>): {
+/** The native audioTracks list, plus the same array for assertions. */
+interface NativeAudioTrackList {
   list: Array<TestNativeAudioTrack>
   tracks: Array<TestNativeAudioTrack>
-} {
+}
+
+function createNativeAudioTracks(
+  languages: Array<string>,
+): NativeAudioTrackList {
   const tracks = languages.map((language, index) => ({
     enabled: index === 0,
     language,
@@ -258,7 +262,9 @@ describe('switchAudioTrack native and HLS runtime selection', () => {
         { lang: 'jpn', name: 'Japanese' },
       ],
       audioTrack: 0,
-    } as unknown as Hls
+      subtitleTracks: [],
+      subtitleTrack: -1,
+    }
     const onReloadHls = vi.fn<() => Promise<void>>()
 
     await expect(
@@ -291,7 +297,7 @@ describe('switchAudioTrack async reload failures', () => {
 
     const result = await switchAudioTrack(5, {
       strategy: 'direct',
-      videoElement: {} as HTMLVideoElement,
+      videoElement: document.createElement('video'),
       audioTracks: [createAudioTrack(5, 0)],
       itemId: 'item-direct',
       mediaSourceId: 'media-source-direct',
@@ -326,13 +332,15 @@ describe('switchAudioTrack async reload failures', () => {
       .mockRejectedValue(new Error('hls reload failed'))
 
     const hlsInstance = {
-      audioTracks: [] as Array<{ lang?: string; name?: string }>,
+      audioTracks: [],
       audioTrack: 0,
-    } as unknown as Hls
+      subtitleTracks: [],
+      subtitleTrack: -1,
+    }
 
     const result = await switchAudioTrack(7, {
       strategy: 'hls',
-      videoElement: {} as HTMLVideoElement,
+      videoElement: document.createElement('video'),
       hlsInstance,
       audioTracks: [createAudioTrack(7, 0)],
       itemId: 'item-hls',
@@ -365,7 +373,7 @@ describe('switchAudioTrack async reload failures', () => {
   it('returns api_unsupported when direct-play fallback lacks item id', async () => {
     const result = await switchAudioTrack(5, {
       strategy: 'direct',
-      videoElement: {} as HTMLVideoElement,
+      videoElement: document.createElement('video'),
       audioTracks: [createAudioTrack(5, 0)],
       onReloadHls: vi.fn<() => Promise<void>>(),
     })
@@ -384,13 +392,15 @@ describe('switchAudioTrack async reload failures', () => {
 
   it('returns api_unsupported when hls reload-required path lacks reload callback', async () => {
     const hlsInstance = {
-      audioTracks: [] as Array<{ lang?: string; name?: string }>,
+      audioTracks: [],
       audioTrack: 0,
-    } as unknown as Hls
+      subtitleTracks: [],
+      subtitleTrack: -1,
+    }
 
     const result = await switchAudioTrack(7, {
       strategy: 'hls',
-      videoElement: {} as HTMLVideoElement,
+      videoElement: document.createElement('video'),
       hlsInstance,
       audioTracks: [createAudioTrack(7, 0)],
       itemId: 'item-hls',
@@ -413,7 +423,7 @@ describe('switchAudioTrack async reload failures', () => {
 
     const result = await switchAudioTrack(5, {
       strategy: 'direct',
-      videoElement: {} as HTMLVideoElement,
+      videoElement: document.createElement('video'),
       audioTracks: [createAudioTrack(5, 0)],
       itemId: 'item-direct',
       onReloadHls,
@@ -447,7 +457,7 @@ describe('switchSubtitleTrack direct play', () => {
 
   it('loads a managed external subtitle track when no TextTrack exists', async () => {
     const video = document.createElement('video')
-    const textTracks: Array<TextTrack> = []
+    const textTracks: Array<{ mode: TextTrackMode }> = []
     Object.defineProperty(video, 'textTracks', {
       configurable: true,
       value: textTracks,
@@ -456,7 +466,7 @@ describe('switchSubtitleTrack direct play', () => {
     const appendChild = video.appendChild.bind(video)
     vi.spyOn(video, 'appendChild').mockImplementation((node) => {
       const result = appendChild(node)
-      textTracks.push({ mode: 'disabled' } as TextTrack)
+      textTracks.push({ mode: 'disabled' })
       window.setTimeout(() => {
         node.dispatchEvent(new Event('load'))
       }, 0)
@@ -482,15 +492,20 @@ describe('switchSubtitleTrack direct play', () => {
 
   it('hides existing text tracks and disables HLS subtitles when subtitles are turned off', async () => {
     const video = document.createElement('video')
-    const textTracks = [
+    const textTracks: Array<{ mode: TextTrackMode }> = [
       { mode: 'showing' },
       { mode: 'showing' },
-    ] as Array<TextTrack>
+    ]
     Object.defineProperty(video, 'textTracks', {
       configurable: true,
       value: textTracks,
     })
-    const hlsInstance = { subtitleTrack: 1 } as unknown as Hls
+    const hlsInstance = {
+      audioTracks: [],
+      audioTrack: 0,
+      subtitleTracks: [],
+      subtitleTrack: 1,
+    }
 
     await expect(
       switchSubtitleTrack(null, {
@@ -506,15 +521,20 @@ describe('switchSubtitleTrack direct play', () => {
 
   it('hides existing text tracks before initializing ASS subtitles', async () => {
     const video = document.createElement('video')
-    const textTracks = [
+    const textTracks: Array<{ mode: TextTrackMode }> = [
       { mode: 'showing' },
       { mode: 'disabled' },
-    ] as Array<TextTrack>
+    ]
     Object.defineProperty(video, 'textTracks', {
       configurable: true,
       value: textTracks,
     })
-    const hlsInstance = { subtitleTrack: 1 } as unknown as Hls
+    const hlsInstance = {
+      audioTracks: [],
+      audioTrack: 0,
+      subtitleTracks: [],
+      subtitleTrack: 1,
+    }
     const assTrack = {
       ...createSubtitleTrack(4, 0),
       format: 'ASS',

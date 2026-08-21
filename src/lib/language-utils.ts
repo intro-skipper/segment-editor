@@ -5,12 +5,14 @@
  * @module lib/language-utils
  */
 
+import { lookup } from './utils'
+
 /**
  * Common ISO 639 language codes to display names mapping.
  * Used when Intl.DisplayNames is not available or for consistency.
  * This is the single source of truth — consumers should import from here.
  */
-const LANGUAGE_NAMES: Record<string, string> = {
+const LANGUAGE_NAMES = {
   eng: 'English',
   en: 'English',
   deu: 'German',
@@ -75,8 +77,10 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ukr: 'Ukrainian',
   uk: 'Ukrainian',
   und: 'Undetermined',
-}
+} satisfies Record<string, string>
 
+// Both guards are load-bearing at module scope: ICU-less builds omit `Intl`
+// entirely, and older runtimes ship it without `DisplayNames`.
 const languageDisplayNames =
   typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
     ? new Intl.DisplayNames(['en'], { type: 'language' })
@@ -97,9 +101,8 @@ export function getLanguageName(languageCode: string | null): string {
   const code = languageCode.toLowerCase()
 
   // Try our mapping first for consistency
-  if (LANGUAGE_NAMES[code]) {
-    return LANGUAGE_NAMES[code]
-  }
+  const knownName = lookup(LANGUAGE_NAMES, code)
+  if (knownName) return knownName
 
   // Try Intl.DisplayNames for less common languages
   if (languageDisplayNames) {
@@ -120,7 +123,7 @@ export function getLanguageName(languageCode: string | null): string {
  * Common language name to ISO 639-1 code mappings.
  * Handles full language names in various languages.
  */
-const LANGUAGE_NAME_MAP: Record<string, string> = {
+const LANGUAGE_NAME_MAP = {
   // English names
   english: 'en',
   german: 'de',
@@ -177,12 +180,12 @@ const LANGUAGE_NAME_MAP: Record<string, string> = {
   magyar: 'hu',
   română: 'ro',
   українська: 'uk',
-}
+} satisfies Record<string, string>
 
 /**
  * ISO 639-2 (3-letter) to ISO 639-1 (2-letter) code mappings.
  */
-const ISO_639_2_TO_1: Record<string, string> = {
+const ISO_639_2_TO_1 = {
   eng: 'en',
   deu: 'de',
   ger: 'de',
@@ -219,7 +222,7 @@ const ISO_639_2_TO_1: Record<string, string> = {
   rum: 'ro',
   ukr: 'uk',
   und: 'und', // Undetermined
-}
+} satisfies Record<string, string>
 
 /**
  * Normalizes a language string to a 2-letter ISO 639-1 code.
@@ -235,14 +238,12 @@ function normalizeLanguage(language: string | null | undefined): string | null {
   if (!normalized) return null
 
   // Check full language name mapping
-  if (LANGUAGE_NAME_MAP[normalized]) {
-    return LANGUAGE_NAME_MAP[normalized]
-  }
+  const namedCode = lookup(LANGUAGE_NAME_MAP, normalized)
+  if (namedCode) return namedCode
 
   // Check ISO 639-2 (3-letter) mapping
-  if (ISO_639_2_TO_1[normalized]) {
-    return ISO_639_2_TO_1[normalized]
-  }
+  const isoCode = lookup(ISO_639_2_TO_1, normalized)
+  if (isoCode) return isoCode
 
   // Handle locale format (en-US -> en)
   const dashIndex = normalized.indexOf('-')

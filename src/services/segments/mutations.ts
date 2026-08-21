@@ -33,8 +33,8 @@ const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
 
 const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
 
-const handleMutationError = (operation: string) => (error: unknown) => {
-  const e = QueryError.from(error)
+const handleMutationError = (operation: string) => (cause: unknown) => {
+  const e = QueryError.from(cause)
   if (e.code === ErrorCodes.CANCELLED) return
   handleQueryError(e, { operation })
   showError(

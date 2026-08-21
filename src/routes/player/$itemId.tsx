@@ -24,13 +24,9 @@ const playerParamsSchema = z.object({
 
 const playerSearchSchema = z.object({
   fetchSegments: z
-    .union([z.boolean(), z.string()])
+    .union([z.boolean(), z.string().transform((val) => val === 'true')])
     .optional()
-    .transform((val) => {
-      if (val === undefined) return true
-      if (typeof val === 'boolean') return val
-      return val === 'true'
-    }),
+    .transform((val) => val ?? true),
 })
 
 export const Route = createFileRoute('/player/$itemId')({

@@ -77,6 +77,10 @@ const basePath = pluginMode
 // boot redirect, whose aborted transition then rejects unhandled. Without
 // type support none of our animations can apply, so disable view transitions
 // there entirely.
+// Both `CSS` guards are load-bearing on this bootstrap path, which has no
+// error handling around it: embedded webviews can leave `CSS` declared but
+// undefined (so `'CSS' in globalThis` is not enough), and engines predating
+// CSS.supports expose the object without the function.
 const supportsViewTransitionTypes =
   typeof window !== 'undefined' &&
   typeof CSS !== 'undefined' &&

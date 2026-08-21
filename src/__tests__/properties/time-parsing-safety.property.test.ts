@@ -212,7 +212,7 @@ describe('Time String Parsing Safety', () => {
     fc.assert(
       fc.property(validInputArb, (input) => {
         const result = parseTimeString(input)
-        return typeof result === 'number'
+        return Number.isFinite(result)
       }),
       { numRuns: 100 },
     )

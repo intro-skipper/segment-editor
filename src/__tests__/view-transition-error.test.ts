@@ -6,11 +6,14 @@ import {
   isViewTransitionAbortError,
 } from '@/lib/view-transition-error'
 
-function createRejectionEvent(reason: unknown): PromiseRejectionEvent {
-  return {
-    reason,
-    preventDefault: vi.fn(),
-  } as unknown as PromiseRejectionEvent
+/** The rejection-event members the abort handler reads. */
+type RejectionEvent = Pick<PromiseRejectionEvent, 'preventDefault' | 'reason'>
+
+function createRejectionEvent(cause: unknown): PromiseRejectionEvent {
+  const event: RejectionEvent = { reason: cause, preventDefault: vi.fn() }
+  // SAFETY: the handler reads `reason` and calls `preventDefault`; the rest
+  // of the event is never touched.
+  return event as PromiseRejectionEvent
 }
 
 describe('isViewTransitionAbortError', () => {
@@ -121,7 +124,7 @@ describe('installViewTransitionAbortHandler', () => {
       if (originalWindow) {
         Object.defineProperty(globalThis, 'window', originalWindow)
       } else {
-        delete (globalThis as { window?: unknown }).window
+        Reflect.deleteProperty(globalThis, 'window')
       }
     }
   })

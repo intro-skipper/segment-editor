@@ -3,6 +3,9 @@
  */
 
 import { createRef } from 'react'
+import { asElement } from './helpers/dom'
+import { isTranslationOptions, resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 import type { ComponentProps } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,15 +16,15 @@ import type { MediaSegmentDto } from '@/types/jellyfin'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, optionsOrFallback?: string | { type?: string }) => {
+    t: (key: string, optionsOrFallback?: TranslationArg) => {
       if (key.startsWith('segmentType.')) return `type:${key.slice(12)}`
       if (
         key === 'player.skipSegment' &&
-        typeof optionsOrFallback === 'object'
+        isTranslationOptions(optionsOrFallback)
       ) {
         return `Skip ${optionsOrFallback.type}`
       }
-      return typeof optionsOrFallback === 'string' ? optionsOrFallback : key
+      return resolveTranslation(key, optionsOrFallback)
     },
   }),
 }))
@@ -57,12 +60,12 @@ const playerControlsProps: PlayerControlsProps = {
   },
 }
 
-const skipSegment = {
+const skipSegment: MediaSegmentDto = {
   Id: 'segment-1',
   Type: 'Intro',
   StartTicks: 10,
   EndTicks: 20,
-} as MediaSegmentDto
+}
 
 type SurfaceProps = ComponentProps<typeof PlayerSurface>
 
@@ -190,7 +193,10 @@ describe('PlayerSurface', () => {
     expect(overlay?.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(
-      container.querySelector('[aria-label="Fill screen"]') as HTMLElement,
+      asElement(
+        container.querySelector('[aria-label="Fill screen"]'),
+        HTMLElement,
+      ),
     )
 
     expect(onToggleVideoFitMode).toHaveBeenCalledTimes(1)

@@ -56,8 +56,8 @@ export function createStandardQueryOptions<TData>({
     retry: shouldRetryQuery,
     retryDelay: getRetryDelay,
     select,
-    throwOnError: (error: unknown) => {
-      handleQueryError(error, { queryKey, operation })
+    throwOnError: (cause: unknown) => {
+      handleQueryError(cause, { queryKey, operation })
       return false
     },
   }

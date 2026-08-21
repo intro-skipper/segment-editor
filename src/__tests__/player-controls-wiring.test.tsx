@@ -15,38 +15,53 @@ import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 type PlayerProps = ComponentProps<typeof Player>
 
-const mocks = vi.hoisted(() => ({
-  playerSurfaceProps: [] as Array<unknown>,
-  videoPlayerError: null as VideoPlayerError | null,
-  videoPlayerIsRecovering: false,
-  setShowVideoPlayer: vi.fn(),
-  setPreferredAudioLanguage: vi.fn(),
-  setPreferredSubtitleLanguage: vi.fn(),
-  setSubtitlesEnabled: vi.fn(),
-  setPlayerVolume: vi.fn(),
-  setPlayerMuted: vi.fn(),
-  selectAudioTrack: vi.fn(() => Promise.resolve(true)),
-  selectSubtitleTrack: vi.fn(() => Promise.resolve(true)),
-  resizeJassub: vi.fn(),
-  setJassubUserOffset: vi.fn(),
-  retry: vi.fn(),
-  videoElement: null as HTMLVideoElement | null,
-  videoPlayerIsLoading: true,
-  videoRef: null as null | { current: HTMLVideoElement | null },
-  trackManagerIsLoading: true,
-  audioSwitchTranscodeScope: 'all' as AudioSwitchTranscodeScope,
-  segmentSkipMode: 'button',
-  segmentSkipModeRevision: 0,
-  fullscreenUi: {
-    isFullscreen: true,
-    showFullscreenControls: false,
-    videoFitMode: 'cover' as const,
-    toggleVideoFitMode: vi.fn(),
-    handleVideoInteraction: vi.fn(),
-    handleFullscreenMouseMove: vi.fn(),
-    handleContainerMouseLeave: vi.fn(),
-  },
-}))
+/** Mock state the tests reassign between renders. */
+interface PlayerMockState {
+  playerSurfaceProps: Array<PlayerSurfaceProps>
+  videoPlayerError: VideoPlayerError | null
+  videoElement: HTMLVideoElement | null
+  videoRef: { current: HTMLVideoElement | null } | null
+  audioSwitchTranscodeScope: AudioSwitchTranscodeScope
+}
+
+const mocks = vi.hoisted(() => {
+  const state: PlayerMockState = {
+    playerSurfaceProps: [],
+    videoPlayerError: null,
+    videoElement: null,
+    videoRef: null,
+    audioSwitchTranscodeScope: 'all',
+  }
+
+  return {
+    ...state,
+    videoPlayerIsRecovering: false,
+    setShowVideoPlayer: vi.fn(),
+    setPreferredAudioLanguage: vi.fn(),
+    setPreferredSubtitleLanguage: vi.fn(),
+    setSubtitlesEnabled: vi.fn(),
+    setPlayerVolume: vi.fn(),
+    setPlayerMuted: vi.fn(),
+    selectAudioTrack: vi.fn(() => Promise.resolve(true)),
+    selectSubtitleTrack: vi.fn(() => Promise.resolve(true)),
+    resizeJassub: vi.fn(),
+    setJassubUserOffset: vi.fn(),
+    retry: vi.fn(),
+    videoPlayerIsLoading: true,
+    trackManagerIsLoading: true,
+    segmentSkipMode: 'button',
+    segmentSkipModeRevision: 0,
+    fullscreenUi: {
+      isFullscreen: true,
+      showFullscreenControls: false,
+      videoFitMode: 'cover' as const,
+      toggleVideoFitMode: vi.fn(),
+      handleVideoInteraction: vi.fn(),
+      handleFullscreenMouseMove: vi.fn(),
+      handleContainerMouseLeave: vi.fn(),
+    },
+  }
+})
 
 const trackState = {
   audioTracks: [
@@ -82,11 +97,18 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/components/player/PlayerSurface', () => ({
-  PlayerSurface: (props: unknown) => {
+  PlayerSurface: (props: PlayerSurfaceProps) => {
     mocks.playerSurfaceProps.push(props)
     return null
   },
 }))
+
+/** The props from the most recent PlayerSurface render. */
+function latestSurfaceProps(): PlayerSurfaceProps {
+  const props = mocks.playerSurfaceProps.at(-1)
+  if (!props) throw new Error('PlayerSurface has not rendered yet')
+  return props
+}
 
 vi.mock('@/components/player/PlayerScrubber', () => ({
   PlayerScrubber: () => null,
@@ -167,21 +189,26 @@ vi.mock('@/stores/app-store', () => {
     setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
     setSubtitlesEnabled: mocks.setSubtitlesEnabled,
   })
-  const useAppStore = (selector: (state: unknown) => unknown) =>
-    selector(getState())
+  const useAppStore = <TSelected,>(
+    selector: (state: ReturnType<typeof getState>) => TSelected,
+  ) => selector(getState())
   useAppStore.getState = getState
   return { useAppStore }
 })
 
-vi.mock('@/stores/session-store', () => ({
-  useSessionStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      playerVolume: 0.8,
-      playerMuted: false,
-      setPlayerVolume: mocks.setPlayerVolume,
-      setPlayerMuted: mocks.setPlayerMuted,
-    }),
-}))
+vi.mock('@/stores/session-store', () => {
+  const getState = () => ({
+    playerVolume: 0.8,
+    playerMuted: false,
+    setPlayerVolume: mocks.setPlayerVolume,
+    setPlayerMuted: mocks.setPlayerMuted,
+  })
+  return {
+    useSessionStore: <TSelected,>(
+      selector: (state: ReturnType<typeof getState>) => TSelected,
+    ) => selector(getState()),
+  }
+})
 
 function createItem(): BaseItemDto {
   return {
@@ -248,7 +275,7 @@ describe('Player controls wiring', () => {
   it('passes Player state, handlers, and render groups through to PlayerSurface', () => {
     const utils = renderPlayer()
 
-    let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    let surfaceProps = latestSurfaceProps()
     expect(surfaceProps.fullscreen).toMatchObject({
       isFullscreen: true,
       showControls: false,
@@ -293,7 +320,7 @@ describe('Player controls wiring', () => {
     mocks.videoPlayerIsRecovering = true
     utils.rerender(playerElement())
 
-    surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    surfaceProps = latestSurfaceProps()
     expect(surfaceProps.playback.error).toEqual(mediaError)
     expect(surfaceProps.playback.isRecovering).toBe(true)
     surfaceProps.playback.onRetry()
@@ -306,7 +333,7 @@ describe('Player controls wiring', () => {
 
     renderPlayer()
 
-    const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    const surfaceProps = latestSurfaceProps()
     const controlsProps = surfaceProps.controlsProps
 
     expect(controlsProps.trackControls?.availability).toBe('available')
@@ -335,20 +362,22 @@ describe('Player controls wiring', () => {
     mocks.videoElement!.currentTime = 12
 
     act(() => {
-      const surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+      const surfaceProps = latestSurfaceProps()
+      // SAFETY: handleTimeUpdate reads only `currentTarget`; the rest of the
+      // synthetic event is never touched on this path.
       surfaceProps.video.onTimeUpdate({
         currentTarget: mocks.videoElement,
       } as SyntheticEvent<HTMLVideoElement>)
     })
 
-    let surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    let surfaceProps = latestSurfaceProps()
     expect(surfaceProps.segmentSkip?.segment).toBe(intro)
 
     act(() => {
       surfaceProps.segmentSkip?.onSkipSegment(intro)
     })
 
-    surfaceProps = mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+    surfaceProps = latestSurfaceProps()
     expect(mocks.videoElement!.currentTime).toBe(20)
     expect(surfaceProps.segmentSkip).toBeNull()
   })

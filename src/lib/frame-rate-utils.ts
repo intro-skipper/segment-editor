@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 import { parseFrameRate } from './time-utils'
 import { DEFAULT_FRAME_STEP } from './constants'
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -10,34 +12,50 @@ const FRAME_RATE_FIELDS: ReadonlyArray<FrameRateField> = [
   'FrameRate',
 ]
 
-function readNumericLikeField(
-  source: unknown,
-  field: FrameRateField,
-): string | number | undefined {
-  if (!source || typeof source !== 'object') return undefined
-  const value = (source as Record<string, unknown>)[field]
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value
-  }
-  return undefined
-}
+/** A frame rate as servers report it: a number, or a rational string. */
+const FrameRateValueSchema = z
+  .union([z.string(), z.number()])
+  .optional()
+  .catch(undefined)
 
-function isVideoStream(stream: unknown): boolean {
-  if (!stream || typeof stream !== 'object') return false
-  return (stream as Record<string, unknown>).Type === 'Video'
-}
+/**
+ * The frame-rate fields this module reads. `FrameRate` is absent from the SDK's
+ * generated MediaStream but is emitted by some server versions, so the chosen
+ * stream is decoded here rather than read through the generated type.
+ */
+const FrameRateStreamSchema = z.object({
+  RealFrameRate: FrameRateValueSchema,
+  AverageFrameRate: FrameRateValueSchema,
+  FrameRate: FrameRateValueSchema,
+})
 
+/**
+ * Runs on the editor's render path, so the streams are filtered by the typed
+ * `Type` field first and only the one match is decoded.
+ */
 function getFrameStepSeconds(item: BaseItemDto): number | undefined {
+  // `MediaStreams` is server-supplied, so its array-ness is checked rather
+  // than trusted — the same reason the chosen stream is decoded below.
   const mediaStreams = item.MediaSources?.[0]?.MediaStreams
-  if (!Array.isArray(mediaStreams) || mediaStreams.length === 0) {
-    return undefined
-  }
+  if (!Array.isArray(mediaStreams)) return undefined
 
-  const videoStream = mediaStreams.find(isVideoStream)
+  // Only the first video stream carries the item's frame rate. The elements
+  // are no more trustworthy than the array, so the predicate takes them as
+  // `unknown` rather than reading `.Type` off whatever the server sent.
+  const videoStream = mediaStreams.find(
+    (stream: unknown) =>
+      typeof stream === 'object' &&
+      stream !== null &&
+      'Type' in stream &&
+      stream.Type === 'Video',
+  )
   if (!videoStream) return undefined
 
+  const decoded = FrameRateStreamSchema.safeParse(videoStream)
+  if (!decoded.success) return undefined
+
   for (const field of FRAME_RATE_FIELDS) {
-    const fps = parseFrameRate(readNumericLikeField(videoStream, field))
+    const fps = parseFrameRate(decoded.data[field])
     if (fps !== null) {
       return 1 / fps
     }

@@ -226,10 +226,9 @@ describe('API Operation Notifications', () => {
               : type === 'negative'
                 ? 'error'
                 : type
-          const [, options] = (toast[toastMethod] as ReturnType<typeof vi.fn>)
-            .mock.calls[0]
+          const [, options] = vi.mocked(toast[toastMethod]).mock.calls[0]
 
-          expect(options.duration).toBe(4000)
+          expect(options?.duration).toBe(4000)
 
           return true
         },

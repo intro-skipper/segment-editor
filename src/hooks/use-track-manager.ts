@@ -120,6 +120,8 @@ function buildSelectionUpdater(
 ): (prev: UserTrackSelectionState) => UserTrackSelectionState {
   return (prev) => {
     if (prev.key !== key) return { key, ...EMPTY_SELECTION, ...patch }
+    // SAFETY: `patch` is typed as a partial selection state, so its own
+    // keys are selection fields; Object.keys only widens them to string.
     const changed = (
       Object.keys(patch) as Array<keyof Omit<UserTrackSelectionState, 'key'>>
     ).some((field) => prev[field] !== patch[field])
@@ -250,8 +252,8 @@ export function useTrackManager({
       // A rejected probe (mediaCapabilities throwing) leaves the static
       // allowlist as the answer for this item, which is a usable fallback,
       // but log it instead of dropping it into an unhandled rejection.
-      .catch((probeError: unknown) => {
-        console.error('[TrackManager] Audio decoder probe failed:', probeError)
+      .catch((cause: unknown) => {
+        console.error('[TrackManager] Audio decoder probe failed:', cause)
       })
     return () => {
       stale = true
@@ -320,8 +322,10 @@ export function useTrackManager({
     showError(t('player.tracks.error.switchFailed'), detail ?? undefined)
   }
 
-  const reportCaughtSwitchError = (err: unknown): void => {
-    reportSwitchError(err instanceof Error && err.message ? err.message : null)
+  const reportCaughtSwitchError = (cause: unknown): void => {
+    reportSwitchError(
+      cause instanceof Error && cause.message ? cause.message : null,
+    )
   }
 
   const containerDefaultAudioIndex =

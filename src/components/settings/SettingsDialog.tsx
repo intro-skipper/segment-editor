@@ -31,7 +31,10 @@ export default function SettingsDialog() {
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      triggerRef.current = document.activeElement as HTMLElement
+      const active = document.activeElement
+      // Keep the previous trigger when focus sits on a non-HTML element (an
+      // inline SVG control, or null mid-transition) so close still restores it.
+      if (active instanceof HTMLElement) triggerRef.current = active
     }
     setSettingsOpen(open)
     if (!open) {

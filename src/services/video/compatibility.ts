@@ -13,6 +13,7 @@ import {
   probeCanPlayType,
 } from '@/services/video/capabilities'
 import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
+import { lookup } from '@/lib/utils'
 
 // ============================================================================
 // Types and Interfaces
@@ -147,14 +148,14 @@ export function getCacheSize(): number {
 
 /**
  * H.264 profile_idc values keyed by the profile name Jellyfin reports.
- * The `| undefined` value type keeps the miss-fallbacks type-required.
+ * Reads go through `lookup`, which reports a miss as undefined.
  */
-const H264_PROFILE_IDS: Record<string, string | undefined> = {
+const H264_PROFILE_IDS = {
   baseline: '42',
   'constrained baseline': '42',
   main: '4D',
   high: '64',
-}
+} satisfies Record<string, string>
 
 /** profile_idc used when the media source does not report a profile. */
 const DEFAULT_H264_PROFILE_ID = '64'
@@ -162,12 +163,12 @@ const DEFAULT_H264_PROFILE_ID = '64'
 const DEFAULT_H264_LEVEL_ID = '28'
 
 /** VP9 profile ids keyed by the profile name Jellyfin reports. */
-const VP9_PROFILE_IDS: Record<string, string | undefined> = {
+const VP9_PROFILE_IDS = {
   'profile 0': '00',
   'profile 1': '01',
   'profile 2': '02',
   'profile 3': '03',
-}
+} satisfies Record<string, string>
 
 const DEFAULT_VP9_PROFILE_ID = '00'
 const DEFAULT_VP9_LEVEL_ID = '10'
@@ -217,7 +218,7 @@ function toHexByte(value: number): string {
  */
 export function buildH264CodecString(profile?: string, level?: number): string {
   const profileId =
-    H264_PROFILE_IDS[profile?.trim().toLowerCase() ?? ''] ??
+    lookup(H264_PROFILE_IDS, profile?.trim().toLowerCase() ?? '') ??
     DEFAULT_H264_PROFILE_ID
   const normalizedLevel = normalizeDecimalLevel(level)
   const levelId =
@@ -284,11 +285,11 @@ function normalizeAv1SeqLevel(level: number | undefined): number {
  * AV1 profile ids keyed by the profile name Jellyfin reports.
  * Main = 0 (4:2:0), High = 1 (4:4:4), Professional = 2 (4:2:2 / 12-bit).
  */
-const AV1_PROFILE_IDS: Record<string, string | undefined> = {
+const AV1_PROFILE_IDS = {
   main: '0',
   high: '1',
   professional: '2',
-}
+} satisfies Record<string, string>
 
 /**
  * Builds an `av01.<profile>.<seq level>M.<bit depth>` codec string from AV1
@@ -312,7 +313,7 @@ export function buildAv1CodecString(
   const profileId =
     depth === '12'
       ? '2'
-      : (AV1_PROFILE_IDS[profile?.trim().toLowerCase() ?? ''] ?? '0')
+      : (lookup(AV1_PROFILE_IDS, profile?.trim().toLowerCase() ?? '') ?? '0')
   return `av01.${profileId}.${seqLevel}M.${depth}`
 }
 
@@ -333,7 +334,7 @@ export function buildVp9CodecString(
   bitDepth?: number,
 ): string {
   let profileId =
-    VP9_PROFILE_IDS[profile?.trim().toLowerCase() ?? ''] ??
+    lookup(VP9_PROFILE_IDS, profile?.trim().toLowerCase() ?? '') ??
     DEFAULT_VP9_PROFILE_ID
   const normalizedLevel = normalizeDecimalLevel(level)
   const levelId =
@@ -361,10 +362,7 @@ function buildHevcContentType(video?: VideoStreamInfo): string {
  * its keys, so a codec can never be listed as supported without a way to build
  * its content type (or the reverse).
  */
-const VIDEO_CODEC_CONTENT_TYPE_BUILDERS: Record<
-  string,
-  ((video?: VideoStreamInfo) => string) | undefined
-> = {
+const VIDEO_CODEC_CONTENT_TYPE_BUILDERS = {
   h264: (video) =>
     `video/mp4; codecs="${buildH264CodecString(video?.profile, video?.level)}"`,
   hevc: buildHevcContentType,
@@ -373,7 +371,7 @@ const VIDEO_CODEC_CONTENT_TYPE_BUILDERS: Record<
     `video/webm; codecs="${buildVp9CodecString(video?.profile, video?.level, video?.bitDepth)}"`,
   av1: (video) =>
     `video/mp4; codecs="${buildAv1CodecString(video?.profile, video?.level, video?.bitDepth)}"`,
-}
+} satisfies Record<string, (video?: VideoStreamInfo) => string>
 
 /**
  * Supported video codecs for direct play.
@@ -392,7 +390,7 @@ export function buildVideoContentType(
   codec: string,
   video?: VideoStreamInfo,
 ): string | null {
-  const build = VIDEO_CODEC_CONTENT_TYPE_BUILDERS[codec.toLowerCase()]
+  const build = lookup(VIDEO_CODEC_CONTENT_TYPE_BUILDERS, codec.toLowerCase())
   return build ? build(video) : null
 }
 
@@ -401,14 +399,14 @@ export function buildVideoContentType(
  * definition of which audio codecs are direct playable:
  * {@link DIRECT_PLAY_AUDIO_CODECS} is derived from its keys.
  */
-const AUDIO_CODEC_MIME_MAP: Record<string, string | undefined> = {
+const AUDIO_CODEC_MIME_MAP = {
   aac: 'audio/mp4; codecs="mp4a.40.2"',
   mp3: 'audio/mpeg',
   opus: 'audio/webm; codecs="opus"',
   flac: 'audio/flac',
   ac3: 'audio/mp4; codecs="ac-3"',
   eac3: 'audio/mp4; codecs="ec-3"',
-}
+} satisfies Record<string, string>
 
 /**
  * Supported audio codecs for direct play.
@@ -422,7 +420,7 @@ export const DIRECT_PLAY_AUDIO_CODECS: ReadonlyArray<string> =
  * @returns The content type, or null when the codec is not direct playable
  */
 export function buildAudioContentType(codec: string): string | null {
-  return AUDIO_CODEC_MIME_MAP[codec.toLowerCase()] ?? null
+  return lookup(AUDIO_CODEC_MIME_MAP, codec.toLowerCase()) ?? null
 }
 
 // ============================================================================

@@ -9,17 +9,19 @@ import { createApi, getRequestConfig, isAborted } from './core'
 import type { ApiOptions, AuthCredentials, AuthResult } from './types'
 import { ConnectionAuthSchema } from '@/lib/forms/connection-form'
 import { AppError, ErrorCodes, isAbortError } from '@/lib/unified-error'
+import type { ErrorCode } from '@/lib/unified-error'
+import { lookup } from '@/lib/utils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Messages (DRY: single source of truth)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const AUTH_ERROR_MESSAGES: Record<string, string> = {
+const AUTH_ERROR_MESSAGES = {
   [ErrorCodes.UNAUTHORIZED]: 'Invalid credentials',
   [ErrorCodes.FORBIDDEN]: 'Access denied',
   [ErrorCodes.NETWORK_ERROR]: 'Network connection failed',
   [ErrorCodes.TIMEOUT]: 'Connection timed out',
-}
+} satisfies Partial<Record<ErrorCode, string>>
 
 function getCredentialValidationError(
   serverAddress: string,
@@ -144,14 +146,14 @@ async function fetchServerVersion(
   }
 }
 
-function handleAuthError(error: unknown, options?: ApiOptions): AuthResult {
-  if (isAbortError(error) || isAborted(options?.signal)) {
+function handleAuthError(cause: unknown, options?: ApiOptions): AuthResult {
+  if (isAbortError(cause) || isAborted(options?.signal)) {
     return { success: false, error: 'Authentication cancelled' }
   }
 
-  const appError = AppError.from(error, 'Authentication failed')
+  const appError = AppError.from(cause, 'Authentication failed')
   return {
     success: false,
-    error: AUTH_ERROR_MESSAGES[appError.code] ?? appError.message,
+    error: lookup(AUTH_ERROR_MESSAGES, appError.code) ?? appError.message,
   }
 }

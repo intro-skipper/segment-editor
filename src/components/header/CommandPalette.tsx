@@ -31,13 +31,11 @@ const SEARCH_RESULT_LIMIT = 80
 const SEARCH_DEBOUNCE_MS = 140
 const MIN_SEARCH_LENGTH = 1
 const VIRTUAL_OVERSCAN = 4
-const EXCLUDED_ITEM_TYPE_LOOKUP: Record<string, true> = {
-  [BaseItemKind.Episode]: true,
-  [BaseItemKind.Season]: true,
-}
-const EXCLUDED_ITEM_TYPES = Object.keys(
-  EXCLUDED_ITEM_TYPE_LOOKUP,
-) as Array<BaseItemKind>
+const EXCLUDED_ITEM_TYPES: Array<BaseItemKind> = [
+  BaseItemKind.Episode,
+  BaseItemKind.Season,
+]
+const EXCLUDED_ITEM_TYPE_LOOKUP = new Set(EXCLUDED_ITEM_TYPES)
 
 interface CommandPaletteProps {
   open: boolean
@@ -95,6 +93,10 @@ function commandPaletteReducer(
   }
 }
 
+// Annotated rather than `satisfies` so `item.Type` can index it directly.
+// `Partial` already types the miss as `undefined`, and React Compiler only
+// treats `<Icon />` as a static component when it can trace the read back to
+// this table; routing it through `lookup` makes the component opaque.
 const ITEM_ICONS: Partial<Record<BaseItemKind, typeof Film>> = {
   [BaseItemKind.Movie]: Film,
   [BaseItemKind.Series]: Tv,
@@ -246,7 +248,7 @@ export default function CommandPalette({
   const resultItems = excludedItemTypes
     ? queriedItems.filter(
         (item) =>
-          item.Type === undefined || !(item.Type in EXCLUDED_ITEM_TYPE_LOOKUP),
+          item.Type === undefined || !EXCLUDED_ITEM_TYPE_LOOKUP.has(item.Type),
       )
     : queriedItems
 
@@ -311,7 +313,10 @@ export default function CommandPalette({
 
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {
-      triggerRef.current = document.activeElement as HTMLElement
+      const active = document.activeElement
+      // Keep the previous trigger when focus sits on a non-HTML element (an
+      // inline SVG control, or null mid-transition) so close still restores it.
+      if (active instanceof HTMLElement) triggerRef.current = active
     }
 
     if (!isOpen) {

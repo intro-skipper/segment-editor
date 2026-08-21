@@ -47,14 +47,14 @@ const CHAPTER_NAME_MAP = new Map<string, MediaSegmentType>(
   CHAPTER_NAME_KEYWORDS,
 )
 
-const SEGMENT_TYPE_NAMES: Record<MediaSegmentType, string> = {
+const SEGMENT_TYPE_NAMES = {
   [MediaSegmentType.Intro]: 'Intro',
   [MediaSegmentType.Outro]: 'Outro',
   [MediaSegmentType.Preview]: 'Preview',
   [MediaSegmentType.Recap]: 'Recap',
   [MediaSegmentType.Commercial]: 'Commercial',
   [MediaSegmentType.Unknown]: 'Unknown',
-}
+} satisfies Record<MediaSegmentType, string>
 
 export function getSegmentTypeFromChapterName(name: string): MediaSegmentType {
   const normalized = name.toLowerCase().trim()

@@ -35,9 +35,11 @@ const mockApis = {
 
 // Mock the jellyfin service module (main entry point)
 vi.mock('@/services/jellyfin', () => ({
-  withApi: vi.fn(async (fn: (apis: typeof mockApis) => Promise<unknown>) => {
-    return fn(mockApis)
-  }),
+  withApi: vi.fn(
+    async <TResult>(fn: (apis: typeof mockApis) => Promise<TResult>) => {
+      return fn(mockApis)
+    },
+  ),
   getRequestConfig: vi.fn(
     (
       options?: { signal?: AbortSignal; timeout?: number },
@@ -82,17 +84,17 @@ const uuidArb = fc
   )
 
 // Arbitrary for segment types
-const segmentTypeArb = fc.constantFrom(
+const segmentTypeArb: fc.Arbitrary<MediaSegmentDto['Type']> = fc.constantFrom(
   'Intro',
   'Outro',
   'Preview',
   'Recap',
   'Commercial',
   'Unknown',
-) as fc.Arbitrary<MediaSegmentDto['Type']>
+)
 
 // Arbitrary for valid MediaSegmentDto
-const segmentArb = fc
+const segmentArb: fc.Arbitrary<MediaSegmentDto> = fc
   .record({
     Id: uuidArb,
     ItemId: uuidArb,
@@ -100,7 +102,7 @@ const segmentArb = fc
     StartTicks: fc.integer({ min: 0, max: 36000 }),
     EndTicks: fc.integer({ min: 1, max: 36001 }),
   })
-  .filter((s) => s.StartTicks < s.EndTicks) as fc.Arbitrary<MediaSegmentDto>
+  .filter((s) => s.StartTicks < s.EndTicks)
 
 // Create a wrapper with QueryClient for testing hooks
 function createWrapper() {

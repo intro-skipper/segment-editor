@@ -19,19 +19,31 @@ import { useAppStore } from '@/stores/app-store'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 
-const mocks = vi.hoisted(() => ({
-  playerSurfaceProps: [] as Array<unknown>,
-  hlsVideoRef: { current: null as HTMLVideoElement | null },
-  fullscreenUi: {
-    isFullscreen: false,
-    showFullscreenControls: true,
-    videoFitMode: 'contain' as const,
-    toggleVideoFitMode: vi.fn(),
-    handleVideoInteraction: vi.fn(),
-    handleFullscreenMouseMove: vi.fn(),
-    handleContainerMouseLeave: vi.fn(),
-  },
-}))
+/** Mock state the tests read back after each render. */
+interface PlayerMockState {
+  playerSurfaceProps: Array<PlayerSurfaceProps>
+  hlsVideoRef: { current: HTMLVideoElement | null }
+}
+
+const mocks = vi.hoisted(() => {
+  const state: PlayerMockState = {
+    playerSurfaceProps: [],
+    hlsVideoRef: { current: null },
+  }
+
+  return {
+    ...state,
+    fullscreenUi: {
+      isFullscreen: false,
+      showFullscreenControls: true,
+      videoFitMode: 'contain' as const,
+      toggleVideoFitMode: vi.fn(),
+      handleVideoInteraction: vi.fn(),
+      handleFullscreenMouseMove: vi.fn(),
+      handleContainerMouseLeave: vi.fn(),
+    },
+  }
+})
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -40,12 +52,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/components/player/PlayerSurface', () => ({
-  PlayerSurface: (props: unknown) => {
+  PlayerSurface: (props: PlayerSurfaceProps) => {
     // Attach a video element the way the real surface would, so the direct
     // play wiring and manual track selection see a live element.
-    const videoRef = (
-      props as { videoRef: { current: HTMLVideoElement | null } }
-    ).videoRef
+    const videoRef = props.videoRef
     if (!videoRef.current) {
       videoRef.current = document.createElement('video')
     }
@@ -158,7 +168,9 @@ function createItem(): BaseItemDto {
 }
 
 function latestSurfaceProps(): PlayerSurfaceProps {
-  return mocks.playerSurfaceProps.at(-1) as PlayerSurfaceProps
+  const props = mocks.playerSurfaceProps.at(-1)
+  if (!props) throw new Error('PlayerSurface has not rendered yet')
+  return props
 }
 
 describe('Player audio preference persistence', () => {

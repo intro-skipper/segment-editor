@@ -22,9 +22,9 @@ let jassubImportPromise: Promise<typeof JASSUB> | null = null
 async function loadJassubRenderer(): Promise<typeof JASSUB> {
   jassubImportPromise ??= import('jassub')
     .then((module) => module.default)
-    .catch((err: unknown) => {
+    .catch((cause: unknown) => {
       jassubImportPromise = null
-      throw err
+      throw cause
     })
 
   return jassubImportPromise
@@ -47,7 +47,7 @@ export interface JassubRendererResult {
   setTrack: (url: string) => Promise<void>
 }
 
-interface CreateRendererOptions {
+export interface CreateRendererOptions {
   video: HTMLVideoElement
   track: SubtitleTrackInfo
   item: BaseItemDto

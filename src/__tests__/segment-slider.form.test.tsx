@@ -10,11 +10,15 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { asElement } from './helpers/dom'
+import { lookup } from '@/lib/utils'
+import { resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 
-const translations: Record<string, string> = {
+const translations = {
   'accessibility.copySegment': 'Copy segment',
   'accessibility.deleteSegment': 'Delete segment',
   'accessibility.seekToEnd': 'Seek to end',
@@ -35,8 +39,8 @@ const translations: Record<string, string> = {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
-    t: (key: string, fallback?: string) =>
-      translations[key] ?? (typeof fallback === 'string' ? fallback : key),
+    t: (key: string, fallback?: TranslationArg) =>
+      lookup(translations, key) ?? resolveTranslation(key, fallback),
   }),
 }))
 
@@ -135,9 +139,10 @@ describe('SegmentSlider TanStack Form migration', () => {
   it('defers commits from typed input until blur', async () => {
     const { onUpdate } = renderSlider()
 
-    const startInput = document.getElementById(
-      'segment-segment-1-start',
-    ) as HTMLInputElement
+    const startInput = asElement(
+      document.getElementById('segment-segment-1-start'),
+      HTMLInputElement,
+    )
     fireEvent.change(startInput, { target: { value: '12' } })
 
     expect(onUpdate).not.toHaveBeenCalled()
@@ -157,9 +162,10 @@ describe('SegmentSlider TanStack Form migration', () => {
   it('reverts invalid typed input to the last valid value on blur without committing', async () => {
     const { onUpdate } = renderSlider()
 
-    const startInput = document.getElementById(
-      'segment-segment-1-start',
-    ) as HTMLInputElement
+    const startInput = asElement(
+      document.getElementById('segment-segment-1-start'),
+      HTMLInputElement,
+    )
     fireEvent.change(startInput, { target: { value: '25' } })
 
     await screen.findByText('Start time must be less than end time')
@@ -174,9 +180,10 @@ describe('SegmentSlider TanStack Form migration', () => {
     const { onUpdate } = renderSlider()
 
     const endHandle = screen.getAllByRole('slider', { name: /end handle/i })[0]
-    const sliderTrack = screen.getByRole('group', {
-      name: /segment slider group/i,
-    }) as HTMLFieldSetElement
+    const sliderTrack = asElement(
+      screen.getByRole('group', { name: /segment slider group/i }),
+      HTMLFieldSetElement,
+    )
     expect(sliderTrack.getAttribute('aria-describedby')).toBe(
       'segment-segment-1-description',
     )
@@ -199,9 +206,10 @@ describe('SegmentSlider TanStack Form migration', () => {
     fireEvent.pointerDown(endHandle, { clientX: 20, pointerId: 1 })
     fireEvent.pointerMove(sliderTrack, { clientX: 35, pointerId: 1 })
 
-    const endInput = document.getElementById(
-      'segment-segment-1-end',
-    ) as HTMLInputElement
+    const endInput = asElement(
+      document.getElementById('segment-segment-1-end'),
+      HTMLInputElement,
+    )
     await waitFor(() => {
       expect(endInput.value).toBe('35')
     })
@@ -237,9 +245,10 @@ describe('SegmentSlider TanStack Form migration', () => {
     const startHandle = screen.getByRole('slider', { name: /start handle/i })
     fireEvent.keyDown(startHandle, { key: 'ArrowRight' })
 
-    const startInput = document.getElementById(
-      'segment-segment-1-start',
-    ) as HTMLInputElement
+    const startInput = asElement(
+      document.getElementById('segment-segment-1-start'),
+      HTMLInputElement,
+    )
     await waitFor(() => {
       expect(startInput.value).toBe('10.093')
     })
@@ -263,9 +272,10 @@ describe('SegmentSlider TanStack Form migration', () => {
       />,
     )
 
-    const startInput = document.getElementById(
-      'segment-segment-1-start',
-    ) as HTMLInputElement
+    const startInput = asElement(
+      document.getElementById('segment-segment-1-start'),
+      HTMLInputElement,
+    )
     fireEvent.focus(startInput)
     fireEvent.change(startInput, { target: { value: '12' } })
 

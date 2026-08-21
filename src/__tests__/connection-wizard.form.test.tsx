@@ -3,6 +3,7 @@
  */
 
 import * as React from 'react'
+import { asElement } from './helpers/dom'
 import {
   cleanup,
   fireEvent,
@@ -141,7 +142,7 @@ describe('ConnectionWizard TanStack Form migration', () => {
     await screen.findByText('Please enter a server address')
 
     expect(discoverServersMock).not.toHaveBeenCalled()
-    expect((addressInput as HTMLInputElement).value).toBe('   ')
+    expect(asElement(addressInput, HTMLInputElement).value).toBe('   ')
   })
 
   it('preserves the entered address and selected server when navigating back', async () => {

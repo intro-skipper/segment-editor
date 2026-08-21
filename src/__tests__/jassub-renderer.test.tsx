@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import type { CreateRendererOptions } from '@/services/video/subtitle'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
@@ -21,7 +22,7 @@ const { resizeSpy, destroySpy, createRendererSpy, control } = vi.hoisted(
 vi.mock('@/services/video/subtitle', () => ({
   requiresJassubRenderer: () => true,
   preloadJassubRenderer: () => control.preload,
-  createJassubRenderer: (options: unknown) => {
+  createJassubRenderer: (options: CreateRendererOptions) => {
     createRendererSpy(options)
     return Promise.resolve({
       instance: { resize: resizeSpy },
@@ -58,7 +59,7 @@ const ASS_TRACK = subtitleTrack(2, {
   isDefault: true,
 })
 
-const ITEM = { Id: 'item-1', Name: 'Movie', Type: 'Movie' } as BaseItemDto
+const ITEM: BaseItemDto = { Id: 'item-1', Name: 'Movie', Type: 'Movie' }
 
 /** A video the renderer will measure: metadata ready and non-zero layout. */
 function createMeasurableVideo() {
@@ -195,7 +196,7 @@ describe('JASSUB renderer setup reactivity', () => {
     })
 
     const view = renderRenderer()
-    const renamed = { ...ITEM, Name: 'Renamed while loading' } as BaseItemDto
+    const renamed: BaseItemDto = { ...ITEM, Name: 'Renamed while loading' }
 
     await act(async () => {
       view.rerender({ item: renamed })

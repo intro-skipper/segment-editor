@@ -177,7 +177,7 @@ export function useFullscreenPlayerUi({
    * - In fullscreen: single tap/click shows OSD, double tap/click toggles fit mode
    */
   const handleVideoInteraction = (event: MouseEvent | TouchEvent) => {
-    const target = event.target as HTMLElement | null
+    const target = event.target instanceof Element ? event.target : null
     if (target?.closest('[data-player-controls-overlay="true"]')) {
       return
     }

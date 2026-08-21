@@ -24,9 +24,8 @@ function detectBrowserLocale(): SupportedLocale {
   if (!browserLang) return 'en-US'
 
   // Check for exact match first
-  if (supportedLocales.includes(browserLang as SupportedLocale)) {
-    return browserLang as SupportedLocale
-  }
+  const exact = supportedLocales.find((locale) => locale === browserLang)
+  if (exact) return exact
 
   // Check for language code match (e.g., 'de-DE' -> 'de')
   const langCode = browserLang.split('-')[0]
@@ -47,11 +46,7 @@ function getInitialLocale(): SupportedLocale {
     return detectBrowserLocale()
   }
 
-  if (supportedLocales.includes(stored as SupportedLocale)) {
-    return stored as SupportedLocale
-  }
-
-  return 'en-US'
+  return supportedLocales.find((locale) => locale === stored) ?? 'en-US'
 }
 
 void i18n.use(initReactI18next).init({

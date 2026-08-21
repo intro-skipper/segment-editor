@@ -17,13 +17,16 @@ const MAX_SAFE_SECONDS = MAX_SAFE_TICKS / JELLYFIN_CONFIG.TICKS_PER_SECOND
 const MIN_TIME_VALUE = 0
 
 /**
- * Safely converts a value to a finite number.
- * Returns 0 for null, undefined, NaN, Infinity, or non-numeric values.
- * @param value - Any value to convert
+ * Safely reduces a value to a finite number.
+ * Returns 0 for null, undefined, NaN, Infinity, and non-numeric strings.
+ * Strings are coerced rather than discarded because some server
+ * configurations serialize Int64 tick fields as JSON strings even though the
+ * DTOs type them as numbers.
+ * @param value - The value to make safe
  * @returns A finite number, or 0 for invalid inputs
  */
-function toSafeNumber(value: unknown): number {
-  if (value == null) return 0
+function toSafeNumber(value: number | string | null | undefined): number {
+  if (value === null || value === undefined) return 0
   const num = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(num) ? num : 0
 }
@@ -46,10 +49,14 @@ function clampToTimeRange(
 /**
  * Converts .NET ticks to seconds.
  * Returns 0 for invalid inputs (null, undefined, NaN, Infinity, negative).
+ * Accepts a string because this is the boundary where server-supplied ticks
+ * enter, and Int64 fields can arrive JSON-encoded as strings.
  * @param ticks - Tick value to convert
  * @returns Seconds value, clamped to valid range [0, MAX_SAFE_SECONDS]
  */
-export function ticksToSeconds(ticks: number | null | undefined): number {
+export function ticksToSeconds(
+  ticks: number | string | null | undefined,
+): number {
   const safeTicks = toSafeNumber(ticks)
   if (safeTicks < MIN_TIME_VALUE) return 0
   if (safeTicks > MAX_SAFE_TICKS) return MAX_SAFE_SECONDS
@@ -109,11 +116,11 @@ export function formatReadableTime(timeInSeconds: number): string {
   const minutes = Math.floor((time % 3600) / 60)
   const seconds = Math.floor(time % 60)
 
-  const parts: Array<string> = [
-    hours > 0 && `${hours}h`,
-    minutes > 0 && `${minutes}m`,
-    (seconds > 0 || (!hours && !minutes)) && `${seconds}s`,
-  ].filter(Boolean) as Array<string>
+  const parts = [
+    hours > 0 ? `${hours}h` : null,
+    minutes > 0 ? `${minutes}m` : null,
+    seconds > 0 || (!hours && !minutes) ? `${seconds}s` : null,
+  ].filter((part) => part !== null)
 
   return parts.join(' ')
 }
@@ -166,12 +173,10 @@ function parseTimeParts(parts: Array<string>): number {
 export function parseTimeString(
   time: string | number | null | undefined,
 ): number {
-  if (time == null) return 0
+  if (time === null || time === undefined) return 0
 
   // Handle numeric input directly
-  if (typeof time === 'number') {
-    return clampToTimeRange(time)
-  }
+  if (typeof time === 'number') return clampToTimeRange(time)
 
   const trimmed = time.trim()
   if (!trimmed) return 0

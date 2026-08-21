@@ -47,14 +47,20 @@ export function formatSegmentInputSeconds(value: number): string {
  * Both the blur-time clamping and the form schema boundary checks derive their
  * range from this single function so the two never drift apart.
  */
-export function getSegmentTimeBounds(maxDuration?: number | null): {
+/** The valid range for a segment's time fields. */
+export interface SegmentTimeBounds {
   min: 0
   max: number
-} {
+}
+
+export function getSegmentTimeBounds(
+  maxDuration?: number | null,
+): SegmentTimeBounds {
   return {
     min: 0,
     max:
-      typeof maxDuration === 'number' &&
+      maxDuration !== null &&
+      maxDuration !== undefined &&
       Number.isFinite(maxDuration) &&
       maxDuration > 0
         ? maxDuration

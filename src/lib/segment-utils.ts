@@ -3,6 +3,7 @@ import {
   SEGMENT_COLORS,
   SEGMENT_TYPES,
 } from './constants'
+import { elementAt, lookup } from './utils'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 
 export { SEGMENT_TYPES }
@@ -78,7 +79,7 @@ export const areSegmentListsEqual = (
   return (
     sortedA.length === sortedB.length &&
     sortedA.every((segment, index) => {
-      const other = sortedB[index] as MediaSegmentDto | undefined
+      const other = elementAt(sortedB, index)
       return (
         other !== undefined &&
         segment.Id === other.Id &&
@@ -126,8 +127,7 @@ const getSegmentColorConfig = (
   type: MediaSegmentType | undefined,
 ): SegmentColorConfig => {
   if (!type) return DEFAULT_SEGMENT_COLOR
-  const config = SEGMENT_COLORS[type] as SegmentColorConfig | undefined
-  return config ?? DEFAULT_SEGMENT_COLOR
+  return lookup(SEGMENT_COLORS, type) ?? DEFAULT_SEGMENT_COLOR
 }
 
 export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
@@ -215,20 +215,27 @@ export const getSegmentRegions = (
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-export const generateUUID = (): string => {
-  const cryptoApi = globalThis.crypto
+/**
+ * The Web Crypto members this module needs. `randomUUID` is gated on a secure
+ * context, so the DOM lib type over-promises it on plain-HTTP origins;
+ * `getRandomValues` carries no such gate but `globalThis.crypto` itself is
+ * absent in some non-browser runtimes. Both the object and each member are
+ * therefore checked before use.
+ */
+type OptionalCrypto = Partial<Pick<Crypto, 'getRandomValues' | 'randomUUID'>>
 
-  if (
-    typeof cryptoApi !== 'undefined' &&
-    typeof cryptoApi.randomUUID === 'function'
-  ) {
+export const generateUUID = (): string => {
+  // `typeof` rather than `'crypto' in globalThis`: embedded webviews and older
+  // runtimes leave the property declared and undefined, a state `in` reports
+  // as available even though every member read off it would then throw.
+  const cryptoApi: OptionalCrypto =
+    typeof globalThis.crypto === 'object' ? globalThis.crypto : {}
+
+  if (cryptoApi.randomUUID) {
     return cryptoApi.randomUUID()
   }
 
-  if (
-    typeof cryptoApi !== 'undefined' &&
-    typeof cryptoApi.getRandomValues === 'function'
-  ) {
+  if (cryptoApi.getRandomValues) {
     const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
     bytes[6] = (bytes[6] & 0x0f) | 0x40
     bytes[8] = (bytes[8] & 0x3f) | 0x80
@@ -243,4 +250,4 @@ export const generateUUID = (): string => {
 }
 
 export const isValidUUID = (uuid: string | null | undefined): boolean =>
-  typeof uuid === 'string' && UUID_V4.test(uuid)
+  uuid !== null && uuid !== undefined && UUID_V4.test(uuid)

@@ -328,9 +328,10 @@ export function useVideoPlayer({
 
     const requestId = playbackRequestIdRef.current
 
-    const video = event.target as HTMLVideoElement
-    const mediaError = video.error
+    const video = event.target
+    if (!(video instanceof HTMLVideoElement)) return
 
+    const mediaError = video.error
     if (!mediaError) return
 
     const videoError = createErrorFromMediaError(mediaError, t)
@@ -376,8 +377,8 @@ export function useVideoPlayer({
   )
 
   const handleInitPlaybackFailure = useEffectEvent(
-    (err: unknown, failedItemId: string) => {
-      console.error('[Player] Init playback failed:', err)
+    (cause: unknown, failedItemId: string) => {
+      console.error('[Player] Init playback failed:', cause)
       reportVideoError({
         type: 'unknown_error',
         message: t('player.error.unknown'),

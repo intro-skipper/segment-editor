@@ -103,8 +103,15 @@ function waitForVideoMetadata(
   })
 }
 
-function getErrorMessage(error: unknown, t: (key: string) => string): string {
-  const msg = error instanceof Error ? error.message.toLowerCase() : ''
+/** Lifecycle of the JASSUB subtitle renderer for the current track. */
+interface RendererState {
+  isActive: boolean
+  isLoading: boolean
+  error: string | null
+}
+
+function getErrorMessage(cause: unknown, t: (key: string) => string): string {
+  const msg = cause instanceof Error ? cause.message.toLowerCase() : ''
   if (msg.includes('timeout')) return t('player.subtitle.error.timeout')
   if (msg.includes('wasm') || msg.includes('worker'))
     return t('player.subtitle.error.wasmFailed')
@@ -184,10 +191,10 @@ export function useJassubRenderer({
   userOffset,
   t,
 }: UseJassubRendererOptions): UseJassubRendererReturn {
-  const [rendererState, setRendererState] = useState({
+  const [rendererState, setRendererState] = useState<RendererState>({
     isActive: false,
     isLoading: false,
-    error: null as string | null,
+    error: null,
   })
   const { isActive, isLoading, error } = rendererState
 
@@ -241,11 +248,11 @@ export function useJassubRenderer({
       }),
   )
 
-  const reportInitError = useEffectEvent((err: unknown) => {
-    const msg = err instanceof Error ? err.message : String(err)
+  const reportInitError = useEffectEvent((cause: unknown) => {
+    const msg = cause instanceof Error ? cause.message : String(cause)
     setRendererState((s) => ({ ...s, isLoading: false, error: msg }))
-    showError(getErrorMessage(err, t), msg)
-    console.error('[JASSUB] Init error:', err)
+    showError(getErrorMessage(cause, t), msg)
+    console.error('[JASSUB] Init error:', cause)
   })
 
   useEffect(() => {

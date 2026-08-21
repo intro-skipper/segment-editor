@@ -295,8 +295,8 @@ describe('Plugin Format Conversion', () => {
             expect(segment.Id).toBeTruthy()
             expect(segment.ItemId).toBe(itemId)
             expect(segment.Type).toBeDefined()
-            expect(typeof segment.StartTicks).toBe('number')
-            expect(typeof segment.EndTicks).toBe('number')
+            expect(segment.StartTicks).toBeTypeOf('number')
+            expect(segment.EndTicks).toBeTypeOf('number')
             expect(segment.StartTicks!).toBeLessThan(segment.EndTicks!)
 
             return true

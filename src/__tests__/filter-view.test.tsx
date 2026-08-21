@@ -3,6 +3,9 @@
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { UseItemsOptions } from '@/services/items/queries'
+import { isTranslationOptions, resolveTranslation } from './helpers/i18n-mock'
+import type { TranslationArg } from './helpers/i18n-mock'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto, VirtualFolderInfo } from '@/types/jellyfin'
@@ -29,25 +32,36 @@ const pluginModeState = vi.hoisted(() => ({
   },
 }))
 
-const collectionsQueryState = vi.hoisted(() => ({
-  current: {
-    data: [] as Array<VirtualFolderInfo> | undefined,
-    isLoading: false,
-    error: null as Error | null,
-    refetch: refetchCollectionsMock,
-  },
-}))
+/** The slice of a query result these tests drive. */
+interface QueryStub<TData> {
+  data: TData | undefined
+  isLoading: boolean
+  error: Error | null
+  refetch: () => void
+}
 
-const itemsQueryState = vi.hoisted(() => ({
-  current: {
-    data: undefined as
-      | { items: Array<BaseItemDto>; totalCount: number }
-      | undefined,
+const collectionsQueryState = vi.hoisted(() => {
+  const current: QueryStub<Array<VirtualFolderInfo>> = {
+    data: [],
     isLoading: false,
-    error: null as Error | null,
+    error: null,
+    refetch: refetchCollectionsMock,
+  }
+  return { current }
+})
+
+const itemsQueryState = vi.hoisted(() => {
+  const current: QueryStub<{
+    items: Array<BaseItemDto>
+    totalCount: number
+  }> = {
+    data: undefined,
+    isLoading: false,
+    error: null,
     refetch: refetchItemsMock,
-  },
-}))
+  }
+  return { current }
+})
 
 vi.mock('@tanstack/react-router', () => ({
   getRouteApi: () => ({
@@ -58,41 +72,26 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (
-      key: string,
-      options?:
-        | string
-        | {
-            defaultValue?: string
-            page?: number
-            start?: number
-            end?: number
-            total?: number
-          },
-    ) => {
+    t: (key: string, options?: TranslationArg) => {
       if (key === 'common.retry') return 'Retry'
       if (key === 'accessibility.pagination.previous') return 'Previous page'
       if (key === 'accessibility.pagination.next') return 'Next page'
-      if (
-        key === 'accessibility.pagination.page' &&
-        typeof options === 'object'
-      ) {
-        return `Page ${options.page}`
+      if (isTranslationOptions(options)) {
+        if (key === 'accessibility.pagination.page') {
+          return `Page ${options.page}`
+        }
+        if (key === 'items.showing') {
+          return `Showing ${options.start}-${options.end} of ${options.total}`
+        }
       }
-      if (key === 'items.showing' && typeof options === 'object') {
-        return `Showing ${options.start}-${options.end} of ${options.total}`
-      }
-      if (typeof options === 'object' && options.defaultValue)
-        return options.defaultValue
-      if (typeof options === 'string') return options
-      return key
+      return resolveTranslation(key, options)
     },
   }),
 }))
 
 vi.mock('@/services/items/queries', () => ({
   useCollections: () => collectionsQueryState.current,
-  useItems: (options: unknown) => {
+  useItems: (options: UseItemsOptions) => {
     useItemsOptionsMock(options)
     return itemsQueryState.current
   },

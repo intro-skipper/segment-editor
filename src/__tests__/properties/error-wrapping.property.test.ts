@@ -7,11 +7,10 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import type { ErrorCode } from '@/lib/unified-error'
 import { AppError, ErrorCodes } from '@/lib/unified-error'
 
 /** All valid error codes */
-const VALID_ERROR_CODES = Object.values(ErrorCodes) as Array<ErrorCode>
+const VALID_ERROR_CODES = Object.values(ErrorCodes)
 
 describe('Error Wrapping Consistency', () => {
   /**
@@ -71,7 +70,8 @@ describe('Error Wrapping Consistency', () => {
     fc.assert(
       fc.property(fc.anything(), (input) => {
         const result = AppError.from(input)
-        return typeof result.recoverable === 'boolean'
+        expect(result.recoverable).toBeTypeOf('boolean')
+        return true
       }),
       { numRuns: 100 },
     )
@@ -133,7 +133,10 @@ describe('Error Wrapping Consistency', () => {
     fc.assert(
       fc.property(fc.anything(), (input) => {
         const result = AppError.from(input)
-        return result.name === ('AppError' as string)
+        // Read through a widened binding: comparing the literal directly is a
+        // tautology to the type checker, but the runtime value is the point.
+        const name: string = result.name
+        return name === 'AppError'
       }),
       { numRuns: 100 },
     )
@@ -151,8 +154,8 @@ describe('Error Wrapping Consistency', () => {
     expect(undefinedResult).toBeInstanceOf(AppError)
     expect(VALID_ERROR_CODES).toContain(nullResult.code)
     expect(VALID_ERROR_CODES).toContain(undefinedResult.code)
-    expect(typeof nullResult.recoverable).toBe('boolean')
-    expect(typeof undefinedResult.recoverable).toBe('boolean')
+    expect(nullResult.recoverable).toBeTypeOf('boolean')
+    expect(undefinedResult.recoverable).toBeTypeOf('boolean')
   })
 
   /**

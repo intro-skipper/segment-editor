@@ -211,10 +211,16 @@ export function clearApiCache(): void {
 export const isAborted = (signal?: AbortSignal): boolean =>
   signal?.aborted === true
 
+/** The abort signal and timeout one API call should run under. */
+export interface RequestConfig {
+  signal?: AbortSignal
+  timeout: number
+}
+
 export function getRequestConfig(
   options?: ApiOptions,
   defaultTimeout: number = API_CONFIG.DEFAULT_TIMEOUT_MS,
-): { signal?: AbortSignal; timeout: number } {
+): RequestConfig {
   return {
     signal: options?.signal,
     timeout: options?.timeout ?? defaultTimeout,
