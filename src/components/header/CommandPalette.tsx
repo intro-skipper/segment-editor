@@ -19,7 +19,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useItems } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
-import { cn, lookup } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { BaseItemKind } from '@/types/jellyfin'
 
@@ -93,13 +93,17 @@ function commandPaletteReducer(
   }
 }
 
-const ITEM_ICONS = {
+// Annotated rather than `satisfies` so `item.Type` can index it directly.
+// `Partial` already types the miss as `undefined`, and React Compiler only
+// treats `<Icon />` as a static component when it can trace the read back to
+// this table; routing it through `lookup` makes the component opaque.
+const ITEM_ICONS: Partial<Record<BaseItemKind, typeof Film>> = {
   [BaseItemKind.Movie]: Film,
   [BaseItemKind.Series]: Tv,
   [BaseItemKind.MusicArtist]: Mic2,
   [BaseItemKind.MusicAlbum]: Mic2,
   [BaseItemKind.Audio]: Mic2,
-} satisfies Partial<Record<BaseItemKind, typeof Film>>
+}
 
 function SearchResultItem({
   item,
@@ -116,7 +120,7 @@ function SearchResultItem({
   onSelect: (item: BaseItemDto) => void
   onIntent: (item: BaseItemDto) => void
 }) {
-  const Icon = (item.Type && lookup(ITEM_ICONS, item.Type)) ?? Film
+  const Icon = (item.Type && ITEM_ICONS[item.Type]) ?? Film
   const selectResult = () => {
     onSelect(item)
   }
