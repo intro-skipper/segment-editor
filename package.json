@@ -54,7 +54,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
-    "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.1",
+    "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
     "fast-check": "^4.9.0",
     "jsdom": "^30.0.1",
     "oxfmt": "^0.64.0",
