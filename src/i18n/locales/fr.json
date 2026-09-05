@@ -192,6 +192,8 @@
     "fitScreen": "Ajuster à l'écran",
     "retry": "Réessayer",
     "selectEpisode": "Sélectionner un épisode",
+    "previousEpisode": "Épisode précédent",
+    "nextEpisode": "Épisode suivant",
     "directPlay": "Lecture directe",
     "hlsFallback": "Lecture transcodée",
     "direct": "Direct",
@@ -268,6 +270,8 @@
     "saveAll": "Tout enregistrer",
     "prevSegment": "Segment précédent",
     "nextSegment": "Segment suivant",
+    "prevEpisode": "Épisode précédent",
+    "nextEpisode": "Épisode suivant",
     "increaseSpeed": "Accélérer",
     "decreaseSpeed": "Ralentir",
     "stepFrameBackForward": "Image précédente / suivante"

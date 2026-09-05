@@ -1,5 +1,11 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
+import { resolveAdjacentEpisodes } from '@/lib/adjacent-episodes'
 import type { PagedItemsResult } from '@/services/items/api'
 import type {
   BaseItemDto,
@@ -109,6 +115,28 @@ export const seriesQueryOptions = {
       cacheDuration: 'LONG',
       operation: 'Fetch episodes',
     }),
+  /** Adjacent Episodes of `episode`, resolved through the cached seasons and episodes queries above. */
+  adjacentEpisodes: (episode: BaseItemDto, queryClient: QueryClient) =>
+    createStandardQueryOptions({
+      queryKey: seriesKeys.adjacentEpisodes(
+        episode.SeriesId ?? '',
+        episode.Id ?? '',
+      ),
+      queryFn: () =>
+        resolveAdjacentEpisodes(
+          {
+            fetchSeasons: (seriesId) =>
+              queryClient.fetchQuery(seriesQueryOptions.seasons(seriesId)),
+            fetchEpisodes: (seriesId, seasonId) =>
+              queryClient.fetchQuery(
+                seriesQueryOptions.episodes(seriesId, seasonId),
+              ),
+          },
+          episode,
+        ),
+      cacheDuration: 'LONG',
+      operation: 'Fetch adjacent episodes',
+    }),
 } as const
 
 export const albumQueryOptions = {
@@ -186,6 +214,18 @@ export const useSeasons = (seriesId: string, opts?: UseEntityOptions) => {
   return useQuery({
     ...seriesQueryOptions.seasons(seriesId),
     enabled: isEntityQueryEnabled(seriesId, validAuth, opts),
+  })
+}
+
+/** Previous and next episode in Series Order for the arrows and hotkeys in the header. */
+export const useAdjacentEpisodes = (episode: BaseItemDto) => {
+  const validAuth = useApiStore(selectValidAuth)
+  const queryClient = useQueryClient()
+
+  return useQuery({
+    ...seriesQueryOptions.adjacentEpisodes(episode, queryClient),
+    enabled:
+      validAuth && !!episode.SeriesId && !!episode.SeasonId && !!episode.Id,
   })
 }
 

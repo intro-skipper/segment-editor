@@ -84,7 +84,7 @@ vi.mock('@/services/video/api', () => ({
   getBestImageUrl: () => null,
 }))
 
-vi.mock('@/components/header/EpisodeSwitcher', () => ({
+vi.mock('@/components/header/EpisodeNavigation', () => ({
   default: ({ currentEpisode }: { currentEpisode: BaseItemDto }) => (
     <div data-testid="episode-switcher">{currentEpisode.Name}</div>
   ),
