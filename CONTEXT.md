@@ -11,11 +11,11 @@ The header control on the player page that shows the current episode's title and
 _Avoid_: Episode dropdown, episode picker
 
 **Series Order**:
-The sequence of a series' playable episodes: regular seasons ascending by season number, episodes ascending within each season. Specials are not part of Series Order.
+The sequence of a series' playable episodes: regular seasons ascending by season number, then Specials, with episodes ascending within each season. It matches the order of the season tabs on the series page.
 _Avoid_: Playback order, air order
 
 **Adjacent Episode**:
-The episode immediately before or after the current one in Series Order, crossing season boundaries. A Special's adjacent episodes are the neighbouring Specials only. The first and last episodes have no previous or next adjacent episode respectively.
+The episode immediately before or after the current one in Series Order, crossing season boundaries. The first episode has no previous and the last Special (or last regular episode, if there are none) has no next.
 _Avoid_: Sibling episode, neighbour
 
 **Specials**:

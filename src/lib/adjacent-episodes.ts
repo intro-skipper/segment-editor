@@ -20,18 +20,17 @@ const NO_ADJACENT: AdjacentEpisodes = { previous: null, next: null }
 /**
  * Jellyfin merges Specials that air before or after a season into that
  * season's listing when the user's DisplaySpecialsWithinSeasons setting is on
- * (the default). Series Order excludes Specials, so keep the season's own
- * episodes only.
+ * (the default). Series Order visits Specials once, at the end, so keep the
+ * season's own episodes only.
  */
 const ownEpisodes = (episodes: Array<BaseItemDto>, seasonId: string) =>
   episodes.filter((item) => item.SeasonId === seasonId)
 
 /**
  * Resolves the Adjacent Episodes of `episode` in Series Order (see CONTEXT.md):
- * seasons in the order Jellyfin returns them, episodes in order within each
- * season, crossing season boundaries and skipping seasons with no playable
- * episodes. Specials form their own lane, so a regular episode never steps
- * into Specials and a Special never steps out.
+ * regular seasons in the order Jellyfin returns them, then Specials, with
+ * episodes in order within each season. Stepping crosses season boundaries
+ * and skips seasons with no playable episodes.
  */
 export async function resolveAdjacentEpisodes(
   fetchers: SeriesFetchers,
@@ -44,11 +43,12 @@ export async function resolveAdjacentEpisodes(
   const currentSeason = seasons.find((season) => season.Id === seasonId)
   if (!currentSeason) return NO_ADJACENT
 
-  const inSpecials = isSpecialSeason(currentSeason)
-  const lane = seasons.filter(
-    (season) => isSpecialSeason(season) === inSpecials,
-  )
-  const seasonIndex = lane.indexOf(currentSeason)
+  // Same order the series page shows its season tabs in.
+  const ordered = [
+    ...seasons.filter((season) => !isSpecialSeason(season)),
+    ...seasons.filter(isSpecialSeason),
+  ]
+  const seasonIndex = ordered.indexOf(currentSeason)
 
   const episodes = ownEpisodes(
     await fetchers.fetchEpisodes(seriesId, seasonId),
@@ -79,10 +79,10 @@ export async function resolveAdjacentEpisodes(
   const [previous, next] = await Promise.all([
     episodeIndex > 0
       ? episodes[episodeIndex - 1]
-      : findAcrossSeasons(lane.slice(0, seasonIndex).reverse(), 'last'),
+      : findAcrossSeasons(ordered.slice(0, seasonIndex).reverse(), 'last'),
     episodeIndex < episodes.length - 1
       ? episodes[episodeIndex + 1]
-      : findAcrossSeasons(lane.slice(seasonIndex + 1), 'first'),
+      : findAcrossSeasons(ordered.slice(seasonIndex + 1), 'first'),
   ])
 
   return { previous, next }

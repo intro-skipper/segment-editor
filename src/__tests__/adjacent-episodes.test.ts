@@ -91,21 +91,37 @@ describe('resolveAdjacentEpisodes', () => {
     expect(last.next).toBeNull()
   })
 
-  it('keeps Specials out of Series Order and in their own lane', async () => {
+  it('visits Specials after the last regular season, wherever Jellyfin lists them', async () => {
     const namedSpecials = season('extras', 7, 'Special Features')
     const { fetchers } = series([
       [SPECIALS, [episode('sp', 1), episode('sp', 2)]],
       [S1, [episode('s1', 1)]],
       [namedSpecials, [episode('extras', 1)]],
+      [S2, [episode('s2', 1)]],
     ])
 
-    const regular = await resolveAdjacentEpisodes(fetchers, episode('s1', 1))
-    expect(regular.previous).toBeNull()
-    expect(regular.next).toBeNull()
+    const first = await resolveAdjacentEpisodes(fetchers, episode('s1', 1))
+    expect(first.previous).toBeNull()
+    expect(first.next?.Id).toBe('s2-e1')
 
-    const special = await resolveAdjacentEpisodes(fetchers, episode('sp', 2))
-    expect(special.previous?.Id).toBe('sp-e1')
-    expect(special.next?.Id).toBe('extras-e1')
+    const lastRegular = await resolveAdjacentEpisodes(
+      fetchers,
+      episode('s2', 1),
+    )
+    expect(lastRegular.next?.Id).toBe('sp-e1')
+
+    const firstSpecial = await resolveAdjacentEpisodes(
+      fetchers,
+      episode('sp', 1),
+    )
+    expect(firstSpecial.previous?.Id).toBe('s2-e1')
+
+    const lastSpecial = await resolveAdjacentEpisodes(
+      fetchers,
+      episode('extras', 1),
+    )
+    expect(lastSpecial.previous?.Id).toBe('sp-e2')
+    expect(lastSpecial.next).toBeNull()
   })
 
   it('ignores Specials that Jellyfin merges into a season listing', async () => {
@@ -121,6 +137,12 @@ describe('resolveAdjacentEpisodes', () => {
 
     const last = await resolveAdjacentEpisodes(fetchers, episode('s1', 2))
     expect(last.next?.Id).toBe('s2-e1')
+
+    const endOfRegular = await resolveAdjacentEpisodes(
+      fetchers,
+      episode('s2', 1),
+    )
+    expect(endOfRegular.next?.Id).toBe('sp-e1')
   })
 
   it('resolves nothing when the episode is not in its season listing', async () => {
