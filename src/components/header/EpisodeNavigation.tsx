@@ -43,11 +43,15 @@ function NextEpisodeArrow({
       }}
       onPointerEnter={intent}
       onFocus={intent}
-      className="rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-30"
+      className={cn(
+        'size-11 rounded-full transition-colors duration-150',
+        'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
+        'focus-visible:ring-2 focus-visible:ring-ring active:scale-95',
+      )}
       aria-label={targetLabel ? `${label}: ${targetLabel}` : label}
       title={`${targetLabel ?? label} (${NEXT_HOTKEY_DISPLAY})`}
     >
-      <ChevronRight className="size-6" aria-hidden />
+      <ChevronRight className="size-5" aria-hidden />
     </Button>
   )
 }
@@ -61,7 +65,8 @@ interface EpisodeNavigationProps {
  * Header control for the player page: the Episode Switcher with a next arrow
  * after it, plus Shift+N for next and Shift+P for previous. Only next gets an
  * arrow, so it cannot be confused with the back button; a sweep runs forward
- * and the dropdown covers the rare step back. The arrow stays visible but
+ * and the dropdown covers the rare step back. It is styled like the header's
+ * other round icon buttons so it reads as a control, and stays visible but
  * disabled at the last episode of the series.
  */
 export default function EpisodeNavigation({
