@@ -141,6 +141,147 @@ function syncSegmentProps(
   return true
 }
 
+/** A positive finite frame step, or undefined when frame snapping is off. */
+function resolveFrameStep(frameStepSeconds: number | undefined) {
+  return frameStepSeconds !== undefined &&
+    Number.isFinite(frameStepSeconds) &&
+    frameStepSeconds > 0
+    ? frameStepSeconds
+    : undefined
+}
+
+interface SegmentSliderHeaderProps {
+  segmentColor: string
+  typeLabel: string
+  localStart: number
+  localEnd: number
+  onCopy: () => void
+  onCopyAllAsJson?: () => void
+  onEdit?: () => void
+  onDelete: () => void
+  onChangeType?: (type: MediaSegmentType) => void
+}
+
+/** Type badge (or type menu), time summary and the copy/edit/delete actions. */
+function SegmentSliderHeader({
+  segmentColor,
+  typeLabel,
+  localStart,
+  localEnd,
+  onCopy,
+  onCopyAllAsJson,
+  onEdit,
+  onDelete,
+  onChangeType,
+}: SegmentSliderHeaderProps) {
+  const { t } = useTranslation()
+  const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
+  const duration = localEnd - localStart
+
+  const handleCopy = () => {
+    setCopyMenuOpen(false)
+    onCopy()
+  }
+
+  const handleCopyAllAsJson = () => {
+    setCopyMenuOpen(false)
+    onCopyAllAsJson?.()
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex items-center gap-3 min-w-0">
+        {onChangeType ? (
+          <SegmentTypeMenu
+            onSelect={onChangeType}
+            render={
+              <button
+                type="button"
+                aria-label={t('segment.type', 'Segment type')}
+                title={t('segment.type', 'Segment type')}
+                className={cn(
+                  'inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-3 text-xs font-medium text-white shadow-sm',
+                  'transition-opacity hover:opacity-90 aria-expanded:opacity-90',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  segmentColor,
+                )}
+              />
+            }
+          >
+            {typeLabel}
+            <ChevronDown className="size-3 opacity-80" aria-hidden="true" />
+          </SegmentTypeMenu>
+        ) : (
+          <span
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-medium text-white shadow-sm',
+              segmentColor,
+            )}
+          >
+            {typeLabel}
+          </span>
+        )}
+        <span className="hidden sm:inline text-sm text-muted-foreground tabular-nums truncate">
+          {formatTime(localStart)} → {formatTime(localEnd)} ·{' '}
+          <span className="font-medium text-foreground">
+            {formatTime(duration)}
+          </span>
+        </span>
+        <span className="sm:hidden text-sm font-medium text-foreground tabular-nums">
+          {formatTime(duration)}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        {/* Copy dropdown menu */}
+        <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('accessibility.copySegment')}
+                className="hover:bg-primary/10"
+              />
+            }
+          >
+            <Copy className="size-4" aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleCopy}>
+              {t('editor.copy', 'Copy')}
+            </DropdownMenuItem>
+            {onCopyAllAsJson && (
+              <DropdownMenuItem onClick={handleCopyAllAsJson}>
+                {t('editor.copyAll', 'Copy all')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onEdit}
+            aria-label={t('segment.edit')}
+            className="hover:bg-primary/10"
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onDelete}
+          aria-label={t('accessibility.deleteSegment')}
+          className="text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 interface SegmentSliderProps {
   /** The segment to display and edit */
   segment: MediaSegmentDto
@@ -197,7 +338,6 @@ export function SegmentSlider({
     defaultValues: getSegmentFormDefaults(segment),
   })
   const formValues = useStore(form.store, (state) => state.values)
-  const [copyMenuOpen, setCopyMenuOpen] = React.useState(false)
   const activeInputRef = React.useRef<'start' | 'end' | null>(null)
   const [stableRange, setStableRange] = React.useState<SegmentRange>({
     start: segment.StartTicks ?? 0,
@@ -328,12 +468,7 @@ export function SegmentSlider({
 
   const duration = localEnd - localStart
 
-  const frameStep =
-    frameStepSeconds !== undefined &&
-    Number.isFinite(frameStepSeconds) &&
-    frameStepSeconds > 0
-      ? frameStepSeconds
-      : undefined
+  const frameStep = resolveFrameStep(frameStepSeconds)
 
   const inputStep = frameStep ?? MIN_SEGMENT_GAP
 
@@ -551,7 +686,6 @@ export function SegmentSlider({
 
   // Copy segment to system clipboard as JSON
   const handleCopy = async () => {
-    setCopyMenuOpen(false)
     const nextSegment = buildSegmentFromFormValues(
       segment,
       formValues,
@@ -572,14 +706,6 @@ export function SegmentSlider({
       })
     }
   }
-
-  // Copy all segments to system clipboard as JSON
-  const handleCopyAllAsJson = () => {
-    setCopyMenuOpen(false)
-    onCopyAllAsJson?.()
-  }
-
-  const handleEdit = () => onEdit?.(index)
 
   const handleDelete = () => onDelete(index)
   const handleSeekStart = () => onPlayerTimestamp(localStart)
@@ -730,10 +856,6 @@ export function SegmentSlider({
 
   const handleSetActiveClick = () => onSetActive(index)
 
-  const handleChangeType = (type: MediaSegmentType) => {
-    onChangeType?.(index, type)
-  }
-
   const typeLabel = t(`segmentType.${formValues.type}`, formValues.type)
 
   return (
@@ -742,97 +864,20 @@ export function SegmentSlider({
       onPointerDownCapture={handleSetActiveClick}
       onFocusCapture={handleSetActiveClick}
     >
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          {onChangeType ? (
-            <SegmentTypeMenu
-              onSelect={handleChangeType}
-              render={
-                <button
-                  type="button"
-                  aria-label={t('segment.type', 'Segment type')}
-                  title={t('segment.type', 'Segment type')}
-                  className={cn(
-                    'inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-3 text-xs font-medium text-white shadow-sm',
-                    'transition-opacity hover:opacity-90 aria-expanded:opacity-90',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                    segmentColor,
-                  )}
-                />
-              }
-            >
-              {typeLabel}
-              <ChevronDown className="size-3 opacity-80" aria-hidden="true" />
-            </SegmentTypeMenu>
-          ) : (
-            <span
-              className={cn(
-                'inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-medium text-white shadow-sm',
-                segmentColor,
-              )}
-            >
-              {typeLabel}
-            </span>
-          )}
-          <span className="hidden sm:inline text-sm text-muted-foreground tabular-nums truncate">
-            {formatTime(localStart)} → {formatTime(localEnd)} ·{' '}
-            <span className="font-medium text-foreground">
-              {formatTime(duration)}
-            </span>
-          </span>
-          <span className="sm:hidden text-sm font-medium text-foreground tabular-nums">
-            {formatTime(duration)}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          {/* Copy dropdown menu */}
-          <DropdownMenu open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('accessibility.copySegment')}
-                  className="hover:bg-primary/10"
-                />
-              }
-            >
-              <Copy className="size-4" aria-hidden="true" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleCopy}>
-                {t('editor.copy', 'Copy')}
-              </DropdownMenuItem>
-              {onCopyAllAsJson && (
-                <DropdownMenuItem onClick={handleCopyAllAsJson}>
-                  {t('editor.copyAll', 'Copy all')}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {onEdit && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleEdit}
-              aria-label={t('segment.edit')}
-              className="hover:bg-primary/10"
-            >
-              <Pencil className="size-4" aria-hidden="true" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleDelete}
-            aria-label={t('accessibility.deleteSegment')}
-            className="text-destructive/70 hover:text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
+      <SegmentSliderHeader
+        segmentColor={segmentColor}
+        typeLabel={typeLabel}
+        localStart={localStart}
+        localEnd={localEnd}
+        onCopy={() => void handleCopy()}
+        onCopyAllAsJson={onCopyAllAsJson}
+        onEdit={onEdit && (() => onEdit(index))}
+        onDelete={handleDelete}
+        onChangeType={
+          onChangeType &&
+          ((type: MediaSegmentType) => onChangeType(index, type))
+        }
+      />
 
       {/* Slider track - with proper overflow handling */}
       <fieldset

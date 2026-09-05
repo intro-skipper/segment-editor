@@ -184,7 +184,239 @@ function SearchResultItem({
 const getResultItemKey = (item: BaseItemDto, index: number) =>
   item.Id ?? `${item.Type ?? 'item'}-${index}`
 
-// eslint-disable-next-line react-doctor/no-giant-component -- cohesive dialog controller; extracting single-use fragments would add prop-drilling without reducing complexity
+/**
+ * Drops excluded item types the server may still return (e.g. an Episode
+ * matched by name) when episodes are not included in the search.
+ */
+function getResultItems(
+  itemsData: ReturnType<typeof useItems>['data'],
+  excludedItemTypes: Array<BaseItemKind> | undefined,
+): Array<BaseItemDto> {
+  const queriedItems = itemsData?.items ?? []
+  if (!excludedItemTypes) return queriedItems
+  return queriedItems.filter(
+    (item) =>
+      item.Type === undefined || !EXCLUDED_ITEM_TYPE_LOOKUP.has(item.Type),
+  )
+}
+
+/** The rows to render: the virtual window when the list scrolls, else all. */
+function getVisibleWindow(
+  resultItems: Array<BaseItemDto>,
+  shouldVirtualize: boolean,
+  virtualWindow: Pick<
+    ReturnType<typeof useVirtualWindow>,
+    'totalSize' | 'startIndex' | 'endIndex'
+  >,
+) {
+  if (!shouldVirtualize) {
+    return {
+      totalListHeight: resultItems.length * ITEM_HEIGHT,
+      visibleStartIndex: 0,
+      visibleItems: resultItems,
+    }
+  }
+  return {
+    totalListHeight: virtualWindow.totalSize,
+    visibleStartIndex: virtualWindow.startIndex,
+    visibleItems: resultItems.slice(
+      virtualWindow.startIndex,
+      virtualWindow.endIndex,
+    ),
+  }
+}
+
+function CommandPaletteSearchField({
+  inputRef,
+  search,
+  onSearchChange,
+  onClearSearch,
+  includeEpisodes,
+  onToggleEpisodes,
+  isLoading,
+  hasResults,
+  activeDescendantId,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>
+  search: string
+  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClearSearch: () => void
+  includeEpisodes: boolean
+  onToggleEpisodes: () => void
+  isLoading: boolean
+  hasResults: boolean
+  activeDescendantId: string | undefined
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="relative border-b border-border/50 p-4 overflow-hidden">
+      {isLoading ? (
+        <div
+          className="absolute left-7 top-1/2 -translate-y-1/2 animate-spin"
+          aria-hidden
+        >
+          <Loader2 className="size-5 text-muted-foreground" />
+        </div>
+      ) : (
+        <Search
+          className="absolute left-7 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none"
+          aria-hidden
+        />
+      )}
+      <input
+        ref={inputRef}
+        value={search}
+        onChange={onSearchChange}
+        placeholder={t('search.placeholder', 'Search media…')}
+        name="media-search"
+        autoComplete="off"
+        spellCheck={false}
+        className={cn(
+          'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md placeholder:text-muted-foreground',
+          search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
+        )}
+        aria-haspopup="listbox"
+        aria-label={t('search.placeholder', 'Search media…')}
+        aria-controls={hasResults ? 'search-results' : undefined}
+        aria-activedescendant={activeDescendantId}
+        aria-autocomplete="list"
+      />
+      <Button
+        type="button"
+        variant={includeEpisodes ? 'secondary' : 'outline'}
+        size="sm"
+        className={cn(
+          'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7 rounded-full px-1.5 sm:px-2 text-[10px] sm:text-[11px]',
+          search ? 'right-13 sm:right-14' : 'right-4 sm:right-5',
+        )}
+        onClick={onToggleEpisodes}
+        aria-pressed={includeEpisodes}
+        aria-label={t(
+          'search.includeEpisodes',
+          'Include episodes in search results',
+        )}
+      >
+        {t('search.includeEpisodesLabel', 'Episodes')}
+      </Button>
+      {search && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2 hover:bg-muted/80"
+          onClick={onClearSearch}
+          aria-label={t('search.clear', 'Clear search')}
+        >
+          <X className="size-4" aria-hidden />
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function CommandPaletteResults({
+  resultItems,
+  visibleWindow,
+  shouldVirtualize,
+  listHeight,
+  selectedIndex,
+  showNoResults,
+  listRef,
+  onSelect,
+  onIntent,
+}: {
+  resultItems: Array<BaseItemDto>
+  visibleWindow: ReturnType<typeof getVisibleWindow>
+  shouldVirtualize: boolean
+  listHeight: number
+  selectedIndex: number
+  /** A completed search matched nothing (vs. the "start typing" prompt). */
+  showNoResults: boolean
+  listRef: (element: HTMLDivElement | null) => void
+  onSelect: (item: BaseItemDto) => void
+  onIntent: (item: BaseItemDto) => void
+}) {
+  const { t } = useTranslation()
+  const { totalListHeight, visibleStartIndex, visibleItems } = visibleWindow
+
+  return (
+    <div className="px-2 pb-2">
+      {resultItems.length > 0 && (
+        <div className="px-3 py-2">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+            {t('search.results', 'Results')}
+            <span className="ml-1.5 opacity-60">({resultItems.length})</span>
+          </span>
+        </div>
+      )}
+
+      {resultItems.length > 0 ? (
+        <div
+          id="search-results"
+          ref={listRef}
+          className="overflow-y-auto"
+          style={{ height: listHeight }}
+          aria-label={t('search.results', 'Search results')}
+        >
+          <div
+            style={
+              shouldVirtualize
+                ? { height: totalListHeight, position: 'relative' }
+                : undefined
+            }
+          >
+            {visibleItems.map((item, virtualIndex) => {
+              const index = visibleStartIndex + virtualIndex
+              const key = getResultItemKey(item, index)
+              return (
+                <div
+                  key={key}
+                  style={
+                    shouldVirtualize
+                      ? {
+                          position: 'absolute',
+                          top: index * ITEM_HEIGHT,
+                          left: 0,
+                          right: 0,
+                        }
+                      : undefined
+                  }
+                >
+                  <SearchResultItem
+                    item={item}
+                    optionId={`search-result-${key}`}
+                    isSelected={index === selectedIndex}
+                    itemIndex={index}
+                    onSelect={onSelect}
+                    onIntent={onIntent}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <output
+          id="search-empty-status"
+          className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+          aria-live="polite"
+        >
+          <Search
+            className="size-8 mb-3 opacity-40"
+            strokeWidth={1.5}
+            aria-hidden
+          />
+          <p className="text-sm">
+            {showNoResults
+              ? t('search.no_results', 'No results found')
+              : t('search.start_typing', 'Start typing to search…')}
+          </p>
+        </output>
+      )}
+    </div>
+  )
+}
+
 export default function CommandPalette({
   open,
   onOpenChange,
@@ -244,13 +476,7 @@ export default function CommandPalette({
     includeMediaStreams: false,
     enabled: open && !!selectedCollection && canSearch,
   })
-  const queriedItems = itemsData?.items ?? []
-  const resultItems = excludedItemTypes
-    ? queriedItems.filter(
-        (item) =>
-          item.Type === undefined || !EXCLUDED_ITEM_TYPE_LOOKUP.has(item.Type),
-      )
-    : queriedItems
+  const resultItems = getResultItems(itemsData, excludedItemTypes)
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     dispatch({ type: 'searchChanged', value: e.target.value })
@@ -269,11 +495,7 @@ export default function CommandPalette({
 
   const shouldVirtualize = resultItems.length > MAX_VISIBLE_ITEMS
 
-  const {
-    totalSize: totalVirtualHeight,
-    startIndex: virtualStartIndex,
-    endIndex: virtualEndIndex,
-  } = useVirtualWindow({
+  const virtualWindow = useVirtualWindow({
     enabled: open && shouldVirtualize,
     scrollElement,
     itemCount: resultItems.length,
@@ -281,16 +503,11 @@ export default function CommandPalette({
     overscan: VIRTUAL_OVERSCAN,
   })
 
-  const totalListHeight = shouldVirtualize
-    ? totalVirtualHeight
-    : resultItems.length * ITEM_HEIGHT
-
-  const visibleStartIndex = shouldVirtualize ? virtualStartIndex : 0
-  const visibleEndIndex = shouldVirtualize
-    ? virtualEndIndex
-    : resultItems.length
-
-  const visibleItems = resultItems.slice(visibleStartIndex, visibleEndIndex)
+  const visibleWindow = getVisibleWindow(
+    resultItems,
+    shouldVirtualize,
+    virtualWindow,
+  )
 
   const setSelectedIndexWithScroll = (nextIndex: number) => {
     dispatch({ type: 'selectedIndexChanged', value: nextIndex })
@@ -378,8 +595,6 @@ export default function CommandPalette({
   const activeDescendantId = resultItems[safeIndex]
     ? `search-result-${getResultItemKey(resultItems[safeIndex], safeIndex)}`
     : undefined
-  const showLoading = isFetching && canSearch
-  const showEmpty = !isFetching && canSearch && resultItems.length === 0
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -388,146 +603,29 @@ export default function CommandPalette({
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >
-        <div className="relative border-b border-border/50 p-4 overflow-hidden">
-          {showLoading ? (
-            <div
-              className="absolute left-7 top-1/2 -translate-y-1/2 animate-spin"
-              aria-hidden
-            >
-              <Loader2 className="size-5 text-muted-foreground" />
-            </div>
-          ) : (
-            <Search
-              className="absolute left-7 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none"
-              aria-hidden
-            />
-          )}
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={handleSearchChange}
-            placeholder={t('search.placeholder', 'Search media…')}
-            name="media-search"
-            autoComplete="off"
-            spellCheck={false}
-            className={cn(
-              'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md placeholder:text-muted-foreground',
-              search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
-            )}
-            aria-haspopup="listbox"
-            aria-label={t('search.placeholder', 'Search media…')}
-            aria-controls={
-              resultItems.length > 0 ? 'search-results' : undefined
-            }
-            aria-activedescendant={activeDescendantId}
-            aria-autocomplete="list"
-          />
-          <Button
-            type="button"
-            variant={includeEpisodes ? 'secondary' : 'outline'}
-            size="sm"
-            className={cn(
-              'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7 rounded-full px-1.5 sm:px-2 text-[10px] sm:text-[11px]',
-              search ? 'right-13 sm:right-14' : 'right-4 sm:right-5',
-            )}
-            onClick={handleEpisodeInclusionToggle}
-            aria-pressed={includeEpisodes}
-            aria-label={t(
-              'search.includeEpisodes',
-              'Include episodes in search results',
-            )}
-          >
-            {t('search.includeEpisodesLabel', 'Episodes')}
-          </Button>
-          {search && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2 hover:bg-muted/80"
-              onClick={handleClearSearch}
-              aria-label={t('search.clear', 'Clear search')}
-            >
-              <X className="size-4" aria-hidden />
-            </Button>
-          )}
-        </div>
+        <CommandPaletteSearchField
+          inputRef={inputRef}
+          search={search}
+          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
+          includeEpisodes={includeEpisodes}
+          onToggleEpisodes={handleEpisodeInclusionToggle}
+          isLoading={isFetching && canSearch}
+          hasResults={resultItems.length > 0}
+          activeDescendantId={activeDescendantId}
+        />
 
-        <div className="px-2 pb-2">
-          {resultItems.length > 0 && (
-            <div className="px-3 py-2">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                {t('search.results', 'Results')}
-                <span className="ml-1.5 opacity-60">
-                  ({resultItems.length})
-                </span>
-              </span>
-            </div>
-          )}
-
-          {resultItems.length > 0 ? (
-            <div
-              id="search-results"
-              ref={setSearchResultsElement}
-              className="overflow-y-auto"
-              style={{ height: listHeight }}
-              aria-label={t('search.results', 'Search results')}
-            >
-              <div
-                style={
-                  shouldVirtualize
-                    ? { height: totalListHeight, position: 'relative' }
-                    : undefined
-                }
-              >
-                {visibleItems.map((item, virtualIndex) => {
-                  const index = visibleStartIndex + virtualIndex
-                  const key = getResultItemKey(item, index)
-                  return (
-                    <div
-                      key={key}
-                      style={
-                        shouldVirtualize
-                          ? {
-                              position: 'absolute',
-                              top: index * ITEM_HEIGHT,
-                              left: 0,
-                              right: 0,
-                            }
-                          : undefined
-                      }
-                    >
-                      <SearchResultItem
-                        item={item}
-                        optionId={`search-result-${key}`}
-                        isSelected={index === safeIndex}
-                        itemIndex={index}
-                        onSelect={handleSelect}
-                        onIntent={handleIntent}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (
-            <output
-              id="search-empty-status"
-              className="flex flex-col items-center justify-center py-12 text-muted-foreground"
-              aria-live="polite"
-            >
-              <Search
-                className="size-8 mb-3 opacity-40"
-                strokeWidth={1.5}
-                aria-hidden
-              />
-              <p className="text-sm">
-                {showEmpty && search
-                  ? t('search.no_results', 'No results found')
-                  : t('search.start_typing', 'Start typing to search…')}
-              </p>
-            </output>
-          )}
-        </div>
+        <CommandPaletteResults
+          resultItems={resultItems}
+          visibleWindow={visibleWindow}
+          shouldVirtualize={shouldVirtualize}
+          listHeight={listHeight}
+          selectedIndex={safeIndex}
+          showNoResults={!isFetching && canSearch && search !== ''}
+          listRef={setSearchResultsElement}
+          onSelect={handleSelect}
+          onIntent={handleIntent}
+        />
       </DialogContent>
     </Dialog>
   )

@@ -129,6 +129,37 @@ function buildSelectionUpdater(
   }
 }
 
+/**
+ * A recorded user selection wins only while it still belongs to the current
+ * item (`trackResetKey`); otherwise the language preference decides.
+ */
+function resolveActiveTrackIndices(
+  userSelection: UserTrackSelectionState,
+  trackResetKey: string,
+  preferredAudioIndex: number,
+  preferredSubtitleIndex: number | null,
+): Pick<TrackState, 'activeAudioIndex' | 'activeSubtitleIndex'> {
+  const isCurrentSelection = userSelection.key === trackResetKey
+  return {
+    activeAudioIndex:
+      isCurrentSelection && userSelection.hasAudioSelection
+        ? userSelection.audioIndex
+        : preferredAudioIndex,
+    activeSubtitleIndex:
+      isCurrentSelection && userSelection.hasSubtitleSelection
+        ? userSelection.subtitleIndex
+        : preferredSubtitleIndex,
+  }
+}
+
+function toAudioSwitchTranscodeScope(
+  transcodingTargetCount: number,
+  targetCount: number,
+): AudioSwitchTranscodeScope {
+  if (transcodingTargetCount === 0) return 'none'
+  return transcodingTargetCount === targetCount ? 'all' : 'some'
+}
+
 export function useTrackManager({
   item,
   strategy,
@@ -272,15 +303,12 @@ export function useTrackManager({
       )
     : null
 
-  const activeAudioIndex =
-    userSelection.key === trackResetKey && userSelection.hasAudioSelection
-      ? userSelection.audioIndex
-      : preferredAudioIndex
-
-  const activeSubtitleIndex =
-    userSelection.key === trackResetKey && userSelection.hasSubtitleSelection
-      ? userSelection.subtitleIndex
-      : preferredSubtitleIndex
+  const { activeAudioIndex, activeSubtitleIndex } = resolveActiveTrackIndices(
+    userSelection,
+    trackResetKey,
+    preferredAudioIndex,
+    preferredSubtitleIndex,
+  )
 
   const trackState: TrackState = {
     audioTracks,
@@ -505,11 +533,9 @@ export function useTrackManager({
     selectSubtitleTrack,
     isLoading: isTrackOperationPending,
     error,
-    audioSwitchTranscodeScope:
-      transcodingTargetCount === 0
-        ? 'none'
-        : transcodingTargetCount === audioSwitchTargets.length
-          ? 'all'
-          : 'some',
+    audioSwitchTranscodeScope: toAudioSwitchTranscodeScope(
+      transcodingTargetCount,
+      audioSwitchTargets.length,
+    ),
   }
 }

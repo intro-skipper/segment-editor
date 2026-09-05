@@ -14,6 +14,7 @@ import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
+import type { SegmentTimeIndex } from './segment-skip'
 import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
@@ -44,6 +45,7 @@ import {
   getSkipStepSeconds,
 } from '@/lib/player-timing-utils'
 import { snapToFrame } from '@/lib/time-utils'
+import type { SubtitleTrackInfo, TrackState } from '@/services/video/tracks'
 import {
   extractTracks,
   findPreferredAudioStreamIndex,
@@ -70,6 +72,35 @@ interface PlaybackTimelineStore {
 interface ActiveSkipSegmentState {
   segment: MediaSegmentDto
   segmentSkipModeRevision: number
+}
+
+/**
+ * The segment the skip overlay should show: the tracked one, dropped once the
+ * skip mode revision moves on, and resolved against the current segment index
+ * so edits (e.g. a Type change) are reflected immediately instead of showing
+ * the cached segment.
+ */
+function resolveActiveSkipSegment(
+  state: ActiveSkipSegmentState | null,
+  segmentSkipModeRevision: number,
+  rangeById: SegmentTimeIndex['rangeById'],
+): MediaSegmentDto | null {
+  const trackedSegment =
+    state?.segmentSkipModeRevision === segmentSkipModeRevision
+      ? state.segment
+      : null
+  if (trackedSegment?.Id === undefined) return trackedSegment
+  return rangeById.get(trackedSegment.Id)?.segment ?? null
+}
+
+function findActiveSubtitleTrack({
+  activeSubtitleIndex,
+  subtitleTracks,
+}: TrackState): SubtitleTrackInfo | null {
+  if (activeSubtitleIndex === null) return null
+  return (
+    subtitleTracks.find((track) => track.index === activeSubtitleIndex) ?? null
+  )
 }
 
 function createPlaybackTimelineStore(): PlaybackTimelineStore {
@@ -267,17 +298,11 @@ function useRenderPlayer({
     lastAutoSkippedSegmentIdRef.current = null
   }, [segmentSkipMode, segmentSkipModeRevision])
 
-  const trackedSkipSegment =
-    activeSkipSegmentState?.segmentSkipModeRevision === segmentSkipModeRevision
-      ? activeSkipSegmentState.segment
-      : null
-
-  // Resolve against the current segments prop so edits (e.g. a Type change)
-  // are reflected immediately instead of showing the cached segment.
-  const activeSkipSegment =
-    trackedSkipSegment?.Id !== undefined
-      ? (segmentTimeIndex.rangeById.get(trackedSkipSegment.Id)?.segment ?? null)
-      : trackedSkipSegment
+  const activeSkipSegment = resolveActiveSkipSegment(
+    activeSkipSegmentState,
+    segmentSkipModeRevision,
+    segmentTimeIndex.rangeById,
+  )
 
   const snappedCurrentTime = () =>
     snapToFrame(currentTimeRef.current, frameStep)
@@ -391,12 +416,7 @@ function useRenderPlayer({
     currentAudioStreamIndexRef.current = trackState.activeAudioIndex
   }, [trackState.activeAudioIndex])
 
-  const activeSubtitleTrack =
-    trackState.activeSubtitleIndex === null
-      ? null
-      : (trackState.subtitleTracks.find(
-          (track) => track.index === trackState.activeSubtitleIndex,
-        ) ?? null)
+  const activeSubtitleTrack = findActiveSubtitleTrack(trackState)
 
   const nativeCaptionTracks = buildNativeCaptionTracks(
     strategy,

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { staggerDelay } from '@/lib/animation-utils'
+import { formatEpisodeLabel } from '@/lib/header-utils'
 
 interface EpisodeSwitcherProps {
   currentEpisode: BaseItemDto
@@ -182,6 +183,7 @@ interface SeasonSelectorProps {
   onSeasonSelect: (seasonId: string) => void
 }
 
+/** Season tabs above the episode list; renders nothing for single-season series. */
 const SeasonSelector = function SeasonSelectorComponent({
   seasons,
   selectedSeasonId,
@@ -190,23 +192,28 @@ const SeasonSelector = function SeasonSelectorComponent({
   if (seasons.length <= 1) return null
 
   return (
-    <div
-      className="flex gap-1.5 px-2 pb-2 overflow-x-auto scrollbar-hide"
-      role="tablist"
-      aria-label="Select season"
-    >
-      {seasons.map((season) => {
-        const isSelected = season.Id === selectedSeasonId
-        return (
-          <SeasonButton
-            key={season.Id}
-            season={season}
-            isSelected={isSelected}
-            onSeasonSelect={onSeasonSelect}
-          />
-        )
-      })}
-    </div>
+    <>
+      <div className="pt-2">
+        <div
+          className="flex gap-1.5 px-2 pb-2 overflow-x-auto scrollbar-hide"
+          role="tablist"
+          aria-label="Select season"
+        >
+          {seasons.map((season) => {
+            const isSelected = season.Id === selectedSeasonId
+            return (
+              <SeasonButton
+                key={season.Id}
+                season={season}
+                isSelected={isSelected}
+                onSeasonSelect={onSeasonSelect}
+              />
+            )
+          })}
+        </div>
+      </div>
+      <DropdownMenuSeparator className="my-0" />
+    </>
   )
 }
 
@@ -392,10 +399,8 @@ export default function EpisodeSwitcher({
 
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
 
-  const episodeLabel = `S${currentEpisode.ParentIndexNumber ?? '?'}E${currentEpisode.IndexNumber ?? '?'}`
-  const displayTitle = currentEpisode.Name
-    ? `${episodeLabel} ${currentEpisode.Name}`
-    : episodeLabel
+  // Same label the Header renders in its sr-only <h1> for this episode.
+  const displayTitle = formatEpisodeLabel(currentEpisode) ?? ''
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -421,18 +426,11 @@ export default function EpisodeSwitcher({
         sideOffset={8}
         className="w-72 max-h-[min(420px,70vh)] p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
       >
-        {seasons.length > 1 && (
-          <>
-            <div className="pt-2">
-              <SeasonSelector
-                seasons={seasons}
-                selectedSeasonId={selectedSeasonId}
-                onSeasonSelect={setOverrideSeasonId}
-              />
-            </div>
-            <DropdownMenuSeparator className="my-0" />
-          </>
-        )}
+        <SeasonSelector
+          seasons={seasons}
+          selectedSeasonId={selectedSeasonId}
+          onSeasonSelect={setOverrideSeasonId}
+        />
 
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-wider">
