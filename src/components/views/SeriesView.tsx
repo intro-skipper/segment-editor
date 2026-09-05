@@ -13,6 +13,7 @@ import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { cn } from '@/lib/utils'
+import { isSpecialSeason } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
@@ -28,9 +29,6 @@ interface SeasonTabsProps {
   selectedSeasonId: string | null
   onSeasonSelect: (seasonId: string) => void
 }
-
-const isSpecialSeason = (s: BaseItemDto) =>
-  s.IndexNumber === 0 || (s.Name || '').toLowerCase().includes('special')
 
 const SeasonTabs = function SeasonTabsComponent({
   seasons,

@@ -33,7 +33,8 @@ import type { BaseItemDto } from '@/types/jellyfin'
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
 const loadCommandPalette = () => import('@/components/header/CommandPalette')
 const rootRouteApi = getRouteApi('__root__')
-const loadEpisodeSwitcher = () => import('@/components/header/EpisodeSwitcher')
+const loadEpisodeNavigation = () =>
+  import('@/components/header/EpisodeNavigation')
 const loadSettingsDialog = () => import('@/components/settings')
 
 const ignorePreloadError = () => undefined
@@ -48,7 +49,7 @@ const preloadSettingsDialog = () => {
 
 const CommandPalette = lazy(loadCommandPalette)
 
-const EpisodeSwitcher = lazy(loadEpisodeSwitcher)
+const EpisodeNavigation = lazy(loadEpisodeNavigation)
 
 interface CollectionSelectorProps {
   collections: Array<{ ItemId?: string | null; Name?: string | null }>
@@ -176,7 +177,7 @@ function DetailHeaderContent({
               </span>
             }
           >
-            <EpisodeSwitcher
+            <EpisodeNavigation
               currentEpisode={currentItem}
               className="flex-1 min-w-0"
             />

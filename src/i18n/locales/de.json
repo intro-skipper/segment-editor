@@ -253,6 +253,7 @@
     "fitScreen": "An Bildschirm anpassen",
     "retry": "Erneut versuchen",
     "selectEpisode": "Episode auswählen",
+    "nextEpisode": "Nächste Episode",
     "controls": "Steuerung des Videoplayers",
     "recovering": "Wiedergabe wird wiederhergestellt",
     "directPlay": "Direktwiedergabe",
@@ -335,6 +336,8 @@
     "saveAll": "Alle speichern",
     "prevSegment": "Vorheriges Segment",
     "nextSegment": "Nächstes Segment",
+    "prevEpisode": "Vorherige Episode",
+    "nextEpisode": "Nächste Episode",
     "increaseSpeed": "Schneller",
     "decreaseSpeed": "Langsamer",
     "stepFrameBackForward": "Einzelbild zurück / vorwärts"

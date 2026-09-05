@@ -20,6 +20,8 @@ export const seriesKeys = {
   seasons: (seriesId: string) => createQueryKey('series', 'seasons', seriesId),
   episodes: (seriesId: string, seasonId: string) =>
     createQueryKey('series', 'episodes', seriesId, seasonId),
+  adjacentEpisodes: (seriesId: string, episodeId: string) =>
+    createQueryKey('series', 'adjacentEpisodes', seriesId, episodeId),
 } as const
 
 export const albumKeys = {

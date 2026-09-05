@@ -20,9 +20,15 @@ export const PLAYER_HOTKEYS = {
   decreaseSpeed: 'Alt+,',
 } as const
 
+/** Hotkeys for stepping to the Adjacent Episode, registered by EpisodeNavigation in the header. */
+export const EPISODE_HOTKEYS = {
+  previousEpisode: 'Shift+P',
+  nextEpisode: 'Shift+N',
+} as const
+
 /** Display-friendly cheatsheet — a superset of PLAYER_HOTKEYS.
- *  Includes shortcuts registered in PlayerEditor (Mod+S, [, ]) that
- *  are not part of usePlayerKeyboard. */
+ *  Includes shortcuts registered in PlayerEditor (Mod+S, [, ]) and
+ *  EPISODE_HOTKEYS that are not part of usePlayerKeyboard. */
 export const PLAYER_SHORTCUT_CHEATSHEET = Object.freeze([
   // togglePlay uses { key } shape because useHotkey receives it as a KeyboardEvent.key value
   { labelKey: 'shortcuts.playPause', hotkeys: [PLAYER_HOTKEYS.togglePlay.key] },
@@ -54,6 +60,11 @@ export const PLAYER_SHORTCUT_CHEATSHEET = Object.freeze([
   { labelKey: 'shortcuts.saveAll', hotkeys: ['Mod+S'] },
   { labelKey: 'shortcuts.prevSegment', hotkeys: ['['] },
   { labelKey: 'shortcuts.nextSegment', hotkeys: [']'] },
+  {
+    labelKey: 'shortcuts.prevEpisode',
+    hotkeys: [EPISODE_HOTKEYS.previousEpisode],
+  },
+  { labelKey: 'shortcuts.nextEpisode', hotkeys: [EPISODE_HOTKEYS.nextEpisode] },
   {
     labelKey: 'shortcuts.stepFrameBackForward',
     hotkeys: [

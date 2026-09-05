@@ -1,5 +1,4 @@
-import { useRef, useState } from 'react'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
 
@@ -18,6 +17,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { staggerDelay } from '@/lib/animation-utils'
 import { formatEpisodeLabel } from '@/lib/header-utils'
+import { isSpecialSeason } from '@/lib/series-utils'
+import { useEpisodeRouteNavigation } from './use-episode-route-navigation'
 
 interface EpisodeSwitcherProps {
   currentEpisode: BaseItemDto
@@ -150,12 +151,10 @@ const SeasonButton = function SeasonButtonComponent({
     if (season.Id) onSeasonSelect(season.Id)
   }
 
-  const label =
-    season.IndexNumber === 0 ? 'SP' : `S${season.IndexNumber ?? '?'}`
-  const fullLabel =
-    season.IndexNumber === 0
-      ? 'Specials'
-      : `Season ${season.IndexNumber ?? '?'}`
+  const label = isSpecialSeason(season) ? 'SP' : `S${season.IndexNumber ?? '?'}`
+  const fullLabel = isSpecialSeason(season)
+    ? 'Specials'
+    : `Season ${season.IndexNumber ?? '?'}`
 
   return (
     <button
@@ -346,13 +345,8 @@ export default function EpisodeSwitcher({
   className,
 }: EpisodeSwitcherProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const router = useRouter()
+  const { goToEpisode, preloadEpisode } = useEpisodeRouteNavigation()
   const [open, setOpen] = useState(false)
-  const prefetchedEpisodeIdsRef = useRef<Set<string> | null>(null)
-  if (prefetchedEpisodeIdsRef.current === null) {
-    prefetchedEpisodeIdsRef.current = new Set<string>()
-  }
   const [episodeListElement, setEpisodeListElement] =
     useState<HTMLDivElement | null>(null)
 
@@ -374,27 +368,7 @@ export default function EpisodeSwitcher({
 
   const handleEpisodeSelect = (episodeId: string) => {
     setOpen(false)
-    void navigate({
-      to: '/player/$itemId',
-      params: { itemId: episodeId },
-      search: { fetchSegments: 'true' },
-    })
-  }
-
-  const prefetchEpisodeRoute = (episodeId: string) => {
-    const prefetchedEpisodeIds = prefetchedEpisodeIdsRef.current
-    if (prefetchedEpisodeIds === null) return
-
-    if (!episodeId || prefetchedEpisodeIds.has(episodeId)) {
-      return
-    }
-
-    prefetchedEpisodeIds.add(episodeId)
-    void router.preloadRoute({
-      to: '/player/$itemId',
-      params: { itemId: episodeId },
-      search: { fetchSegments: 'true' },
-    })
+    goToEpisode(episodeId)
   }
 
   if (!seriesId || currentEpisode.Type !== 'Episode') return null
@@ -452,7 +426,7 @@ export default function EpisodeSwitcher({
             isLoading={isLoading}
             isError={isError}
             onSelect={handleEpisodeSelect}
-            onIntent={prefetchEpisodeRoute}
+            onIntent={preloadEpisode}
             scrollElement={episodeListElement}
           />
         </div>

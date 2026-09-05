@@ -253,6 +253,7 @@
     "fitScreen": "Fit to screen",
     "retry": "Retry",
     "selectEpisode": "Select episode",
+    "nextEpisode": "Next episode",
     "controls": "Video player controls",
     "recovering": "Recovering playback",
     "directPlay": "Direct play",
@@ -335,6 +336,8 @@
     "saveAll": "Save all",
     "prevSegment": "Previous segment",
     "nextSegment": "Next segment",
+    "prevEpisode": "Previous episode",
+    "nextEpisode": "Next episode",
     "increaseSpeed": "Increase speed",
     "decreaseSpeed": "Decrease speed",
     "stepFrameBackForward": "Step frame back / forward"
