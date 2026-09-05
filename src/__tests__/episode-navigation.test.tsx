@@ -64,6 +64,14 @@ const previous: BaseItemDto = {
   Name: 'First',
 }
 
+const next: BaseItemDto = {
+  Id: 'ep-3',
+  Type: BaseItemKind.Episode,
+  ParentIndexNumber: 1,
+  IndexNumber: 3,
+  Name: 'Last',
+}
+
 /** The handler EpisodeNavigation registered for a hotkey, via the mocked useHotkey. */
 function registeredHandler(hotkey: string): () => void {
   const call = useHotkeyMock.mock.calls.findLast(
@@ -84,43 +92,51 @@ describe('EpisodeNavigation', () => {
     navigateMock.mockReset()
     preloadRouteMock.mockReset()
     useHotkeyMock.mockReset()
-    adjacentRef.current = { previous, next: null }
+    adjacentRef.current = { previous, next }
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('enables the arrow that has a target and disables the one at the series boundary', () => {
+  it('shows only a next arrow, naming its target and shortcut', () => {
     render(<EpisodeNavigation currentEpisode={current} />)
 
-    const prevButton = screen.getByRole('button', {
-      name: 'Previous episode: S1E1 First',
+    const nextButton = screen.getByRole('button', {
+      name: 'Next episode: S1E3 Last',
     })
-    const nextButton = screen.getByRole('button', { name: 'Next episode' })
 
-    expect(prevButton.hasAttribute('disabled')).toBe(false)
-    expect(nextButton.hasAttribute('disabled')).toBe(true)
-    expect(prevButton.getAttribute('title')).toBe(
-      `S1E1 First (${EPISODE_HOTKEYS.previousEpisode})`,
+    expect(nextButton.hasAttribute('disabled')).toBe(false)
+    expect(nextButton.getAttribute('title')).toBe(
+      `S1E3 Last (${EPISODE_HOTKEYS.nextEpisode})`,
     )
+    expect(screen.queryByRole('button', { name: /previous/i })).toBeNull()
   })
 
-  it('navigates to the target on click and preloads it on hover', () => {
+  it('disables the next arrow at the end of the series', () => {
+    adjacentRef.current = { previous, next: null }
     render(<EpisodeNavigation currentEpisode={current} />)
 
-    const prevButton = screen.getByRole('button', {
-      name: 'Previous episode: S1E1 First',
-    })
-
-    fireEvent.pointerEnter(prevButton)
-    expect(preloadRouteMock).toHaveBeenCalledWith(expectedRoute('ep-1'))
-
-    fireEvent.click(prevButton)
-    expect(navigateMock).toHaveBeenCalledWith(expectedRoute('ep-1'))
+    const nextButton = screen.getByRole('button', { name: 'Next episode' })
+    expect(nextButton.hasAttribute('disabled')).toBe(true)
   })
 
-  it('binds the hotkeys and makes them no-ops without a target', () => {
+  it('navigates to the next episode on click and preloads it on hover', () => {
+    render(<EpisodeNavigation currentEpisode={current} />)
+
+    const nextButton = screen.getByRole('button', {
+      name: 'Next episode: S1E3 Last',
+    })
+
+    fireEvent.pointerEnter(nextButton)
+    expect(preloadRouteMock).toHaveBeenCalledWith(expectedRoute('ep-3'))
+
+    fireEvent.click(nextButton)
+    expect(navigateMock).toHaveBeenCalledWith(expectedRoute('ep-3'))
+  })
+
+  it('binds both hotkeys and makes them no-ops without a target', () => {
+    adjacentRef.current = { previous, next: null }
     render(<EpisodeNavigation currentEpisode={current} />)
 
     registeredHandler(EPISODE_HOTKEYS.nextEpisode)()

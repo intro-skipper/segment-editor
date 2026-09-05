@@ -1,6 +1,6 @@
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useAdjacentEpisodes } from '@/services/items/queries'
@@ -11,29 +11,22 @@ import { EPISODE_HOTKEYS } from '@/lib/player-shortcuts'
 import { cn } from '@/lib/utils'
 import { useEpisodeRouteNavigation } from './use-episode-route-navigation'
 
-const PREVIOUS_HOTKEY_DISPLAY = formatForDisplay(
-  EPISODE_HOTKEYS.previousEpisode,
-)
 const NEXT_HOTKEY_DISPLAY = formatForDisplay(EPISODE_HOTKEYS.nextEpisode)
 
-interface EpisodeArrowProps {
-  /** The Adjacent Episode this arrow leads to; null disables the arrow at a series boundary. */
+interface NextEpisodeArrowProps {
+  /** The next Adjacent Episode; null disables the arrow at the end of the series. */
   target: BaseItemDto | null
   label: string
-  hotkeyDisplay: string
-  icon: typeof ChevronLeft
   onSelect: (episodeId: string) => void
   onIntent: (episodeId: string) => void
 }
 
-function EpisodeArrow({
+function NextEpisodeArrow({
   target,
   label,
-  hotkeyDisplay,
-  icon: Icon,
   onSelect,
   onIntent,
-}: EpisodeArrowProps) {
+}: NextEpisodeArrowProps) {
   const targetId = target?.Id
   const targetLabel = formatEpisodeLabel(target)
   const intent = () => {
@@ -52,9 +45,9 @@ function EpisodeArrow({
       onFocus={intent}
       className="rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-30"
       aria-label={targetLabel ? `${label}: ${targetLabel}` : label}
-      title={`${targetLabel ?? label} (${hotkeyDisplay})`}
+      title={`${targetLabel ?? label} (${NEXT_HOTKEY_DISPLAY})`}
     >
-      <Icon className="size-6" aria-hidden />
+      <ChevronRight className="size-6" aria-hidden />
     </Button>
   )
 }
@@ -65,9 +58,11 @@ interface EpisodeNavigationProps {
 }
 
 /**
- * Header control for the player page: previous and next arrows flanking the
- * Episode Switcher, plus the Shift+P / Shift+N hotkeys that do the same thing.
- * Arrows stay visible but disabled at the first and last episode of the series.
+ * Header control for the player page: the Episode Switcher with a next arrow
+ * after it, plus Shift+N for next and Shift+P for previous. Only next gets an
+ * arrow, so it cannot be confused with the back button; a sweep runs forward
+ * and the dropdown covers the rare step back. The arrow stays visible but
+ * disabled at the last episode of the series.
  */
 export default function EpisodeNavigation({
   currentEpisode,
@@ -90,20 +85,10 @@ export default function EpisodeNavigation({
 
   return (
     <div className={cn('flex items-center gap-1 min-w-0', className)}>
-      <EpisodeArrow
-        target={previous}
-        label={t('player.previousEpisode', 'Previous episode')}
-        hotkeyDisplay={PREVIOUS_HOTKEY_DISPLAY}
-        icon={ChevronLeft}
-        onSelect={goToEpisode}
-        onIntent={preloadEpisode}
-      />
       <EpisodeSwitcher currentEpisode={currentEpisode} className="min-w-0" />
-      <EpisodeArrow
+      <NextEpisodeArrow
         target={next}
         label={t('player.nextEpisode', 'Next episode')}
-        hotkeyDisplay={NEXT_HOTKEY_DISPLAY}
-        icon={ChevronRight}
         onSelect={goToEpisode}
         onIntent={preloadEpisode}
       />
