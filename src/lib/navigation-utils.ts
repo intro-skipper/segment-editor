@@ -69,7 +69,8 @@ function isPlayerItemKind(
   return PLAYER_ITEM_KINDS.some((kind) => kind === itemType)
 }
 
-function getPlayerNavigationRoute(itemId: string): NavigationRoute {
+/** Player page for an item, with segment fetching enabled. */
+export function getPlayerNavigationRoute(itemId: string): NavigationRoute {
   return {
     to: '/player/$itemId',
     params: { itemId },

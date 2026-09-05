@@ -1,12 +1,6 @@
 import { useRef } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-
-const episodeRoute = (episodeId: string) =>
-  ({
-    to: '/player/$itemId',
-    params: { itemId: episodeId },
-    search: { fetchSegments: 'true' },
-  }) as const
+import { getPlayerNavigationRoute } from '@/lib/navigation-utils'
 
 /**
  * Navigation to another episode's player page, shared by the Episode Switcher
@@ -22,7 +16,7 @@ export function useEpisodeRouteNavigation() {
   }
 
   const goToEpisode = (episodeId: string) => {
-    void navigate(episodeRoute(episodeId))
+    void navigate(getPlayerNavigationRoute(episodeId))
   }
 
   const preloadEpisode = (episodeId: string) => {
@@ -31,7 +25,7 @@ export function useEpisodeRouteNavigation() {
       return
     }
     preloadedEpisodeIds.add(episodeId)
-    void router.preloadRoute(episodeRoute(episodeId))
+    void router.preloadRoute(getPlayerNavigationRoute(episodeId))
   }
 
   return { goToEpisode, preloadEpisode }

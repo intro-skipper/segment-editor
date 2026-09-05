@@ -18,6 +18,15 @@ export interface SeriesFetchers {
 const NO_ADJACENT: AdjacentEpisodes = { previous: null, next: null }
 
 /**
+ * Jellyfin merges Specials that air before or after a season into that
+ * season's listing when the user's DisplaySpecialsWithinSeasons setting is on
+ * (the default). Series Order excludes Specials, so keep the season's own
+ * episodes only.
+ */
+const ownEpisodes = (episodes: Array<BaseItemDto>, seasonId: string) =>
+  episodes.filter((item) => item.SeasonId === seasonId)
+
+/**
  * Resolves the Adjacent Episodes of `episode` in Series Order (see CONTEXT.md):
  * seasons in the order Jellyfin returns them, episodes in order within each
  * season, crossing season boundaries and skipping seasons with no playable
@@ -41,7 +50,10 @@ export async function resolveAdjacentEpisodes(
   )
   const seasonIndex = lane.indexOf(currentSeason)
 
-  const episodes = await fetchers.fetchEpisodes(seriesId, seasonId)
+  const episodes = ownEpisodes(
+    await fetchers.fetchEpisodes(seriesId, seasonId),
+    seasonId,
+  )
   const episodeIndex = episodes.findIndex((item) => item.Id === episodeId)
   if (episodeIndex === -1) return NO_ADJACENT
 
@@ -52,7 +64,10 @@ export async function resolveAdjacentEpisodes(
   ): Promise<BaseItemDto | null> => {
     for (const season of candidates) {
       if (!season.Id) continue
-      const seasonEpisodes = await fetchers.fetchEpisodes(seriesId, season.Id)
+      const seasonEpisodes = ownEpisodes(
+        await fetchers.fetchEpisodes(seriesId, season.Id),
+        season.Id,
+      )
       if (seasonEpisodes.length === 0) continue
       return pick === 'first'
         ? seasonEpisodes[0]

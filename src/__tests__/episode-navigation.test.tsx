@@ -17,7 +17,7 @@ const { navigateMock, preloadRouteMock, useHotkeyMock, adjacentRef } =
   vi.hoisted(() => ({
     navigateMock: vi.fn(),
     preloadRouteMock: vi.fn(),
-    useHotkeyMock: vi.fn(),
+    useHotkeyMock: vi.fn<(hotkey: string, callback: () => void) => void>(),
     adjacentRef: { current: null as AdjacentEpisodes | null },
   }))
 
@@ -70,7 +70,7 @@ function registeredHandler(hotkey: string): () => void {
     ([registered]) => registered === hotkey,
   )
   if (!call) throw new Error(`No handler registered for ${hotkey}`)
-  return call[1] as () => void
+  return call[1]
 }
 
 const expectedRoute = (itemId: string) => ({

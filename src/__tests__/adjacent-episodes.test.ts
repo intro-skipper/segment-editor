@@ -108,6 +108,21 @@ describe('resolveAdjacentEpisodes', () => {
     expect(special.next?.Id).toBe('extras-e1')
   })
 
+  it('ignores Specials that Jellyfin merges into a season listing', async () => {
+    const mergedSpecial: BaseItemDto = { ...episode('sp', 1), Id: 'sp-e1' }
+    const { fetchers } = series([
+      [SPECIALS, [mergedSpecial]],
+      [S1, [mergedSpecial, episode('s1', 1), episode('s1', 2)]],
+      [S2, [mergedSpecial, episode('s2', 1)]],
+    ])
+
+    const first = await resolveAdjacentEpisodes(fetchers, episode('s1', 1))
+    expect(first.previous).toBeNull()
+
+    const last = await resolveAdjacentEpisodes(fetchers, episode('s1', 2))
+    expect(last.next?.Id).toBe('s2-e1')
+  })
+
   it('resolves nothing when the episode is not in its season listing', async () => {
     const { fetchers } = series([[S1, [episode('s1', 1)]]])
 
