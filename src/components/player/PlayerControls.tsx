@@ -79,6 +79,85 @@ export interface PlayerControlsProps {
   }
 }
 
+/** Mute toggle button that opens a vertical volume slider popover. */
+function VolumeControl({
+  volumeControls,
+  portalContainer,
+}: Pick<PlayerControlsProps, 'volumeControls'> &
+  Pick<PlayerControlsProps['display'], 'portalContainer'>) {
+  const { t } = useTranslation()
+  const isMuted = volumeControls.state === 'muted'
+  const { level: volume } = volumeControls
+  const isSilent = isMuted || volume === 0
+  const sliderVolume = isMuted ? 0 : volume
+
+  const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    volumeControls.onChange(parseFloat(e.target.value))
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            aria-label={
+              isSilent
+                ? t('accessibility.player.muted', 'Volume muted')
+                : t('player.volume', 'Volume')
+            }
+            className={getButtonClass(false)}
+          />
+        }
+      >
+        {isSilent ? (
+          <VolumeX
+            className={ICON_CLASS}
+            strokeWidth={2.5}
+            aria-hidden="true"
+          />
+        ) : (
+          <Volume2
+            className={ICON_CLASS}
+            strokeWidth={2.5}
+            aria-hidden="true"
+          />
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="p-4"
+        container={portalContainer}
+      >
+        <div className="flex flex-col gap-2 items-center">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={sliderVolume}
+            onChange={handleVolumeSliderChange}
+            aria-label={t('player.volumeSlider')}
+            aria-valuemin={0}
+            aria-valuemax={1}
+            aria-valuenow={sliderVolume}
+            aria-valuetext={`${Math.round(sliderVolume * 100)}%`}
+            className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={volumeControls.onToggleMute}
+            className="text-xs"
+          >
+            {isMuted ? t('player.unmute') : t('player.mute')}
+          </Button>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function PlayerControls({
   playback,
   volumeControls,
@@ -90,15 +169,9 @@ export function PlayerControls({
 }: PlayerControlsProps) {
   const { t } = useTranslation()
   const isPlaying = playback.state === 'playing'
-  const isMuted = volumeControls.state === 'muted'
   const isFullscreen = display.mode === 'fullscreen'
   const hasActiveSubtitle = settings.subtitleState === 'active'
-  const { level: volume } = volumeControls
   const { portalContainer } = display
-
-  const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    volumeControls.onChange(parseFloat(e.target.value))
-  }
 
   return (
     <div
@@ -140,65 +213,10 @@ export function PlayerControls({
         </Button>
 
         {/* Volume */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="outline"
-                aria-label={
-                  isMuted || volume === 0
-                    ? t('accessibility.player.muted', 'Volume muted')
-                    : t('player.volume', 'Volume')
-                }
-                className={getButtonClass(false)}
-              />
-            }
-          >
-            {isMuted || volume === 0 ? (
-              <VolumeX
-                className={ICON_CLASS}
-                strokeWidth={2.5}
-                aria-hidden="true"
-              />
-            ) : (
-              <Volume2
-                className={ICON_CLASS}
-                strokeWidth={2.5}
-                aria-hidden="true"
-              />
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="p-4"
-            container={portalContainer}
-          >
-            <div className="flex flex-col gap-2 items-center">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={isMuted ? 0 : volume}
-                onChange={handleVolumeSliderChange}
-                aria-label={t('player.volumeSlider')}
-                aria-valuemin={0}
-                aria-valuemax={1}
-                aria-valuenow={isMuted ? 0 : volume}
-                aria-valuetext={`${Math.round((isMuted ? 0 : volume) * 100)}%`}
-                className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={volumeControls.onToggleMute}
-                className="text-xs"
-              >
-                {isMuted ? t('player.unmute') : t('player.mute')}
-              </Button>
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <VolumeControl
+          volumeControls={volumeControls}
+          portalContainer={portalContainer}
+        />
 
         {/* Track selector for audio and subtitles */}
         {trackControls && (

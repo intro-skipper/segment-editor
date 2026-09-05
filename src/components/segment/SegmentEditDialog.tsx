@@ -369,10 +369,8 @@ function SegmentEditDialogContent({
       <SegmentDeleteConfirmDialog
         open={showDeleteConfirm}
         segmentType={values.type}
-        onOpenChange={setShowDeleteConfirm}
-        onCancel={() => setShowDeleteConfirm(false)}
+        onDismiss={() => setShowDeleteConfirm(false)}
         onConfirm={handleConfirmDelete}
-        t={t}
       />
     </>
   )
@@ -381,22 +379,26 @@ function SegmentEditDialogContent({
 interface SegmentDeleteConfirmDialogProps {
   open: boolean
   segmentType: MediaSegmentType | undefined
-  onOpenChange: (open: boolean) => void
-  onCancel: () => void
+  /** Called for cancel, escape and overlay click. */
+  onDismiss: () => void
   onConfirm: () => void
-  t: ReturnType<typeof useTranslation>['t']
 }
 
-function SegmentDeleteConfirmDialog({
+export function SegmentDeleteConfirmDialog({
   open,
   segmentType,
-  onOpenChange,
-  onCancel,
+  onDismiss,
   onConfirm,
-  t,
 }: SegmentDeleteConfirmDialogProps) {
+  const { t } = useTranslation()
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onDismiss()
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t('editor.deleteSureTitle')}</AlertDialogTitle>
@@ -405,7 +407,7 @@ function SegmentDeleteConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>{t('no')}</AlertDialogCancel>
+          <AlertDialogCancel onClick={onDismiss}>{t('no')}</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>{t('yes')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -31,6 +31,197 @@ interface TrackSelectorProps {
   portalContainer?: React.RefObject<HTMLElement | null>
 }
 
+interface AudioSwitchHints {
+  /** Some or all audio switches restart the stream as a transcode */
+  showTranscodeHint: boolean
+  /** Every switch transcodes, so the copy is the blanket warning */
+  showFullTranscodeHint: boolean
+  /** The transcode stems from the missing native API, which a Chromium flag can enable */
+  showChromiumFlagTip: boolean
+}
+
+function getAudioSwitchHints(
+  audioSwitchTranscodeScope: AudioSwitchTranscodeScope,
+): AudioSwitchHints {
+  const showFullTranscodeHint = audioSwitchTranscodeScope === 'all'
+  return {
+    showTranscodeHint: audioSwitchTranscodeScope !== 'none',
+    showFullTranscodeHint,
+    // Pointless when the API is already exposed and the transcode hint stems
+    // from an undecodable codec instead of the missing API.
+    showChromiumFlagTip:
+      showFullTranscodeHint && canEnableNativeAudioSwitchingViaBrowserFlag(),
+  }
+}
+
+/** Space-separated ids of the hints that render, for `aria-describedby`. */
+function getMenuDescriptionIds(
+  hints: AudioSwitchHints,
+  ids: { transcodeHintId: string; flagTipId: string },
+): string | undefined {
+  const hintIds: Array<string> = []
+  if (hints.showTranscodeHint) hintIds.push(ids.transcodeHintId)
+  if (hints.showChromiumFlagTip) hintIds.push(ids.flagTipId)
+  return hintIds.length > 0 ? hintIds.join(' ') : undefined
+}
+
+function StrategyBadge({ strategy }: { strategy: PlaybackStrategy }) {
+  const { t } = useTranslation()
+  const isDirect = strategy === 'direct'
+  const StrategyIcon = isDirect ? Zap : Monitor
+
+  return (
+    <div className="px-3 py-2">
+      <output
+        className={cn(
+          'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium',
+          isDirect
+            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+            : 'bg-blue-500/10 text-blue-600 border border-blue-500/20',
+        )}
+        aria-label={
+          isDirect
+            ? t(
+                'player.strategy.direct',
+                'Direct Play - Original quality, no transcoding',
+              )
+            : t(
+                'player.strategy.hls',
+                'HLS Streaming - Transcoded for compatibility',
+              )
+        }
+      >
+        <StrategyIcon className="size-3" aria-hidden="true" />
+        <span>
+          {isDirect
+            ? t('player.strategy.directLabel', 'Direct Play')
+            : t('player.strategy.hlsLabel', 'HLS Transcode')}
+        </span>
+      </output>
+    </div>
+  )
+}
+
+function TrackMenuItem({
+  label,
+  isActive,
+  onSelect,
+}: {
+  label: string
+  isActive: boolean
+  onSelect: () => void
+}) {
+  return (
+    <DropdownMenuItem
+      onClick={onSelect}
+      className={cn(
+        'flex items-center justify-between gap-2',
+        isActive && 'bg-accent',
+      )}
+      aria-selected={isActive}
+    >
+      <span className="truncate">{label}</span>
+      {isActive && (
+        <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />
+      )}
+    </DropdownMenuItem>
+  )
+}
+
+function AudioTrackGroup({
+  audioTracks,
+  activeAudioIndex,
+  onSelectAudio,
+  hints,
+  transcodeHintId,
+  flagTipId,
+}: Pick<TrackState, 'audioTracks' | 'activeAudioIndex'> &
+  Pick<TrackSelectorProps, 'onSelectAudio'> & {
+    hints: AudioSwitchHints
+    transcodeHintId: string
+    flagTipId: string
+  }) {
+  const { t } = useTranslation()
+
+  return (
+    <DropdownMenuGroup>
+      <DropdownMenuLabel className="flex items-center gap-2">
+        <AudioLines className="size-4" aria-hidden="true" />
+        {t('player.tracks.audio', 'Audio')}
+      </DropdownMenuLabel>
+
+      {audioTracks.map((track) => (
+        <TrackMenuItem
+          key={`audio-${track.index}`}
+          label={track.displayTitle}
+          isActive={track.index === activeAudioIndex}
+          onSelect={() => onSelectAudio(track.index)}
+        />
+      ))}
+
+      {/* When only some targets restart the stream (e.g. one DTS
+          track), the blanket copy would be wrong in both directions. */}
+      {hints.showTranscodeHint && (
+        <p
+          id={transcodeHintId}
+          className="px-3 pb-1 text-xs text-muted-foreground"
+        >
+          {hints.showFullTranscodeHint
+            ? t(
+                'player.tracks.audioSwitchTranscodeHint',
+                'Switching audio restarts the stream as a transcode',
+              )
+            : t(
+                'player.tracks.audioSwitchPartialTranscodeHint',
+                'Switching to some audio tracks restarts the stream as a transcode',
+              )}
+        </p>
+      )}
+      {hints.showChromiumFlagTip && (
+        <p id={flagTipId} className="px-3 pb-1 text-xs text-muted-foreground">
+          {t(
+            'player.tracks.audioSwitchChromiumFlagTip',
+            'Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags',
+          )}
+        </p>
+      )}
+    </DropdownMenuGroup>
+  )
+}
+
+function SubtitleTrackGroup({
+  subtitleTracks,
+  activeSubtitleIndex,
+  onSelectSubtitle,
+}: Pick<TrackState, 'subtitleTracks' | 'activeSubtitleIndex'> &
+  Pick<TrackSelectorProps, 'onSelectSubtitle'>) {
+  const { t } = useTranslation()
+
+  return (
+    <DropdownMenuGroup>
+      <DropdownMenuLabel className="flex items-center gap-2">
+        <Captions className="size-4" aria-hidden="true" />
+        {t('player.tracks.subtitle', 'Subtitles')}
+      </DropdownMenuLabel>
+
+      <TrackMenuItem
+        label={t('player.tracks.off', 'Off')}
+        isActive={activeSubtitleIndex === null}
+        onSelect={() => onSelectSubtitle(null)}
+      />
+
+      {subtitleTracks.map((track) => (
+        <TrackMenuItem
+          key={`subtitle-${track.index}`}
+          label={track.displayTitle}
+          isActive={track.index === activeSubtitleIndex}
+          onSelect={() => onSelectSubtitle(track.index)}
+        />
+      ))}
+    </DropdownMenuGroup>
+  )
+}
+
 export const TrackSelector = function TrackSelectorComponent({
   trackState,
   onSelectAudio,
@@ -50,23 +241,16 @@ export const TrackSelector = function TrackSelectorComponent({
   const hasSubtitleTracks = subtitleTracks.length > 0
   const hasTracks = hasAudioTracks || hasSubtitleTracks
 
-  const isDirect = strategy === 'direct'
-  const StrategyIcon = isDirect ? Zap : Monitor
-  const showTranscodeHint = audioSwitchTranscodeScope === 'all'
-  // Pointless when the API is already exposed and the transcode hint stems
-  // from an undecodable codec instead of the missing API.
-  const showChromiumFlagTip =
-    showTranscodeHint && canEnableNativeAudioSwitchingViaBrowserFlag()
-
   // Associate the hints with the menu so screen readers announce them when
   // the menu opens; a bare <p> between menu items is skipped by arrow-key
   // navigation and would leave the transcode warning silent.
   const transcodeHintId = useId()
   const flagTipId = useId()
-  const hintIds: Array<string> = []
-  if (audioSwitchTranscodeScope !== 'none') hintIds.push(transcodeHintId)
-  if (showChromiumFlagTip) hintIds.push(flagTipId)
-  const menuDescriptionIds = hintIds.length > 0 ? hintIds.join(' ') : undefined
+  const hints = getAudioSwitchHints(audioSwitchTranscodeScope)
+  const menuDescriptionIds = getMenuDescriptionIds(hints, {
+    transcodeHintId,
+    flagTipId,
+  })
 
   return (
     <DropdownMenu>
@@ -98,151 +282,30 @@ export const TrackSelector = function TrackSelectorComponent({
       >
         {strategy && (
           <>
-            <div className="px-3 py-2">
-              <output
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium',
-                  isDirect
-                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                    : 'bg-blue-500/10 text-blue-600 border border-blue-500/20',
-                )}
-                aria-label={
-                  isDirect
-                    ? t(
-                        'player.strategy.direct',
-                        'Direct Play - Original quality, no transcoding',
-                      )
-                    : t(
-                        'player.strategy.hls',
-                        'HLS Streaming - Transcoded for compatibility',
-                      )
-                }
-              >
-                <StrategyIcon className="size-3" aria-hidden="true" />
-                <span>
-                  {isDirect
-                    ? t('player.strategy.directLabel', 'Direct Play')
-                    : t('player.strategy.hlsLabel', 'HLS Transcode')}
-                </span>
-              </output>
-            </div>
+            <StrategyBadge strategy={strategy} />
             {hasTracks && <DropdownMenuSeparator />}
           </>
         )}
 
         {hasAudioTracks && (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="flex items-center gap-2">
-              <AudioLines className="size-4" aria-hidden="true" />
-              {t('player.tracks.audio', 'Audio')}
-            </DropdownMenuLabel>
-
-            {audioTracks.map((track) => {
-              const isActive = track.index === activeAudioIndex
-
-              return (
-                <DropdownMenuItem
-                  key={`audio-${track.index}`}
-                  onClick={() => onSelectAudio(track.index)}
-                  className={cn(
-                    'flex items-center justify-between gap-2',
-                    isActive && 'bg-accent',
-                  )}
-                  aria-selected={isActive}
-                >
-                  <span className="truncate">{track.displayTitle}</span>
-                  {isActive && (
-                    <Check
-                      className="size-4 shrink-0 text-primary"
-                      aria-hidden="true"
-                    />
-                  )}
-                </DropdownMenuItem>
-              )
-            })}
-
-            {/* When only some targets restart the stream (e.g. one DTS
-                track), the blanket copy would be wrong in both directions. */}
-            {audioSwitchTranscodeScope !== 'none' && (
-              <p
-                id={transcodeHintId}
-                className="px-3 pb-1 text-xs text-muted-foreground"
-              >
-                {showTranscodeHint
-                  ? t(
-                      'player.tracks.audioSwitchTranscodeHint',
-                      'Switching audio restarts the stream as a transcode',
-                    )
-                  : t(
-                      'player.tracks.audioSwitchPartialTranscodeHint',
-                      'Switching to some audio tracks restarts the stream as a transcode',
-                    )}
-              </p>
-            )}
-            {showChromiumFlagTip && (
-              <p
-                id={flagTipId}
-                className="px-3 pb-1 text-xs text-muted-foreground"
-              >
-                {t(
-                  'player.tracks.audioSwitchChromiumFlagTip',
-                  'Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags',
-                )}
-              </p>
-            )}
-          </DropdownMenuGroup>
+          <AudioTrackGroup
+            audioTracks={audioTracks}
+            activeAudioIndex={activeAudioIndex}
+            onSelectAudio={onSelectAudio}
+            hints={hints}
+            transcodeHintId={transcodeHintId}
+            flagTipId={flagTipId}
+          />
         )}
 
         {hasAudioTracks && hasSubtitleTracks && <DropdownMenuSeparator />}
 
         {hasSubtitleTracks && (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="flex items-center gap-2">
-              <Captions className="size-4" aria-hidden="true" />
-              {t('player.tracks.subtitle', 'Subtitles')}
-            </DropdownMenuLabel>
-
-            <DropdownMenuItem
-              onClick={() => onSelectSubtitle(null)}
-              className={cn(
-                'flex items-center justify-between gap-2',
-                activeSubtitleIndex === null && 'bg-accent',
-              )}
-              aria-selected={activeSubtitleIndex === null}
-            >
-              <span>{t('player.tracks.off', 'Off')}</span>
-              {activeSubtitleIndex === null && (
-                <Check
-                  className="size-4 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-              )}
-            </DropdownMenuItem>
-
-            {subtitleTracks.map((track) => {
-              const isActive = track.index === activeSubtitleIndex
-
-              return (
-                <DropdownMenuItem
-                  key={`subtitle-${track.index}`}
-                  onClick={() => onSelectSubtitle(track.index)}
-                  className={cn(
-                    'flex items-center justify-between gap-2',
-                    isActive && 'bg-accent',
-                  )}
-                  aria-selected={isActive}
-                >
-                  <span className="truncate">{track.displayTitle}</span>
-                  {isActive && (
-                    <Check
-                      className="size-4 shrink-0 text-primary"
-                      aria-hidden="true"
-                    />
-                  )}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuGroup>
+          <SubtitleTrackGroup
+            subtitleTracks={subtitleTracks}
+            activeSubtitleIndex={activeSubtitleIndex}
+            onSelectSubtitle={onSelectSubtitle}
+          />
         )}
 
         {!hasTracks && (

@@ -61,33 +61,27 @@ function decodeBlurhashToDataUrl(
   }
 }
 
-export function ItemImage({
-  item,
-  maxWidth = 300,
-  maxHeight,
-  alt,
-  className,
-  aspectRatio = 'aspect-[2/3]',
-  showFallback = true,
-}: ItemImageProps) {
+/**
+ * Resolves the item's image source and tracks its load lifecycle. A failed
+ * direct load is retried once through a blob URL (authenticated fetch); a
+ * failure of that retry is final.
+ */
+function useItemImageSource(
+  item: BaseItemDto,
+  maxWidth: number,
+  maxHeight: number | undefined,
+) {
   const [loadedSource, setLoadedSource] = useState<string | null>(null)
   const [failedSource, setFailedSource] = useState<string | null>(null)
   const [blobFallbackSource, setBlobFallbackSource] = useState<string | null>(
     null,
   )
-  const imgRef = useRef<HTMLImageElement>(null)
 
   const rawImageUrl = getBestImageUrl(item, maxWidth, maxHeight) ?? null
   const useBlobFallback =
     rawImageUrl !== null && blobFallbackSource === rawImageUrl
   const blobImageUrl = useBlobUrl(useBlobFallback ? rawImageUrl : null)
   const imageUrl = useBlobFallback ? blobImageUrl : rawImageUrl
-
-  const blurhash = getImageBlurhash(item) ?? null
-  const blurhashDataUrl = blurhash ? decodeBlurhashToDataUrl(blurhash) : null
-
-  const imageKey = imageUrl || rawImageUrl || item.Id
-  const isLoaded = imageUrl !== null && loadedSource === imageUrl
 
   const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const src = event.currentTarget.currentSrc || imageUrl
@@ -109,9 +103,64 @@ export function ItemImage({
     }
   }
 
+  return {
+    rawImageUrl,
+    imageUrl,
+    isLoaded: imageUrl !== null && loadedSource === imageUrl,
+    hasFinalImageError: imageUrl !== null && failedSource === imageUrl,
+    /** For images that were already complete when the element mounted. */
+    markLoaded: setLoadedSource,
+    handleLoad,
+    handleError,
+  }
+}
+
+function ItemImageFallback({
+  item,
+  aspectRatio,
+  className,
+}: Pick<ItemImageProps, 'item' | 'aspectRatio' | 'className'>) {
+  return (
+    <div
+      className={cn(
+        'bg-muted flex items-center justify-center rounded-lg overflow-hidden',
+        aspectRatio,
+        className,
+      )}
+    >
+      <span className="text-muted-foreground text-xs text-center px-2 line-clamp-2">
+        {item.Name || 'No image'}
+      </span>
+    </div>
+  )
+}
+
+export function ItemImage({
+  item,
+  maxWidth = 300,
+  maxHeight,
+  alt,
+  className,
+  aspectRatio = 'aspect-[2/3]',
+  showFallback = true,
+}: ItemImageProps) {
+  const imgRef = useRef<HTMLImageElement>(null)
+  const {
+    rawImageUrl,
+    imageUrl,
+    isLoaded,
+    hasFinalImageError,
+    markLoaded,
+    handleLoad,
+    handleError,
+  } = useItemImageSource(item, maxWidth, maxHeight)
+
+  const blurhash = getImageBlurhash(item) ?? null
+  const blurhashDataUrl = blurhash ? decodeBlurhashToDataUrl(blurhash) : null
+
+  const imageKey = imageUrl || rawImageUrl || item.Id
   const displayAlt = alt || item.Name || 'Media item'
 
-  const hasFinalImageError = imageUrl !== null && failedSource === imageUrl
   const shouldShowFallback =
     (!imageUrl && !blurhashDataUrl) || hasFinalImageError
 
@@ -119,18 +168,11 @@ export function ItemImage({
     if (!showFallback) return null
 
     return (
-      <div
-        key={failedSource ?? 'no-image'}
-        className={cn(
-          'bg-muted flex items-center justify-center rounded-lg overflow-hidden',
-          aspectRatio,
-          className,
-        )}
-      >
-        <span className="text-muted-foreground text-xs text-center px-2 line-clamp-2">
-          {item.Name || 'No image'}
-        </span>
-      </div>
+      <ItemImageFallback
+        item={item}
+        aspectRatio={aspectRatio}
+        className={className}
+      />
     )
   }
 
@@ -159,7 +201,7 @@ export function ItemImage({
           ref={(el) => {
             imgRef.current = el
             if (el?.complete && el.naturalWidth > 0) {
-              setLoadedSource(el.currentSrc || imageUrl)
+              markLoaded(el.currentSrc || imageUrl)
             }
           }}
           src={imageUrl}
