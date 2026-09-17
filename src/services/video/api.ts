@@ -260,7 +260,7 @@ export function getBestImageUrl(
 export function getImageBlurhash(item: BaseItemDto): string | undefined {
   const hashes = item.ImageBlurHashes?.Primary
   if (!hashes) return undefined
-  return Object.values(hashes)[0]
+  return Object.values(hashes)[0] ?? undefined
 }
 
 export function extractMediaSourceInfo(

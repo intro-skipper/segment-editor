@@ -4,20 +4,33 @@ import {
   getDeviceId,
   withApi,
 } from '@/services/jellyfin'
+import { jellyfinFetchEmpty } from '@/services/jellyfin/http'
 
 interface ActiveEncodingOptions {
   playSessionId: string | null | undefined
 }
 
+const ACTIVE_ENCODINGS_ENDPOINT = 'Videos/ActiveEncodings'
+
+const activeEncodingQuery = (playSessionId: string) =>
+  new URLSearchParams({ deviceId: getDeviceId(), playSessionId })
+
+/**
+ * Stops the server-side transcode for a play session. Jellyfin hides this
+ * endpoint from its OpenAPI spec, so the SDK has no method for it.
+ */
 export async function stopActiveEncoding({
   playSessionId,
 }: ActiveEncodingOptions): Promise<void> {
   if (!playSessionId) return
 
   await withApi(async (apis) => {
-    await apis.hlsSegmentApi.stopEncodingProcess({
-      deviceId: getDeviceId(),
-      playSessionId,
+    await jellyfinFetchEmpty({
+      baseUrl: apis.api.basePath,
+      accessToken: apis.api.accessToken,
+      method: 'DELETE',
+      endpoint: ACTIVE_ENCODINGS_ENDPOINT,
+      query: activeEncodingQuery(playSessionId),
     })
   })
 }
@@ -31,11 +44,8 @@ export function stopActiveEncodingKeepalive({
   const url = buildApiUrl({
     serverAddress,
     accessToken,
-    endpoint: 'Videos/ActiveEncodings',
-    query: new URLSearchParams({
-      deviceId: getDeviceId(),
-      playSessionId,
-    }),
+    endpoint: ACTIVE_ENCODINGS_ENDPOINT,
+    query: activeEncodingQuery(playSessionId),
   })
 
   if (!url) return

@@ -20,12 +20,9 @@ const jellyfinFetchJsonMock = vi.hoisted(() => vi.fn())
 
 // Mock APIs object for withApi
 const mockApis = {
-  itemsApi: {},
   libraryApi: {},
-  tvShowsApi: {},
+  showApi: {},
   imageApi: {},
-  videosApi: {},
-  pluginsApi: {},
   systemApi: {},
   api: {
     accessToken: 'test-token',

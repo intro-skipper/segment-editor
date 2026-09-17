@@ -28,7 +28,7 @@ export async function startPlaybackStatus({
   isPaused,
 }: PlaybackStatusOptions): Promise<void> {
   await withApi(async (apis) => {
-    await apis.playstateApi.reportPlaybackStart({
+    await apis.sessionApi.reportPlaybackStart({
       playbackStartInfo: {
         ItemId: itemId,
         MediaSourceId: mediaSourceId,
@@ -51,7 +51,7 @@ export async function reportPlaybackProgress({
   isPaused,
 }: PlaybackStatusOptions): Promise<void> {
   await withApi(async (apis) => {
-    await apis.playstateApi.reportPlaybackProgress({
+    await apis.sessionApi.reportPlaybackProgress({
       playbackProgressInfo: {
         ItemId: itemId,
         MediaSourceId: mediaSourceId,
@@ -73,7 +73,7 @@ export async function stopPlaybackStatus({
   failed,
 }: StopPlaybackStatusOptions): Promise<void> {
   await withApi(async (apis) => {
-    await apis.playstateApi.reportPlaybackStopped({
+    await apis.sessionApi.reportPlaybackStopped({
       playbackStopInfo: {
         ItemId: itemId,
         MediaSourceId: mediaSourceId,

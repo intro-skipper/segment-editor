@@ -7,16 +7,12 @@
 import type { Api } from '@jellyfin/sdk'
 import type {
   getImageApi,
-  getItemsApi,
   getLibraryApi,
   getLibraryStructureApi,
-  getHlsSegmentApi,
-  getPlaystateApi,
-  getPluginsApi,
   getSearchApi,
+  getSessionApi,
+  getShowApi,
   getSystemApi,
-  getTvShowsApi,
-  getVideosApi,
 } from '@jellyfin/sdk/lib/utils/api'
 
 export interface Credentials {
@@ -32,16 +28,12 @@ export interface ApiOptions {
 export interface TypedApis {
   api: Api
   systemApi: ReturnType<typeof getSystemApi>
-  itemsApi: ReturnType<typeof getItemsApi>
   libraryApi: ReturnType<typeof getLibraryApi>
   libraryStructureApi: ReturnType<typeof getLibraryStructureApi>
-  hlsSegmentApi: ReturnType<typeof getHlsSegmentApi>
   imageApi: ReturnType<typeof getImageApi>
-  videosApi: ReturnType<typeof getVideosApi>
-  tvShowsApi: ReturnType<typeof getTvShowsApi>
-  pluginsApi: ReturnType<typeof getPluginsApi>
+  showApi: ReturnType<typeof getShowApi>
   searchApi: ReturnType<typeof getSearchApi>
-  playstateApi: ReturnType<typeof getPlaystateApi>
+  sessionApi: ReturnType<typeof getSessionApi>
 }
 
 interface ApiKeyCredentials {

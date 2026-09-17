@@ -7,16 +7,12 @@
 import { Jellyfin } from '@jellyfin/sdk'
 import {
   getImageApi,
-  getItemsApi,
-  getHlsSegmentApi,
   getLibraryApi,
   getLibraryStructureApi,
-  getPlaystateApi,
-  getPluginsApi,
   getSearchApi,
+  getSessionApi,
+  getShowApi,
   getSystemApi,
-  getTvShowsApi,
-  getVideosApi,
 } from '@jellyfin/sdk/lib/utils/api'
 import { sanitizeUrl } from './security'
 import type { Api } from '@jellyfin/sdk'
@@ -161,16 +157,12 @@ function createTypedApis(api: Api): TypedApis {
   return {
     api,
     systemApi: getSystemApi(api),
-    itemsApi: getItemsApi(api),
-    hlsSegmentApi: getHlsSegmentApi(api),
     libraryApi: getLibraryApi(api),
     libraryStructureApi: getLibraryStructureApi(api),
     imageApi: getImageApi(api),
-    videosApi: getVideosApi(api),
-    tvShowsApi: getTvShowsApi(api),
-    pluginsApi: getPluginsApi(api),
+    showApi: getShowApi(api),
     searchApi: getSearchApi(api),
-    playstateApi: getPlaystateApi(api),
+    sessionApi: getSessionApi(api),
   }
 }
 

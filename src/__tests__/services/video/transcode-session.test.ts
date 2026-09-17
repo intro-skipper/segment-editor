@@ -10,6 +10,7 @@ import {
   getDeviceId,
   withApi,
 } from '@/services/jellyfin'
+import { jellyfinFetchEmpty } from '@/services/jellyfin/http'
 
 vi.mock('@/services/jellyfin', () => ({
   buildApiUrl: vi.fn(),
@@ -18,7 +19,9 @@ vi.mock('@/services/jellyfin', () => ({
   withApi: vi.fn(),
 }))
 
-const stopEncodingProcess = vi.fn()
+vi.mock('@/services/jellyfin/http', () => ({
+  jellyfinFetchEmpty: vi.fn(),
+}))
 
 describe('transcode-session active encoding cleanup', () => {
   beforeEach(() => {
@@ -26,21 +29,27 @@ describe('transcode-session active encoding cleanup', () => {
     vi.mocked(getDeviceId).mockReturnValue('device-1')
     vi.mocked(withApi).mockImplementation(async (callback) => {
       // SAFETY: withApi hands its callback the full Jellyfin API set, but
-      // this path reaches only the single API stubbed below.
+      // this path reaches only the raw client fields stubbed below.
       await callback({
-        hlsSegmentApi: { stopEncodingProcess },
+        api: { basePath: 'https://jellyfin.example', accessToken: 'token' },
       } as never)
       return null
     })
   })
 
-  it('stops active encoding through the HLS segment API', async () => {
+  it('stops active encoding with a DELETE to Videos/ActiveEncodings', async () => {
     await stopActiveEncoding({ playSessionId: 'play-session-1' })
 
-    expect(stopEncodingProcess).toHaveBeenCalledWith({
-      deviceId: 'device-1',
-      playSessionId: 'play-session-1',
+    expect(jellyfinFetchEmpty).toHaveBeenCalledTimes(1)
+    const options = vi.mocked(jellyfinFetchEmpty).mock.calls[0][0]
+    expect(options).toMatchObject({
+      baseUrl: 'https://jellyfin.example',
+      accessToken: 'token',
+      method: 'DELETE',
+      endpoint: 'Videos/ActiveEncodings',
     })
+    expect(options.query?.get('deviceId')).toBe('device-1')
+    expect(options.query?.get('playSessionId')).toBe('play-session-1')
   })
 
   it('does not call cleanup without a play session id', async () => {

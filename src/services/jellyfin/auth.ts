@@ -4,7 +4,7 @@
  * @module services/jellyfin/auth
  */
 
-import { getSystemApi, getUserApi } from '@jellyfin/sdk/lib/utils/api'
+import { getAuthenticationApi, getSystemApi } from '@jellyfin/sdk/lib/utils/api'
 import { createApi, getRequestConfig, isAborted } from './core'
 import type { ApiOptions, AuthCredentials, AuthResult } from './types'
 import { ConnectionAuthSchema } from '@/lib/forms/connection-form'
@@ -106,7 +106,7 @@ async function authWithUserPass(
   const api = createApi(serverAddress)
   if (!api) return { success: false, error: 'Invalid server address' }
 
-  const { data } = await getUserApi(api).authenticateUserByName(
+  const { data } = await getAuthenticationApi(api).authenticateUserByName(
     { authenticateUserByName: { Username: username, Pw: password } },
     getRequestConfig(options),
   )

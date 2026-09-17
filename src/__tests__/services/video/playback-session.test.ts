@@ -34,7 +34,7 @@ describe('playback-session status helpers', () => {
       // SAFETY: withApi hands its callback the full Jellyfin API set, but
       // this path reaches only the single API stubbed below.
       await callback({
-        playstateApi: {
+        sessionApi: {
           reportPlaybackStart,
           reportPlaybackProgress: reportPlaybackProgressApi,
           reportPlaybackStopped,
