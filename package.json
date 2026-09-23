@@ -59,7 +59,7 @@
     "jsdom": "^30.0.1",
     "oxfmt": "^0.68.0",
     "oxlint": "^1.83.0",
-    "oxlint-tsgolint": "^7.0.2001",
+    "oxlint-tsgolint": "^7.0.2002",
     "react-doctor": "0.9.14",
     "shadcn": "^4.21.0",
     "tailwindcss": "^4.3.3",
