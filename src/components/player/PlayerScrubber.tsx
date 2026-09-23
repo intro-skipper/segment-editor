@@ -216,8 +216,7 @@ function useScrubberInteraction({
 }) {
   const scrubberRef = React.useRef<HTMLDivElement>(null)
   const isDraggingRef = React.useRef(false)
-  const seekFrameRef = React.useRef<number | null>(null)
-  const pendingSeekTimeRef = React.useRef<number | null>(null)
+  const pendingScrubTimeRef = React.useRef<number | null>(null)
   const hoverFrameRef = React.useRef<number | null>(null)
   const scrubberRectRef = React.useRef<DOMRect | null>(null)
   const pendingHoverRef = React.useRef<{
@@ -254,20 +253,6 @@ function useScrubberInteraction({
     return { time, position: x }
   }
 
-  const scheduleSeek = (time: number) => {
-    pendingSeekTimeRef.current = time
-    if (seekFrameRef.current !== null) return
-
-    seekFrameRef.current = requestAnimationFrame(() => {
-      seekFrameRef.current = null
-      const nextTime = pendingSeekTimeRef.current
-      if (nextTime !== null) {
-        onSeek(nextTime)
-        pendingSeekTimeRef.current = null
-      }
-    })
-  }
-
   const scheduleHoverUpdate = (time: number, position: number) => {
     pendingHoverRef.current = { time, position }
     if (hoverFrameRef.current !== null) return
@@ -302,11 +287,16 @@ function useScrubberInteraction({
     e.preventDefault()
     // `Element`, not `HTMLElement`: pointer capture is defined on Element, so
     // an SVG child of the track has to capture too or the drag stops tracking.
-    if (e.target instanceof Element) e.target.setPointerCapture(e.pointerId)
+    if (
+      e.target instanceof Element &&
+      typeof e.target.setPointerCapture === 'function'
+    ) {
+      e.target.setPointerCapture(e.pointerId)
+    }
     refreshScrubberRect()
     isDraggingRef.current = true
     const { time } = getPositionFromClientX(e.clientX)
-    scheduleSeek(time)
+    pendingScrubTimeRef.current = time
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -314,27 +304,42 @@ function useScrubberInteraction({
     scheduleHoverUpdate(time, position)
 
     if (isDraggingRef.current) {
-      scheduleSeek(time)
+      // Keep the video on its current frame while the pointer moves. The
+      // hover preview follows the pointer, and the actual seek is committed
+      // once the scrub ends.
+      pendingScrubTimeRef.current = time
     }
   }
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.target instanceof Element) {
-      e.target.releasePointerCapture(e.pointerId)
-    }
+  const finishScrub = () => {
     isDraggingRef.current = false
     scrubberRectRef.current = null
 
-    if (seekFrameRef.current !== null) {
-      cancelAnimationFrame(seekFrameRef.current)
-      seekFrameRef.current = null
-    }
-
-    const finalTime = pendingSeekTimeRef.current
+    const finalTime = pendingScrubTimeRef.current
+    pendingScrubTimeRef.current = null
     if (finalTime !== null) {
       onSeek(finalTime)
-      pendingSeekTimeRef.current = null
     }
+  }
+
+  const cancelScrub = () => {
+    isDraggingRef.current = false
+    scrubberRectRef.current = null
+    pendingScrubTimeRef.current = null
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (
+      e.target instanceof Element &&
+      typeof e.target.releasePointerCapture === 'function'
+    ) {
+      e.target.releasePointerCapture(e.pointerId)
+    }
+    finishScrub()
+  }
+
+  const handlePointerCancel = () => {
+    cancelScrub()
   }
 
   const handlePointerLeave = () => {
@@ -370,12 +375,8 @@ function useScrubberInteraction({
   }, [])
 
   React.useEffect(() => {
-    const seekFrame = seekFrameRef
     const hoverFrame = hoverFrameRef
     return () => {
-      if (seekFrame.current !== null) {
-        cancelAnimationFrame(seekFrame.current)
-      }
       if (hoverFrame.current !== null) {
         cancelAnimationFrame(hoverFrame.current)
       }
@@ -405,6 +406,7 @@ function useScrubberInteraction({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    handlePointerCancel,
     handlePointerLeave,
     handleKeyDown,
   }
@@ -484,6 +486,7 @@ export function PlayerScrubber({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    handlePointerCancel,
     handlePointerLeave,
     handleKeyDown,
   } = useScrubberInteraction({
@@ -533,6 +536,7 @@ export function PlayerScrubber({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onPointerLeave={handlePointerLeave}
         onPointerEnter={refreshScrubberRect}
       >

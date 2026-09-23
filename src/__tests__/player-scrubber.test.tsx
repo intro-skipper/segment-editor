@@ -86,4 +86,36 @@ describe('PlayerScrubber', () => {
 
     expect(onSeek).not.toHaveBeenCalled()
   })
+
+  it('keeps the video at its current frame until pointer scrubbing ends', () => {
+    const onSeek = vi.fn()
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 8,
+      width: 100,
+      height: 8,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    render(<PlayerScrubber currentTime={10} duration={100} onSeek={onSeek} />)
+
+    const scrubber = asElement(
+      screen.getByRole('slider', { name: 'Video progress' }).parentElement,
+      HTMLDivElement,
+    )
+
+    fireEvent.pointerDown(scrubber, { clientX: 20, pointerId: 1 })
+    fireEvent.pointerMove(scrubber, { clientX: 80, pointerId: 1 })
+
+    expect(onSeek).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(scrubber, { clientX: 80, pointerId: 1 })
+
+    expect(onSeek).toHaveBeenCalledTimes(1)
+    expect(onSeek).toHaveBeenCalledWith(80)
+  })
 })
