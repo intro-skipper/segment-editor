@@ -139,6 +139,8 @@ function ScrubberChapterMarkers({
           aria-label={marker.name || `Chapter ${index + 1}`}
           onPointerEnter={() => onHover(marker)}
           onPointerLeave={onLeave}
+          // A scrub started here would seek twice: on release and on click.
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
             onSeek(marker.time)
@@ -215,9 +217,9 @@ function useScrubberInteraction({
   setHoverPosition: React.Dispatch<React.SetStateAction<number>>
 }) {
   const scrubberRef = React.useRef<HTMLDivElement>(null)
-  const isDraggingRef = React.useRef(false)
-  const seekFrameRef = React.useRef<number | null>(null)
-  const pendingSeekTimeRef = React.useRef<number | null>(null)
+  // Drag position, null when idle. Committed as the seek on release.
+  const pendingScrubTimeRef = React.useRef<number | null>(null)
+  const [scrubTime, setScrubTime] = React.useState<number | null>(null)
   const hoverFrameRef = React.useRef<number | null>(null)
   const scrubberRectRef = React.useRef<DOMRect | null>(null)
   const pendingHoverRef = React.useRef<{
@@ -254,20 +256,6 @@ function useScrubberInteraction({
     return { time, position: x }
   }
 
-  const scheduleSeek = (time: number) => {
-    pendingSeekTimeRef.current = time
-    if (seekFrameRef.current !== null) return
-
-    seekFrameRef.current = requestAnimationFrame(() => {
-      seekFrameRef.current = null
-      const nextTime = pendingSeekTimeRef.current
-      if (nextTime !== null) {
-        onSeek(nextTime)
-        pendingSeekTimeRef.current = null
-      }
-    })
-  }
-
   const scheduleHoverUpdate = (time: number, position: number) => {
     pendingHoverRef.current = { time, position }
     if (hoverFrameRef.current !== null) return
@@ -298,43 +286,40 @@ function useScrubberInteraction({
     })
   }
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !e.isPrimary) return
     e.preventDefault()
-    // `Element`, not `HTMLElement`: pointer capture is defined on Element, so
-    // an SVG child of the track has to capture too or the drag stops tracking.
-    if (e.target instanceof Element) e.target.setPointerCapture(e.pointerId)
+    // Capture on the track, which outlives any child that unmounts mid-drag.
+    e.currentTarget.setPointerCapture(e.pointerId)
     refreshScrubberRect()
-    isDraggingRef.current = true
-    const { time } = getPositionFromClientX(e.clientX)
-    scheduleSeek(time)
+    const { time, position } = getPositionFromClientX(e.clientX)
+    pendingScrubTimeRef.current = time
+    setScrubTime(time)
+    scheduleHoverUpdate(time, position)
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (!e.isPrimary) return
     const { time, position } = getPositionFromClientX(e.clientX)
     scheduleHoverUpdate(time, position)
 
-    if (isDraggingRef.current) {
-      scheduleSeek(time)
+    // The seek waits for release; only the thumb and preview follow the pointer.
+    if (pendingScrubTimeRef.current !== null) {
+      pendingScrubTimeRef.current = time
+      setScrubTime(time)
     }
   }
 
+  // Also handles pointercancel, so an interrupted touch drag still seeks to
+  // where the thumb was instead of silently dropping it.
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.target instanceof Element) {
-      e.target.releasePointerCapture(e.pointerId)
-    }
-    isDraggingRef.current = false
+    if (!e.isPrimary) return
     scrubberRectRef.current = null
-
-    if (seekFrameRef.current !== null) {
-      cancelAnimationFrame(seekFrameRef.current)
-      seekFrameRef.current = null
-    }
-
-    const finalTime = pendingSeekTimeRef.current
-    if (finalTime !== null) {
-      onSeek(finalTime)
-      pendingSeekTimeRef.current = null
-    }
+    const finalTime = pendingScrubTimeRef.current
+    if (finalTime === null) return
+    pendingScrubTimeRef.current = null
+    setScrubTime(null)
+    onSeek(finalTime)
   }
 
   const handlePointerLeave = () => {
@@ -370,12 +355,8 @@ function useScrubberInteraction({
   }, [])
 
   React.useEffect(() => {
-    const seekFrame = seekFrameRef
     const hoverFrame = hoverFrameRef
     return () => {
-      if (seekFrame.current !== null) {
-        cancelAnimationFrame(seekFrame.current)
-      }
       if (hoverFrame.current !== null) {
         cancelAnimationFrame(hoverFrame.current)
       }
@@ -401,6 +382,7 @@ function useScrubberInteraction({
 
   return {
     scrubberRef,
+    scrubTime,
     refreshScrubberRect,
     handlePointerDown,
     handlePointerMove,
@@ -474,12 +456,9 @@ export function PlayerScrubber({
   const rangeMax = Math.round(safeDuration)
   const rangeValue = clamp(Math.round(safeCurrentTime), 0, rangeMax)
 
-  const progress = safeDuration > 0 ? (safeCurrentTime / safeDuration) * 100 : 0
-  const bufferedProgress =
-    safeDuration > 0 ? (safeBuffered / safeDuration) * 100 : 0
-
   const {
     scrubberRef,
+    scrubTime,
     refreshScrubberRect,
     handlePointerDown,
     handlePointerMove,
@@ -493,6 +472,12 @@ export function PlayerScrubber({
     setHoverTime,
     setHoverPosition,
   })
+
+  // While dragging, the thumb tracks the pointer, not the advancing playhead.
+  const displayTime = scrubTime ?? safeCurrentTime
+  const progress = safeDuration > 0 ? (displayTime / safeDuration) * 100 : 0
+  const bufferedProgress =
+    safeDuration > 0 ? (safeBuffered / safeDuration) * 100 : 0
 
   const handleChapterHover = (marker: ChapterMarker) => {
     setHoveredChapter({ name: marker.name, position: marker.position })
@@ -533,6 +518,7 @@ export function PlayerScrubber({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         onPointerEnter={refreshScrubberRect}
       >
