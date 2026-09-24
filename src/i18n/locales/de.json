@@ -207,16 +207,6 @@
     "chapter": "Chapter Segments",
     "segment": "MediaSegments API"
   },
-  "plugin": {
-    "edl": {
-      "enable": "EDL Unterstützung",
-      "created": "EDL Datei wurde erstellt"
-    },
-    "chapter": {
-      "enable": "Kapitelersteller",
-      "created": "Kapiteldatei erstellt"
-    }
-  },
   "error": {
     "not_found": "Seite nicht gefunden",
     "not_found_description": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
