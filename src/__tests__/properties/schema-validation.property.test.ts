@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { MediaSegmentSchema, TimeInputSchema } from '@/lib/schemas'
+import { MediaSegmentSchema } from '@/lib/schemas'
 
 /** Valid segment types matching the schema */
 const VALID_SEGMENT_TYPES = [
@@ -206,97 +206,6 @@ describe('Zod Schema Validation Round-Trip', () => {
     ]
     for (const invalid of invalidSegments) {
       expect(() => MediaSegmentSchema.parse(invalid)).toThrow()
-    }
-  })
-})
-
-describe('TimeInput Schema Validation', () => {
-  it('parses valid numeric time inputs', () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: 0, max: 1_000_000 }).map((n) => n + Math.random()),
-        (time) => {
-          const result = TimeInputSchema.safeParse(time)
-          return result.success === true && result.data === time
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  it('parses valid time string formats', () => {
-    const validTimeStrings = [
-      '0',
-      '123',
-      '1:30',
-      '01:30:00',
-      '90.5',
-      '1:30.5',
-      '12:34:56.789',
-      '0:00',
-      '99:99:99',
-    ]
-
-    fc.assert(
-      fc.property(fc.constantFrom(...validTimeStrings), (timeStr) => {
-        const result = TimeInputSchema.safeParse(timeStr)
-        return result.success === true && result.data === timeStr
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  it('rejects negative numeric time inputs', () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: -1_000_000, max: -1 }).map((n) => n + Math.random()),
-        (time) => {
-          const result = TimeInputSchema.safeParse(time)
-          return result.success === false
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  it('rejects invalid time string formats', () => {
-    const invalidTimeStrings = [
-      'abc',
-      '1:30am',
-      '12:34:56pm',
-      '-1:30',
-      '1h30m',
-      'noon',
-      '',
-      ' ',
-      '1 30',
-    ]
-
-    fc.assert(
-      fc.property(fc.constantFrom(...invalidTimeStrings), (timeStr) => {
-        const result = TimeInputSchema.safeParse(timeStr)
-        return result.success === false
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  it('rejects non-string, non-number types', () => {
-    const invalidTypes = [null, undefined, {}, [], true, false]
-
-    fc.assert(
-      fc.property(fc.constantFrom(...invalidTypes), (invalid) => {
-        const result = TimeInputSchema.safeParse(invalid)
-        return result.success === false
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  it('TimeInputSchema.parse throws on invalid input', () => {
-    const invalidInputs = [null, undefined, 'abc', -1, '1:30am']
-    for (const invalid of invalidInputs) {
-      expect(() => TimeInputSchema.parse(invalid)).toThrow()
     }
   })
 })

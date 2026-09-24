@@ -50,12 +50,6 @@ export function buildSegmentTimeIndex(
   return { ranges, rangeById }
 }
 
-export function buildSegmentTimeRanges(
-  segments: ReadonlyArray<MediaSegmentDto> | undefined,
-): Array<SegmentTimeRange> {
-  return buildSegmentTimeIndex(segments).ranges
-}
-
 export function findActiveSegmentRange(
   ranges: ReadonlyArray<SegmentTimeRange>,
   currentTime: number,

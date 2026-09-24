@@ -47,54 +47,8 @@ export function capturePlaybackState(
 }
 
 /**
- * Restores playback state to a video element.
- * Handles async restoration for scenarios where video needs to buffer.
- *
- * @param video - The video element to restore state to
- * @param state - The state to restore
- * @returns Promise that resolves when state is restored
- */
-export async function restorePlaybackState(
-  video: HTMLVideoElement | null | undefined,
-  state: PlaybackState,
-): Promise<void> {
-  if (!video) return
-
-  // Restore volume and mute state immediately
-  video.volume = state.volume
-  video.muted = state.muted
-
-  // Wait for video to be ready before seeking
-  // HAVE_CURRENT_DATA = 2 (using numeric constant for test environment compatibility)
-  if (video.readyState < 2) {
-    await new Promise<void>((resolve) => {
-      const handleCanPlay = () => {
-        video.removeEventListener('canplay', handleCanPlay)
-        resolve()
-      }
-      video.addEventListener('canplay', handleCanPlay)
-    })
-  }
-
-  // Seek to preserved position
-  if (state.currentTime > 0 && isFinite(state.currentTime)) {
-    video.currentTime = state.currentTime
-  }
-
-  // Restore play/pause state
-  if (!state.paused) {
-    try {
-      await video.play()
-    } catch {
-      // Autoplay may be blocked, ignore
-    }
-  }
-}
-
-/**
- * Synchronously restores playback state (volume, mute, seek).
+ * Restores playback state (volume, mute, seek) to a video element.
  * Does not wait for video readiness or restore play state.
- * Use when you need immediate restoration without async.
  *
  * @param video - The video element to restore state to
  * @param state - The state to restore

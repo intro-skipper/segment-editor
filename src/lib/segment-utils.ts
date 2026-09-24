@@ -212,9 +212,6 @@ export const getSegmentRegions = (
   return regions
 }
 
-const UUID_V4 =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
 /**
  * The Web Crypto members this module needs. `randomUUID` is gated on a secure
  * context, so the DOM lib type over-promises it on plain-HTTP origins;
@@ -248,6 +245,3 @@ export const generateUUID = (): string => {
 
   throw new Error('crypto.getRandomValues is unavailable')
 }
-
-export const isValidUUID = (uuid: string | null | undefined): boolean =>
-  uuid !== null && uuid !== undefined && UUID_V4.test(uuid)

@@ -61,16 +61,4 @@ void i18n.use(initReactI18next).init({
   },
 })
 
-/**
- * Changes the current locale and optionally persists the preference
- */
-export function changeLocale(locale: SupportedLocale | 'auto'): void {
-  if (locale === 'auto') {
-    const detected = detectBrowserLocale()
-    void i18n.changeLanguage(detected)
-  } else {
-    void i18n.changeLanguage(locale)
-  }
-}
-
 export default i18n

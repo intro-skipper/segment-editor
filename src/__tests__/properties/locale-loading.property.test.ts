@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
 import type { SupportedLocale } from '@/i18n/config'
-import i18n, { changeLocale, supportedLocales } from '@/i18n/config'
+import i18n, { supportedLocales } from '@/i18n/config'
 
 // Import locale files directly for verification
 import enUS from '@/i18n/locales/en-US.json'
@@ -94,7 +94,7 @@ describe('Locale Loading and Application', () => {
     fc.assert(
       fc.property(supportedLocaleArb, (locale) => {
         // Change to the selected locale
-        changeLocale(locale)
+        void i18n.changeLanguage(locale)
 
         // Verify the language was changed
         expect(i18n.language).toBe(locale)
@@ -126,7 +126,7 @@ describe('Locale Loading and Application', () => {
         (localeSequence) => {
           // Apply each locale change in sequence
           for (const locale of localeSequence) {
-            changeLocale(locale)
+            void i18n.changeLanguage(locale)
             expect(i18n.language).toBe(locale)
           }
 
@@ -153,7 +153,7 @@ describe('Locale Loading and Application', () => {
         fc.constantFrom(...sampleTranslationKeys),
         (locale, key) => {
           // Change to the locale
-          changeLocale(locale)
+          void i18n.changeLanguage(locale)
 
           // Get the translation
           const translation = i18n.t(key)
@@ -186,10 +186,10 @@ describe('Locale Loading and Application', () => {
           if (locale1 === locale2) return true
 
           // Get translations for both locales
-          changeLocale(locale1)
+          void i18n.changeLanguage(locale1)
           const translations1 = sampleTranslationKeys.map((key) => i18n.t(key))
 
-          changeLocale(locale2)
+          void i18n.changeLanguage(locale2)
           const translations2 = sampleTranslationKeys.map((key) => i18n.t(key))
 
           // At least one translation should be different
@@ -201,25 +201,6 @@ describe('Locale Loading and Application', () => {
           return true
         },
       ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: Auto locale detection falls back correctly
-   * When 'auto' is selected, the system should select a valid supported locale.
-   */
-  it('handles auto locale selection', () => {
-    fc.assert(
-      fc.property(fc.constant('auto' as const), () => {
-        // Change to auto
-        changeLocale('auto')
-
-        // The resulting language should be one of the supported locales
-        expect(supportedLocales).toContain(i18n.language)
-
-        return true
-      }),
       { numRuns: 100 },
     )
   })

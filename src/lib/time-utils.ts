@@ -145,49 +145,6 @@ export function formatCompactTime(timeInSeconds: number): string {
   return `${minutes}:${ss}`
 }
 
-/** Time multipliers: [seconds, minutes, hours] */
-const TIME_MULTIPLIERS = [1, 60, 3600] as const
-
-/**
- * Parses time parts into total seconds.
- * @param parts - Array of time string parts (e.g., ['1', '30', '45'])
- * @returns Total seconds calculated from parts
- */
-function parseTimeParts(parts: Array<string>): number {
-  return parts.reverse().reduce((sum, part, i) => {
-    const parsed = parseFloat(part)
-    // Skip invalid parts (NaN, Infinity)
-    if (!Number.isFinite(parsed)) return sum
-    const multiplier = TIME_MULTIPLIERS[i] ?? 0
-    return sum + parsed * multiplier
-  }, 0)
-}
-
-/**
- * Parses a time string into seconds.
- * Supports formats: '1:20:15', '1:20:15.500', '20:15', '15', space-separated variants
- * Returns 0 for invalid inputs (null, undefined, NaN, Infinity, empty string).
- * @param time - Time string or number to parse
- * @returns Parsed time in seconds, clamped to valid range [0, MAX_SAFE_SECONDS]
- */
-export function parseTimeString(
-  time: string | number | null | undefined,
-): number {
-  if (time === null || time === undefined) return 0
-
-  // Handle numeric input directly
-  if (typeof time === 'number') return clampToTimeRange(time)
-
-  const trimmed = time.trim()
-  if (!trimmed) return 0
-
-  const delimiter = trimmed.includes(':') ? ':' : ' '
-  const parts = trimmed.split(delimiter).filter(Boolean)
-  const result = parseTimeParts(parts)
-
-  return clampToTimeRange(result)
-}
-
 /**
  * Parses a frame rate value into frames per second.
  * Supports numeric values and rational strings like "24000/1001".

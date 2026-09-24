@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildSegmentTimeIndex,
-  buildSegmentTimeRanges,
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
   getSegmentTimeRangeId,
@@ -44,10 +43,10 @@ describe('player segment skip helpers', () => {
   })
 
   it('finds the active segment by start-inclusive end-exclusive time', () => {
-    const ranges = buildSegmentTimeRanges([
+    const ranges = buildSegmentTimeIndex([
       segment({ Id: 'intro', StartTicks: 30, EndTicks: 40 }),
       segment({ Id: 'recap', StartTicks: 10, EndTicks: 20 }),
-    ])
+    ]).ranges
 
     expect(findActiveSegmentRange(ranges, 10)?.segment.Id).toBe('recap')
     expect(findActiveSegmentRange(ranges, 19.999)?.segment.Id).toBe('recap')
@@ -57,19 +56,19 @@ describe('player segment skip helpers', () => {
   })
 
   it('keeps an earlier overlapping segment active after a nested segment ends', () => {
-    const ranges = buildSegmentTimeRanges([
+    const ranges = buildSegmentTimeIndex([
       segment({ Id: 'outer', StartTicks: 0, EndTicks: 100 }),
       segment({ Id: 'nested', StartTicks: 50, EndTicks: 60 }),
-    ])
+    ]).ranges
 
     expect(findActiveSegmentRange(ranges, 55)?.segment.Id).toBe('nested')
     expect(findActiveSegmentRange(ranges, 70)?.segment.Id).toBe('outer')
   })
 
   it('resolves stable range ids and skip targets without an id', () => {
-    const range = buildSegmentTimeRanges([
+    const range = buildSegmentTimeIndex([
       segment({ Type: 'Outro', StartTicks: 70, EndTicks: 90 }),
-    ])[0]
+    ]).ranges[0]
 
     expect(getSegmentTimeRangeId(range)).toBe('70:90:Outro')
     expect(getSegmentSkipTargetEndSeconds(range.segment, undefined)).toBe(90)
@@ -81,9 +80,9 @@ describe('player segment skip helpers', () => {
       StartTicks: 30,
       EndTicks: 31,
     })
-    const normalizedRange = buildSegmentTimeRanges([
+    const normalizedRange = buildSegmentTimeIndex([
       { ...segmentWithStaleEnd, EndTicks: 40 },
-    ])[0]
+    ]).ranges[0]
 
     expect(
       getSegmentSkipTargetEndSeconds(segmentWithStaleEnd, normalizedRange),
