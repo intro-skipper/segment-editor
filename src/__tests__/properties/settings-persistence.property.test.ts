@@ -29,6 +29,21 @@ describe('Settings Persistence Round-Trip', () => {
     }
   })
 
+  it('drops the removed EDL and chapter flags during migration', async () => {
+    localStorage.setItem(
+      APP_STORAGE_KEY,
+      JSON.stringify({
+        state: { enableEdl: true, enableChapter: true },
+        version: 3,
+      }),
+    )
+
+    await useAppStore.persist.rehydrate()
+
+    expect(useAppStore.getState()).not.toHaveProperty('enableEdl')
+    expect(useAppStore.getState()).not.toHaveProperty('enableChapter')
+  })
+
   it('defaults playback sync to disabled during app settings migration', async () => {
     const previousState = {
       theme: 'auto' satisfies Theme,

@@ -26,8 +26,6 @@ interface AppState {
   monochrome: boolean
   locale: Locale
   showVideoPlayer: boolean
-  enableEdl: boolean
-  enableChapter: boolean
   /** Track preferences for audio and subtitle auto-selection */
   trackPreferences: TrackPreferences
   /** How to handle segments during playback: show a button, auto-skip, or do nothing */
@@ -41,8 +39,6 @@ interface AppActions {
   setMonochrome: (monochrome: boolean) => void
   setLocale: (locale: Locale) => void
   setShowVideoPlayer: (show: boolean) => void
-  setEnableEdl: (enable: boolean) => void
-  setEnableChapter: (enable: boolean) => void
   /** Set preferred audio track language */
   setPreferredAudioLanguage: (language: string | null) => void
   /** Set preferred subtitle track language */
@@ -111,8 +107,6 @@ const initialState: AppState = {
   monochrome: false,
   locale: 'auto',
   showVideoPlayer: true,
-  enableEdl: false,
-  enableChapter: false,
   trackPreferences: {
     preferredAudioLanguage: null,
     preferredSubtitleLanguage: null,
@@ -137,8 +131,6 @@ export const useAppStore = create<AppStore>()(
       },
       setLocale: (locale) => set({ locale }),
       setShowVideoPlayer: (showVideoPlayer) => set({ showVideoPlayer }),
-      setEnableEdl: (enableEdl) => set({ enableEdl }),
-      setEnableChapter: (enableChapter) => set({ enableChapter }),
       setPreferredAudioLanguage: (language) =>
         set((state) => ({
           trackPreferences: {
@@ -174,7 +166,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'segment-editor-app',
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         const decoded = LegacyPersistedAppSchema.safeParse(persistedState)
         if (!decoded.success) return persistedState
@@ -196,6 +188,11 @@ export const useAppStore = create<AppStore>()(
         }
         if (version < 3 && state.monochrome === undefined) {
           state.monochrome = false
+        }
+        if (version < 4) {
+          // The EDL and chapter plugins were removed; drop their flags.
+          delete state.enableEdl
+          delete state.enableChapter
         }
         return state
       },

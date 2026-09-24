@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { sortServersByScore } from '@/services/jellyfin'
+import { findBestServer, sortServersByScore } from '@/services/jellyfin'
 import { RecommendedServerInfoScore } from '@/types/jellyfin'
 import type { RecommendedServerInfo } from '@/types/jellyfin'
 
@@ -210,6 +210,25 @@ describe('Discovery Results Sorting', () => {
         expect(servers.map((s) => s.address)).toEqual(originalAddresses)
         expect(servers.map((s) => s.score)).toEqual(originalScores)
 
+        return true
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  /**
+   * Property: findBestServer is the head of the sorted list, or null when
+   * there is nothing to choose from.
+   */
+  it('picks the first sorted server as the best, or null for an empty list', () => {
+    fc.assert(
+      fc.property(serverListArb, (servers) => {
+        const best = findBestServer(servers)
+        if (servers.length === 0) {
+          expect(best).toBeNull()
+        } else {
+          expect(best).toBe(sortServersByScore(servers)[0])
+        }
         return true
       }),
       { numRuns: 100 },

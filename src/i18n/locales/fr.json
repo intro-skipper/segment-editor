@@ -150,16 +150,6 @@
     "chapter": "Chapter Segments",
     "segment": "MediaSegments API"
   },
-  "plugin": {
-    "edl": {
-      "enable": "Support EDL",
-      "created": "Fichier EDL créé"
-    },
-    "chapter": {
-      "enable": "Créateur de chapitres",
-      "created": "Fichier de chapitres créé"
-    }
-  },
   "error": {
     "not_found": "Page non trouvée",
     "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée."
