@@ -1,45 +1,18 @@
 /**
- * Feature: Settings Persistence Round-Trip
- * For any settings change (theme, locale, monochrome, playback sync),
- * the value SHALL be persisted to local storage immediately.
- * When the application loads, for any previously persisted settings,
- * the state SHALL be restored to match the persisted values exactly.
+ * App store persistence: setters write to local storage immediately, and
+ * rehydrating a persisted state from an older version migrates it to the
+ * current shape.
  *
  * @vitest-environment jsdom
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import * as fc from 'fast-check'
 import { useAppStore } from '@/stores/app-store'
 
 const APP_STORAGE_KEY = 'segment-editor-app'
 
 type Theme = 'auto' | 'dark' | 'light'
 type Locale = 'en-US' | 'de' | 'fr' | 'auto'
-
-interface AppSettings {
-  theme: Theme
-  monochrome: boolean
-  locale: Locale
-  showVideoPlayer: boolean
-  enableEdl: boolean
-  enableChapter: boolean
-  jellyfinPlaybackSyncEnabled: boolean
-}
-
-const themeArb = fc.constantFrom<Theme>('auto', 'dark', 'light')
-const localeArb = fc.constantFrom<Locale>('en-US', 'de', 'fr', 'auto')
-const booleanArb = fc.boolean()
-
-const appSettingsArb = fc.record<AppSettings>({
-  theme: themeArb,
-  monochrome: booleanArb,
-  locale: localeArb,
-  showVideoPlayer: booleanArb,
-  enableEdl: booleanArb,
-  enableChapter: booleanArb,
-  jellyfinPlaybackSyncEnabled: booleanArb,
-})
 
 describe('Settings Persistence Round-Trip', () => {
   let originalAppStorage: string | null
@@ -54,110 +27,6 @@ describe('Settings Persistence Round-Trip', () => {
     } else {
       localStorage.removeItem(APP_STORAGE_KEY)
     }
-  })
-
-  it('persists theme changes immediately', () => {
-    fc.assert(
-      fc.property(themeArb, (theme) => {
-        const initialState = {
-          state: {
-            theme: 'auto' satisfies Theme,
-            monochrome: false,
-            locale: 'en-US' satisfies Locale,
-            showVideoPlayer: true,
-            enableEdl: false,
-            enableChapter: false,
-            jellyfinPlaybackSyncEnabled: false,
-          },
-          version: 0,
-        }
-        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(initialState))
-
-        const updatedState = {
-          ...initialState,
-          state: { ...initialState.state, theme },
-        }
-        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updatedState))
-
-        const stored = localStorage.getItem(APP_STORAGE_KEY)
-        const parsed = JSON.parse(stored!)
-        expect(parsed.state.theme).toBe(theme)
-
-        return true
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  it('persists locale changes immediately', () => {
-    fc.assert(
-      fc.property(localeArb, (locale) => {
-        const initialState = {
-          state: {
-            theme: 'auto' satisfies Theme,
-            monochrome: false,
-            locale: 'en-US' satisfies Locale,
-            showVideoPlayer: true,
-            enableEdl: false,
-            enableChapter: false,
-            jellyfinPlaybackSyncEnabled: false,
-          },
-          version: 0,
-        }
-        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(initialState))
-
-        const updatedState = {
-          ...initialState,
-          state: { ...initialState.state, locale },
-        }
-        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(updatedState))
-
-        const stored = localStorage.getItem(APP_STORAGE_KEY)
-        const parsed = JSON.parse(stored!)
-        expect(parsed.state.locale).toBe(locale)
-
-        return true
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  it('persists multiple sequential settings changes', () => {
-    fc.assert(
-      fc.property(
-        fc.array(appSettingsArb, { minLength: 1, maxLength: 10 }),
-        (settingsSequence) => {
-          for (const settings of settingsSequence) {
-            const persistedState = {
-              state: settings,
-              version: 0,
-            }
-            localStorage.setItem(
-              APP_STORAGE_KEY,
-              JSON.stringify(persistedState),
-            )
-          }
-
-          const finalSettings = settingsSequence[settingsSequence.length - 1]
-          const stored = localStorage.getItem(APP_STORAGE_KEY)
-          const parsed = JSON.parse(stored!)
-          const restored: AppSettings = parsed.state
-
-          expect(restored.theme).toBe(finalSettings.theme)
-          expect(restored.monochrome).toBe(finalSettings.monochrome)
-          expect(restored.locale).toBe(finalSettings.locale)
-          expect(restored.showVideoPlayer).toBe(finalSettings.showVideoPlayer)
-          expect(restored.enableEdl).toBe(finalSettings.enableEdl)
-          expect(restored.enableChapter).toBe(finalSettings.enableChapter)
-          expect(restored.jellyfinPlaybackSyncEnabled).toBe(
-            finalSettings.jellyfinPlaybackSyncEnabled,
-          )
-
-          return true
-        },
-      ),
-      { numRuns: 100 },
-    )
   })
 
   it('defaults playback sync to disabled during app settings migration', async () => {
