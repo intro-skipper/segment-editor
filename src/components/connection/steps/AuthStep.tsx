@@ -19,13 +19,18 @@ import {
 } from '../WizardActions'
 import type { useConnectionWizardController } from '../use-connection-wizard-controller'
 import { getFirstValidationMessage } from '@/lib/forms/form-error-utils'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 type ConnectionWizardFormApi = ReturnType<
   typeof useConnectionWizardController
 >['form']
+
+const AUTH_METHODS = [
+  { method: 'apiKey', icon: Key, label: 'API Key' },
+  { method: 'userPass', icon: User, label: 'Username' },
+] as const
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -90,45 +95,23 @@ export function AuthStep({
       </div>
 
       {/* Auth Method Toggle */}
-      <div className="flex rounded-lg bg-muted/60 p-1">
-        <button
-          type="button"
-          onClick={() => {
-            form.setFieldValue('authMethod', 'apiKey', {
-              dontValidate: true,
-            })
-            onClearError?.()
-          }}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            authMethod === 'apiKey'
-              ? 'bg-background shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          aria-pressed={authMethod === 'apiKey'}
-        >
-          <Key className="size-4" aria-hidden />
-          API Key
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            form.setFieldValue('authMethod', 'userPass', {
-              dontValidate: true,
-            })
-            onClearError?.()
-          }}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            authMethod === 'userPass'
-              ? 'bg-background shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          aria-pressed={authMethod === 'userPass'}
-        >
-          <User className="size-4" aria-hidden />
-          Username
-        </button>
+      <div className="flex gap-2">
+        {AUTH_METHODS.map(({ method, icon: Icon, label }) => (
+          <Button
+            key={method}
+            type="button"
+            variant={authMethod === method ? 'default' : 'secondary'}
+            className="flex-1"
+            onClick={() => {
+              form.setFieldValue('authMethod', method, { dontValidate: true })
+              onClearError?.()
+            }}
+            aria-pressed={authMethod === method}
+          >
+            <Icon aria-hidden />
+            {label}
+          </Button>
+        ))}
       </div>
 
       {/* Form Fields */}
@@ -211,21 +194,23 @@ export function AuthStep({
                       spellCheck={false}
                       className="pr-10"
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost-muted"
+                      size="icon-sm"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                      className="absolute right-0.5 top-1/2 -translate-y-1/2"
                       aria-label={
                         showPassword ? 'Hide password' : 'Show password'
                       }
                       disabled={isLoading}
                     >
                       {showPassword ? (
-                        <EyeOff className="size-4" aria-hidden />
+                        <EyeOff aria-hidden />
                       ) : (
-                        <Eye className="size-4" aria-hidden />
+                        <Eye aria-hidden />
                       )}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Leave empty if your account has no password

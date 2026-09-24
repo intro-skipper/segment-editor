@@ -13,14 +13,10 @@ interface ItemImageProps {
   maxWidth?: number
   /** Maximum height for the image */
   maxHeight?: number
-  /** Alt text for the image */
-  alt?: string
   /** Additional CSS classes */
   className?: string
   /** Aspect ratio class (e.g., 'aspect-video', 'aspect-square') */
   aspectRatio?: string
-  /** Whether to show a fallback when no image is available */
-  showFallback?: boolean
 }
 
 const blurhashCache = new Map<string, string>()
@@ -139,10 +135,8 @@ export function ItemImage({
   item,
   maxWidth = 300,
   maxHeight,
-  alt,
   className,
-  aspectRatio = 'aspect-[2/3]',
-  showFallback = true,
+  aspectRatio = 'aspect-2/3',
 }: ItemImageProps) {
   const imgRef = useRef<HTMLImageElement>(null)
   const {
@@ -159,14 +153,12 @@ export function ItemImage({
   const blurhashDataUrl = blurhash ? decodeBlurhashToDataUrl(blurhash) : null
 
   const imageKey = imageUrl || rawImageUrl || item.Id
-  const displayAlt = alt || item.Name || 'Media item'
+  const displayAlt = item.Name || 'Media item'
 
   const shouldShowFallback =
     (!imageUrl && !blurhashDataUrl) || hasFinalImageError
 
   if (shouldShowFallback) {
-    if (!showFallback) return null
-
     return (
       <ItemImageFallback
         item={item}

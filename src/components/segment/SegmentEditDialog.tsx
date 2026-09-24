@@ -13,14 +13,17 @@ import {
   getSegmentFormDefaults,
   getSegmentTimeBounds,
 } from '@/lib/forms/segment-form'
-import { SEGMENT_TYPES, getSegmentColor } from '@/lib/segment-utils'
+import {
+  SEGMENT_TYPES,
+  getSegmentChipClass,
+  getSegmentColor,
+} from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogCloseButton,
@@ -118,7 +121,6 @@ function SegmentEditDialogContent({
     },
     runtimeSeconds,
   )
-  const segmentColor = getSegmentColor(values.type)
   const duration = Math.max(0, draftRange.endSeconds - draftRange.startSeconds)
 
   const handleClose = () => {
@@ -178,14 +180,11 @@ function SegmentEditDialogContent({
         <DialogContent className="sm:max-w-md" initialFocus={startInputRef}>
           <DialogCloseButton />
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center">
               {t('segment.edit')}
-              <Badge
-                variant="outline"
-                className={cn('text-white border-0 ml-2', segmentColor)}
-              >
-                {values.type}
-              </Badge>
+              <span className={cn(getSegmentChipClass(values.type), 'ml-4')}>
+                {t(`segmentType.${values.type}`, values.type)}
+              </span>
             </DialogTitle>
             <DialogDescription>{t('editor.slider.title')}</DialogDescription>
           </DialogHeader>
@@ -211,6 +210,10 @@ function SegmentEditDialogContent({
                         const type = SEGMENT_TYPES.find((it) => it === value)
                         if (type) field.handleChange(type)
                       }}
+                      items={SEGMENT_TYPES.map((type) => ({
+                        value: type,
+                        label: t(`segmentType.${type}`, type),
+                      }))}
                     >
                       <SelectTrigger id="segment-type">
                         <SelectValue />
@@ -224,8 +227,9 @@ function SegmentEditDialogContent({
                                   'size-3 rounded-full',
                                   getSegmentColor(type),
                                 )}
+                                aria-hidden="true"
                               />
-                              {type}
+                              {t(`segmentType.${type}`, type)}
                             </div>
                           </SelectItem>
                         ))}
@@ -324,7 +328,7 @@ function SegmentEditDialogContent({
             )}
           </div>
 
-          <DialogFooter className="flex-col gap-3 sm:flex-row sm:gap-2">
+          <DialogFooter className="flex-col sm:flex-row">
             <div className="flex gap-2 w-full sm:w-auto sm:flex-1 order-2 sm:order-1">
               <Button
                 variant="outline"
@@ -332,7 +336,7 @@ function SegmentEditDialogContent({
                 onClick={handleCopy}
                 className="flex-1 sm:flex-none"
               >
-                <Copy className="size-4 mr-2" />
+                <Copy className="size-4" />
                 Copy
               </Button>
               <Button
@@ -341,7 +345,7 @@ function SegmentEditDialogContent({
                 onClick={() => setShowDeleteConfirm(true)}
                 className="flex-1 sm:flex-none"
               >
-                <Trash2 className="size-4 mr-2" />
+                <Trash2 className="size-4" />
                 Delete
               </Button>
             </div>
@@ -358,7 +362,7 @@ function SegmentEditDialogContent({
                 disabled={!validation.valid}
                 className="flex-1 sm:flex-none"
               >
-                <Save className="size-4 mr-2" />
+                <Save className="size-4" />
                 {t('editor.saveSegment')}
               </Button>
             </div>

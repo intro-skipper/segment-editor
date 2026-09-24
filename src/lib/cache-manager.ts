@@ -210,7 +210,7 @@ export function getBlobCacheUrlSnapshot(
 /**
  * Blob URL cache for media thumbnails, keyed by source URL.
  * Every stored value is an object URL owned by this module: it is revoked
- * when its entry is overwritten, evicted at capacity, removed, or cleared.
+ * when its entry is overwritten, evicted at capacity, or removed.
  * Reads are pure; recency lives in blobUrlRecency so snapshots stay
  * render-safe.
  */
@@ -309,15 +309,4 @@ export function fetchBlobUrl(
   void promise.finally(() => pendingBlobFetches.delete(url))
 
   return promise
-}
-
-/** Revokes every cached object URL, empties the cache, and notifies. */
-export function clearBlobCache(): void {
-  blobCache.forEach((cachedBlobUrl) => URL.revokeObjectURL(cachedBlobUrl))
-  const urls = Array.from(blobCache.keys())
-  blobCache.clear()
-  blobUrlRecency.clear()
-  for (const url of urls) {
-    notifyBlobCacheChange(url)
-  }
 }

@@ -39,7 +39,6 @@ export function AppearanceSection() {
           onClick={() => setMonochrome(!monochrome)}
           className={cn(
             'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-[background-color,border-color,color,box-shadow]',
-            'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none',
             monochrome
               ? 'border-primary/40 bg-primary/10 text-foreground'
               : 'border-border/70 bg-input/20 hover:bg-muted/50',

@@ -8,7 +8,6 @@ export function DetailRouteErrorComponent({
   return (
     <RouteErrorFallback
       message={error instanceof Error ? error.message : undefined}
-      minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
     />
   )
 }

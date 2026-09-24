@@ -60,7 +60,6 @@ interface PlayerSurfaceSegmentSkipAction {
 }
 
 interface PlayerSurfaceProps {
-  className?: string
   containerRef: RefObject<HTMLDivElement | null>
   videoRef: RefObject<HTMLVideoElement | null>
   fullscreen: PlayerSurfaceFullscreenState
@@ -184,7 +183,7 @@ function PlayerErrorOverlay({
       <p className="text-lg font-medium mb-2">{error.message}</p>
       {error.recoverable ? (
         <Button
-          variant="outline"
+          variant="overlay"
           size="sm"
           onClick={(event) => {
             event.stopPropagation()
@@ -192,7 +191,7 @@ function PlayerErrorOverlay({
           }}
           className="mt-2"
         >
-          <RefreshCw className="size-4 mr-2" />
+          <RefreshCw />
           {t('player.retry')}
         </Button>
       ) : null}
@@ -252,10 +251,9 @@ function SegmentSkipOverlay({
       data-player-controls-overlay="true"
     >
       <Button
-        variant="outline"
+        variant="overlay"
         size="sm"
         onClick={() => onSkipSegment(segment)}
-        className="gap-1.5 bg-black/60 text-white border-white/30 hover:bg-black/80 hover:text-white backdrop-blur-sm"
         aria-label={label}
       >
         <SkipForward className="size-4" aria-hidden="true" />
@@ -288,13 +286,12 @@ function FullscreenControlsOverlay({
       aria-hidden={!showControls}
       inert={!showControls || undefined}
     >
-      <div className="max-w-[90%] mx-auto" data-player-controls-overlay="true">
+      <div className="max-w-9/10 mx-auto" data-player-controls-overlay="true">
         <div className="flex justify-end mb-2">
           <Button
-            variant="ghost"
-            size="sm"
+            variant="overlay"
+            size="xs"
             onClick={onToggleVideoFitMode}
-            className="text-white/70 hover:text-white hover:bg-white/10 text-xs gap-1.5"
             aria-label={
               videoFitMode === 'contain'
                 ? t('player.fillScreen', 'Fill screen')
@@ -324,7 +321,6 @@ function FullscreenControlsOverlay({
 }
 
 export function PlayerSurface({
-  className,
   containerRef,
   videoRef,
   fullscreen,
@@ -337,7 +333,7 @@ export function PlayerSurface({
   const { t } = useTranslation()
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    <div className="flex flex-col gap-4">
       <section
         ref={containerRef}
         aria-label={t('player.videoPlayer')}

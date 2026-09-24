@@ -19,6 +19,7 @@ import { RecommendedServerInfoScore } from '@/types/jellyfin'
 import type { RecommendedServerInfo } from '@/types/jellyfin'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { getScoreDisplay } from '@/services/jellyfin'
 import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
@@ -42,14 +43,6 @@ function renderScoreIcon(score: RecommendedServerInfoScore) {
     default:
       return <ShieldOff className="size-3" aria-hidden />
   }
-}
-
-function getBadgeVariant(
-  variant: 'success' | 'warning' | 'error',
-): 'default' | 'secondary' | 'destructive' {
-  if (variant === 'success') return 'default'
-  if (variant === 'warning') return 'secondary'
-  return 'destructive'
 }
 
 interface ServerItemProps {
@@ -85,10 +78,8 @@ function ServerItem({
       aria-pressed={isSelected}
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
-        'w-full text-left p-4 rounded-xl transition-[transform,box-shadow,background-color,border-color] duration-200',
-        'border-2 border-transparent',
-        'hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        isSelected && 'border-primary bg-primary/5',
+        'w-full text-left p-4 rounded-xl border-2 border-transparent hover:bg-muted/60',
+        isSelected && 'border-primary bg-primary/10',
         'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
       )}
       style={{ animationDelay: staggerDelay(index, STAGGER_SLOW) }}
@@ -122,19 +113,18 @@ function ServerItem({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={getBadgeVariant(scoreDisplay.variant)}>
+            <Badge
+              variant={
+                scoreDisplay.variant === 'error'
+                  ? 'destructive'
+                  : scoreDisplay.variant
+              }
+            >
               {scoreIcon}
               {scoreDisplay.label}
             </Badge>
             <Badge variant="outline">v{serverVersion}</Badge>
-            {isHttps && (
-              <Badge
-                variant="outline"
-                className="text-green-600 dark:text-green-400"
-              >
-                HTTPS
-              </Badge>
-            )}
+            {isHttps && <Badge variant="success">HTTPS</Badge>}
             {server.responseTime > 0 && (
               <span className="text-xs text-muted-foreground">
                 {server.responseTime}ms
@@ -211,34 +201,35 @@ function ServerList({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <div className="animate-spin mb-3" aria-hidden>
-          <Loader2 className="size-8" />
-        </div>
-        <p>Discovering servers…</p>
-      </div>
+      <EmptyState
+        icon={
+          <div className="animate-spin">
+            <Loader2 />
+          </div>
+        }
+        message="Discovering servers…"
+      />
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShieldOff className="size-8 text-destructive mb-3" aria-hidden />
-        <p className="text-destructive font-medium mb-1">Discovery Failed</p>
-        <p className="text-sm text-muted-foreground">{error}</p>
-      </div>
+      <EmptyState
+        tone="destructive"
+        icon={<ShieldOff />}
+        title="Discovery Failed"
+        message={error}
+      />
     )
   }
 
   if (servers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Server className="size-8 text-muted-foreground mb-3" aria-hidden />
-        <p className="font-medium mb-1">No Servers Found</p>
-        <p className="text-sm text-muted-foreground">
-          Check the server address and try again.
-        </p>
-      </div>
+      <EmptyState
+        icon={<Server />}
+        title="No Servers Found"
+        message="Check the server address and try again."
+      />
     )
   }
 
@@ -295,18 +286,18 @@ export function SelectStep({
 
       {isMixedContent && (
         <div
-          className="flex items-start gap-3 p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10"
+          className="flex items-start gap-3 p-4 rounded-xl border border-warning/20 bg-warning/10"
           role="alert"
         >
-          <AlertTriangle className="size-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+          <AlertTriangle className="size-5 text-warning shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p className="font-medium text-yellow-600 dark:text-yellow-400">
+            <p className="font-medium text-warning">
               {t('login.http_warning.title')}
             </p>
-            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <p className="text-sm text-warning">
               {t('login.http_warning.message')}
             </p>
-            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+            <p className="text-xs text-warning mt-2">
               {t('login.http_warning.browser_recommendation')}
             </p>
           </div>

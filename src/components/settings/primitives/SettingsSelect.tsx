@@ -36,7 +36,7 @@ export function SettingsSelect<T extends string = string>({
   return (
     <Select value={value} onValueChange={handleValueChange} items={options}>
       <SelectTrigger
-        className="w-full h-9 rounded-lg bg-muted/60 border-0 focus:ring-2 focus:ring-ring/50"
+        className="w-full"
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
       >

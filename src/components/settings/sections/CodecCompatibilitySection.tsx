@@ -162,9 +162,9 @@ function CodecList({ title, codecs }: CodecListProps) {
                 <Loader2 className="size-4 text-muted-foreground" />
               </div>
             ) : supported ? (
-              <CheckCircle className="size-4 text-green-500" />
+              <CheckCircle className="size-4 text-success" />
             ) : (
-              <XCircle className="size-4 text-red-500" />
+              <XCircle className="size-4 text-destructive" />
             )}
             <span className="text-sm font-mono uppercase">{codec}</span>
           </div>
@@ -223,9 +223,9 @@ export function CodecCompatibilitySection() {
                     className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/30"
                   >
                     {isDirectPlayContainerSupported(container) ? (
-                      <CheckCircle className="size-3 text-green-500" />
+                      <CheckCircle className="size-3 text-success" />
                     ) : (
-                      <XCircle className="size-3 text-red-500" />
+                      <XCircle className="size-3 text-destructive" />
                     )}
                     <span className="text-xs font-mono uppercase">
                       {container}
@@ -249,7 +249,7 @@ export function CodecCompatibilitySection() {
                 {state.isRefreshing ? (
                   <>
                     <div className="animate-spin" aria-hidden>
-                      <Loader2 className="size-4 mr-2" />
+                      <Loader2 className="size-4" />
                     </div>
                     Checking…
                   </>
@@ -261,11 +261,11 @@ export function CodecCompatibilitySection() {
 
             <div className="text-xs text-muted-foreground space-y-1">
               <p>
-                <CheckCircle className="size-3 inline text-green-500 mr-1" />
+                <CheckCircle className="size-3 inline text-success mr-1" />
                 Green: Supported for direct play
               </p>
               <p>
-                <XCircle className="size-3 inline text-red-500 mr-1" />
+                <XCircle className="size-3 inline text-destructive mr-1" />
                 Red: Requires transcoding (HLS)
               </p>
             </div>

@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
 const LIST_SKELETON_CLASS = 'flex flex-col gap-3'
@@ -7,6 +8,7 @@ interface MediaListSkeletonProps {
   loadingLabel: string
 }
 
+/** Placeholder rows with the same box as MediaListRow, so loading does not shift layout. */
 export function MediaListSkeleton({
   count,
   loadingLabel,
@@ -17,14 +19,14 @@ export function MediaListSkeleton({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl bg-card/60 backdrop-blur-sm animate-in fade-in animation-duration-300"
+          className="flex items-center gap-3 md:gap-4 p-2.5 md:p-3 rounded-2xl bg-card border border-border/50 animate-in fade-in animation-duration-300"
           style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
           aria-hidden="true"
         >
-          <div className="w-16 md:w-20 aspect-[2/3] rounded-xl md:rounded-2xl skeleton-shimmer flex-shrink-0" />
+          <Skeleton className="w-12 md:w-14 aspect-2/3 rounded-lg shrink-0" />
           <div className="flex-grow min-w-0 space-y-2">
-            <div className="h-5 md:h-6 w-2/3 rounded-md skeleton-shimmer" />
-            <div className="h-4 w-1/3 rounded-md skeleton-shimmer" />
+            <Skeleton className="h-4 md:h-5 w-2/3" />
+            <Skeleton className="h-3 w-1/3" />
           </div>
         </div>
       ))}

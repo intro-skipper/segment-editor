@@ -2,8 +2,7 @@
  * Feature: direct-play-fallback, Property 6: Capability Caching Idempotence
  *
  * For any codec string, calling isCodecSupported multiple times with the same codec
- * SHALL return the same result, and subsequent calls SHALL use cached values
- * (not re-query the browser APIs).
+ * SHALL return the same result.
  */
 
 import { beforeEach, describe, it } from 'vitest'

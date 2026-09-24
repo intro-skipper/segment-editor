@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { MediaSegmentDto } from '@/types/jellyfin'
+import type * as Notifications from '@/lib/notifications'
 import { useBatchSaveSegments } from '@/services/segments/mutations'
 import { segmentsKeys } from '@/services/segments/query-keys'
 
@@ -55,6 +56,13 @@ vi.mock('@/services/jellyfin', () => ({
 vi.mock('@/services/jellyfin/http', () => ({
   jellyfinFetchEmpty: jellyfinFetchEmptyMock,
   jellyfinFetchJson: jellyfinFetchJsonMock,
+}))
+
+const showErrorMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/notifications', async (importOriginal) => ({
+  ...(await importOriginal<typeof Notifications>()),
+  showError: showErrorMock,
 }))
 
 // Custom arbitrary for hex strings
@@ -206,6 +214,34 @@ describe('Segment Save Reload', () => {
         },
       ),
       { numRuns: 50 },
+    )
+  })
+
+  // Per-segment requests are settled individually, so a save where every
+  // request fails still resolves; it must be reported instead of looking saved.
+  it('reports a failed save when no segment could be created', async () => {
+    jellyfinFetchEmptyMock.mockRejectedValue(new Error('network down'))
+    const itemId = 'item-1'
+    const segment: MediaSegmentDto = {
+      Id: 'segment-1',
+      ItemId: itemId,
+      Type: 'Intro',
+      StartTicks: 0,
+      EndTicks: 10,
+    }
+
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useBatchSaveSegments(), { wrapper })
+    result.current.mutate({
+      itemId,
+      existingSegments: [],
+      newSegments: [segment],
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(showErrorMock).toHaveBeenCalledWith(
+      'Save failed',
+      'No segments were saved',
     )
   })
 })

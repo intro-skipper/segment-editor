@@ -742,14 +742,14 @@ function useRenderPlayerEditor({
             onClick={() => setShowVideoPlayer(true)}
             aria-label={t('player.restore', 'Show player')}
           >
-            <Eye className="size-4 mr-2" aria-hidden="true" />
+            <Eye className="size-4" aria-hidden="true" />
             {t('player.restore', 'Show player')}
           </Button>
           <SegmentTypeMenu
             onSelect={handleCreateSegmentOfType}
             render={<Button variant="outline" />}
           >
-            <Plus className="size-4 mr-2" aria-hidden="true" />
+            <Plus className="size-4" aria-hidden="true" />
             {t('editor.newSegment')}
           </SegmentTypeMenu>
         </div>
@@ -759,7 +759,7 @@ function useRenderPlayerEditor({
         {isLoadingSegments ? (
           <SegmentLoadingState count={2} />
         ) : editingSegments.length === 0 ? (
-          <Empty className="border-none bg-transparent py-8">
+          <Empty>
             <EmptyHeader>
               <EmptyTitle>
                 {t('editor.noSegmentsTitle', 'No segments yet')}
@@ -777,11 +777,11 @@ function useRenderPlayerEditor({
                   onSelect={handleCreateSegmentOfType}
                   render={<Button variant="outline" />}
                 >
-                  <Plus className="size-4 mr-2" aria-hidden="true" />
+                  <Plus className="size-4" aria-hidden="true" />
                   {t('editor.newSegment')}
                 </SegmentTypeMenu>
                 <Button variant="outline" onClick={handlePasteFromClipboard}>
-                  <ClipboardPaste className="size-4 mr-2" aria-hidden="true" />
+                  <ClipboardPaste className="size-4" aria-hidden="true" />
                   {t('editor.paste', 'Paste')}
                 </Button>
               </div>

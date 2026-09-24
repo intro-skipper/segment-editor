@@ -1,125 +1,55 @@
-import { Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, ArrowLeft, Home, RefreshCw } from 'lucide-react'
 
 import type { ReactNode } from 'react'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { Button } from '@/components/ui/button'
-import { buttonVariants } from '@/components/ui/button-variants'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 
 interface FeatureErrorBoundaryProps {
   children: ReactNode
   featureName: string
-  minHeightClass?: string
   showNavigation?: boolean
-  errorMessage?: string
 }
 
 function FeatureErrorFallback({
   featureName,
-  minHeightClass = 'min-h-[var(--spacing-page-min-height-sm)]',
-  showNavigation = true,
-  errorMessage,
+  showNavigation,
   onRetry,
-}: {
-  featureName: string
-  minHeightClass?: string
-  showNavigation?: boolean
-  errorMessage?: string
-  onRetry?: () => void
-}) {
+}: Omit<FeatureErrorBoundaryProps, 'children'> & { onRetry: () => void }) {
   const { t } = useTranslation()
-  const canGoBack = useCanGoBack()
-  const router = useRouter()
-
-  const handleRetry = () => {
-    if (onRetry) {
-      onRetry()
-      return
-    }
-
-    void router.invalidate()
-  }
 
   return (
-    <div
-      className={`flex items-center justify-center p-4 ${minHeightClass}`}
-      role="alert"
-      aria-live="assertive"
-    >
-      <Card className="w-full max-w-md text-center">
-        <CardHeader className="space-y-4">
-          <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-destructive/10">
-            <AlertCircle
-              className="size-8 text-destructive"
-              aria-hidden="true"
-            />
-          </div>
-          <CardTitle className="text-xl">
-            {t('error.feature_error', {
-              feature: featureName,
-              defaultValue: `${featureName} Error`,
-            })}
-          </CardTitle>
-          <CardDescription>
-            {errorMessage ||
-              t(
-                'error.feature_description',
-                'This feature encountered an error. You can try again or navigate elsewhere.',
-              )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button variant="outline" onClick={handleRetry}>
-            <RefreshCw className="size-4" aria-hidden="true" />
-            {t('common.retry', 'Try Again')}
-          </Button>
-          {showNavigation && (
-            <>
-              {canGoBack && (
-                <Button variant="outline" onClick={() => router.history.back()}>
-                  <ArrowLeft className="size-4" aria-hidden="true" />
-                  {t('common.go_back', 'Go Back')}
-                </Button>
-              )}
-              <Link to="/" className={buttonVariants()}>
-                <Home className="size-4" aria-hidden="true" />
-                {t('common.home', 'Home')}
-              </Link>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorFallback
+      title={t('error.feature_error', {
+        feature: featureName,
+        defaultValue: `${featureName} Error`,
+      })}
+      message={t(
+        'error.feature_description',
+        'This feature encountered an error. You can try again or navigate elsewhere.',
+      )}
+      showNavigation={showNavigation}
+      onRetry={onRetry}
+    />
   )
 }
 
+/** Error boundary whose fallback names the feature and offers retry and navigation. */
 export function FeatureErrorBoundary({
   children,
   featureName,
-  minHeightClass,
   showNavigation = true,
-  errorMessage,
 }: FeatureErrorBoundaryProps) {
   return (
     <ErrorBoundary
       componentName={featureName}
-      fallback={
+      fallback={(reset) => (
         <FeatureErrorFallback
           featureName={featureName}
-          minHeightClass={minHeightClass}
           showNavigation={showNavigation}
-          errorMessage={errorMessage}
+          onRetry={reset}
         />
-      }
+      )}
     >
       {children}
     </ErrorBoundary>

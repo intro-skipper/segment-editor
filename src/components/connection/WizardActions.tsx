@@ -24,14 +24,12 @@ export function WizardActions({ children }: WizardActionsProps) {
 interface WizardBackActionProps {
   onBack: () => void
   disabled?: boolean
-  label?: string
 }
 
 /** Back button variant for wizard flows. */
 export function WizardBackAction({
   onBack,
   disabled = false,
-  label = 'Back',
 }: WizardBackActionProps) {
   return (
     <Button
@@ -42,7 +40,7 @@ export function WizardBackAction({
       className="flex-1"
     >
       <ArrowLeft className="size-4" aria-hidden />
-      {label}
+      Back
     </Button>
   )
 }
@@ -50,14 +48,12 @@ export function WizardBackAction({
 interface WizardContinueActionProps {
   onContinue: () => void
   disabled?: boolean
-  label?: string
 }
 
 /** Continue button variant for intermediate wizard steps. */
 export function WizardContinueAction({
   onContinue,
   disabled = false,
-  label = 'Continue',
 }: WizardContinueActionProps) {
   return (
     <Button
@@ -66,7 +62,7 @@ export function WizardContinueAction({
       disabled={disabled}
       className="flex-1"
     >
-      {label}
+      Continue
       <ArrowRight className="size-4" aria-hidden />
     </Button>
   )
@@ -74,7 +70,6 @@ export function WizardContinueAction({
 
 interface WizardSubmitActionProps {
   isLoading?: boolean
-  disabled?: boolean
   label?: string
   loadingLabel?: string
 }
@@ -82,14 +77,13 @@ interface WizardSubmitActionProps {
 /** Submit button variant with built-in loading state. */
 export function WizardSubmitAction({
   isLoading = false,
-  disabled = false,
   label = 'Continue',
   loadingLabel,
 }: WizardSubmitActionProps) {
   const submitLabel = isLoading ? (loadingLabel ?? label) : label
 
   return (
-    <Button type="submit" disabled={disabled || isLoading} className="flex-1">
+    <Button type="submit" disabled={isLoading} className="flex-1">
       {isLoading && (
         <div className="animate-spin" aria-hidden>
           <Loader2 className="size-4" />

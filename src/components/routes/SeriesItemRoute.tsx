@@ -9,7 +9,6 @@ import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
-import { staggerDelay, STAGGER_SLOW } from '@/lib/animation-utils'
 
 const routeApi = getRouteApi('/series/$itemId')
 
@@ -21,8 +20,8 @@ const SeriesView = lazy(() =>
 
 export function SeriesSkeleton() {
   return (
-    <main
-      className="h-[var(--spacing-page-min-height-skeleton)] px-4 py-6 sm:px-6 overflow-auto"
+    <div
+      className="flex-1 px-4 py-6 sm:px-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -35,15 +34,11 @@ export function SeriesSkeleton() {
         </div>
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton
-              key={i}
-              className="h-14 w-full rounded-lg animate-in fade-in animation-duration-300"
-              style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
-            />
+            <Skeleton key={i} className="h-14 w-full rounded-2xl" />
           ))}
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -68,12 +63,7 @@ export function SeriesPage() {
   }
 
   if (!series) {
-    return (
-      <RouteErrorFallback
-        message="Series not found"
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-      />
-    )
+    return <RouteErrorFallback message="Series not found" />
   }
 
   if (seasons.length === 0) {
@@ -81,28 +71,25 @@ export function SeriesPage() {
       <RouteErrorFallback
         message="No seasons found for this series"
         showRetry={false}
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
       />
     )
   }
 
   return (
-    <DynamicThemeScope seedColor={seedColor}>
-      <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto relative z-10">
-        <FeatureErrorBoundary
-          featureName="Series"
-          minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-        >
-          <Suspense fallback={<SeriesSkeleton />}>
-            <SeriesView
-              series={series}
-              seasons={seasons}
-              selectedSeasonId={seasonId}
-              onSeasonSelect={handleSeasonSelect}
-            />
-          </Suspense>
-        </FeatureErrorBoundary>
-      </main>
+    <DynamicThemeScope
+      seedColor={seedColor}
+      className="relative z-10 flex flex-1 flex-col px-4 py-6 sm:px-6"
+    >
+      <FeatureErrorBoundary featureName="Series">
+        <Suspense fallback={<SeriesSkeleton />}>
+          <SeriesView
+            series={series}
+            seasons={seasons}
+            selectedSeasonId={seasonId}
+            onSeasonSelect={handleSeasonSelect}
+          />
+        </Suspense>
+      </FeatureErrorBoundary>
     </DynamicThemeScope>
   )
 }

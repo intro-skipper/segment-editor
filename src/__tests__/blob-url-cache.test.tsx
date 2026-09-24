@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import {
   blobCache,
   blobUrlRecency,
-  clearBlobCache,
   getBlobCacheUrlSnapshot,
   removeBlobUrl,
 } from '@/lib/cache-manager'
@@ -16,15 +15,12 @@ const cachedUrl = 'https://example.test/cached.jpg'
 const newerUrl = 'https://example.test/newer.jpg'
 const evictedUrl = 'https://example.test/evicted.jpg'
 
-beforeEach(() => {
-  clearBlobCache()
-})
-
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  clearBlobCache()
+  blobCache.clear()
+  blobUrlRecency.clear()
 })
 
 /** The single prop the blob-url hook harness re-renders with. */

@@ -10,6 +10,7 @@
 import { AlertCircle, Loader2, RefreshCw, WifiOff } from 'lucide-react'
 import { getErrorSuggestion, isNetworkRelatedError } from '@/lib/error-utils'
 import { Button } from '@/components/ui/button'
+import { IconDisc } from '@/components/ui/icon-disc'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -47,9 +48,9 @@ export function WizardError({
       aria-live="assertive"
       className="flex flex-col items-center text-center p-4 rounded-xl bg-destructive/10 border border-destructive/20"
     >
-      <div className="size-10 rounded-full bg-destructive/15 flex items-center justify-center mb-3">
-        <Icon className="size-5 text-destructive" aria-hidden />
-      </div>
+      <IconDisc tone="destructive" className="mb-3">
+        <Icon />
+      </IconDisc>
 
       <p className="font-medium text-destructive mb-1">{message}</p>
       <p className="text-sm text-muted-foreground mb-4">{suggestion}</p>
@@ -60,7 +61,6 @@ export function WizardError({
           size="sm"
           onClick={onRetry}
           disabled={isRetrying}
-          className="gap-2"
         >
           {isRetrying ? (
             <>

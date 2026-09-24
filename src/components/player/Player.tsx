@@ -147,7 +147,6 @@ interface TimelineScrubberProps {
   item: BaseItemDto
   segments: Array<MediaSegmentDto> | undefined
   onSeek: (time: number) => void
-  className?: string
 }
 
 function TimelineScrubber({
@@ -155,7 +154,6 @@ function TimelineScrubber({
   item,
   segments,
   onSeek,
-  className,
 }: TimelineScrubberProps) {
   const { currentTime, duration, buffered } = useSyncExternalStore(
     timelineStore.subscribe,
@@ -173,7 +171,6 @@ function TimelineScrubber({
       onSeek={onSeek}
       itemId={item.Id}
       trickplay={item.Trickplay}
-      className={className}
     />
   )
 }
@@ -201,7 +198,6 @@ interface PlayerProps {
   frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
-  className?: string
   getCurrentTimeRef?: React.MutableRefObject<(() => number) | null>
 }
 
@@ -212,7 +208,6 @@ export function Player({
   frameStepSeconds,
   onCreateSegment,
   onUpdateSegmentTimestamp,
-  className,
   getCurrentTimeRef,
 }: PlayerProps) {
   return useRenderPlayer({
@@ -222,7 +217,6 @@ export function Player({
     frameStepSeconds,
     onCreateSegment,
     onUpdateSegmentTimestamp,
-    className,
     getCurrentTimeRef,
   })
 }
@@ -234,7 +228,6 @@ function useRenderPlayer({
   frameStepSeconds: frameStep,
   onCreateSegment,
   onUpdateSegmentTimestamp,
-  className,
   getCurrentTimeRef,
 }: PlayerProps) {
   const { t } = useTranslation()
@@ -916,7 +909,6 @@ function useRenderPlayer({
 
   return (
     <PlayerSurface
-      className={className}
       containerRef={containerRef}
       videoRef={videoRef}
       fullscreen={{

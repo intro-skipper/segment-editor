@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["import", "typescript"],
+  "jsPlugins": ["@shadcn/lint"],
   "categories": {
     "correctness": "off"
   },
@@ -24,7 +25,34 @@
     "eslint.config.js",
     "prettier.config.js"
   ],
-  "rules": {},
+  "rules": {
+    "shadcn/no-restyle": [
+      "error",
+      {
+        "allow": ["layout"],
+        "contracts": [
+          {
+            "pattern": "^(DynamicThemeScope|DropdownMenuTrigger)$",
+            "allow": ["*"]
+          },
+          { "pattern": "^Skeleton$", "allow": ["layout", "shape"] },
+          { "pattern": "^CardTitle$", "allow": ["layout", "typography"] },
+          {
+            "pattern": "^(DialogContent|DropdownMenuContent)$",
+            "allow": ["layout", "spacing"]
+          },
+          { "pattern": "^Input$", "allow": ["layout", "spacing", "typography"] }
+        ]
+      }
+    ],
+    "shadcn/no-raw-colors": "error",
+    "shadcn/no-arbitrary-values": [
+      "error",
+      { "allow": ["grid-cols-*", "grid-rows-*", "transition-*"] }
+    ],
+    "shadcn/require-static-classes": "error",
+    "shadcn/no-unknown-classes": "error"
+  },
   "overrides": [
     {
       "files": ["**/*.{js,ts,tsx}"],

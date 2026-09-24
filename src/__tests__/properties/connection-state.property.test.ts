@@ -48,38 +48,6 @@ describe('Connection State Management', () => {
   })
 
   /**
-   * Property: resetConnection clears connection state
-   * After resetConnection is called, validConnection, validAuth,
-   * and serverVersion should all be reset.
-   */
-  it('resetConnection clears connection state', () => {
-    fc.assert(
-      fc.property(
-        fc.boolean(),
-        fc.boolean(),
-        fc.string(),
-        (initialValid, initialAuth, initialVersion) => {
-          useApiStore.setState({
-            validConnection: initialValid,
-            validAuth: initialAuth,
-            serverVersion: initialVersion,
-          })
-
-          useApiStore.getState().resetConnection()
-
-          const state = useApiStore.getState()
-          expect(state.validConnection).toBe(false)
-          expect(state.validAuth).toBe(false)
-          expect(state.serverVersion).toBe('')
-
-          return true
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
    * Property: setServerVersion updates version correctly
    */
   it('setServerVersion updates version correctly', () => {

@@ -1,8 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronLeft } from 'lucide-react'
+import { Disc3 } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { Button } from '@/components/ui/button'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -33,11 +32,11 @@ const AlbumCard = function AlbumCardComponent({
 
   return (
     <InteractiveCard
+      variant="tile"
       onClick={handleSelectAlbum}
-      className="group w-full rounded-lg overflow-hidden hover:scale-[1.02] hover:shadow-lg focus-visible:ring-offset-2"
       aria-label={ariaLabel}
     >
-      <div className="aspect-square bg-muted rounded-lg overflow-hidden">
+      <div className="aspect-square bg-muted">
         <ItemImage
           item={album}
           maxWidth={200}
@@ -46,15 +45,15 @@ const AlbumCard = function AlbumCardComponent({
         />
       </div>
 
-      <div className="mt-2">
+      <div className="px-3 py-2.5 md:px-4 md:py-3">
         <p
-          className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary transition-colors text-center"
+          className="text-sm md:text-base font-semibold truncate leading-snug text-foreground"
           title={album.Name || undefined}
         >
-          {album.Name || 'Unknown Album'}
+          {albumName}
         </p>
         {album.ProductionYear && (
-          <p className="text-xs text-muted-foreground text-center mt-0.5">
+          <p className="text-xs md:text-sm font-medium truncate text-muted-foreground">
             {album.ProductionYear}
           </p>
         )}
@@ -67,32 +66,16 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
   const navigate = useNavigate({ from: '/artist/$itemId' })
 
   const artistName = artist.Name || albums[0]?.AlbumArtist || 'Unknown Artist'
-
-  const handleBack = () => void navigate({ to: '/' })
-
   const handleAlbumClick = (albumId: string) => {
     void navigate({ to: '/album/$itemId', params: { itemId: albumId } })
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleBack}
-          className="rounded-full"
-        >
-          <ChevronLeft className="size-5" />
-          <span className="sr-only">Go back</span>
-        </Button>
-        <h1 className="text-xl font-semibold text-balance">{artistName}</h1>
-      </div>
-
       {albums.length === 0 ? (
         <EmptyState
+          icon={<Disc3 />}
           message="No albums found for this artist"
-          className="py-8"
         />
       ) : (
         <ul

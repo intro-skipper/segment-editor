@@ -36,14 +36,13 @@ export function MediaListRow({
       {...interactiveProps}
       animate
       animationDelay={animationDelay}
-      className="group flex items-center gap-3 md:gap-4 p-2.5 md:p-3 rounded-xl bg-card border border-border/50 hover:border-border"
     >
       <div className="relative flex-shrink-0 w-12 md:w-14 rounded-lg overflow-hidden bg-muted">
         <ItemImage
           item={item}
           maxWidth={160}
           maxHeight={240}
-          aspectRatio="aspect-[2/3]"
+          aspectRatio="aspect-2/3"
           className="w-full"
         />
       </div>

@@ -1,48 +1,29 @@
 /**
- * AsyncState - Reusable loading, error, and empty state components.
- * Consolidates duplicated patterns across views.
+ * AsyncState - Reusable loading state component.
  *
  * LoadingState includes proper ARIA attributes for accessibility.
  */
 
 import { Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 interface LoadingStateProps {
   /** Loading message to display */
   message?: string
-  /** Additional classes */
-  className?: string
-  /** Size of the spinner */
-  size?: 'sm' | 'md' | 'lg'
 }
-
-const spinnerSizes = {
-  sm: 'size-4',
-  md: 'size-5',
-  lg: 'size-6',
-} as const
 
 /**
  * Centered loading spinner with optional message.
  * Use for inline loading states within components.
  */
-export function LoadingState({
-  message,
-  className,
-  size = 'sm',
-}: LoadingStateProps) {
+export function LoadingState({ message }: LoadingStateProps) {
   return (
     <output
-      className={cn(
-        'py-6 flex items-center justify-center gap-2 text-muted-foreground',
-        className,
-      )}
+      className="py-6 flex items-center justify-center gap-2 text-muted-foreground"
       aria-live="polite"
       aria-busy="true"
     >
       <div className="animate-spin" aria-hidden="true">
-        <Loader2 className={cn(spinnerSizes[size])} />
+        <Loader2 className="size-4" />
       </div>
       <span className="sr-only">Loading</span>
       {message && <span>{message}</span>}

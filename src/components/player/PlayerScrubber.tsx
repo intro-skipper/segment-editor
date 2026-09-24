@@ -26,7 +26,7 @@ function clamp(value: number, min: number, max: number) {
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
-      className="rounded overflow-hidden shadow-lg mb-1 bg-neutral-950"
+      className="rounded overflow-hidden shadow-lg mb-1 bg-black"
       style={{
         width: position.thumbnailWidth,
         height: position.thumbnailHeight,
@@ -131,7 +131,7 @@ function ScrubberChapterMarkers({
         <button
           key={`chapter-${marker.time}-${marker.position}-${marker.name}`}
           type="button"
-          className="absolute top-1/2 w-1 h-3 rounded-sm bg-white/80 shadow-sm pointer-events-auto cursor-pointer transition-[height,background-color] hover:h-4 hover:bg-white z-10"
+          className="absolute top-1/2 w-1 h-3 rounded-sm bg-current/80 shadow-sm pointer-events-auto cursor-pointer transition-[height,background-color] hover:h-4 hover:bg-current z-10"
           style={{
             left: `${marker.position}%`,
             transform: 'translate(-50%, -50%)',
@@ -399,7 +399,6 @@ interface PlayerScrubberProps {
   chapters?: Array<ChapterInfo> | null
   segments?: Array<MediaSegmentDto>
   onSeek: (time: number) => void
-  className?: string
   /** Item ID for trickplay URL construction */
   itemId?: string
   /** Trickplay data from BaseItemDto.Trickplay */
@@ -416,7 +415,6 @@ export function PlayerScrubber({
   chapters,
   segments,
   onSeek,
-  className,
   itemId,
   trickplay,
 }: PlayerScrubberProps) {
@@ -506,8 +504,8 @@ export function PlayerScrubber({
   const segmentRegions = getSegmentRegions(segments, safeDuration)
 
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)]">
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-(--spacing-time-display)">
         {formatTime(safeCurrentTime)}
       </span>
 
@@ -530,8 +528,12 @@ export function PlayerScrubber({
           onChange={(event) => onSeek(Number(event.currentTarget.value))}
           onKeyDown={handleKeyDown}
           className="sr-only"
-          aria-label={t('accessibility.player.videoProgress', 'Video progress')}
-          aria-valuetext={`${formatTime(safeCurrentTime)} of ${formatTime(safeDuration)}`}
+          aria-label={t('accessibility.player.progressLabel', 'Video progress')}
+          aria-valuetext={t('accessibility.player.videoProgress', {
+            current: formatTime(safeCurrentTime),
+            total: formatTime(safeDuration),
+            defaultValue: '{{current}} of {{total}}',
+          })}
         />
         <ScrubberTrack
           bufferedStyle={bufferedStyle}
@@ -550,7 +552,7 @@ export function PlayerScrubber({
 
         <div
           className={cn(
-            'absolute top-0 w-0.5 h-full bg-white/50 pointer-events-none transition-opacity',
+            'absolute top-0 w-0.5 h-full bg-current/50 pointer-events-none transition-opacity',
             hoverTime !== null ? 'opacity-100' : 'opacity-0',
           )}
           style={hoverIndicatorStyle}
@@ -565,7 +567,7 @@ export function PlayerScrubber({
         />
       </div>
 
-      <span className="text-xs font-medium tabular-nums opacity-80 min-w-[var(--spacing-time-display)] text-right">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-(--spacing-time-display) text-right">
         {formatTime(safeDuration)}
       </span>
     </div>

@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MoreVertical } from 'lucide-react'
 
 import { formatForDisplay } from '@tanstack/react-hotkeys'
-import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type React from 'react'
-import { cn } from '@/lib/utils'
 import { PLAYER_SHORTCUT_CHEATSHEET } from '@/lib/player-shortcuts'
 import {
   formatSkipDurationLabel,
@@ -65,10 +63,7 @@ export function PlayerSettingsMenu({
       <span className="text-muted-foreground">{t(labelKey)}</span>
       <span>
         {displayKeys.map((dk) => (
-          <kbd
-            key={dk}
-            className="px-2 py-0.5 bg-muted rounded text-xs font-mono ml-1"
-          >
+          <kbd key={dk} className="ml-1">
             {dk}
           </kbd>
         ))}
@@ -81,154 +76,145 @@ export function PlayerSettingsMenu({
       <DropdownMenuTrigger
         render={
           <Button
-            variant="outline"
+            variant="player"
+            size="icon-xl"
             aria-label={t('accessibility.playerSettings', 'Player settings')}
-            className={getButtonClass(false)}
           />
         }
       >
-        <MoreVertical
-          className={ICON_CLASS}
-          strokeWidth={3}
-          aria-hidden="true"
-        />
+        <MoreVertical strokeWidth={3} aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="p-4 min-w-[280px]"
+        className="min-w-70"
         container={portalContainer}
       >
-        <div className="mb-4 pb-4 border-b border-border">
-          <p
-            className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
-            id={`${idPrefix}-skip-duration`}
-          >
-            {t('player.skipDuration', 'Skip Duration')}
-          </p>
-          <div
-            className="flex flex-wrap gap-1.5"
-            role="radiogroup"
-            aria-labelledby={`${idPrefix}-skip-duration`}
-          >
-            {SKIP_TIMES.map((time, idx) => {
-              const label = formatSkipDurationLabel(time)
-              const ariaLabel = isFrameSkipSeconds(time)
-                ? t('player.skipOneFrame', 'Skip 1 frame')
-                : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
-              return (
-                <button
-                  type="button"
-                  key={time}
-                  onClick={() => onSkipTimeChange(idx)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    idx === skipTimeIndex
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-muted/80 text-foreground',
-                  )}
-                  role="radio"
-                  aria-checked={idx === skipTimeIndex}
-                  aria-label={ariaLabel}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {onSpeedChange && playbackSpeedIndex !== undefined && (
+        <div className="p-3">
           <div className="mb-4 pb-4 border-b border-border">
             <p
-              className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
-              id={`${idPrefix}-playback-speed`}
+              className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+              id={`${idPrefix}-skip-duration`}
             >
-              {t('player.playbackSpeed', 'Playback Speed')}
+              {t('player.skipDuration', 'Skip Duration')}
             </p>
             <div
               className="flex flex-wrap gap-1.5"
               role="radiogroup"
-              aria-labelledby={`${idPrefix}-playback-speed`}
+              aria-labelledby={`${idPrefix}-skip-duration`}
             >
-              {PLAYBACK_SPEEDS.map((speed, idx) => (
-                <button
-                  type="button"
-                  key={speed}
-                  onClick={() => onSpeedChange(idx)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    idx === playbackSpeedIndex
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-muted/80 text-foreground',
-                  )}
-                  role="radio"
-                  aria-checked={idx === playbackSpeedIndex}
-                  aria-label={t('player.speedValue', '{{speed}}x speed', {
-                    speed,
-                  })}
-                >
-                  {speed}x
-                </button>
-              ))}
+              {SKIP_TIMES.map((time, idx) => {
+                const label = formatSkipDurationLabel(time)
+                const ariaLabel = isFrameSkipSeconds(time)
+                  ? t('player.skipOneFrame', 'Skip 1 frame')
+                  : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
+                return (
+                  <Button
+                    type="button"
+                    key={time}
+                    size="sm"
+                    variant={idx === skipTimeIndex ? 'default' : 'secondary'}
+                    onClick={() => onSkipTimeChange(idx)}
+                    role="radio"
+                    aria-checked={idx === skipTimeIndex}
+                    aria-label={ariaLabel}
+                  >
+                    {label}
+                  </Button>
+                )
+              })}
             </div>
           </div>
-        )}
 
-        {hasActiveSubtitle && onSubtitleOffsetChange && (
-          <div className="mb-4 pb-4 border-b border-border">
-            <p
-              className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide"
-              id={`${idPrefix}-subtitle-offset`}
-            >
-              {t('player.subtitleOffset', 'Subtitle Offset')}
+          {onSpeedChange && playbackSpeedIndex !== undefined && (
+            <div className="mb-4 pb-4 border-b border-border">
+              <p
+                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+                id={`${idPrefix}-playback-speed`}
+              >
+                {t('player.playbackSpeed', 'Playback Speed')}
+              </p>
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="radiogroup"
+                aria-labelledby={`${idPrefix}-playback-speed`}
+              >
+                {PLAYBACK_SPEEDS.map((speed, idx) => (
+                  <Button
+                    type="button"
+                    key={speed}
+                    size="sm"
+                    variant={
+                      idx === playbackSpeedIndex ? 'default' : 'secondary'
+                    }
+                    onClick={() => onSpeedChange(idx)}
+                    role="radio"
+                    aria-checked={idx === playbackSpeedIndex}
+                    aria-label={t('player.speedValue', '{{speed}}x speed', {
+                      speed,
+                    })}
+                  >
+                    {speed}x
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasActiveSubtitle && onSubtitleOffsetChange && (
+            <div className="mb-4 pb-4 border-b border-border">
+              <p
+                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+                id={`${idPrefix}-subtitle-offset`}
+              >
+                {t('player.subtitleOffset', 'Subtitle Offset')}
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.1"
+                    value={subtitleOffset}
+                    onChange={handleSubtitleOffsetChange}
+                    aria-labelledby={`${idPrefix}-subtitle-offset`}
+                    aria-valuemin={-10}
+                    aria-valuemax={10}
+                    aria-valuenow={subtitleOffset}
+                    aria-valuetext={t(
+                      'player.subtitleOffsetValue',
+                      '{{offset}}s',
+                      { offset: subtitleOffset.toFixed(1) },
+                    )}
+                    className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
+                  />
+                  <span className="text-sm tabular-nums min-w-12 text-right">
+                    {subtitleOffset > 0 ? '+' : ''}
+                    {subtitleOffset.toFixed(1)}s
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{t('player.subtitleEarlier', 'Earlier')}</span>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleSubtitleOffsetReset}
+                    disabled={subtitleOffset === 0}
+                  >
+                    {t('player.subtitleReset', 'Reset')}
+                  </Button>
+                  <span>{t('player.subtitleLater', 'Later')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+              {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
             </p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="-10"
-                  max="10"
-                  step="0.1"
-                  value={subtitleOffset}
-                  onChange={handleSubtitleOffsetChange}
-                  aria-labelledby={`${idPrefix}-subtitle-offset`}
-                  aria-valuemin={-10}
-                  aria-valuemax={10}
-                  aria-valuenow={subtitleOffset}
-                  aria-valuetext={t(
-                    'player.subtitleOffsetValue',
-                    '{{offset}}s',
-                    { offset: subtitleOffset.toFixed(1) },
-                  )}
-                  className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
-                />
-                <span className="text-sm tabular-nums min-w-[6ch] text-right">
-                  {subtitleOffset > 0 ? '+' : ''}
-                  {subtitleOffset.toFixed(1)}s
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{t('player.subtitleEarlier', 'Earlier')}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSubtitleOffsetReset}
-                  className="h-6 px-2 text-xs"
-                  disabled={subtitleOffset === 0}
-                >
-                  {t('player.subtitleReset', 'Reset')}
-                </Button>
-                <span>{t('player.subtitleLater', 'Later')}</span>
-              </div>
-            </div>
+            <div className="space-y-1.5 text-sm">{shortcutItems}</div>
           </div>
-        )}
-
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-            {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
-          </p>
-          <div className="space-y-1.5 text-sm">{shortcutItems}</div>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

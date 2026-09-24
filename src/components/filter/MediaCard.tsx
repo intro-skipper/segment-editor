@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { ItemImage } from '@/components/media/ItemImage'
+import { InteractiveCard } from '@/components/ui/interactive-card'
 import { cn } from '@/lib/utils'
 import { navigateToMediaItem, preloadMediaRoute } from '@/lib/navigation-utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
@@ -67,10 +68,10 @@ export const MediaCard = function MediaCardComponent({
     <div
       role={role}
       aria-selected={ariaSelected}
-      className={cn('rounded-2xl min-h-[44px]', className)}
+      className={cn('rounded-2xl min-h-11', className)}
     >
-      <button
-        type="button"
+      <InteractiveCard
+        variant="tile"
         tabIndex={tabIndex}
         data-grid-index={dataGridIndex}
         aria-label={accessibleLabel}
@@ -78,20 +79,14 @@ export const MediaCard = function MediaCardComponent({
         onFocus={handleFocusPrefetch}
         onPointerEnter={prefetchRoute}
         onTouchStart={prefetchRoute}
-        className={cn(
-          'group cursor-pointer rounded-2xl overflow-hidden min-h-[44px] w-full text-left',
-          'bg-card border border-border/50',
-          'transition-[transform,box-shadow,border-color] duration-200 ease-out',
-          'hover:scale-[1.02] active:scale-[0.98]',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-          'animate-in fade-in slide-in-from-bottom-3 animation-duration-400 fill-mode-both',
-        )}
-        style={{ animationDelay }}
+        animate
+        animationDelay={animationDelay}
+        className="min-h-11"
       >
         <ItemImage
           item={item}
           maxWidth={200}
-          aspectRatio="aspect-[2/3]"
+          aspectRatio="aspect-2/3"
           className="w-full"
         />
 
@@ -103,12 +98,12 @@ export const MediaCard = function MediaCardComponent({
             {item.Name || 'Unknown'}
           </p>
 
-          {/* Year and series counts - fixed height keeps grid rows aligned */}
-          <p className="text-xs md:text-sm font-medium h-[1.25em] truncate text-muted-foreground">
+          {/* Year and series counts - the nbsp fallback keeps one line so grid rows stay aligned */}
+          <p className="text-xs md:text-sm font-medium truncate text-muted-foreground">
             {metaText || '\u00A0'}
           </p>
         </div>
-      </button>
+      </InteractiveCard>
     </div>
   )
 }

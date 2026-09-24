@@ -27,7 +27,7 @@ import {
   getSegmentFormDefaults,
   validateSegmentFormValues,
 } from '@/lib/forms/segment-form'
-import { getSegmentColor, getSegmentCssVar } from '@/lib/segment-utils'
+import { getSegmentChipClass, getSegmentCssVar } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -151,7 +151,7 @@ function resolveFrameStep(frameStepSeconds: number | undefined) {
 }
 
 interface SegmentSliderHeaderProps {
-  segmentColor: string
+  chipClassName: string
   typeLabel: string
   localStart: number
   localEnd: number
@@ -164,7 +164,7 @@ interface SegmentSliderHeaderProps {
 
 /** Type badge (or type menu), time summary and the copy/edit/delete actions. */
 function SegmentSliderHeader({
-  segmentColor,
+  chipClassName,
   typeLabel,
   localStart,
   localEnd,
@@ -200,10 +200,8 @@ function SegmentSliderHeader({
                 aria-label={t('segment.type', 'Segment type')}
                 title={t('segment.type', 'Segment type')}
                 className={cn(
-                  'inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-3 text-xs font-medium text-white shadow-sm',
-                  'transition-opacity hover:opacity-90 aria-expanded:opacity-90',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                  segmentColor,
+                  chipClassName,
+                  'cursor-pointer transition-opacity hover:opacity-90 aria-expanded:opacity-90',
                 )}
               />
             }
@@ -212,14 +210,7 @@ function SegmentSliderHeader({
             <ChevronDown className="size-3 opacity-80" aria-hidden="true" />
           </SegmentTypeMenu>
         ) : (
-          <span
-            className={cn(
-              'inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-medium text-white shadow-sm',
-              segmentColor,
-            )}
-          >
-            {typeLabel}
-          </span>
+          <span className={chipClassName}>{typeLabel}</span>
         )}
         <span className="hidden sm:inline text-sm text-muted-foreground tabular-nums truncate">
           {formatTime(localStart)} → {formatTime(localEnd)} ·{' '}
@@ -240,7 +231,6 @@ function SegmentSliderHeader({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={t('accessibility.copySegment')}
-                className="hover:bg-primary/10"
               />
             }
           >
@@ -263,17 +253,15 @@ function SegmentSliderHeader({
             size="icon-sm"
             onClick={onEdit}
             aria-label={t('segment.edit')}
-            className="hover:bg-primary/10"
           >
             <Pencil className="size-4" aria-hidden="true" />
           </Button>
         )}
         <Button
-          variant="ghost"
+          variant="destructive"
           size="icon-sm"
           onClick={onDelete}
           aria-label={t('accessibility.deleteSegment')}
-          className="text-destructive/70 hover:text-destructive hover:bg-destructive/10"
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </Button>
@@ -457,7 +445,7 @@ export function SegmentSlider({
     )
   }, [form, segment])
 
-  const segmentColor = getSegmentColor(formValues.type)
+  const chipClassName = getSegmentChipClass(formValues.type)
   const segmentCssVar = getSegmentCssVar(formValues.type)
 
   const startPercent =
@@ -829,10 +817,10 @@ export function SegmentSlider({
   }
 
   const containerClassName = cn(
-    'group relative rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-[transform,box-shadow,background-color,border-color] duration-200',
+    'group relative rounded-2xl border bg-card p-4 transition-[box-shadow,background-color,border-color] duration-200',
     isActive
       ? 'border-primary/60 bg-primary/5 shadow-lg shadow-primary/10'
-      : 'border-border/50 hover:border-primary/30 hover:bg-card',
+      : 'border-border/50 hover:border-primary/30',
   )
 
   const segmentRangeStyle = {
@@ -865,7 +853,7 @@ export function SegmentSlider({
       onFocusCapture={handleSetActiveClick}
     >
       <SegmentSliderHeader
-        segmentColor={segmentColor}
+        chipClassName={chipClassName}
         typeLabel={typeLabel}
         localStart={localStart}
         localEnd={localEnd}
@@ -914,10 +902,7 @@ export function SegmentSlider({
           >
             <input
               type="range"
-              className={cn(
-                'segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              )}
+              className="segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
               aria-label={t('segment.startHandle', { type: segment.Type })}
               aria-valuetext={formatTime(localStart)}
               min={0}
@@ -931,7 +916,7 @@ export function SegmentSlider({
             />
             <span
               aria-hidden="true"
-              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-[2px]"
+              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-xs"
               style={handleVisualStyle}
             />
           </span>
@@ -943,10 +928,7 @@ export function SegmentSlider({
           >
             <input
               type="range"
-              className={cn(
-                'segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              )}
+              className="segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
               aria-label={t('segment.endHandle', { type: segment.Type })}
               aria-valuetext={formatTime(localEnd)}
               min={localStart + MIN_SEGMENT_GAP}
@@ -960,7 +942,7 @@ export function SegmentSlider({
             />
             <span
               aria-hidden="true"
-              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-[2px]"
+              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-xs"
               style={handleVisualStyle}
             />
           </span>
@@ -972,29 +954,29 @@ export function SegmentSlider({
         {/* Start time */}
         <div className="flex items-start sm:items-center gap-2 flex-1 min-w-0">
           <Button
-            variant="ghost"
+            variant="ghost-muted"
             size="icon-sm"
             onClick={handleSeekStart}
             aria-label={t('accessibility.seekToStart')}
             title={t('accessibility.seekToStart')}
-            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+            className="shrink-0"
           >
             <Play className="size-4" aria-hidden="true" />
           </Button>
           {getPlayerTime && (
             <Button
-              variant="ghost"
+              variant="ghost-muted"
               size="icon-sm"
               onClick={handleSetStartFromPlayer}
               aria-label={t('editor.setStartTime', 'Set start from player')}
               title={`${t('editor.setStartTime', 'Set start from player')} (E)`}
-              className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+              className="shrink-0"
             >
               <Crosshair className="size-4" aria-hidden="true" />
             </Button>
           )}
           <Button
-            variant="ghost"
+            variant="ghost-muted"
             size="icon-sm"
             onClick={handleSetStartToZero}
             aria-label={t(
@@ -1002,7 +984,7 @@ export function SegmentSlider({
               'Set start to beginning',
             )}
             title={t('editor.setStartToBeginning', 'Set start to beginning')}
-            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+            className="shrink-0"
           >
             <SkipBack className="size-4" aria-hidden="true" />
           </Button>
@@ -1031,7 +1013,7 @@ export function SegmentSlider({
                     field.handleBlur()
                     handleInputBlur('start')
                   }}
-                  className="w-full h-8 text-sm font-mono bg-background/50"
+                  className="w-full h-8 font-mono"
                   aria-describedby={`segment-${segment.Id}-start-formatted`}
                 />
               )}
@@ -1054,35 +1036,35 @@ export function SegmentSlider({
         {/* End time */}
         <div className="flex items-start sm:items-center gap-2 flex-1 min-w-0">
           <Button
-            variant="ghost"
+            variant="ghost-muted"
             size="icon-sm"
             onClick={handleSeekEnd}
             aria-label={t('accessibility.seekToEnd')}
             title={t('accessibility.seekToEnd')}
-            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+            className="shrink-0"
           >
             <Play className="size-4" aria-hidden="true" />
           </Button>
           {getPlayerTime && (
             <Button
-              variant="ghost"
+              variant="ghost-muted"
               size="icon-sm"
               onClick={handleSetEndFromPlayer}
               aria-label={t('editor.setEndTime', 'Set end from player')}
               title={`${t('editor.setEndTime', 'Set end from player')} (F)`}
-              className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+              className="shrink-0"
             >
               <Crosshair className="size-4" aria-hidden="true" />
             </Button>
           )}
           <Button
-            variant="ghost"
+            variant="ghost-muted"
             size="icon-sm"
             onClick={handleSetEndToDuration}
             disabled={!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0}
             aria-label={t('editor.setEndToDuration', 'Set end to duration')}
             title={t('editor.setEndToDuration', 'Set end to duration')}
-            className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+            className="shrink-0"
           >
             <SkipForward className="size-4" aria-hidden="true" />
           </Button>
@@ -1111,7 +1093,7 @@ export function SegmentSlider({
                     field.handleBlur()
                     handleInputBlur('end')
                   }}
-                  className="w-full h-8 text-sm font-mono bg-background/50"
+                  className="w-full h-8 font-mono"
                   aria-describedby={`segment-${segment.Id}-end-formatted`}
                 />
               )}
