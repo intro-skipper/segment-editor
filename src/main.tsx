@@ -19,7 +19,6 @@ import {
 
 import { routeTree } from './routeTree.gen'
 import {
-  APP_BASE_ROUTE,
   PLUGIN_ROUTER_BASE_PATH,
   PLUGIN_ROUTER_ENTRY,
   isJellyfinDesktopClient,
@@ -58,16 +57,16 @@ const queryClient = new QueryClient({
 })
 const routerContext = { queryClient }
 const pluginMode = isPluginMode()
-const pluginBuild = import.meta.env.BASE_URL.startsWith(`/${APP_BASE_ROUTE}/`)
 
 const history = pluginMode
   ? createMemoryHistory({ initialEntries: [PLUGIN_ROUTER_ENTRY] })
   : createBrowserHistory()
+// BASE_URL is `/` for the standalone build and `./` for the plugin build, where
+// resolving it against the page yields the mount point including any Jellyfin
+// base URL (e.g. `/jellyfin/SegmentEditor/`).
 const basePath = pluginMode
   ? PLUGIN_ROUTER_BASE_PATH
-  : pluginBuild
-    ? `/${APP_BASE_ROUTE}`
-    : '/'
+  : new URL(import.meta.env.BASE_URL, window.location.href).pathname
 
 // The app's navigation animations are defined entirely via
 // `:active-view-transition-type(...)` rules in styles.css. When transition
