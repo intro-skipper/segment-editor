@@ -275,4 +275,67 @@ describe('Segment Timestamp Validation', () => {
       { numRuns: 100 },
     )
   })
+
+  /**
+   * Property: End beyond the media duration is rejected
+   * For any segment whose EndTicks exceeds maxDuration, validation SHALL fail
+   * with the duration error.
+   */
+  it('rejects segments whose end exceeds max duration', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 1_000_000 }),
+        fc.integer({ min: 1, max: 1_000_000 }),
+        segmentTypeArb,
+        (maxDuration, overshoot, type) => {
+          const segment: MediaSegmentDto = {
+            Id: 'test-id',
+            ItemId: 'test-item',
+            Type: type,
+            StartTicks: 0,
+            EndTicks: maxDuration + overshoot,
+          }
+
+          const result = validateSegmentValues(segment, maxDuration)
+          return (
+            result.valid === false &&
+            result.error === 'End time exceeds media duration'
+          )
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  /**
+   * Property: Ordered segments inside the media duration pass
+   * For any segment with 0 <= StartTicks < EndTicks <= maxDuration,
+   * validation SHALL return { valid: true }.
+   */
+  it('accepts ordered segments within max duration', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 1_000_000 }),
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        segmentTypeArb,
+        (maxDuration, startRatio, endRatio, type) => {
+          const start = Math.floor(startRatio * (maxDuration - 1))
+          const end =
+            start + 1 + Math.floor(endRatio * (maxDuration - start - 1))
+          const segment: MediaSegmentDto = {
+            Id: 'test-id',
+            ItemId: 'test-item',
+            Type: type,
+            StartTicks: start,
+            EndTicks: end,
+          }
+
+          const result = validateSegmentValues(segment, maxDuration)
+          return result.valid === true
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
 })
