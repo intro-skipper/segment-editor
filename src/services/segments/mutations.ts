@@ -7,7 +7,7 @@ import { useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { batchSaveSegments, deleteSegment } from '@/services/segments/api'
+import { batchSaveSegments } from '@/services/segments/api'
 import { segmentsKeys } from './query-keys'
 import {
   QueryError,
@@ -15,7 +15,6 @@ import {
 } from '@/hooks/queries/query-error-handling'
 import { showError, showSuccess } from '@/lib/notifications'
 import { ErrorCodes } from '@/lib/unified-error'
-import { isValidItemId } from '@/lib/schemas'
 
 interface BatchSaveInput {
   itemId: string
@@ -27,11 +26,6 @@ interface OptimisticContext {
   previousSegments?: Array<MediaSegmentDto>
   rolledBack?: boolean
 }
-
-const DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE =
-  'The server did not confirm the delete. Please try again.'
-
-const DELETE_SEGMENT_INVALID_MESSAGE = 'Invalid or missing segment ID'
 
 const handleMutationError = (operation: string) => (cause: unknown) => {
   const e = QueryError.from(cause)
@@ -85,52 +79,6 @@ const rollbackSegments = (
     }
   }
   ctx.rolledBack = true
-}
-
-const validateDeleteInput = (segment: MediaSegmentDto) => {
-  if (!isValidItemId(segment.Id)) {
-    throw QueryError.validation(DELETE_SEGMENT_INVALID_MESSAGE)
-  }
-}
-
-export const useDeleteSegment = () => {
-  const qc = useQueryClient()
-  const getController = useAbortController()
-
-  return useMutation<boolean, QueryError, MediaSegmentDto, OptimisticContext>({
-    mutationFn: wrapMutationFn(async (segment, signal) => {
-      validateDeleteInput(segment)
-      const deleted = await deleteSegment(segment, { signal })
-      if (!deleted) {
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-        throw new Error(DELETE_SEGMENT_NOT_CONFIRMED_MESSAGE)
-      }
-      return deleted
-    }, getController),
-    onMutate: async (segment) => {
-      if (!segment.ItemId) return { rolledBack: false }
-      await qc.cancelQueries({ queryKey: segmentsKeys.list(segment.ItemId) })
-      const previousSegments = qc.getQueryData<Array<MediaSegmentDto>>(
-        segmentsKeys.list(segment.ItemId),
-      )
-      if (previousSegments) {
-        qc.setQueryData<Array<MediaSegmentDto>>(
-          segmentsKeys.list(segment.ItemId),
-          previousSegments.filter((s) => s.Id !== segment.Id),
-        )
-      }
-      return { previousSegments, rolledBack: false }
-    },
-    onError: (error, segment, ctx) => {
-      if (segment.ItemId && ctx?.previousSegments)
-        rollbackSegments(qc, segment.ItemId, ctx.previousSegments, ctx)
-      handleMutationError('Delete segment')(error)
-    },
-    onSuccess: (_data, segment) => {
-      if (segment.ItemId) showSuccess('Segment deleted')
-    },
-    onSettled: () => {},
-  })
 }
 
 export const useBatchSaveSegments = () => {

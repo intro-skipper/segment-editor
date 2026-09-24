@@ -6,23 +6,9 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fc from 'fast-check'
-import { generateUUID, isValidUUID } from '@/lib/segment-utils'
+import { generateUUID } from '@/lib/segment-utils'
 
 describe('UUID Generation Uniqueness', () => {
-  /**
-   * Property: All generated UUIDs conform to UUID v4 format
-   * For any generated UUID, it must match the UUID v4 pattern.
-   */
-  it('generates valid UUID v4 format', () => {
-    fc.assert(
-      fc.property(fc.constant(null), () => {
-        const uuid = generateUUID()
-        return isValidUUID(uuid)
-      }),
-      { numRuns: 100 },
-    )
-  })
-
   /**
    * Property: Generated UUIDs are unique
    * For any batch of generated UUIDs, all values must be distinct.

@@ -135,13 +135,6 @@ export function clearCache(): void {
   clearCapabilityProbeCache()
 }
 
-/**
- * Gets the current cache size (for testing purposes).
- */
-export function getCacheSize(): number {
-  return capabilityCache.size
-}
-
 // ============================================================================
 // Codec String Builders
 // ============================================================================

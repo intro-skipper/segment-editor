@@ -43,15 +43,6 @@ export const MediaSegmentSchema = z.object({
   EndTicks: z.number().nonnegative(),
 })
 
-/**
- * Time input schema - accepts numbers or time strings.
- * Security: Strict regex prevents injection via malformed time strings.
- */
-export const TimeInputSchema = z.union([
-  z.number().nonnegative(),
-  z.string().regex(/^[\d:.]+$/, 'Invalid time format'),
-])
-
 export const MediaSegmentArraySchema = z.array(MediaSegmentSchema)
 
 /**
@@ -80,24 +71,8 @@ const VirtualFolderSchema = z.looseObject({
 
 export const VirtualFolderArraySchema = z.array(VirtualFolderSchema)
 
-/**
- * Search input schema with sanitization.
- * Security: Limits length and trims whitespace to prevent injection.
- */
-const SearchInputSchema = z
-  .string()
-  .max(200, 'Search query too long')
-  .transform((val) => val.trim())
-
 export const isValidItemId = (id: string | null | undefined): id is string =>
   ItemIdSchema.safeParse(id).success
-
-export const sanitizeSearchInput = (
-  input: string | null | undefined,
-): string => {
-  const result = SearchInputSchema.safeParse(input)
-  return result.success ? result.data : ''
-}
 
 /**
  * Safely encodes a value for use in URL path segments.
