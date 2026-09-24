@@ -14,16 +14,8 @@ import {
 } from 'lucide-react'
 import { MediaGridSkeleton } from '@/components/ui/loading-skeleton'
 import { Button } from '@/components/ui/button'
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty'
+import { EmptyState } from '@/components/ui/empty-state'
 import { MediaListSkeleton } from '@/components/filter/MediaListSkeleton'
-import { GRID_CLASS } from '@/components/filter/MediaCollections'
 import type { ViewMode } from '@/stores/session-store'
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'not-connected'
@@ -38,59 +30,41 @@ export function ConnectionStatusNotice({
   const { t } = useTranslation()
 
   return (
-    <div className="flex items-center justify-center min-h-[var(--spacing-empty-state-min-height)]">
-      <Empty className="border-none bg-transparent">
-        {status === 'not-connected' ? (
-          <>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Unplug className="size-12" aria-hidden="true" />
-              </EmptyMedia>
-              <EmptyTitle className="text-2xl">
-                {t('connection.notConnected', {
-                  defaultValue: 'Not Connected',
-                })}
-              </EmptyTitle>
-              <EmptyDescription className="text-base">
-                {t('connection.notConnectedDescription', {
-                  defaultValue:
-                    'Configure your Jellyfin server connection to get started',
-                })}
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                size="lg"
-                className="gap-2 rounded-2xl"
-                onClick={onOpenSettings}
-              >
-                <Settings2 className="size-5" aria-hidden="true" />
-                {t('connection.openSettings', {
-                  defaultValue: 'Open Settings',
-                })}
-              </Button>
-            </EmptyContent>
-          </>
-        ) : (
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <div className="animate-spin" aria-hidden="true">
-                <Loader2 className="size-12" />
-              </div>
-            </EmptyMedia>
-            <EmptyTitle className="text-2xl">
-              {t('connection.connecting', {
-                defaultValue: 'Connecting…',
+    <div className="flex items-center justify-center min-h-(--spacing-empty-state-min-height)">
+      {status === 'not-connected' ? (
+        <EmptyState
+          icon={<Unplug />}
+          title={t('connection.notConnected', {
+            defaultValue: 'Not Connected',
+          })}
+          message={t('connection.notConnectedDescription', {
+            defaultValue:
+              'Configure your Jellyfin server connection to get started',
+          })}
+          action={
+            <Button onClick={onOpenSettings}>
+              <Settings2 aria-hidden="true" />
+              {t('connection.openSettings', {
+                defaultValue: 'Open Settings',
               })}
-            </EmptyTitle>
-            <EmptyDescription className="text-base">
-              {t('connection.connectingDescription', {
-                defaultValue: 'Establishing connection to Jellyfin server',
-              })}
-            </EmptyDescription>
-          </EmptyHeader>
-        )}
-      </Empty>
+            </Button>
+          }
+        />
+      ) : (
+        <EmptyState
+          icon={
+            <div className="animate-spin">
+              <Loader2 />
+            </div>
+          }
+          title={t('connection.connecting', {
+            defaultValue: 'Connecting…',
+          })}
+          message={t('connection.connectingDescription', {
+            defaultValue: 'Establishing connection to Jellyfin server',
+          })}
+        />
+      )}
     </div>
   )
 }
@@ -114,10 +88,7 @@ export function MediaLoadingState({
           })}
         />
       ) : (
-        <MediaGridSkeleton
-          count={Math.min(pageSize, 24)}
-          className={GRID_CLASS}
-        />
+        <MediaGridSkeleton count={Math.min(pageSize, 24)} />
       )}
     </div>
   )
@@ -133,30 +104,22 @@ export function MediaLoadErrorState({
   const { t } = useTranslation()
 
   return (
-    <div
-      className="flex flex-col items-center justify-center py-16 gap-4"
-      role="alert"
-      aria-live="assertive"
-    >
-      <div className="size-16 rounded-full bg-destructive/10 flex items-center justify-center">
-        <AlertCircle className="size-8 text-destructive" aria-hidden="true" />
-      </div>
-      <p className="text-destructive text-center text-lg">
-        {error.message ||
-          t('items.loadError', {
-            defaultValue: 'Unable to load media items',
-          })}
-      </p>
-      <Button
-        variant="secondary"
-        size="lg"
-        className="rounded-full px-6"
-        onClick={onRetry}
-      >
-        <RefreshCw className="size-4 mr-2" aria-hidden="true" />
-        {t('common.retry')}
-      </Button>
-    </div>
+    <EmptyState
+      tone="destructive"
+      icon={<AlertCircle />}
+      message={
+        error.message ||
+        t('items.loadError', {
+          defaultValue: 'Unable to load media items',
+        })
+      }
+      action={
+        <Button variant="outline" onClick={onRetry}>
+          <RefreshCw aria-hidden="true" />
+          {t('common.retry')}
+        </Button>
+      }
+    />
   )
 }
 
@@ -164,17 +127,10 @@ export function MediaEmptyState() {
   const { t } = useTranslation()
 
   return (
-    <output
-      className="flex flex-col items-center justify-center py-16 text-center"
-      aria-live="polite"
-    >
-      <div className="size-20 rounded-full bg-muted flex items-center justify-center mb-4">
-        <Search className="size-10 text-muted-foreground" aria-hidden="true" />
-      </div>
-      <p className="text-muted-foreground text-lg">
-        {t('items.noItems', { defaultValue: 'No items found' })}
-      </p>
-    </output>
+    <EmptyState
+      icon={<Search />}
+      message={t('items.noItems', { defaultValue: 'No items found' })}
+    />
   )
 }
 

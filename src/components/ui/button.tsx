@@ -14,10 +14,7 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       data-interactive-transition="true"
-      className={cn(
-        'touch-manipulation',
-        buttonVariants({ variant, size, className }),
-      )}
+      className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   )

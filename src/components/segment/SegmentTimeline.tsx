@@ -12,7 +12,6 @@ import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { SegmentRegion } from '@/lib/segment-utils'
 import { getSegmentRegions } from '@/lib/segment-utils'
 import { formatCompactTime } from '@/lib/time-utils'
-import { cn } from '@/lib/utils'
 
 /**
  * Minimum rendered region width in percent. Keeps short segments (e.g. a
@@ -27,14 +26,12 @@ interface SegmentTimelineProps {
   runtimeSeconds: number
   /** Renders a pulsing placeholder track while segment data loads */
   isLoading?: boolean
-  className?: string
 }
 
 export function SegmentTimeline({
   segments,
   runtimeSeconds,
   isLoading = false,
-  className,
 }: SegmentTimelineProps) {
   const { t } = useTranslation()
 
@@ -48,10 +45,7 @@ export function SegmentTimeline({
   if (isLoading) {
     return (
       <div
-        className={cn(
-          'h-1.5 rounded-full bg-muted/70 animate-pulse',
-          className,
-        )}
+        className="h-1.5 rounded-full bg-muted/70 animate-pulse"
         aria-hidden="true"
       />
     )
@@ -80,10 +74,7 @@ export function SegmentTimeline({
     <div
       role="img"
       aria-label={label}
-      className={cn(
-        'relative h-1.5 rounded-full overflow-hidden bg-primary/15',
-        className,
-      )}
+      className="relative h-1.5 rounded-full overflow-hidden bg-primary/15"
     >
       {regions.map((region) => (
         <div

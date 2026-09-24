@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Check, ChevronDown, Play } from 'lucide-react'
+import { AlertCircle, Check, Play, Tv } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { NO_ITEMS, useEpisodes, useSeasons } from '@/services/items/queries'
@@ -12,8 +12,10 @@ import {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { TitleMenuTrigger } from '@/components/header/TitleMenuTrigger'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { staggerDelay } from '@/lib/animation-utils'
 import { formatEpisodeLabel } from '@/lib/header-utils'
@@ -78,12 +80,12 @@ const EpisodeItem = function EpisodeItemComponent({
   return (
     <button
       type="button"
+      data-interactive-transition="true"
       onClick={selectEpisode}
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
-        'transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive
-          ? 'bg-primary/15 text-primary'
+          ? 'bg-primary/10 text-primary'
           : 'hover:bg-muted/80 text-foreground',
       )}
       onPointerEnter={() => {
@@ -157,22 +159,17 @@ const SeasonButton = function SeasonButtonComponent({
     : `Season ${season.IndexNumber ?? '?'}`
 
   return (
-    <button
+    <Button
       type="button"
+      size="xs"
+      variant={isSelected ? 'default' : 'secondary'}
       onClick={selectSeason}
-      className={cn(
-        'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-[background-color,color,box-shadow] duration-150 ease-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        isSelected
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
       role="tab"
       aria-selected={isSelected}
       aria-label={fullLabel}
     >
       {label}
-    </button>
+    </Button>
   )
 }
 
@@ -194,7 +191,7 @@ const SeasonSelector = function SeasonSelectorComponent({
     <>
       <div className="pt-2">
         <div
-          className="flex gap-1.5 px-2 pb-2 overflow-x-auto scrollbar-hide"
+          className="flex gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar"
           role="tablist"
           aria-label="Select season"
         >
@@ -262,26 +259,20 @@ const EpisodeListContent = function EpisodeListContentComponent({
 
   if (isError) {
     return (
-      <div
-        className="flex flex-col items-center justify-center py-8 text-muted-foreground"
-        role="alert"
-      >
-        <AlertCircle className="size-6 mb-2 opacity-60" aria-hidden="true" />
-        <p className="text-sm">
-          {t('series.loadError', 'Failed to load episodes')}
-        </p>
-      </div>
+      <EmptyState
+        tone="destructive"
+        icon={<AlertCircle />}
+        message={t('series.loadError', 'Failed to load episodes')}
+      />
     )
   }
 
   if (episodes.length === 0) {
     return (
-      <p
-        className="text-center text-muted-foreground text-sm py-8"
-        role="status"
-      >
-        {t('series.noEpisodes', 'No episodes found')}
-      </p>
+      <EmptyState
+        icon={<Tv />}
+        message={t('series.noEpisodes', 'No episodes found')}
+      />
     )
   }
 
@@ -378,27 +369,19 @@ export default function EpisodeSwitcher({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        className={cn(
-          'flex items-center gap-2 min-w-0 max-w-full hover:opacity-80 transition-opacity',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md',
-          className,
-        )}
+      <TitleMenuTrigger
+        className={className}
         aria-label={t('player.selectEpisode', 'Select episode')}
       >
         <span className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
           {displayTitle}
         </span>
-        <ChevronDown
-          className="size-5 flex-shrink-0 text-muted-foreground"
-          aria-hidden
-        />
-      </DropdownMenuTrigger>
+      </TitleMenuTrigger>
 
       <DropdownMenuContent
         align="start"
         sideOffset={8}
-        className="w-72 max-h-[min(420px,70vh)] p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
+        className="w-72 p-0 overflow-hidden"
       >
         <SeasonSelector
           seasons={seasons}
@@ -407,17 +390,17 @@ export default function EpisodeSwitcher({
         />
 
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-wider">
+          <DropdownMenuLabel>
             {t('series.episodes', 'Episodes')}
             {episodes.length > 0 && (
-              <span className="ml-1.5 opacity-60">({episodes.length})</span>
+              <span className="opacity-60">({episodes.length})</span>
             )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
 
         <div
           ref={setEpisodeListElement}
-          className="overflow-y-auto max-h-[min(320px,50vh)] px-1.5 pb-1.5"
+          className="overflow-y-auto max-h-(--spacing-popup-max-height) px-1.5 pb-1.5"
           role="tabpanel"
         >
           <EpisodeListContent

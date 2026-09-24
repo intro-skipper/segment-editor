@@ -19,6 +19,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { IconDisc } from '@/components/ui/icon-disc'
 
 export default function SettingsDialog() {
   const { t } = useTranslation()
@@ -44,11 +45,11 @@ export default function SettingsDialog() {
 
   return (
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden">
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
         <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />
 
-        <div className="max-h-[min(480px,70vh)] overflow-y-auto px-3 pb-3">
+        <div className="max-h-(--spacing-popup-max-height) overflow-y-auto px-3 pb-3">
           {!pluginMode && <ServerConnectionSection />}
           <AppearanceSection />
           <LanguageSection />
@@ -78,12 +79,12 @@ export default function SettingsDialog() {
 function SettingsHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 px-5 pt-5 pb-3 pr-14">
-      <div className="size-10 rounded-xl bg-primary/15 flex items-center justify-center">
-        <Settings2 className="size-5 text-primary" aria-hidden />
-      </div>
+      <IconDisc tone="primary">
+        <Settings2 />
+      </IconDisc>
       <div className="min-w-0">
-        <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
-        <DialogDescription id="settings-description" className="text-xs">
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription id="settings-description">
           Configure your preferences
         </DialogDescription>
       </div>

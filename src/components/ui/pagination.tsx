@@ -27,7 +27,7 @@ function PaginationContent({
   return (
     <ul
       data-slot="pagination-content"
-      className={cn('gap-1 flex items-center', className)}
+      className={cn('gap-2 flex items-center', className)}
       {...props}
     />
   )
@@ -55,8 +55,8 @@ function getPaginationLinkClassName({
   size?: VariantProps<typeof buttonVariants>['size']
 }) {
   return cn(
-    'touch-manipulation min-h-11 min-w-11',
-    buttonVariants({ variant: isActive ? 'outline' : 'ghost', size }),
+    'min-h-11 min-w-11 aria-disabled:pointer-events-none aria-disabled:opacity-50',
+    buttonVariants({ variant: isActive ? 'default' : 'ghost', size }),
     className,
   )
 }
@@ -139,7 +139,7 @@ function PaginationPrevious({
     <PaginationLink
       aria-label="Go to previous page"
       size="default"
-      className={cn('pl-2!', className)}
+      className={className}
       {...props}
     >
       <ChevronLeftIcon data-icon="inline-start" />
@@ -156,7 +156,7 @@ function PaginationNext({
     <PaginationLink
       aria-label="Go to next page"
       size="default"
-      className={cn('pr-2!', className)}
+      className={className}
       {...props}
     >
       <span className="hidden sm:block">Next</span>

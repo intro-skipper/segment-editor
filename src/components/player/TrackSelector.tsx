@@ -2,12 +2,11 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
-import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 import { canEnableNativeAudioSwitchingViaBrowserFlag } from '@/services/video/capabilities'
-import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,7 +26,6 @@ interface TrackSelectorProps {
   /** Which audio switch targets restart the stream as a transcode */
   audioSwitchTranscodeScope?: AudioSwitchTranscodeScope
   disabled?: boolean
-  className?: string
   portalContainer?: React.RefObject<HTMLElement | null>
 }
 
@@ -72,13 +70,9 @@ function StrategyBadge({ strategy }: { strategy: PlaybackStrategy }) {
 
   return (
     <div className="px-3 py-2">
-      <output
-        className={cn(
-          'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium',
-          isDirect
-            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-            : 'bg-blue-500/10 text-blue-600 border border-blue-500/20',
-        )}
+      <Badge
+        variant={isDirect ? 'success' : 'info'}
+        render={<output />}
         aria-label={
           isDirect
             ? t(
@@ -91,13 +85,11 @@ function StrategyBadge({ strategy }: { strategy: PlaybackStrategy }) {
               )
         }
       >
-        <StrategyIcon className="size-3" aria-hidden="true" />
-        <span>
-          {isDirect
-            ? t('player.strategy.directLabel', 'Direct Play')
-            : t('player.strategy.hlsLabel', 'HLS Transcode')}
-        </span>
-      </output>
+        <StrategyIcon aria-hidden="true" />
+        {isDirect
+          ? t('player.strategy.directLabel', 'Direct Play')
+          : t('player.strategy.hlsLabel', 'HLS Transcode')}
+      </Badge>
     </div>
   )
 }
@@ -114,11 +106,8 @@ function TrackMenuItem({
   return (
     <DropdownMenuItem
       onClick={onSelect}
-      className={cn(
-        'flex items-center justify-between gap-2',
-        isActive && 'bg-accent',
-      )}
-      aria-selected={isActive}
+      className="justify-between"
+      aria-current={isActive || undefined}
     >
       <span className="truncate">{label}</span>
       {isActive && (
@@ -145,7 +134,7 @@ function AudioTrackGroup({
 
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel className="flex items-center gap-2">
+      <DropdownMenuLabel>
         <AudioLines className="size-4" aria-hidden="true" />
         {t('player.tracks.audio', 'Audio')}
       </DropdownMenuLabel>
@@ -199,7 +188,7 @@ function SubtitleTrackGroup({
 
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel className="flex items-center gap-2">
+      <DropdownMenuLabel>
         <Captions className="size-4" aria-hidden="true" />
         {t('player.tracks.subtitle', 'Subtitles')}
       </DropdownMenuLabel>
@@ -229,7 +218,6 @@ export const TrackSelector = function TrackSelectorComponent({
   strategy,
   audioSwitchTranscodeScope = 'none',
   disabled = false,
-  className,
   portalContainer,
 }: TrackSelectorProps) {
   const { t } = useTranslation()
@@ -257,26 +245,22 @@ export const TrackSelector = function TrackSelectorComponent({
       <DropdownMenuTrigger
         render={
           <Button
-            variant="outline"
+            variant="player"
+            size="icon-xl"
             aria-label={t(
               'player.tracks.selector',
               'Audio and subtitle tracks',
             )}
             disabled={disabled || !hasTracks}
-            className={cn(getButtonClass(false), className)}
           />
         }
       >
-        <AudioLines
-          className={ICON_CLASS}
-          strokeWidth={2.5}
-          aria-hidden="true"
-        />
+        <AudioLines strokeWidth={2.5} aria-hidden="true" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="start"
-        className="min-w-[240px] max-h-[400px] overflow-y-auto"
+        className="min-w-60 max-h-(--spacing-popup-max-height) overflow-y-auto"
         container={portalContainer}
         aria-describedby={menuDescriptionIds}
       >

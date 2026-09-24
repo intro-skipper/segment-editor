@@ -1,5 +1,5 @@
 /**
- * TanStack Query mutation hooks for segment CRUD operations.
+ * TanStack Query mutation hook for batch-saving segments.
  * Provides optimistic updates, rollback verification, and cache invalidation.
  */
 
@@ -122,6 +122,7 @@ export const useBatchSaveSegments = () => {
       if (saved === expected) showSuccess('All segments saved')
       else if (saved > 0)
         showError('Partial save', `${saved} of ${expected} segments saved`)
+      else showError('Save failed', 'No segments were saved')
     },
     onSettled: (_data, _error, { itemId }, ctx) => {
       if (!ctx?.rolledBack) {

@@ -14,7 +14,7 @@ export function SettingsSection({
   children,
 }: SettingsSectionProps) {
   return (
-    <div className="p-3 rounded-xl hover:bg-muted/40 transition-colors">
+    <div className="p-3 rounded-xl">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Icon className="size-4 text-muted-foreground" aria-hidden />

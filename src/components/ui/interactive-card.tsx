@@ -1,21 +1,42 @@
-import * as React from 'react'
+import { cva } from 'class-variance-authority'
+import type { VariantProps } from 'class-variance-authority'
+
 import { cn } from '@/lib/utils'
 
-interface InteractiveCardProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  onClick?: () => void
-  animationDelay?: string
-  animate?: boolean
-  'aria-label'?: string
-}
+const interactiveCardVariants = cva(
+  'group w-full cursor-pointer overflow-hidden rounded-2xl border border-border/50 bg-card text-left',
+  {
+    variants: {
+      variant: {
+        tile: 'hover:scale-102',
+        row: 'flex items-center gap-3 p-3 hover:border-border md:gap-4',
+      },
+    },
+    defaultVariants: {
+      variant: 'row',
+    },
+  },
+)
 
-export const InteractiveCard = function InteractiveCardComponent({
-  onClick,
-  animationDelay,
+type InteractiveCardProps = React.ComponentProps<'button'> &
+  VariantProps<typeof interactiveCardVariants> & {
+    animate?: boolean
+    /** Stagger offset for the entrance animation; only read when `animate` is set. */
+    animationDelay?: string
+    'data-grid-index'?: number
+  }
+
+/**
+ * Clickable card for media tiles and list rows. Owns the card chrome and hover
+ * feedback so callers only add layout. `tile` is for image-led grid cells,
+ * `row` for horizontal list entries.
+ */
+export function InteractiveCard({
+  variant,
   animate = false,
+  animationDelay,
   className,
   style,
-  children,
-  'aria-label': ariaLabel,
   ...props
 }: InteractiveCardProps) {
   // Applied before `style` so a caller-supplied delay still wins.
@@ -26,18 +47,13 @@ export const InteractiveCard = function InteractiveCardComponent({
     <button
       type="button"
       data-interactive-transition="true"
-      onClick={onClick}
-      aria-label={ariaLabel}
       className={cn(
-        'cursor-pointer transition-[transform,box-shadow,background-color,color] duration-200 text-left w-full',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        interactiveCardVariants({ variant }),
         animate && 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
         className,
       )}
       style={{ ...animationStyle, ...style }}
       {...props}
-    >
-      {children}
-    </button>
+    />
   )
 }

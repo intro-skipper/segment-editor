@@ -17,6 +17,7 @@ import { Film, Loader2, Mic2, Play, Search, Tv, X } from 'lucide-react'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useItems } from '@/services/items/queries'
 import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { cn } from '@/lib/utils'
@@ -134,9 +135,8 @@ function SearchResultItem({
       onClick={selectResult}
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
-        'transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isSelected
-          ? 'bg-primary/15 text-primary'
+          ? 'bg-primary/10 text-primary'
           : 'hover:bg-muted/80 text-foreground',
       )}
       onPointerEnter={() => onIntent(item)}
@@ -273,8 +273,8 @@ function CommandPaletteSearchField({
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md placeholder:text-muted-foreground',
-          search ? 'pr-24 sm:pr-32' : 'pr-16 sm:pr-24',
+          'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none placeholder:text-muted-foreground',
+          search ? 'pr-28 sm:pr-34' : 'pr-20 sm:pr-24',
         )}
         aria-haspopup="listbox"
         aria-label={t('search.placeholder', 'Search media…')}
@@ -285,9 +285,9 @@ function CommandPaletteSearchField({
       <Button
         type="button"
         variant={includeEpisodes ? 'secondary' : 'outline'}
-        size="sm"
+        size="xs"
         className={cn(
-          'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7 rounded-full px-1.5 sm:px-2 text-[10px] sm:text-[11px]',
+          'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7',
           search ? 'right-13 sm:right-14' : 'right-4 sm:right-5',
         )}
         onClick={onToggleEpisodes}
@@ -303,7 +303,7 @@ function CommandPaletteSearchField({
         <Button
           variant="ghost"
           size="icon-sm"
-          className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2 hover:bg-muted/80"
+          className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2"
           onClick={onClearSearch}
           aria-label={t('search.clear', 'Clear search')}
         >
@@ -396,22 +396,14 @@ function CommandPaletteResults({
           </div>
         </div>
       ) : (
-        <output
-          id="search-empty-status"
-          className="flex flex-col items-center justify-center py-12 text-muted-foreground"
-          aria-live="polite"
-        >
-          <Search
-            className="size-8 mb-3 opacity-40"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-          <p className="text-sm">
-            {showNoResults
+        <EmptyState
+          icon={<Search />}
+          message={
+            showNoResults
               ? t('search.no_results', 'No results found')
-              : t('search.start_typing', 'Start typing to search…')}
-          </p>
-        </output>
+              : t('search.start_typing', 'Start typing to search…')
+          }
+        />
       )}
     </div>
   )
@@ -599,7 +591,7 @@ export default function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-full sm:max-w-lg p-0 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden"
+        className="sm:max-w-lg p-0 overflow-hidden"
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >

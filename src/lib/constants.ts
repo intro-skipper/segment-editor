@@ -43,8 +43,6 @@ export const PLAYER_CONFIG = {
    * attempt triggers swapAudioCodec() first, per hls.js recovery guidance.
    */
   MEDIA_ERROR_SWAP_WINDOW_MS: 3000,
-  /** Color extraction timeout in milliseconds */
-  COLOR_EXTRACTION_TIMEOUT_MS: 5000,
   RESIZE_DEBOUNCE_MS,
   /**
    * Settle delay before measuring the video after a fullscreen transition,
@@ -53,8 +51,6 @@ export const PLAYER_CONFIG = {
    * measured after the layout stops moving.
    */
   FULLSCREEN_RESIZE_DELAY_MS: RESIZE_DEBOUNCE_MS + 50,
-  /** Video metadata wait timeout in milliseconds */
-  VIDEO_METADATA_TIMEOUT_MS: 15_000,
   /** Fullscreen controls auto-hide delay in milliseconds */
   CONTROLS_HIDE_DELAY_MS: 3000,
   /** Mouse move throttle interval in milliseconds */
@@ -78,8 +74,6 @@ export const DEFAULT_FRAME_STEP = 1 / DEFAULT_FRAME_RATE
 export const SUBTITLE_CONFIG = {
   /** JASSUB initialization timeout; first ASS load may fetch/compile worker/WASM/fonts. */
   JASSUB_READY_TIMEOUT_MS: 30_000,
-  /** ASS/SSA codec identifiers (case-insensitive) */
-  ASS_CODECS: ['ass', 'ssa'] as const,
   /** Supported font MIME types for embedded fonts */
   SUPPORTED_FONT_TYPES: [
     'application/vnd.ms-opentype',
@@ -171,16 +165,44 @@ export const VIEWPORT_BREAKPOINTS = {
 
 /**
  * Segment color configuration - single source of truth.
- * Maps segment types to their CSS variable and Tailwind class names.
+ * Maps segment types to their CSS variable and Tailwind background and
+ * readable-text class names.
  */
 export const SEGMENT_COLORS = {
-  Intro: { css: 'var(--segment-intro)', bg: 'bg-segment-intro' },
-  Outro: { css: 'var(--segment-outro)', bg: 'bg-segment-outro' },
-  Preview: { css: 'var(--segment-preview)', bg: 'bg-segment-preview' },
-  Recap: { css: 'var(--segment-recap)', bg: 'bg-segment-recap' },
-  Commercial: { css: 'var(--segment-commercial)', bg: 'bg-segment-commercial' },
-  Unknown: { css: 'var(--segment-unknown)', bg: 'bg-segment-unknown' },
-} as const satisfies Record<MediaSegmentType, { css: string; bg: string }>
+  Intro: {
+    css: 'var(--segment-intro)',
+    bg: 'bg-segment-intro',
+    fg: 'text-segment-intro-foreground',
+  },
+  Outro: {
+    css: 'var(--segment-outro)',
+    bg: 'bg-segment-outro',
+    fg: 'text-segment-outro-foreground',
+  },
+  Preview: {
+    css: 'var(--segment-preview)',
+    bg: 'bg-segment-preview',
+    fg: 'text-segment-preview-foreground',
+  },
+  Recap: {
+    css: 'var(--segment-recap)',
+    bg: 'bg-segment-recap',
+    fg: 'text-segment-recap-foreground',
+  },
+  Commercial: {
+    css: 'var(--segment-commercial)',
+    bg: 'bg-segment-commercial',
+    fg: 'text-segment-commercial-foreground',
+  },
+  Unknown: {
+    css: 'var(--segment-unknown)',
+    bg: 'bg-segment-unknown',
+    fg: 'text-segment-unknown-foreground',
+  },
+} as const satisfies Record<
+  MediaSegmentType,
+  { css: string; bg: string; fg: string }
+>
 
 /** Default segment color for unknown/undefined types */
 export const DEFAULT_SEGMENT_COLOR = SEGMENT_COLORS.Unknown

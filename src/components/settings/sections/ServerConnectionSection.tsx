@@ -59,7 +59,7 @@ export function ServerConnectionSection() {
           validConnection ? (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {validAuth ? (
-                <CheckCircle className="size-3.5 text-green-500" />
+                <CheckCircle className="size-3.5 text-success" />
               ) : (
                 <XCircle className="size-3.5 text-destructive" />
               )}
@@ -104,7 +104,7 @@ function ConnectedState({
 }: ConnectedStateProps) {
   return (
     <div className="space-y-3">
-      <div className="p-3 rounded-lg bg-muted/60">
+      <div className="p-3 rounded-xl bg-muted/60">
         <p className="text-sm font-medium truncate">{serverAddress}</p>
         {username && (
           <p className="text-xs text-muted-foreground mt-1">
@@ -113,19 +113,11 @@ function ConnectedState({
         )}
       </div>
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={onChangeServer}
-          className="flex-1 h-9 rounded-lg"
-        >
+        <Button variant="outline" onClick={onChangeServer} className="flex-1">
           <Server className="size-4" aria-hidden />
           Change Server
         </Button>
-        <Button
-          variant="outline"
-          onClick={onDisconnect}
-          className="h-9 rounded-lg text-destructive hover:text-destructive"
-        >
+        <Button variant="destructive" onClick={onDisconnect}>
           <LogOut className="size-4" aria-hidden />
           Disconnect
         </Button>
@@ -146,11 +138,7 @@ function DisconnectedState({ onConnect }: DisconnectedStateProps) {
       <p className="text-sm text-muted-foreground">
         {t('login.not_connected', 'Not connected to any server')}
       </p>
-      <Button
-        variant="default"
-        onClick={onConnect}
-        className="w-full h-9 rounded-lg"
-      >
+      <Button variant="default" onClick={onConnect} className="w-full">
         <Server className="size-4" aria-hidden />
         {t('login.connect', 'Connect to Server')}
       </Button>

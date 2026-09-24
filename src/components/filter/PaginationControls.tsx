@@ -8,7 +8,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import { cn } from '@/lib/utils'
 
 function buildMiddlePages(
   current: number,
@@ -56,7 +55,7 @@ export function PaginationControls({
   return (
     <div className="mt-10">
       <Pagination>
-        <PaginationContent className="gap-2">
+        <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
               onClick={
@@ -67,12 +66,7 @@ export function PaginationControls({
               aria-disabled={currentPage === 1}
               tabIndex={currentPage === 1 ? -1 : undefined}
               aria-label={t('accessibility.pagination.previous')}
-              className={cn(
-                'rounded-full',
-                currentPage === 1
-                  ? 'pointer-events-none opacity-50'
-                  : 'cursor-pointer',
-              )}
+              className={currentPage === 1 ? undefined : 'cursor-pointer'}
             />
           </PaginationItem>
 
@@ -96,12 +90,9 @@ export function PaginationControls({
                     page: pageNum,
                   })}
                   aria-current={currentPage === pageNum ? 'page' : undefined}
-                  className={cn(
-                    'rounded-full',
-                    currentPage !== pageNum && 'cursor-pointer',
-                    currentPage === pageNum &&
-                      'bg-primary text-primary-foreground',
-                  )}
+                  className={
+                    currentPage === pageNum ? undefined : 'cursor-pointer'
+                  }
                 >
                   {pageNum}
                 </PaginationLink>
@@ -119,12 +110,9 @@ export function PaginationControls({
               aria-disabled={currentPage === totalPages}
               tabIndex={currentPage === totalPages ? -1 : undefined}
               aria-label={t('accessibility.pagination.next')}
-              className={cn(
-                'rounded-full',
-                currentPage === totalPages
-                  ? 'pointer-events-none opacity-50'
-                  : 'cursor-pointer',
-              )}
+              className={
+                currentPage === totalPages ? undefined : 'cursor-pointer'
+              }
             />
           </PaginationItem>
         </PaginationContent>

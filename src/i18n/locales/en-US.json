@@ -38,12 +38,12 @@
       "play": "Play: {{name}}"
     },
     "player": {
-      "videoProgress": "Video progress: {{current}} of {{total}}",
+      "progressLabel": "Video progress",
+      "videoProgress": "{{current}} of {{total}}",
       "volumeLevel": "Volume: {{level}}%",
       "muted": "Audio muted",
       "unmuted": "Audio unmuted",
       "playing": "Video playing",
-      "paused": "Pause video",
       "buffering": "Video buffering",
       "controls": "Video player controls"
     },

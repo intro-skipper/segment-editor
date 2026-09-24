@@ -10,6 +10,7 @@ import { CheckCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import type { RecommendedServerInfo } from '@/types/jellyfin'
+import { IconDisc } from '@/components/ui/icon-disc'
 
 interface SuccessStepProps {
   selectedServer: RecommendedServerInfo | null
@@ -21,9 +22,9 @@ export function SuccessStep({ selectedServer, onComplete }: SuccessStepProps) {
     <div className="space-y-6">
       {/* Inline header with success icon */}
       <div className="text-center">
-        <div className="size-12 rounded-xl bg-green-500/15 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="size-6 text-green-500" aria-hidden />
-        </div>
+        <IconDisc tone="success" className="mx-auto mb-4">
+          <CheckCircle />
+        </IconDisc>
         <h2 className="text-lg font-semibold mb-1">Connected!</h2>
         <p className="text-sm text-muted-foreground">
           Successfully connected to your Jellyfin server
@@ -31,7 +32,7 @@ export function SuccessStep({ selectedServer, onComplete }: SuccessStepProps) {
       </div>
 
       {selectedServer && (
-        <div className="p-4 rounded-xl bg-muted/60 text-left">
+        <div className="p-3 rounded-xl bg-muted/60 text-left">
           <p className="font-medium">
             {selectedServer.systemInfo?.ServerName ?? 'Jellyfin Server'}
           </p>

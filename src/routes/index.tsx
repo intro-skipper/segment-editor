@@ -24,14 +24,11 @@ const indexSearchSchema = z.object({
   search: z.string().optional().catch(undefined),
 })
 
-/**
- * Loading skeleton for the index page.
- * Uses consistent height variables and ARIA attributes.
- */
+/** Loading skeleton for the index page. */
 function IndexSkeleton() {
   return (
-    <main
-      className="min-h-[var(--spacing-page-min-height-md)] px-4 pb-8 sm:px-6"
+    <div
+      className="flex-1 px-4 pb-8 sm:px-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -40,7 +37,7 @@ function IndexSkeleton() {
       <div className="max-w-7xl mx-auto">
         <MediaGridSkeleton count={12} />
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -55,16 +52,10 @@ export const Route = createFileRoute('/')({
 
 function IndexPage() {
   return (
-    <main className="min-h-[var(--spacing-page-min-height-md)]">
-      <FeatureErrorBoundary
-        featureName="Media Browser"
-        minHeightClass="min-h-[var(--spacing-page-min-height-md)]"
-        showNavigation={false}
-      >
-        <Suspense fallback={<IndexSkeleton />}>
-          <FilterView />
-        </Suspense>
-      </FeatureErrorBoundary>
-    </main>
+    <FeatureErrorBoundary featureName="Media Browser" showNavigation={false}>
+      <Suspense fallback={<IndexSkeleton />}>
+        <FilterView />
+      </Suspense>
+    </FeatureErrorBoundary>
   )
 }

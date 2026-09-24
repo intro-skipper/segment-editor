@@ -1,12 +1,10 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, Music, Play } from 'lucide-react'
+import { Music, Play } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { Button } from '@/components/ui/button'
 import { ItemImage } from '@/components/media/ItemImage'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { cn } from '@/lib/utils'
 import { formatReadableTime, ticksToSeconds } from '@/lib/time-utils'
 
 interface AlbumViewProps {
@@ -39,10 +37,6 @@ const TrackRow = function TrackRowComponent({
   return (
     <InteractiveCard
       onClick={handleSelectTrack}
-      className={cn(
-        'flex items-center gap-4 p-3 rounded-lg',
-        'hover:bg-accent/50 group',
-      )}
       aria-label={`Play track ${trackNumber}: ${track.Name || `Track ${trackNumber}`}, duration ${duration}`}
     >
       <div
@@ -74,9 +68,6 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
   const albumName = album.Name || 'Unknown Album'
   const artistName = album.AlbumArtist || album.Artists?.[0] || 'Unknown Artist'
-
-  const handleBack = () => void navigate({ to: '/' })
-
   const handleTrackClick = (trackId: string) => {
     void navigate({
       to: '/player/$itemId',
@@ -87,20 +78,8 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleBack}
-          className="rounded-full"
-        >
-          <ChevronLeft className="size-5" />
-          <span className="sr-only">Go back</span>
-        </Button>
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-        <div className="flex-shrink-0 w-[var(--spacing-thumbnail-sm)] h-[var(--spacing-thumbnail-sm)] sm:w-[var(--spacing-thumbnail-md)] sm:h-[var(--spacing-thumbnail-md)] bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
+        <div className="flex-shrink-0 w-(--spacing-thumbnail-sm) h-(--spacing-thumbnail-sm) sm:w-(--spacing-thumbnail-md) sm:h-(--spacing-thumbnail-md) bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
           <ItemImage
             item={album}
             maxWidth={200}
@@ -110,12 +89,12 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
         </div>
 
         <div className="flex flex-col justify-end text-center sm:text-left">
-          <p className="text-sm text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Album
           </p>
-          <h1 className="text-xl sm:text-2xl font-semibold mt-1 text-balance">
+          <h2 className="text-xl sm:text-2xl font-semibold mt-1 text-balance">
             {albumName}
-          </h1>
+          </h2>
           <p className="text-muted-foreground mt-2">{artistName}</p>
           {album.ProductionYear && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -126,14 +105,10 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
       </div>
 
       {tracks.length === 0 ? (
-        <EmptyState
-          icon={<Music className="size-8" aria-hidden="true" />}
-          message="No tracks found for this album"
-          className="py-8"
-        />
+        <EmptyState icon={<Music />} message="No tracks found for this album" />
       ) : (
         <ul
-          className="space-y-1"
+          className="space-y-2 md:space-y-3"
           aria-label={`${tracks.length} tracks in ${albumName}`}
         >
           {tracks.map((track, index) => (

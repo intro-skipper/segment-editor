@@ -12,7 +12,13 @@ import type { ChapterInfo } from '@/types/jellyfin'
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { changeLanguage: vi.fn(), language: 'en-US' },
-    t: (_key: string, fallback?: string) => fallback ?? _key,
+    t: (key: string, options?: string | Record<string, string>) => {
+      if (typeof options === 'string') return options
+      const template = options?.defaultValue ?? key
+      return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
+        String(options?.[name] ?? ''),
+      )
+    },
   }),
 }))
 

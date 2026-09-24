@@ -102,7 +102,7 @@ export function ConnectionWizardContent({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-md p-6 bg-popover/95 backdrop-blur-xl border-border/50 shadow-2xl"
+        className="sm:max-w-md"
         initialFocus={serverAddressInputRef}
       >
         {controller.step !== 'success' && <DialogCloseButton />}

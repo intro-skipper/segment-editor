@@ -17,13 +17,11 @@ import {
 
 import { TrackSelector } from './TrackSelector'
 import { PlayerSettingsMenu } from './PlayerSettingsMenu'
-import { ICON_CLASS, getButtonClass } from './player-ui-constants'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { TrackState } from '@/services/video/tracks'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -100,36 +98,24 @@ function VolumeControl({
       <DropdownMenuTrigger
         render={
           <Button
-            variant="outline"
+            variant="player"
+            size="icon-xl"
             aria-label={
               isSilent
                 ? t('accessibility.player.muted', 'Volume muted')
                 : t('player.volume', 'Volume')
             }
-            className={getButtonClass(false)}
           />
         }
       >
         {isSilent ? (
-          <VolumeX
-            className={ICON_CLASS}
-            strokeWidth={2.5}
-            aria-hidden="true"
-          />
+          <VolumeX strokeWidth={2.5} aria-hidden="true" />
         ) : (
-          <Volume2
-            className={ICON_CLASS}
-            strokeWidth={2.5}
-            aria-hidden="true"
-          />
+          <Volume2 strokeWidth={2.5} aria-hidden="true" />
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="p-4"
-        container={portalContainer}
-      >
-        <div className="flex flex-col gap-2 items-center">
+      <DropdownMenuContent align="start" container={portalContainer}>
+        <div className="p-3 flex flex-col gap-2 items-center">
           <input
             type="range"
             min="0"
@@ -142,13 +128,12 @@ function VolumeControl({
             aria-valuemax={1}
             aria-valuenow={sliderVolume}
             aria-valuetext={`${Math.round(sliderVolume * 100)}%`}
-            className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer [writing-mode:vertical-lr] [direction:rtl]"
+            className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer slider-vertical"
           />
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
             onClick={volumeControls.onToggleMute}
-            className="text-xs"
           >
             {isMuted ? t('player.unmute') : t('player.mute')}
           </Button>
@@ -182,33 +167,16 @@ export function PlayerControls({
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Play/Pause */}
         <Button
-          variant="outline"
+          variant="player"
+          size="icon-xl"
           onClick={playback.onToggle}
-          aria-label={
-            isPlaying
-              ? t('accessibility.player.paused', 'Pause video')
-              : t('accessibility.playPause', 'Play video')
-          }
+          aria-label={t('accessibility.playPause', 'Play or pause video')}
           aria-pressed={isPlaying}
-          className={cn(
-            getButtonClass(isPlaying),
-            !isPlaying && 'rounded-full',
-          )}
         >
           {isPlaying ? (
-            <Pause
-              className={ICON_CLASS}
-              fill="currentColor"
-              strokeWidth={0}
-              aria-hidden="true"
-            />
+            <Pause fill="currentColor" strokeWidth={0} aria-hidden="true" />
           ) : (
-            <Play
-              className={ICON_CLASS}
-              fill="currentColor"
-              strokeWidth={0}
-              aria-hidden="true"
-            />
+            <Play fill="currentColor" strokeWidth={0} aria-hidden="true" />
           )}
         </Button>
 
@@ -238,13 +206,13 @@ export function PlayerControls({
           container={portalContainer}
           render={
             <Button
-              variant="outline"
+              variant="player"
+              size="icon-xl"
               aria-label={t('editor.newSegment')}
-              className={getButtonClass(false)}
             />
           }
         >
-          <Plus className={ICON_CLASS} strokeWidth={3} aria-hidden="true" />
+          <Plus strokeWidth={3} aria-hidden="true" />
         </SegmentTypeMenu>
       </div>
 
@@ -253,39 +221,31 @@ export function PlayerControls({
       {/* Minimize button */}
       {display.onMinimize && !isFullscreen && (
         <Button
-          variant="outline"
+          variant="player"
+          size="icon-xl"
           onClick={display.onMinimize}
           aria-label={t('player.minimize', 'Minimize player')}
-          className={getButtonClass(false)}
         >
-          <EyeOff className={ICON_CLASS} strokeWidth={2.5} aria-hidden="true" />
+          <EyeOff strokeWidth={2.5} aria-hidden="true" />
         </Button>
       )}
 
       {/* Fullscreen button */}
       {display.onToggleFullscreen && (
         <Button
-          variant="outline"
+          variant="player"
+          size="icon-xl"
           onClick={display.onToggleFullscreen}
           aria-label={
             isFullscreen
               ? t('player.exitFullscreen', 'Exit fullscreen')
               : t('player.fullscreen', 'Fullscreen')
           }
-          className={getButtonClass(false)}
         >
           {isFullscreen ? (
-            <Minimize
-              className={ICON_CLASS}
-              strokeWidth={2.5}
-              aria-hidden="true"
-            />
+            <Minimize strokeWidth={2.5} aria-hidden="true" />
           ) : (
-            <Maximize
-              className={ICON_CLASS}
-              strokeWidth={2.5}
-              aria-hidden="true"
-            />
+            <Maximize strokeWidth={2.5} aria-hidden="true" />
           )}
         </Button>
       )}

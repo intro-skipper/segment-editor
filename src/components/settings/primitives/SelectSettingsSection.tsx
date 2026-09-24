@@ -27,8 +27,6 @@ interface SelectSettingsSectionProps<T extends string = string> {
   onValueChange: (value: T) => void
   /** Available options */
   options: Array<SelectOption<T>>
-  /** Optional badge to display in header */
-  badge?: React.ReactNode
 }
 
 /**
@@ -42,13 +40,12 @@ export function SelectSettingsSection<T extends string = string>({
   value,
   onValueChange,
   options,
-  badge,
 }: SelectSettingsSectionProps<T>) {
   const { t } = useTranslation()
   const title = t(titleKey, { defaultValue: defaultTitle ?? titleKey })
 
   return (
-    <SettingsSection icon={icon} title={title} badge={badge}>
+    <SettingsSection icon={icon} title={title}>
       <SettingsSelect
         value={value}
         onValueChange={onValueChange}

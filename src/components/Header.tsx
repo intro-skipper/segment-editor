@@ -10,7 +10,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronLeft, Home, Search, Settings } from 'lucide-react'
+import { ChevronLeft, Home, Search, Settings } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -18,8 +18,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { TitleMenuTrigger } from '@/components/header/TitleMenuTrigger'
 import { useSessionStore } from '@/stores/session-store'
 import { useCollections, useItem } from '@/services/items/queries'
 import { getBestImageUrl } from '@/services/video/api'
@@ -68,27 +68,23 @@ function CollectionSelector({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        className="flex items-center gap-3 hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      <TitleMenuTrigger
         aria-label={t('items.filter.selectCollection', 'Select collection')}
       >
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
           {currentName ?? t('items.filter.collection', 'All Libraries')}
         </h1>
-        <ChevronDown className="size-5 text-muted-foreground" aria-hidden />
-      </DropdownMenuTrigger>
+      </TitleMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="min-w-[var(--spacing-dropdown-min)]"
+        className="min-w-(--spacing-dropdown-min)"
       >
         {collections.map((c) => (
           <DropdownMenuItem
             key={c.ItemId ?? c.Name}
             onClick={() => onSelect(c.ItemId ?? null)}
-            className={cn(
-              'cursor-pointer',
-              selectedId === c.ItemId && 'bg-primary/10 text-primary',
-            )}
+            className="cursor-pointer"
+            aria-current={selectedId === c.ItemId || undefined}
           >
             {c.Name}
           </DropdownMenuItem>
@@ -97,12 +93,6 @@ function CollectionSelector({
     </DropdownMenu>
   )
 }
-
-const iconButtonClass = cn(
-  'size-11 rounded-full',
-  'transition-colors duration-150',
-  'focus-visible:ring-2 focus-visible:ring-ring',
-)
 
 /** Pre-computed platform-aware shortcut display for search button title */
 const MOD_K_DISPLAY = formatForDisplay('Mod+K')
@@ -155,14 +145,10 @@ function DetailHeaderContent({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="subtle"
         size="icon"
         onClick={onBack}
-        className={cn(
-          iconButtonClass,
-          'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
-          'active:scale-95',
-        )}
+        className="size-11"
         aria-label={t('navigation.back', 'Go back')}
       >
         <ChevronLeft className="size-5" aria-hidden />
@@ -172,7 +158,7 @@ function DetailHeaderContent({
           <h1 className="sr-only">{pageTitle}</h1>
           <Suspense
             fallback={
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+              <span className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
                 {pageTitle}
               </span>
             }
@@ -199,21 +185,17 @@ function HeaderActions({
   onOpenSettings,
 }: HeaderActionsProps) {
   const { t } = useTranslation()
-  const actionButtonClassName = cn(
-    iconButtonClass,
-    'bg-secondary/60 text-secondary-foreground hover:bg-secondary',
-  )
 
   return (
     <div className="flex items-center gap-2 shrink-0">
       {selectedCollection && (
         <Button
-          variant="ghost"
+          variant="subtle"
           size="icon"
           onClick={onOpenSearch}
           onPointerEnter={preloadCommandPalette}
           onFocus={preloadCommandPalette}
-          className={actionButtonClassName}
+          className="size-11"
           aria-label={t('search.open', 'Open search')}
           title={`${t('search.open', 'Open search')} (${MOD_K_DISPLAY})`}
         >
@@ -226,10 +208,10 @@ function HeaderActions({
           search={
             selectedCollection ? { collection: selectedCollection } : undefined
           }
+          data-interactive-transition="true"
           className={cn(
-            'touch-manipulation',
-            buttonVariants({ variant: 'ghost', size: 'icon' }),
-            actionButtonClassName,
+            buttonVariants({ variant: 'subtle', size: 'icon' }),
+            'size-11',
           )}
           aria-label={t('navigation.home', 'Go to library')}
         >
@@ -237,12 +219,12 @@ function HeaderActions({
         </Link>
       )}
       <Button
-        variant="ghost"
+        variant="subtle"
         size="icon"
         onClick={onOpenSettings}
         onPointerEnter={preloadSettingsDialog}
         onFocus={preloadSettingsDialog}
-        className={actionButtonClassName}
+        className="size-11"
         aria-label={t('settings.open', 'Open settings')}
       >
         <Settings className="size-5" aria-hidden />
@@ -342,7 +324,7 @@ export default function Header() {
       <header className="sticky top-0 z-40">
         <DynamicThemeScope
           seedColor={seedColor}
-          className="bg-background/80 backdrop-blur-xl border-b border-border/40"
+          className="border-b border-border/40"
         >
           <nav
             className="px-4 py-4 sm:px-6"

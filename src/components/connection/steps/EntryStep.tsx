@@ -15,6 +15,7 @@ import { getFirstValidationMessage } from '@/lib/forms/form-error-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { IconDisc } from '@/components/ui/icon-disc'
 
 type ConnectionWizardFormApi = ReturnType<
   typeof useConnectionWizardController
@@ -57,9 +58,9 @@ export function EntryStep({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <div className="size-12 rounded-xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
-                <Server className="size-6 text-primary" aria-hidden />
-              </div>
+              <IconDisc tone="primary" className="mx-auto mb-4">
+                <Server />
+              </IconDisc>
               <h2 className="text-lg font-semibold mb-1">
                 Connect to Jellyfin
               </h2>

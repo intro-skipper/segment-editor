@@ -122,7 +122,7 @@ export function VirtualizedMediaGrid({
       aria-label={t('items.mediaGrid', {
         defaultValue: 'Media items',
       })}
-      className="max-h-[72vh] overflow-auto overscroll-contain pr-1"
+      className="max-h-(--spacing-media-grid-max-height) overflow-auto overscroll-contain pr-1"
     >
       <div
         style={{

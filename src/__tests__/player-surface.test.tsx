@@ -70,7 +70,6 @@ const skipSegment: MediaSegmentDto = {
 type SurfaceProps = ComponentProps<typeof PlayerSurface>
 
 interface SurfacePropOverrides {
-  className?: SurfaceProps['className']
   containerRef?: SurfaceProps['containerRef']
   videoRef?: SurfaceProps['videoRef']
   fullscreen?: Partial<SurfaceProps['fullscreen']>
@@ -83,7 +82,6 @@ interface SurfacePropOverrides {
 
 function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
   return {
-    className: overrides.className,
     containerRef: overrides.containerRef ?? createRef<HTMLDivElement>(),
     videoRef: overrides.videoRef ?? createRef<HTMLVideoElement>(),
     fullscreen: {

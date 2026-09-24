@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useEffectEvent, useState } from 'react'
 import { Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router'
 
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Home } from 'lucide-react'
+import { ArrowLeft, Home, SearchX } from 'lucide-react'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { toast } from 'sonner'
 
@@ -11,13 +11,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Toaster } from '../components/ui/sonner'
 import { Button } from '../components/ui/button'
 import { buttonVariants } from '../components/ui/button-variants'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../components/ui/card'
+import { ErrorCard } from '../components/ui/error-card'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
 import { registerPwaUpdates } from '../lib/pwa'
@@ -54,7 +48,7 @@ function HeaderFallback() {
   }
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80">
+    <header className="sticky top-0 z-40 bg-background">
       <nav className="px-4 py-4 sm:px-6">
         <div className="flex items-center justify-between gap-4">
           <Link to="/" className="text-xl font-bold">
@@ -78,25 +72,16 @@ export function NotFoundComponent() {
   }
 
   return (
-    <div className="flex min-h-[var(--spacing-page-min-height-sm)] items-center justify-center p-4">
-      <Card className="w-full max-w-md text-center">
-        <CardHeader className="space-y-4">
-          <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-muted">
-            <span className="text-4xl font-bold text-muted-foreground">
-              404
-            </span>
-          </div>
-          <CardTitle className="text-2xl">
-            {t('error.not_found', 'Page Not Found')}
-          </CardTitle>
-          <CardDescription>
-            {t(
-              'error.not_found_description',
-              "The page you're looking for doesn't exist or has been moved.",
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+    <ErrorCard
+      icon={<SearchX />}
+      tone="muted"
+      title={t('error.not_found', 'Page Not Found')}
+      description={t(
+        'error.not_found_description',
+        "The page you're looking for doesn't exist or has been moved.",
+      )}
+      actions={
+        <>
           <Button variant="outline" onClick={handleGoBack}>
             <ArrowLeft className="size-4" />
             {t('common.go_back', 'Go Back')}
@@ -105,9 +90,9 @@ export function NotFoundComponent() {
             <Home className="size-4" />
             {t('common.home', 'Home')}
           </Link>
-        </CardContent>
-      </Card>
-    </div>
+        </>
+      }
+    />
   )
 }
 
@@ -174,11 +159,11 @@ export function RootComponent() {
 
   return (
     <HotkeysProvider>
-      <div className="min-h-screen">
+      <div className="flex min-h-dvh flex-col">
         {showSkipToMain ? (
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl"
           >
             {t('accessibility.skipToMain', 'Skip to main content')}
           </a>
@@ -190,7 +175,7 @@ export function RootComponent() {
           id="main-content"
           aria-label={t('accessibility.mainContent', 'Main content')}
           tabIndex={-1}
-          className="pb-safe outline-none"
+          className="flex flex-1 flex-col pb-safe outline-none"
         >
           <ErrorBoundary componentName="MainContent">
             <Outlet />

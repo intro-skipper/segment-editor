@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Play } from 'lucide-react'
+import { AlertCircle, Play, RefreshCw, Tv } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { NO_ITEMS, useEpisodes } from '@/services/items/queries'
@@ -8,10 +8,10 @@ import { NO_SEGMENTS, useSegments } from '@/services/segments/queries'
 import { useInView } from '@/hooks/use-in-view'
 import { ItemImage } from '@/components/media/ItemImage'
 import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
+import { Button } from '@/components/ui/button'
 import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ErrorState } from '@/components/ui/error-state'
 import { cn } from '@/lib/utils'
 import { isSpecialSeason } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
@@ -47,7 +47,7 @@ const SeasonTabs = function SeasonTabsComponent({
 
   return (
     <div
-      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 scrollbar-hide relative z-10"
+      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 no-scrollbar relative z-10"
       role="tablist"
       aria-label="Seasons"
     >
@@ -56,24 +56,18 @@ const SeasonTabs = function SeasonTabsComponent({
         const label = season.Name ?? `Season ${season.IndexNumber ?? index + 1}`
 
         return (
-          <button
+          <Button
             type="button"
             key={season.Id}
+            size="lg"
+            variant={isSelected ? 'default' : 'secondary'}
             role="tab"
             aria-selected={isSelected}
             aria-controls={`season-panel-${season.Id}`}
             onClick={() => season.Id && onSeasonSelect(season.Id)}
-            className={cn(
-              'flex-shrink-0 px-4 py-3 md:px-6 md:py-4 rounded-full text-base md:text-lg font-semibold whitespace-nowrap',
-              'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out border-2 border-transparent',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              isSelected
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
-            )}
           >
             {label}
-          </button>
+          </Button>
         )
       })}
     </div>
@@ -156,13 +150,9 @@ const EpisodeCard = function EpisodeCardComponent({
       onClick={selectEpisode}
       animate
       animationDelay={animationDelay}
-      className={cn(
-        'group flex items-center gap-4 p-3 md:p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50',
-        'hover:shadow-lg hover:shadow-black/10',
-      )}
       aria-label={ariaLabel}
     >
-      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-muted shadow-md">
+      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-lg overflow-hidden bg-muted shadow-md">
         <ItemImage
           item={episode}
           maxWidth={192}
@@ -233,16 +223,22 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
 
   if (error) {
     return (
-      <ErrorState
+      <EmptyState
+        tone="destructive"
+        icon={<AlertCircle />}
         message={t('series.episodeLoadError')}
-        onRetry={() => refetch()}
-        retryText={t('common.retry')}
+        action={
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw aria-hidden="true" />
+            {t('common.retry')}
+          </Button>
+        }
       />
     )
   }
 
   if (episodes.length === 0) {
-    return <EmptyState message={t('series.noEpisodes')} />
+    return <EmptyState icon={<Tv />} message={t('series.noEpisodes')} />
   }
 
   return (
@@ -301,10 +297,7 @@ export function SeriesView({
   if (seasons.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4">
-        <EmptyState
-          icon={<AlertCircle className="size-14" />}
-          message={t('series.noSeasons')}
-        />
+        <EmptyState icon={<Tv />} message={t('series.noSeasons')} />
       </div>
     )
   }

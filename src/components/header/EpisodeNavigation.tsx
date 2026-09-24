@@ -35,7 +35,7 @@ function NextEpisodeArrow({
 
   return (
     <Button
-      variant="ghost"
+      variant="subtle"
       size="icon"
       disabled={!targetId}
       onClick={() => {
@@ -43,11 +43,7 @@ function NextEpisodeArrow({
       }}
       onPointerEnter={intent}
       onFocus={intent}
-      className={cn(
-        'size-11 rounded-full transition-colors duration-150',
-        'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
-        'focus-visible:ring-2 focus-visible:ring-ring active:scale-95',
-      )}
+      className="size-11"
       aria-label={targetLabel ? `${label}: ${targetLabel}` : label}
       title={`${targetLabel ?? label} (${NEXT_HOTKEY_DISPLAY})`}
     >

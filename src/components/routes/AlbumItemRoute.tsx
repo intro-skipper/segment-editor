@@ -6,7 +6,6 @@ import { albumQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
-import { staggerDelay } from '@/lib/animation-utils'
 
 const routeApi = getRouteApi('/album/$itemId')
 
@@ -18,8 +17,8 @@ const AlbumView = lazy(() =>
 
 export function AlbumSkeleton() {
   return (
-    <main
-      className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto"
+    <div
+      className="flex-1 px-4 py-6 sm:px-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -37,17 +36,13 @@ export function AlbumSkeleton() {
             <Skeleton className="h-4 w-32" />
           </div>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 md:space-y-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton
-              key={i}
-              className="h-12 w-full rounded-lg animate-in fade-in animation-duration-300"
-              style={{ animationDelay: staggerDelay(i) }}
-            />
+            <Skeleton key={i} className="h-12 w-full rounded-2xl" />
           ))}
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -58,24 +53,16 @@ export function AlbumPage() {
   const { data: tracks } = useSuspenseQuery(albumQueryOptions.tracks(itemId))
 
   if (!album) {
-    return (
-      <RouteErrorFallback
-        message="Album not found"
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-      />
-    )
+    return <RouteErrorFallback message="Album not found" />
   }
 
   return (
-    <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto">
-      <FeatureErrorBoundary
-        featureName="Album"
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-      >
+    <div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
+      <FeatureErrorBoundary featureName="Album">
         <Suspense fallback={<AlbumSkeleton />}>
           <AlbumView album={album} tracks={tracks} />
         </Suspense>
       </FeatureErrorBoundary>
-    </main>
+    </div>
   )
 }

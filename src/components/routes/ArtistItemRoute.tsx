@@ -18,8 +18,8 @@ const ArtistView = lazy(() =>
 
 export function ArtistSkeleton() {
   return (
-    <main
-      className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto"
+    <div
+      className="flex-1 px-4 py-6 sm:px-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -37,13 +37,13 @@ export function ArtistSkeleton() {
               className="space-y-2 animate-in fade-in animation-duration-300"
               style={{ animationDelay: staggerDelay(i) }}
             >
-              <Skeleton className="aspect-square w-full rounded-lg" />
+              <Skeleton className="aspect-square w-full rounded-2xl" />
               <Skeleton className="h-4 w-3/4" />
             </div>
           ))}
         </div>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -54,24 +54,16 @@ export function ArtistPage() {
   const { data: albums } = useSuspenseQuery(artistQueryOptions.albums(itemId))
 
   if (!artist) {
-    return (
-      <RouteErrorFallback
-        message="Artist not found"
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-      />
-    )
+    return <RouteErrorFallback message="Artist not found" />
   }
 
   return (
-    <main className="min-h-[var(--spacing-page-min-height-header)] px-4 py-6 sm:px-6 overflow-auto">
-      <FeatureErrorBoundary
-        featureName="Artist"
-        minHeightClass="min-h-[var(--spacing-page-min-height-header)]"
-      >
+    <div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
+      <FeatureErrorBoundary featureName="Artist">
         <Suspense fallback={<ArtistSkeleton />}>
           <ArtistView artist={artist} albums={albums} />
         </Suspense>
       </FeatureErrorBoundary>
-    </main>
+    </div>
   )
 }

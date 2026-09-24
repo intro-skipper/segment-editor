@@ -20,7 +20,6 @@ interface ApiActions {
   setApiKey: (key: string | undefined) => void
   setServerVersion: (version: string) => void
   setConnectionStatus: (valid: boolean, auth: boolean) => void
-  resetConnection: () => void
   setAuthMethod: (method: AuthMethod) => void
   setUserInfo: (userId: string, username: string) => void
   clearAuth: () => void
@@ -65,8 +64,6 @@ export const useApiStore = create<ApiStore>()(
       setServerVersion: (serverVersion) => set({ serverVersion }),
       setConnectionStatus: (validConnection, validAuth) =>
         set({ validConnection, validAuth }),
-      resetConnection: () =>
-        set({ validConnection: false, validAuth: false, serverVersion: '' }),
       setAuthMethod: (authMethod) => set({ authMethod }),
       setUserInfo: (userId, username) => set({ userId, username }),
       clearAuth: () =>

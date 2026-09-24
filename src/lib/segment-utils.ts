@@ -136,6 +136,14 @@ export const getSegmentColor = (type: MediaSegmentType | undefined): string =>
 export const getSegmentCssVar = (type: MediaSegmentType | undefined): string =>
   getSegmentColorConfig(type).css
 
+/** Classes for a pill in the segment's color, with text that stays readable on it. */
+export const getSegmentChipClass = (
+  type: MediaSegmentType | undefined,
+): string => {
+  const { bg, fg } = getSegmentColorConfig(type)
+  return `inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-medium shadow-sm ${bg} ${fg}`
+}
+
 /**
  * A segment mapped to percent-based track coordinates for timeline rendering.
  * Shared by the player scrubber and the read-only episode-list timeline.

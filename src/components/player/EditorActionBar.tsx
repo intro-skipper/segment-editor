@@ -25,7 +25,7 @@ export function EditorActionBar({
   const { t } = useTranslation()
 
   return (
-    <div className="sticky bottom-0 z-20 bg-background/85 backdrop-blur-md border-t border-border/40 pb-safe">
+    <div className="sticky bottom-0 z-20 bg-background border-t border-border/40 pb-safe">
       <div
         className="flex items-center justify-between gap-3 py-3"
         role="toolbar"
@@ -39,7 +39,7 @@ export function EditorActionBar({
           {isDirty ? (
             <>
               <span
-                className="size-2 rounded-full bg-amber-500 shrink-0"
+                className="size-2 rounded-full bg-warning shrink-0"
                 aria-hidden="true"
               />
               <span className="truncate">

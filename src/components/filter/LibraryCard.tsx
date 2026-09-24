@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react'
 import type { VirtualFolderInfo } from '@/types/jellyfin'
 import { getServerBaseUrl } from '@/services/jellyfin'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
+import { InteractiveCard } from '@/components/ui/interactive-card'
 import { cn } from '@/lib/utils'
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
 
@@ -72,21 +73,13 @@ export const LibraryCard = function LibraryCardComponent({
   const animationDelay = staggerDelay(index, STAGGER_FAST)
 
   return (
-    <button
-      type="button"
-      data-interactive-transition="true"
+    <InteractiveCard
+      variant="tile"
       onClick={selectLibrary}
       aria-label={accessibleLabel}
-      className={cn(
-        'group cursor-pointer rounded-2xl overflow-hidden w-full text-left',
-        'bg-card border border-border/50',
-        'transition-[transform,box-shadow,border-color] duration-200',
-        'hover:scale-[1.02] active:scale-[0.98]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        'animate-in fade-in slide-in-from-bottom-3 animation-duration-400 fill-mode-both',
-        className,
-      )}
-      style={{ animationDelay }}
+      animate
+      animationDelay={animationDelay}
+      className={className}
     >
       {/* Library Image - 16:9 aspect ratio */}
       <div className="relative aspect-video bg-muted overflow-hidden">
@@ -128,6 +121,6 @@ export const LibraryCard = function LibraryCardComponent({
           {collection.Name || 'Unknown'}
         </p>
       </div>
-    </button>
+    </InteractiveCard>
   )
 }
