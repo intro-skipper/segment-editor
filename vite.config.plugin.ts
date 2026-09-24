@@ -9,7 +9,16 @@ const withoutPwa: UserConfig = {
 
 export default defineConfig(
   mergeConfig(withoutPwa, {
-    base: '/SegmentEditor/',
+    // A relative base makes JS and CSS resolve assets against their own URL,
+    // so the bundle works under any Jellyfin base URL (e.g. `/jellyfin`).
+    base: './',
+    experimental: {
+      // HTML tags resolve against the page, which is either jellyfin-web at
+      // `{base}/web/` (config page) or `{base}/SegmentEditor/` (direct URL).
+      // Both share the parent directory, so point every tag through it.
+      renderBuiltUrl: (filename, { hostType }) =>
+        hostType === 'html' ? `../SegmentEditor/${filename}` : undefined,
+    },
     build: {
       outDir: 'dist-plugin',
       rolldownOptions: {
@@ -21,5 +30,5 @@ export default defineConfig(
         },
       },
     },
-  }),
+  } satisfies UserConfig),
 )

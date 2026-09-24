@@ -110,7 +110,7 @@ pnpm build:plugin
 ```
 
 - Output: `dist-plugin/`
-- Uses base path `/SegmentEditor/` with a stable entry filename plus hashed chunks/assets for cache-safe embedding.
+- Uses relative asset URLs so it works under a Jellyfin base URL, with a stable entry filename plus hashed chunks/assets for cache-safe embedding.
 
 ## Hosting notes
 
