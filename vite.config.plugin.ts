@@ -9,7 +9,7 @@ const withoutPwa: UserConfig = {
 
 export default defineConfig(
   mergeConfig(withoutPwa, {
-    base: './SegmentEditor/',
+    base: '/SegmentEditor/',
     build: {
       outDir: 'dist-plugin',
       rolldownOptions: {
