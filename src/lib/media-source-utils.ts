@@ -64,6 +64,20 @@ function sameMediaSourceId(
   )
 }
 
+function trickplayForMediaSource(
+  item: BaseItemDto,
+  mediaSourceId: string,
+): BaseItemDto['Trickplay'] {
+  const trickplay = item.Trickplay
+  if (!trickplay) return trickplay
+
+  const matchingKey = Object.keys(trickplay).find((key) =>
+    sameMediaSourceId(key, mediaSourceId),
+  )
+
+  return matchingKey ? { [matchingKey]: trickplay[matchingKey] } : {}
+}
+
 /** Finds a selected version, falling back to Jellyfin's default first source. */
 export function findMediaSource(
   item: Pick<BaseItemDto, 'MediaSources'>,
@@ -94,5 +108,6 @@ export function itemForMediaSource(
     MediaSourceCount: 1,
     MediaStreams: source.MediaStreams ?? item.MediaStreams,
     RunTimeTicks: source.RunTimeTicks ?? item.RunTimeTicks,
+    Trickplay: trickplayForMediaSource(item, source.Id),
   }
 }

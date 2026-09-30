@@ -28,6 +28,14 @@ function createItem(): BaseItemDto {
         MediaStreams: [{ Type: 'Video', Width: 3840 }],
       },
     ],
+    Trickplay: {
+      'default-source': {
+        '320': { Width: 320, Height: 180 },
+      },
+      'director-source': {
+        '640': { Width: 640, Height: 360 },
+      },
+    },
   }
 }
 
@@ -75,6 +83,15 @@ describe('media-source-utils', () => {
       selected.MediaSources?.[0]?.MediaStreams,
     )
     expect(selected.RunTimeTicks).toBe(200)
+    expect(selected.Trickplay).toEqual({
+      'director-source': {
+        '640': { Width: 640, Height: 360 },
+      },
+    })
     expect(item.MediaSources).toHaveLength(2)
+    expect(Object.keys(item.Trickplay ?? {})).toEqual([
+      'default-source',
+      'director-source',
+    ])
   })
 })
