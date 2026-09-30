@@ -222,7 +222,8 @@ export function useTrackManager({
   // every successful switch, so preference values in this key would let that
   // write invalidate the very selection that caused it (checkmark snapping
   // back to the first track of the same language).
-  const trackResetKey = `${itemId ?? ''}|${audioTracks.length}|${subtitleTracks.length}`
+  const mediaSourceId = item?.MediaSources?.[0]?.Id ?? ''
+  const trackResetKey = `${itemId ?? ''}|${mediaSourceId}|${audioTracks.length}|${subtitleTracks.length}`
 
   // Rotate the manual-operation controller whenever the item (reset key)
   // changes, not only on unmount: a switch that is still awaiting its decoder
@@ -317,7 +318,7 @@ export function useTrackManager({
     activeSubtitleIndex,
   }
 
-  const mediaSourceId = item?.MediaSources?.[0]?.Id ?? undefined
+  const selectedMediaSourceId = item?.MediaSources?.[0]?.Id ?? undefined
 
   const audioTrackMap = new Map(
     audioTracks.map((track) => [track.index, track]),
@@ -335,7 +336,7 @@ export function useTrackManager({
     videoElement,
     hlsInstance: hlsRef?.current,
     itemId,
-    mediaSourceId,
+    mediaSourceId: selectedMediaSourceId,
     audioTracks,
     subtitleTracks,
     onReloadHls,

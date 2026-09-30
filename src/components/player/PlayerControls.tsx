@@ -16,9 +16,11 @@ import {
 } from 'lucide-react'
 
 import { TrackSelector } from './TrackSelector'
+import { MediaSourceSelector } from './MediaSourceSelector'
 import { PlayerSettingsMenu } from './PlayerSettingsMenu'
 import type { MediaSegmentType } from '@/types/jellyfin'
 import type { TrackState } from '@/services/video/tracks'
+import type { SelectableMediaSource } from '@/lib/media-source-utils'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
@@ -42,6 +44,12 @@ export interface PlayerControlsProps {
   }
   segmentCreation: {
     onCreate: (type: MediaSegmentType) => void
+  }
+  /** Alternate Jellyfin media versions available for this item. */
+  mediaSourceControls?: {
+    sources: SelectableMediaSource[]
+    value: string
+    onSelect: (mediaSourceId: string) => void
   }
   skipControls: {
     timeIndex: number
@@ -147,6 +155,7 @@ export function PlayerControls({
   playback,
   volumeControls,
   segmentCreation,
+  mediaSourceControls,
   skipControls,
   trackControls,
   display,
@@ -185,6 +194,16 @@ export function PlayerControls({
           volumeControls={volumeControls}
           portalContainer={portalContainer}
         />
+
+        {/* Alternate video versions */}
+        {mediaSourceControls && (
+          <MediaSourceSelector
+            sources={mediaSourceControls.sources}
+            value={mediaSourceControls.value}
+            onValueChange={mediaSourceControls.onSelect}
+            portalContainer={portalContainer}
+          />
+        )}
 
         {/* Track selector for audio and subtitles */}
         {trackControls && (

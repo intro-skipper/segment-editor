@@ -53,6 +53,11 @@ import {
 } from '@/components/segment/SegmentEditDialog'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { SegmentLoadingState } from '@/components/ui/segment-loading-state'
+import {
+  findMediaSource,
+  getSelectableMediaSources,
+  itemForMediaSource,
+} from '@/lib/media-source-utils'
 
 const SEGMENT_VIRTUALIZATION_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',
@@ -294,6 +299,14 @@ function useRenderPlayerEditor({
 
   const batchSaveMutation = useBatchSaveSegments()
 
+  const selectableMediaSources = React.useMemo(
+    () => getSelectableMediaSources(item),
+    [item],
+  )
+  const defaultMediaSourceId = selectableMediaSources[0]?.Id ?? ''
+  const [selectedMediaSourceId, setSelectedMediaSourceId] =
+    React.useState(defaultMediaSourceId)
+
   const { data: serverSegments = NO_SEGMENTS, isLoading: isLoadingSegments } =
     useSegments(item.Id ?? '', {
       enabled: fetchSegments && !!item.Id,
@@ -329,12 +342,20 @@ function useRenderPlayerEditor({
   const [renderedItemId, setRenderedItemId] = React.useState(item.Id)
   if (renderedItemId !== item.Id) {
     setRenderedItemId(item.Id)
+    setSelectedMediaSourceId(defaultMediaSourceId)
     setEditingState({ localEditingSegments: null, activeIndex: 0 })
     setEditDialogOpen(false)
     setEditingSegmentIndex(null)
     setPendingImport(null)
     setPendingDelete(null)
   }
+
+  const selectedMediaSource = findMediaSource(item, selectedMediaSourceId)
+  const effectiveMediaSourceId = selectedMediaSource?.Id ?? ''
+  const playbackItem = React.useMemo(
+    () => itemForMediaSource(item, effectiveMediaSourceId),
+    [item, effectiveMediaSourceId],
+  )
 
   const isSaving = batchSaveMutation.isPending
   const isDirty = isEditorDirty(
@@ -391,9 +412,9 @@ function useRenderPlayerEditor({
     })
   }
 
-  const runtimeSeconds = ticksToSeconds(item.RunTimeTicks) || 0
+  const runtimeSeconds = ticksToSeconds(playbackItem.RunTimeTicks) || 0
 
-  const frameStepSeconds = resolveFrameStepSeconds(item)
+  const frameStepSeconds = resolveFrameStepSeconds(playbackItem)
 
   const handleCreateSegment = (data: CreateSegmentData) => {
     const newSegment: MediaSegmentDto = {
@@ -727,7 +748,13 @@ function useRenderPlayerEditor({
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
       {showVideoPlayer ? (
         <Player
-          item={item}
+          key={effectiveMediaSourceId}
+          item={playbackItem}
+          mediaSourceControls={{
+            sources: selectableMediaSources,
+            value: effectiveMediaSourceId,
+            onSelect: setSelectedMediaSourceId,
+          }}
           timestamp={playerTimestamp}
           segments={editingSegments}
           frameStepSeconds={frameStepSeconds}
