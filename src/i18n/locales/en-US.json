@@ -147,6 +147,7 @@
     "perPage": "Items per page"
   },
   "editor": {
+    "videoVersion": "Video version",
     "saveSegment": "Save",
     "deleteSure": "Are you sure to delete segment '{{Type}}'?",
     "deleteSureTitle": "Delete Segment",

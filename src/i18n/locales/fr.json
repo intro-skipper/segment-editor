@@ -92,6 +92,7 @@
     "perPage": "Éléments par page"
   },
   "editor": {
+    "videoVersion": "Version vidéo",
     "saveSegment": "Sauvegarder",
     "deleteSure": "Êtes-vous sûr de supprimer le segment '{{Type}}' ?",
     "deleteSureTitle": "Supprimer un segment",

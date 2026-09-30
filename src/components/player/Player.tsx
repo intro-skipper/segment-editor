@@ -46,6 +46,7 @@ import {
 } from '@/lib/player-timing-utils'
 import { snapToFrame } from '@/lib/time-utils'
 import type { SubtitleTrackInfo, TrackState } from '@/services/video/tracks'
+import type { SelectableMediaSource } from '@/lib/media-source-utils'
 import {
   extractTracks,
   findPreferredAudioStreamIndex,
@@ -193,6 +194,11 @@ const readPreferredAudioLanguage = () =>
 
 interface PlayerProps {
   item: BaseItemDto
+  mediaSourceControls?: {
+    sources: SelectableMediaSource[]
+    value: string
+    onSelect: (mediaSourceId: string) => void
+  }
   timestamp?: number
   segments?: Array<MediaSegmentDto>
   frameStepSeconds: number
@@ -203,6 +209,7 @@ interface PlayerProps {
 
 export function Player({
   item,
+  mediaSourceControls,
   timestamp,
   segments,
   frameStepSeconds,
@@ -212,6 +219,7 @@ export function Player({
 }: PlayerProps) {
   return useRenderPlayer({
     item,
+    mediaSourceControls,
     timestamp,
     segments,
     frameStepSeconds,
@@ -223,6 +231,7 @@ export function Player({
 
 function useRenderPlayer({
   item,
+  mediaSourceControls,
   timestamp,
   segments,
   frameStepSeconds: frameStep,
@@ -880,6 +889,7 @@ function useRenderPlayer({
     segmentCreation: {
       onCreate: handleCreateSegment,
     },
+    mediaSourceControls,
     skipControls: {
       timeIndex: skipTimeIndex,
       onTimeChange: handleSkipTimeChange,
