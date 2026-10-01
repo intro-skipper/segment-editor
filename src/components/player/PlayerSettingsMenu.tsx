@@ -21,7 +21,7 @@ const { SKIP_TIMES, PLAYBACK_SPEEDS } = PLAYER_CONFIG
 
 const CHEATSHEET_DISPLAY = PLAYER_SHORTCUT_CHEATSHEET.map((entry) => ({
   labelKey: entry.labelKey,
-  displayKeys: entry.hotkeys.map(formatForDisplay),
+  displayKeys: entry.hotkeys.map((hotkey) => formatForDisplay(hotkey)),
 }))
 
 interface PlayerSettingsMenuProps {
