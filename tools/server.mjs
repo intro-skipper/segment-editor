@@ -505,6 +505,8 @@ const server = http.createServer(async (req, res) => {
     'Access-Control-Allow-Headers',
     req.headers['access-control-request-headers'] ?? '*',
   )
+  // Browser clients cannot read ETag unless it is explicitly exposed.
+  res.setHeader('Access-Control-Expose-Headers', 'ETag')
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   res.setHeader('Timing-Allow-Origin', '*')
 
