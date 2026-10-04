@@ -28,6 +28,10 @@ import { AppError, logValidationWarning } from '@/lib/unified-error'
 
 const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
 const bulkWriteSupportByBaseUrl = new Map<string, boolean>()
+const segmentEtagByItem = new Map<string, string>()
+
+const segmentCacheKey = (baseUrl: string, itemId: string): string =>
+  `${baseUrl}|${itemId.replace(/-/g, '').toLowerCase()}`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry Configuration
@@ -103,6 +107,7 @@ export async function getSegmentsById(
   const result = await withApi(async (apis) => {
     let segments: Array<MediaSegmentDto>
     try {
+      let etag: string | undefined
       const data = await jellyfinFetchJson<
         Array<MediaSegmentDto> | { Items?: Array<MediaSegmentDto> }
       >({
@@ -112,13 +117,24 @@ export async function getSegmentsById(
         method: 'GET',
         signal: options?.signal,
         timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+        onResponse: (response) => {
+          etag = response.headers.get('ETag') ?? undefined
+        },
       })
       segments = Array.isArray(data) ? data : (data.Items ?? [])
-      bulkWriteSupportByBaseUrl.set(apis.api.basePath, true)
+      const cacheKey = segmentCacheKey(apis.api.basePath, itemId)
+      if (etag) {
+        segmentEtagByItem.set(cacheKey, etag)
+        bulkWriteSupportByBaseUrl.set(apis.api.basePath, true)
+      } else {
+        segmentEtagByItem.delete(cacheKey)
+        bulkWriteSupportByBaseUrl.set(apis.api.basePath, false)
+      }
     } catch (error) {
       const normalized = AppError.from(error)
       if (normalized.status !== 404 && normalized.status !== 405) throw error
       bulkWriteSupportByBaseUrl.set(apis.api.basePath, false)
+      segmentEtagByItem.delete(segmentCacheKey(apis.api.basePath, itemId))
 
       const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
         accessToken: apis.api.accessToken,
@@ -230,7 +246,10 @@ export async function batchSaveSegments(
     toServerSegment({ ...segment, ItemId: itemId }),
   )
   const result = await withApi(async (apis) => {
-    if (bulkWriteSupportByBaseUrl.get(apis.api.basePath) === false) {
+    const etag = segmentEtagByItem.get(
+      segmentCacheKey(apis.api.basePath, itemId),
+    )
+    if (bulkWriteSupportByBaseUrl.get(apis.api.basePath) !== true || !etag) {
       const deleteResults = await Promise.allSettled(
         existingSegments.map((segment) => deleteSegment(segment, options)),
       )
@@ -261,22 +280,36 @@ export async function batchSaveSegments(
       providerId: DEFAULT_SEGMENT_PROVIDER_ID,
     })
 
-    return withSegmentRetry(async () => {
+    let staleWriteRejected = false
+    const saved = await withSegmentRetry(async () => {
       // The bulk endpoint applies the complete desired list atomically. This
       // preserves repeated segment types and avoids the old delete-then-create
       // window where a partial save could erase existing segments.
-      await jellyfinFetchEmpty({
-        accessToken: apis.api.accessToken,
-        baseUrl: apis.api.basePath,
-        body: serverSegments,
-        endpoint,
-        method: 'PUT',
-        query,
-        signal: options?.signal,
-        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
-      })
+      try {
+        await jellyfinFetchEmpty({
+          accessToken: apis.api.accessToken,
+          baseUrl: apis.api.basePath,
+          body: serverSegments,
+          endpoint,
+          method: 'PUT',
+          query,
+          headers: { 'If-Match': etag },
+          signal: options?.signal,
+          timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+        })
+      } catch (error) {
+        if (AppError.from(error).status === 412) staleWriteRejected = true
+        throw error
+      }
       return serverSegments.map(toUiSegment)
     }, options)
+
+    if (staleWriteRejected) {
+      console.error(
+        '[Segments] Save rejected because the segment list changed on the server',
+      )
+    }
+    return saved
   }, options)
 
   if (!result) {

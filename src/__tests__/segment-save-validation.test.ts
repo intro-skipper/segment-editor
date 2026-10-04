@@ -40,6 +40,16 @@ const segment = (
   EndTicks: start + 10,
 })
 
+const primeBulkRead = async () => {
+  jellyfinFetchJsonMock.mockImplementationOnce(async (request) => {
+    request.onResponse?.(
+      new Response(null, { status: 200, headers: { ETag: '"v1"' } }),
+    )
+    return []
+  })
+  await getSegmentsById(itemId)
+}
+
 describe('batch segment save', () => {
   afterEach(() => {
     vi.clearAllMocks()
@@ -47,6 +57,7 @@ describe('batch segment save', () => {
 
   it('saves duplicate non-commercial types in one atomic request', async () => {
     jellyfinFetchEmptyMock.mockResolvedValue(undefined)
+    await primeBulkRead()
     const existing = [segment('0', 'Intro', 0)]
     const requested = [segment('1', 'Intro', 0), segment('2', 'Intro', 20)]
 
@@ -58,6 +69,7 @@ describe('batch segment save', () => {
       expect.objectContaining({
         method: 'PUT',
         endpoint: `MediaSegmentsApi/${itemId}`,
+        headers: { 'If-Match': '"v1"' },
       }),
     )
     expect(jellyfinFetchEmptyMock.mock.calls[0][0].body).toEqual([
@@ -76,6 +88,7 @@ describe('batch segment save', () => {
 
   it('keeps duplicate Commercial segments supported', async () => {
     jellyfinFetchEmptyMock.mockResolvedValue(undefined)
+    await primeBulkRead()
     const requested = [
       segment('1', 'Commercial', 0),
       segment('2', 'Commercial', 20),
@@ -84,6 +97,20 @@ describe('batch segment save', () => {
     await expect(
       batchSaveSegments(itemId, [], requested),
     ).resolves.toHaveLength(2)
+    expect(jellyfinFetchEmptyMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a stale bulk replacement instead of overwriting newer segments', async () => {
+    await primeBulkRead()
+    jellyfinFetchEmptyMock.mockRejectedValue({ status: 412 })
+
+    await expect(
+      batchSaveSegments(
+        itemId,
+        [segment('0', 'Intro', 0)],
+        [segment('1', 'Intro', 20)],
+      ),
+    ).resolves.toEqual([])
     expect(jellyfinFetchEmptyMock).toHaveBeenCalledTimes(1)
   })
 
