@@ -58,20 +58,6 @@ const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   EndTicks: secondsToTicks(s.EndTicks ?? 0),
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation (Single Responsibility)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Validates segment creation prerequisites */
-const validateForCreate = (segment: MediaSegmentDto): boolean => {
-  if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
-    console.error('[Segments] Invalid or missing Item ID')
-    return false
-  }
-
-  return true
-}
-
 /** Validates segment deletion prerequisites */
 const validateForDelete = (segment: MediaSegmentDto): boolean => {
   if (!segment.Id || !isValidItemId(segment.Id)) {
@@ -141,47 +127,6 @@ export async function getSegmentsById(
   return result ?? []
 }
 
-async function createSegment(
-  segment: MediaSegmentDto,
-  options?: ApiOptions,
-): Promise<MediaSegmentDto | false> {
-  if (!validateForCreate(segment)) return false
-
-  const result = await withApi(async (apis) => {
-    const endpoint = buildSegmentEndpoint(encodeUrlParam(segment.ItemId!))
-    const query = new URLSearchParams({
-      providerId: DEFAULT_SEGMENT_PROVIDER_ID,
-    })
-    // Built once outside the retry so every attempt posts the same payload
-    // (toServerSegment generates an Id when the segment has none).
-    const serverSegment = toServerSegment(segment)
-
-    return withSegmentRetry(async () => {
-      // Intro-Skipper's create endpoint replies 200 with an empty body, so
-      // the created segment cannot be read from the response. Echo back what
-      // was posted - the endpoint is create-or-replace, so that is exactly
-      // what the server stored.
-      await jellyfinFetchEmpty({
-        accessToken: apis.api.accessToken,
-        baseUrl: apis.api.basePath,
-        body: serverSegment,
-        endpoint,
-        method: 'POST',
-        query,
-        signal: options?.signal,
-        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
-      })
-      return toUiSegment(serverSegment)
-    }, options)
-  }, options)
-
-  if (!result) {
-    console.error('[Segments] Failed to create segment')
-    return false
-  }
-  return result
-}
-
 export async function deleteSegment(
   segment: MediaSegmentDto,
   options?: ApiOptions,
@@ -222,37 +167,47 @@ export async function deleteSegment(
 
 export async function batchSaveSegments(
   itemId: string,
-  existingSegments: Array<MediaSegmentDto>,
+  _existingSegments: Array<MediaSegmentDto>,
   newSegments: Array<MediaSegmentDto>,
   options?: ApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
   if (options?.signal?.aborted) return []
 
-  // Delete existing segments (continue on partial failure)
-  const deleteResults = await Promise.allSettled(
-    existingSegments.map((s) => deleteSegment(s, options)),
-  )
-  const failures = deleteResults.filter((r) => r.status === 'rejected').length
-  if (failures > 0) {
-    console.warn(`[Segments] ${failures} deletions failed`)
+  if (!isValidItemId(itemId)) {
+    console.error('[Segments] Invalid or missing Item ID')
+    return []
   }
 
-  if (options?.signal?.aborted) return []
-
-  // Create new segments
-  const createResults = await Promise.allSettled(
-    newSegments.map((s) =>
-      createSegment(
-        { ...s, ItemId: itemId, Id: s.Id || generateUUID() },
-        options,
-      ),
-    ),
+  const serverSegments = newSegments.map((segment) =>
+    toServerSegment({ ...segment, ItemId: itemId }),
   )
+  const result = await withApi(async (apis) => {
+    const endpoint = buildSegmentEndpoint(encodeUrlParam(itemId))
+    const query = new URLSearchParams({
+      providerId: DEFAULT_SEGMENT_PROVIDER_ID,
+    })
 
-  return createResults.reduce<Array<MediaSegmentDto>>((acc, r) => {
-    if (r.status === 'fulfilled' && r.value !== false) {
-      acc.push(r.value)
-    }
-    return acc
-  }, [])
+    return withSegmentRetry(async () => {
+      // The bulk endpoint applies the complete desired list atomically. This
+      // preserves repeated segment types and avoids the old delete-then-create
+      // window where a partial save could erase existing segments.
+      await jellyfinFetchEmpty({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        body: serverSegments,
+        endpoint,
+        method: 'PUT',
+        query,
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
+      return serverSegments.map(toUiSegment)
+    }, options)
+  }, options)
+
+  if (!result) {
+    console.error('[Segments] Failed to replace segments')
+    return []
+  }
+  return result
 }

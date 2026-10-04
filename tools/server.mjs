@@ -651,14 +651,34 @@ const server = http.createServer(async (req, res) => {
     return json(res, { Items: segs, TotalRecordCount: segs.length })
   }
 
-  // Segment editor API (intro-skipper style). Writes only, mirroring every released plugin:
-  // the route is registered for POST and DELETE, so a GET answers 405. Serving a GET here
-  // instead let commit 3a3de4e point the editor's read at a route no real server has
-  // (segment-editor-plugin issue #17). The unfiltered editor read arrives with Phase 1 of
-  // docs/plans/plugin-api-integration.md, which specifies a bare EditorSegmentDto[] body.
+  // Segment editor API (intro-skipper style). Reads still use the core endpoint;
+  // this route handles the atomic bulk replacement plus legacy single-segment
+  // POST/DELETE operations used by older clients.
   m = /^\/MediaSegmentsApi\/([0-9a-f-]+)$/i.exec(p)
   if (m && req.method === 'GET') {
     return json(res, { error: 'Method Not Allowed' }, 405)
+  }
+  if (m && req.method === 'PUT') {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      try {
+        const itemId = m[1].replace(/-/g, '')
+        const segments = JSON.parse(body)
+        if (!Array.isArray(segments)) throw new Error('expected array')
+        const stored = segments.map((seg) => ({
+          ...seg,
+          Id: (seg.Id ?? nextId()).replace(/-/g, ''),
+          ItemId: itemId,
+        }))
+        segmentsByItem.set(itemId, stored)
+        res.writeHead(204)
+        res.end()
+      } catch {
+        json(res, { error: 'bad segment list' }, 400)
+      }
+    })
+    return
   }
   if (m && req.method === 'POST') {
     let body = ''
