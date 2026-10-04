@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { batchSaveSegments } from '@/services/segments/api'
+import { batchSaveSegments, getSegmentsById } from '@/services/segments/api'
 
 const jellyfinFetchEmptyMock = vi.hoisted(() => vi.fn())
+const jellyfinFetchJsonMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/jellyfin', () => ({
   withApi: vi.fn(
@@ -22,6 +23,7 @@ vi.mock('@/services/jellyfin', () => ({
 
 vi.mock('@/services/jellyfin/http', () => ({
   jellyfinFetchEmpty: jellyfinFetchEmptyMock,
+  jellyfinFetchJson: jellyfinFetchJsonMock,
 }))
 
 const itemId = '6872cc2e-33a9-909b-7b2d-07ab03abcb03'
@@ -83,5 +85,23 @@ describe('batch segment save', () => {
       batchSaveSegments(itemId, [], requested),
     ).resolves.toHaveLength(2)
     expect(jellyfinFetchEmptyMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('avoids bulk replacement when the provider has no unfiltered read', async () => {
+    jellyfinFetchJsonMock
+      .mockRejectedValueOnce({ status: 405 })
+      .mockResolvedValueOnce({ Items: [segment('0', 'Intro', 0)] })
+    jellyfinFetchEmptyMock.mockResolvedValue(undefined)
+
+    await getSegmentsById(itemId)
+    await batchSaveSegments(
+      itemId,
+      [segment('0', 'Intro', 0)],
+      [segment('1', 'Intro', 20)],
+    )
+
+    expect(
+      jellyfinFetchEmptyMock.mock.calls.map(([request]) => request.method),
+    ).toEqual(['DELETE', 'POST'])
   })
 })

@@ -221,9 +221,9 @@ describe('Segment Save Reload', () => {
   // request fails still resolves; it must be reported instead of looking saved.
   it('reports a failed save when no segment could be created', async () => {
     jellyfinFetchEmptyMock.mockRejectedValue(new Error('network down'))
-    const itemId = 'item-1'
+    const itemId = '6872cc2e-33a9-909b-7b2d-07ab03abcb03'
     const segment: MediaSegmentDto = {
-      Id: 'segment-1',
+      Id: '48f9667b-0b42-4900-87d8-94b181223490',
       ItemId: itemId,
       Type: 'Intro',
       StartTicks: 0,
@@ -239,6 +239,7 @@ describe('Segment Save Reload', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(jellyfinFetchEmptyMock).toHaveBeenCalled()
     expect(showErrorMock).toHaveBeenCalledWith(
       'Save failed',
       'No segments were saved',

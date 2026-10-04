@@ -24,9 +24,10 @@ import {
   encodeUrlParam,
   isValidItemId,
 } from '@/lib/schemas'
-import { logValidationWarning } from '@/lib/unified-error'
+import { AppError, logValidationWarning } from '@/lib/unified-error'
 
 const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
+const bulkWriteSupportByBaseUrl = new Map<string, boolean>()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry Configuration
@@ -86,18 +87,12 @@ const withSegmentRetry = <T>(
 ): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
 /**
- * Reads an item's segments from Jellyfin's core endpoint.
+ * Reads an item's segments from the editor provider when available.
  *
- * That response is shaped for playback: Intro-Skipper's first-episode filter strips intros from
- * season premieres, and Jellyfin hides segments whose provider the library has disabled, so a
- * saved premiere intro is invisible here (segment-editor-plugin issue #16).
- *
- * Reading Intro-Skipper's unfiltered `GET MediaSegmentsApi/{itemId}` instead is Phase 1 of
- * docs/plans/plugin-api-integration.md and waits on the Phase 0 capability probe. Two traps make
- * the swap unsafe without it: no released plugin serves that route, so it answers 405 and every
- * read fails (issue #17), and the implementation on the plugin's `expand-segment-editor-workflows`
- * branch returns a bare array rather than this `{ Items }` envelope, which would parse as zero
- * segments and feed an empty delete baseline into `batchSaveSegments`.
+ * The editor endpoint is the authoritative, unfiltered baseline required by
+ * the bulk replacement write. Its response is a bare array on the editor API.
+ * Older providers answer 405 there, so retain the core read as a compatibility
+ * fallback and use the legacy additive write path for those providers.
  */
 export async function getSegmentsById(
   itemId: string,
@@ -106,15 +101,35 @@ export async function getSegmentsById(
   if (!itemId) return []
 
   const result = await withApi(async (apis) => {
-    const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
-      accessToken: apis.api.accessToken,
-      baseUrl: apis.api.basePath,
-      endpoint: buildCoreSegmentEndpoint(encodeUrlParam(itemId)),
-      method: 'GET',
-      signal: options?.signal,
-      timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
-    })
-    const segments = data.Items ?? []
+    let segments: Array<MediaSegmentDto>
+    try {
+      const data = await jellyfinFetchJson<
+        Array<MediaSegmentDto> | { Items?: Array<MediaSegmentDto> }
+      >({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        endpoint: buildSegmentEndpoint(encodeUrlParam(itemId)),
+        method: 'GET',
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
+      segments = Array.isArray(data) ? data : (data.Items ?? [])
+      bulkWriteSupportByBaseUrl.set(apis.api.basePath, true)
+    } catch (error) {
+      const normalized = AppError.from(error)
+      if (normalized.status !== 404 && normalized.status !== 405) throw error
+      bulkWriteSupportByBaseUrl.set(apis.api.basePath, false)
+
+      const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        endpoint: buildCoreSegmentEndpoint(encodeUrlParam(itemId)),
+        method: 'GET',
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
+      segments = data.Items ?? []
+    }
 
     const validation = MediaSegmentArraySchema.safeParse(segments)
     if (!validation.success) {
@@ -125,6 +140,39 @@ export async function getSegmentsById(
   }, options)
 
   return result ?? []
+}
+
+async function createSegment(
+  segment: MediaSegmentDto,
+  options?: ApiOptions,
+): Promise<MediaSegmentDto | false> {
+  const result = await withApi(async (apis) => {
+    const endpoint = buildSegmentEndpoint(encodeUrlParam(segment.ItemId!))
+    const query = new URLSearchParams({
+      providerId: DEFAULT_SEGMENT_PROVIDER_ID,
+    })
+    const serverSegment = toServerSegment(segment)
+
+    return withSegmentRetry(async () => {
+      await jellyfinFetchEmpty({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        body: serverSegment,
+        endpoint,
+        method: 'POST',
+        query,
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
+      return toUiSegment(serverSegment)
+    }, options)
+  }, options)
+
+  if (!result) {
+    console.error('[Segments] Failed to create segment')
+    return false
+  }
+  return result
 }
 
 export async function deleteSegment(
@@ -167,7 +215,7 @@ export async function deleteSegment(
 
 export async function batchSaveSegments(
   itemId: string,
-  _existingSegments: Array<MediaSegmentDto>,
+  existingSegments: Array<MediaSegmentDto>,
   newSegments: Array<MediaSegmentDto>,
   options?: ApiOptions,
 ): Promise<Array<MediaSegmentDto>> {
@@ -182,6 +230,32 @@ export async function batchSaveSegments(
     toServerSegment({ ...segment, ItemId: itemId }),
   )
   const result = await withApi(async (apis) => {
+    if (bulkWriteSupportByBaseUrl.get(apis.api.basePath) === false) {
+      const deleteResults = await Promise.allSettled(
+        existingSegments.map((segment) => deleteSegment(segment, options)),
+      )
+      const failures = deleteResults.filter(
+        (result) => result.status === 'rejected',
+      ).length
+      if (failures > 0) {
+        console.warn(`[Segments] ${failures} deletions failed`)
+      }
+
+      if (options?.signal?.aborted) return []
+
+      const createResults = await Promise.allSettled(
+        newSegments.map((segment) =>
+          createSegment({ ...segment, ItemId: itemId }, options),
+        ),
+      )
+      return createResults.reduce<Array<MediaSegmentDto>>((saved, result) => {
+        if (result.status === 'fulfilled' && result.value !== false) {
+          saved.push(result.value)
+        }
+        return saved
+      }, [])
+    }
+
     const endpoint = buildSegmentEndpoint(encodeUrlParam(itemId))
     const query = new URLSearchParams({
       providerId: DEFAULT_SEGMENT_PROVIDER_ID,

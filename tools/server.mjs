@@ -651,50 +651,54 @@ const server = http.createServer(async (req, res) => {
     return json(res, { Items: segs, TotalRecordCount: segs.length })
   }
 
-  // Segment editor API (intro-skipper style). Reads still use the core endpoint;
-  // this route handles the atomic bulk replacement plus legacy single-segment
-  // POST/DELETE operations used by older clients.
+  // Segment editor API (intro-skipper style). The editor read is unfiltered so
+  // a bulk replacement cannot discard segments hidden by the playback read.
   m = /^\/MediaSegmentsApi\/([0-9a-f-]+)$/i.exec(p)
   if (m && req.method === 'GET') {
-    return json(res, { error: 'Method Not Allowed' }, 405)
-  }
-  if (m && req.method === 'PUT') {
-    let body = ''
-    req.on('data', (c) => (body += c))
-    req.on('end', () => {
-      try {
-        const itemId = m[1].replace(/-/g, '')
-        const segments = JSON.parse(body)
-        if (!Array.isArray(segments)) throw new Error('expected array')
-        const stored = segments.map((seg) => ({
-          ...seg,
-          Id: (seg.Id ?? nextId()).replace(/-/g, ''),
-          ItemId: itemId,
-        }))
-        segmentsByItem.set(itemId, stored)
-        res.writeHead(204)
-        res.end()
-      } catch {
-        json(res, { error: 'bad segment list' }, 400)
-      }
-    })
-    return
+    const itemId = m[1].replace(/-/g, '')
+    return json(res, segmentsByItem.get(itemId) ?? [])
   }
   if (m && req.method === 'POST') {
     let body = ''
     req.on('data', (c) => (body += c))
     req.on('end', () => {
       try {
-        const seg = JSON.parse(body)
-        const itemId = (seg.ItemId ?? m[1]).replace(/-/g, '')
+        const parsed = JSON.parse(body)
+        const seg = parsed
+        const singleItemId = (seg.ItemId ?? m[1]).replace(/-/g, '')
         const stored = {
           ...seg,
           Id: (seg.Id ?? nextId()).replace(/-/g, ''),
-          ItemId: itemId,
+          ItemId: singleItemId,
         }
-        if (!segmentsByItem.has(itemId)) segmentsByItem.set(itemId, [])
-        segmentsByItem.get(itemId).push(stored)
+        if (!segmentsByItem.has(singleItemId))
+          segmentsByItem.set(singleItemId, [])
+        segmentsByItem.get(singleItemId).push(stored)
         json(res, stored)
+      } catch {
+        json(res, { error: 'bad json' }, 400)
+      }
+    })
+    return
+  }
+  if (m && req.method === 'PUT') {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body)
+        if (!Array.isArray(parsed)) {
+          return json(res, { error: 'expected segment array' }, 400)
+        }
+        const bulkItemId = m[1].replace(/-/g, '')
+        const stored = parsed.map((seg) => ({
+          ...seg,
+          Id: (seg.Id ?? nextId()).replace(/-/g, ''),
+          ItemId: bulkItemId,
+        }))
+        segmentsByItem.set(bulkItemId, stored)
+        res.writeHead(204)
+        return res.end()
       } catch {
         json(res, { error: 'bad json' }, 400)
       }
