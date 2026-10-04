@@ -713,8 +713,7 @@ const server = http.createServer(async (req, res) => {
         }))
         segmentsByItem.set(bulkItemId, stored)
         bumpSegmentVersion(bulkItemId)
-        res.writeHead(204, { ETag: segmentEtag(bulkItemId) })
-        return res.end()
+        return json(res, stored, 200, { ETag: segmentEtag(bulkItemId) })
       } catch {
         json(res, { error: 'bad json' }, 400)
       }

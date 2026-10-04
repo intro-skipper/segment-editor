@@ -276,9 +276,6 @@ export async function batchSaveSegments(
     }
 
     const endpoint = buildSegmentEndpoint(encodeUrlParam(itemId))
-    const query = new URLSearchParams({
-      providerId: DEFAULT_SEGMENT_PROVIDER_ID,
-    })
 
     let staleWriteRejected = false
     const saved = await withSegmentRetry(async () => {
@@ -286,17 +283,38 @@ export async function batchSaveSegments(
       // preserves repeated segment types and avoids the old delete-then-create
       // window where a partial save could erase existing segments.
       try {
-        await jellyfinFetchEmpty({
+        let responseStatus = 0
+        let responseEtag: string | undefined
+        const response = await jellyfinFetchJson<unknown>({
           accessToken: apis.api.accessToken,
           baseUrl: apis.api.basePath,
           body: serverSegments,
           endpoint,
           method: 'PUT',
-          query,
           headers: { 'If-Match': etag },
           signal: options?.signal,
           timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+          onResponse: (result) => {
+            responseStatus = result.status
+            responseEtag = result.headers.get('ETag') ?? undefined
+          },
         })
+
+        if (responseEtag) {
+          segmentEtagByItem.set(
+            segmentCacheKey(apis.api.basePath, itemId),
+            responseEtag,
+          )
+        }
+
+        // A synchronous PUT returns the canonical image. A 202 response means
+        // the durable edit was accepted but projection is pending; keep the
+        // requested image until the invalidated query observes the projection.
+        if (responseStatus === 200) {
+          const validation = MediaSegmentArraySchema.safeParse(response)
+          if (validation.success) return validation.data.map(toUiSegment)
+          logValidationWarning('Segment API', validation.error)
+        }
       } catch (error) {
         if (AppError.from(error).status === 412) staleWriteRejected = true
         throw error
