@@ -4,12 +4,14 @@ import { isValidEndpoint } from './security'
 export interface JellyfinFetchOptions {
   baseUrl: string
   accessToken?: string
+  headers?: Record<string, string>
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   endpoint: string
   query?: URLSearchParams
   body?: unknown
   signal?: AbortSignal
   timeout?: number
+  onResponse?: (response: Response) => void
 }
 
 interface RequestOptions extends JellyfinFetchOptions {
@@ -102,7 +104,7 @@ async function jellyfinRequest<T>(options: RequestOptions): Promise<T> {
   const requestSignal = createRequestSignal(signal, timeout)
 
   try {
-    const headers: Record<string, string> = {}
+    const headers: Record<string, string> = { ...options.headers }
     if (accessToken)
       headers.Authorization = `MediaBrowser Token="${accessToken}"`
     if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -117,6 +119,7 @@ async function jellyfinRequest<T>(options: RequestOptions): Promise<T> {
       },
     )
 
+    options.onResponse?.(response)
     if (!response.ok) throw AppError.fromStatus(response.status)
     if (!expectJson) {
       // SAFETY: callers that pass `expectJson: false` declare `T` as void or

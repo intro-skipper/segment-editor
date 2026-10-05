@@ -183,7 +183,16 @@ function makeMediaSource(id) {
 const items = new Map() // id -> BaseItemDto
 const childrenOf = new Map() // parentId -> [ids]
 const segmentsByItem = new Map() // itemId -> [MediaSegmentDto] (server ticks)
+const segmentVersionByItem = new Map() // itemId -> optimistic-concurrency version
 const artOf = new Map() // id -> {bg, fg, label, kind}
+
+function segmentEtag(itemId) {
+  return `"${segmentVersionByItem.get(itemId) ?? 0}"`
+}
+
+function bumpSegmentVersion(itemId) {
+  segmentVersionByItem.set(itemId, (segmentVersionByItem.get(itemId) ?? 0) + 1)
+}
 
 function addItem(item, parentId, art) {
   items.set(item.Id, item)
@@ -425,11 +434,12 @@ function shade(hex, amt) {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
-function json(res, body, status = 200) {
+function json(res, body, status = 200, extraHeaders = {}) {
   const buf = Buffer.from(JSON.stringify(body))
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Content-Length': buf.length,
+    ...extraHeaders,
   })
   res.end(buf)
 }
@@ -495,6 +505,8 @@ const server = http.createServer(async (req, res) => {
     'Access-Control-Allow-Headers',
     req.headers['access-control-request-headers'] ?? '*',
   )
+  // Browser clients cannot read ETag unless it is explicitly exposed.
+  res.setHeader('Access-Control-Expose-Headers', 'ETag')
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   res.setHeader('Timing-Allow-Origin', '*')
 
@@ -651,30 +663,59 @@ const server = http.createServer(async (req, res) => {
     return json(res, { Items: segs, TotalRecordCount: segs.length })
   }
 
-  // Segment editor API (intro-skipper style). Writes only, mirroring every released plugin:
-  // the route is registered for POST and DELETE, so a GET answers 405. Serving a GET here
-  // instead let commit 3a3de4e point the editor's read at a route no real server has
-  // (segment-editor-plugin issue #17). The unfiltered editor read arrives with Phase 1 of
-  // docs/plans/plugin-api-integration.md, which specifies a bare EditorSegmentDto[] body.
+  // Segment editor API (intro-skipper style). The editor read is unfiltered so
+  // a bulk replacement cannot discard segments hidden by the playback read.
   m = /^\/MediaSegmentsApi\/([0-9a-f-]+)$/i.exec(p)
   if (m && req.method === 'GET') {
-    return json(res, { error: 'Method Not Allowed' }, 405)
+    const itemId = m[1].replace(/-/g, '')
+    const segs = segmentsByItem.get(itemId) ?? []
+    return json(res, segs, 200, { ETag: segmentEtag(itemId) })
   }
   if (m && req.method === 'POST') {
     let body = ''
     req.on('data', (c) => (body += c))
     req.on('end', () => {
       try {
-        const seg = JSON.parse(body)
-        const itemId = (seg.ItemId ?? m[1]).replace(/-/g, '')
+        const parsed = JSON.parse(body)
+        const seg = parsed
+        const singleItemId = (seg.ItemId ?? m[1]).replace(/-/g, '')
         const stored = {
           ...seg,
           Id: (seg.Id ?? nextId()).replace(/-/g, ''),
-          ItemId: itemId,
+          ItemId: singleItemId,
         }
-        if (!segmentsByItem.has(itemId)) segmentsByItem.set(itemId, [])
-        segmentsByItem.get(itemId).push(stored)
+        if (!segmentsByItem.has(singleItemId))
+          segmentsByItem.set(singleItemId, [])
+        segmentsByItem.get(singleItemId).push(stored)
+        bumpSegmentVersion(singleItemId)
         json(res, stored)
+      } catch {
+        json(res, { error: 'bad json' }, 400)
+      }
+    })
+    return
+  }
+  if (m && req.method === 'PUT') {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body)
+        if (!Array.isArray(parsed)) {
+          return json(res, { error: 'expected segment array' }, 400)
+        }
+        const bulkItemId = m[1].replace(/-/g, '')
+        if (req.headers['if-match'] !== segmentEtag(bulkItemId)) {
+          return json(res, { error: 'segment list changed' }, 412)
+        }
+        const stored = parsed.map((seg) => ({
+          ...seg,
+          Id: (seg.Id ?? nextId()).replace(/-/g, ''),
+          ItemId: bulkItemId,
+        }))
+        segmentsByItem.set(bulkItemId, stored)
+        bumpSegmentVersion(bulkItemId)
+        return json(res, stored, 200, { ETag: segmentEtag(bulkItemId) })
       } catch {
         json(res, { error: 'bad json' }, 400)
       }
@@ -689,6 +730,7 @@ const server = http.createServer(async (req, res) => {
       )
       if (idx !== -1) {
         segs.splice(idx, 1)
+        bumpSegmentVersion(itemId)
         break
       }
     }

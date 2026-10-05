@@ -1,5 +1,7 @@
 /**
- * The editor reads segments from Jellyfin's core `/MediaSegments/{itemId}`.
+ * The editor prefers Intro-Skipper's unfiltered `/MediaSegmentsApi/{itemId}`
+ * and falls back to Jellyfin's core `/MediaSegments/{itemId}` for older
+ * providers that answer 405.
  *
  * Commit 3a3de4e pointed this read at Intro-Skipper's `MediaSegmentsApi/{itemId}` to escape the
  * playback filtering that hides premiere intros (segment-editor-plugin issue #16). No released
@@ -7,7 +9,8 @@
  * unfiltered read returns as Phase 1 of docs/plans/plugin-api-integration.md, behind the Phase 0
  * capability probe and parsing the bare array that endpoint actually returns.
  *
- * These pin the endpoint and the tick conversion so the read cannot be repointed by accident.
+ * These pin both endpoint behaviors and the tick conversion so a bulk save
+ * cannot accidentally replace segments hidden by the core playback read.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -29,6 +32,7 @@ vi.mock('@/services/jellyfin', () => ({
 
 const ITEM_ID = '6872cc2e33a9909b7b2d07ab03abcb03'
 const CORE_URL = `http://localhost:8096/MediaSegments/${ITEM_ID}`
+const EDITOR_URL = `http://localhost:8096/MediaSegmentsApi/${ITEM_ID}`
 
 const PREMIERE_INTRO = {
   Id: '48f9667b0b42490b87d894b18122349d',
@@ -52,19 +56,24 @@ const segmentsResponse = (segments: Array<unknown>) =>
     { status: 200 },
   )
 
+const editorSegmentsResponse = (segments: Array<unknown>) =>
+  new Response(JSON.stringify(segments), { status: 200 })
+
 describe('segment read endpoint', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('reads the core endpoint, which every supported plugin serves', async () => {
+  it('reads the unfiltered editor endpoint when available', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async () => segmentsResponse([]))
+      .mockImplementation(async () => editorSegmentsResponse([]))
 
     await getSegmentsById(ITEM_ID)
 
-    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([CORE_URL])
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      EDITOR_URL,
+    ])
     const [, init] = fetchMock.mock.calls[0]
     expect(init?.method).toBe('GET')
     expect(init?.headers).toMatchObject({
@@ -72,9 +81,23 @@ describe('segment read endpoint', () => {
     })
   })
 
+  it('falls back to the core endpoint for providers without an editor read', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => new Response(null, { status: 405 }))
+      .mockImplementationOnce(async () => segmentsResponse([]))
+
+    await getSegmentsById(ITEM_ID)
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      EDITOR_URL,
+      CORE_URL,
+    ])
+  })
+
   it('converts every segment to UI seconds and preserves order', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
-      segmentsResponse([PREMIERE_INTRO, OUTRO]),
+      editorSegmentsResponse([PREMIERE_INTRO, OUTRO]),
     )
 
     const segments = await getSegmentsById(ITEM_ID)
@@ -88,8 +111,8 @@ describe('segment read endpoint', () => {
   })
 
   it('returns an empty list when the response carries no Items', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      async () => new Response(JSON.stringify({}), { status: 200 }),
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      editorSegmentsResponse([]),
     )
 
     await expect(getSegmentsById(ITEM_ID)).resolves.toEqual([])

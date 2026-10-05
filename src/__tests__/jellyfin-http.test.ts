@@ -40,6 +40,30 @@ describe('jellyfin http helper', () => {
     expect(init?.body).toBe(JSON.stringify({ Name: 'Intro' }))
   })
 
+  it('supports conditional writes and exposes response headers', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { ETag: '"v2"' },
+      }),
+    )
+    let responseEtag: string | null = null
+
+    await jellyfinFetchJson({
+      ...baseOptions,
+      headers: { 'If-Match': '"v1"' },
+      method: 'PUT',
+      onResponse: (response) => {
+        responseEtag = response.headers.get('ETag')
+      },
+    })
+
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      'If-Match': '"v1"',
+    })
+    expect(responseEtag).toBe('"v2"')
+  })
+
   it('maps non-2xx responses through AppError status mapping', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('', { status: 403 }),

@@ -24,9 +24,14 @@ import {
   encodeUrlParam,
   isValidItemId,
 } from '@/lib/schemas'
-import { logValidationWarning } from '@/lib/unified-error'
+import { AppError, logValidationWarning } from '@/lib/unified-error'
 
 const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
+const bulkWriteSupportByBaseUrl = new Map<string, boolean>()
+const segmentEtagByItem = new Map<string, string>()
+
+const segmentCacheKey = (baseUrl: string, itemId: string): string =>
+  `${baseUrl}|${itemId.replace(/-/g, '').toLowerCase()}`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Retry Configuration
@@ -58,20 +63,6 @@ const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
   EndTicks: secondsToTicks(s.EndTicks ?? 0),
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation (Single Responsibility)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Validates segment creation prerequisites */
-const validateForCreate = (segment: MediaSegmentDto): boolean => {
-  if (!segment.ItemId || !isValidItemId(segment.ItemId)) {
-    console.error('[Segments] Invalid or missing Item ID')
-    return false
-  }
-
-  return true
-}
-
 /** Validates segment deletion prerequisites */
 const validateForDelete = (segment: MediaSegmentDto): boolean => {
   if (!segment.Id || !isValidItemId(segment.Id)) {
@@ -100,18 +91,12 @@ const withSegmentRetry = <T>(
 ): Promise<T | false> => withRetryOrFalse(fn, getRetryOptions(options))
 
 /**
- * Reads an item's segments from Jellyfin's core endpoint.
+ * Reads an item's segments from the editor provider when available.
  *
- * That response is shaped for playback: Intro-Skipper's first-episode filter strips intros from
- * season premieres, and Jellyfin hides segments whose provider the library has disabled, so a
- * saved premiere intro is invisible here (segment-editor-plugin issue #16).
- *
- * Reading Intro-Skipper's unfiltered `GET MediaSegmentsApi/{itemId}` instead is Phase 1 of
- * docs/plans/plugin-api-integration.md and waits on the Phase 0 capability probe. Two traps make
- * the swap unsafe without it: no released plugin serves that route, so it answers 405 and every
- * read fails (issue #17), and the implementation on the plugin's `expand-segment-editor-workflows`
- * branch returns a bare array rather than this `{ Items }` envelope, which would parse as zero
- * segments and feed an empty delete baseline into `batchSaveSegments`.
+ * The editor endpoint is the authoritative, unfiltered baseline required by
+ * the bulk replacement write. Its response is a bare array on the editor API.
+ * Older providers answer 405 there, so retain the core read as a compatibility
+ * fallback and use the legacy additive write path for those providers.
  */
 export async function getSegmentsById(
   itemId: string,
@@ -120,15 +105,47 @@ export async function getSegmentsById(
   if (!itemId) return []
 
   const result = await withApi(async (apis) => {
-    const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
-      accessToken: apis.api.accessToken,
-      baseUrl: apis.api.basePath,
-      endpoint: buildCoreSegmentEndpoint(encodeUrlParam(itemId)),
-      method: 'GET',
-      signal: options?.signal,
-      timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
-    })
-    const segments = data.Items ?? []
+    let segments: Array<MediaSegmentDto>
+    try {
+      let etag: string | undefined
+      const data = await jellyfinFetchJson<
+        Array<MediaSegmentDto> | { Items?: Array<MediaSegmentDto> }
+      >({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        endpoint: buildSegmentEndpoint(encodeUrlParam(itemId)),
+        method: 'GET',
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+        onResponse: (response) => {
+          etag = response.headers.get('ETag') ?? undefined
+        },
+      })
+      segments = Array.isArray(data) ? data : (data.Items ?? [])
+      const cacheKey = segmentCacheKey(apis.api.basePath, itemId)
+      if (etag) {
+        segmentEtagByItem.set(cacheKey, etag)
+        bulkWriteSupportByBaseUrl.set(apis.api.basePath, true)
+      } else {
+        segmentEtagByItem.delete(cacheKey)
+        bulkWriteSupportByBaseUrl.set(apis.api.basePath, false)
+      }
+    } catch (error) {
+      const normalized = AppError.from(error)
+      if (normalized.status !== 404 && normalized.status !== 405) throw error
+      bulkWriteSupportByBaseUrl.set(apis.api.basePath, false)
+      segmentEtagByItem.delete(segmentCacheKey(apis.api.basePath, itemId))
+
+      const data = await jellyfinFetchJson<{ Items?: Array<MediaSegmentDto> }>({
+        accessToken: apis.api.accessToken,
+        baseUrl: apis.api.basePath,
+        endpoint: buildCoreSegmentEndpoint(encodeUrlParam(itemId)),
+        method: 'GET',
+        signal: options?.signal,
+        timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+      })
+      segments = data.Items ?? []
+    }
 
     const validation = MediaSegmentArraySchema.safeParse(segments)
     if (!validation.success) {
@@ -145,22 +162,14 @@ async function createSegment(
   segment: MediaSegmentDto,
   options?: ApiOptions,
 ): Promise<MediaSegmentDto | false> {
-  if (!validateForCreate(segment)) return false
-
   const result = await withApi(async (apis) => {
     const endpoint = buildSegmentEndpoint(encodeUrlParam(segment.ItemId!))
     const query = new URLSearchParams({
       providerId: DEFAULT_SEGMENT_PROVIDER_ID,
     })
-    // Built once outside the retry so every attempt posts the same payload
-    // (toServerSegment generates an Id when the segment has none).
     const serverSegment = toServerSegment(segment)
 
     return withSegmentRetry(async () => {
-      // Intro-Skipper's create endpoint replies 200 with an empty body, so
-      // the created segment cannot be read from the response. Echo back what
-      // was posted - the endpoint is create-or-replace, so that is exactly
-      // what the server stored.
       await jellyfinFetchEmpty({
         accessToken: apis.api.accessToken,
         baseUrl: apis.api.basePath,
@@ -228,31 +237,102 @@ export async function batchSaveSegments(
 ): Promise<Array<MediaSegmentDto>> {
   if (options?.signal?.aborted) return []
 
-  // Delete existing segments (continue on partial failure)
-  const deleteResults = await Promise.allSettled(
-    existingSegments.map((s) => deleteSegment(s, options)),
-  )
-  const failures = deleteResults.filter((r) => r.status === 'rejected').length
-  if (failures > 0) {
-    console.warn(`[Segments] ${failures} deletions failed`)
+  if (!isValidItemId(itemId)) {
+    console.error('[Segments] Invalid or missing Item ID')
+    return []
   }
 
-  if (options?.signal?.aborted) return []
-
-  // Create new segments
-  const createResults = await Promise.allSettled(
-    newSegments.map((s) =>
-      createSegment(
-        { ...s, ItemId: itemId, Id: s.Id || generateUUID() },
-        options,
-      ),
-    ),
+  const serverSegments = newSegments.map((segment) =>
+    toServerSegment({ ...segment, ItemId: itemId }),
   )
+  const result = await withApi(async (apis) => {
+    const etag = segmentEtagByItem.get(
+      segmentCacheKey(apis.api.basePath, itemId),
+    )
+    if (bulkWriteSupportByBaseUrl.get(apis.api.basePath) !== true || !etag) {
+      const deleteResults = await Promise.allSettled(
+        existingSegments.map((segment) => deleteSegment(segment, options)),
+      )
+      const failures = deleteResults.filter(
+        (result) => result.status === 'rejected',
+      ).length
+      if (failures > 0) {
+        console.warn(`[Segments] ${failures} deletions failed`)
+      }
 
-  return createResults.reduce<Array<MediaSegmentDto>>((acc, r) => {
-    if (r.status === 'fulfilled' && r.value !== false) {
-      acc.push(r.value)
+      if (options?.signal?.aborted) return []
+
+      const createResults = await Promise.allSettled(
+        newSegments.map((segment) =>
+          createSegment({ ...segment, ItemId: itemId }, options),
+        ),
+      )
+      return createResults.reduce<Array<MediaSegmentDto>>((saved, result) => {
+        if (result.status === 'fulfilled' && result.value !== false) {
+          saved.push(result.value)
+        }
+        return saved
+      }, [])
     }
-    return acc
-  }, [])
+
+    const endpoint = buildSegmentEndpoint(encodeUrlParam(itemId))
+
+    let staleWriteRejected = false
+    const saved = await withSegmentRetry(async () => {
+      // The bulk endpoint applies the complete desired list atomically. This
+      // preserves repeated segment types and avoids the old delete-then-create
+      // window where a partial save could erase existing segments.
+      try {
+        let responseStatus = 0
+        let responseEtag: string | undefined
+        const response = await jellyfinFetchJson<unknown>({
+          accessToken: apis.api.accessToken,
+          baseUrl: apis.api.basePath,
+          body: serverSegments,
+          endpoint,
+          method: 'PUT',
+          headers: { 'If-Match': etag },
+          signal: options?.signal,
+          timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
+          onResponse: (result) => {
+            responseStatus = result.status
+            responseEtag = result.headers.get('ETag') ?? undefined
+          },
+        })
+
+        if (responseEtag) {
+          segmentEtagByItem.set(
+            segmentCacheKey(apis.api.basePath, itemId),
+            responseEtag,
+          )
+        }
+
+        // A synchronous PUT returns the canonical image. A 202 response means
+        // the durable edit was accepted but projection is pending; keep the
+        // requested image until the invalidated query observes the projection.
+        if (responseStatus === 200) {
+          const validation = MediaSegmentArraySchema.safeParse(response)
+          if (validation.success) return validation.data.map(toUiSegment)
+          logValidationWarning('Segment API', validation.error)
+        }
+      } catch (error) {
+        if (AppError.from(error).status === 412) staleWriteRejected = true
+        throw error
+      }
+      return serverSegments.map(toUiSegment)
+    }, options)
+
+    if (staleWriteRejected) {
+      console.error(
+        '[Segments] Save rejected because the segment list changed on the server',
+      )
+    }
+    return saved
+  }, options)
+
+  if (!result) {
+    console.error('[Segments] Failed to replace segments')
+    return []
+  }
+  return result
 }
