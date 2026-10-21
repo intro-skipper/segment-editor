@@ -942,6 +942,30 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     }
   })
 
+  it('stops at the seek position when unmounted before the seek report fires', async () => {
+    const { unmount } = renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+    await act(async () => {})
+
+    const video = hlsMocks.videoRef.current!
+    act(() => {
+      video.currentTime = 42
+      video.dispatchEvent(new Event('seeked'))
+    })
+    // React detaches the video ref before passive cleanups run on unmount.
+    hlsMocks.videoRef.current = null
+    unmount()
+
+    await waitFor(() => {
+      expect(stopPlaybackStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ positionTicks: 420_000_000 }),
+      )
+    })
+  })
+
   it('starts direct-play sync with a generated direct play session id', async () => {
     vi.mocked(createPlaySessionId)
       .mockReturnValueOnce('unused-hls-session')

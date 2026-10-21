@@ -336,6 +336,11 @@ export function useJellyfinSession({
     }
   }
 
+  // getCurrentPositionTicks also stores the position on the active session.
+  const recordCurrentPosition = useEffectEvent(() => {
+    getCurrentPositionTicks()
+  })
+
   const reportCurrentPlaybackProgress = useEffectEvent(
     async (isPaused: boolean) => {
       const status = playbackStatusRef.current
@@ -394,6 +399,9 @@ export function useJellyfinSession({
     // only the position the burst settles on.
     let seekReportTimer: number | undefined
     const handleSeeked = () => {
+      // Store the position now: a stop sent before the timer fires (e.g. on
+      // unmount, after the video ref is gone) must still carry the seek target.
+      recordCurrentPosition()
       window.clearTimeout(seekReportTimer)
       seekReportTimer = window.setTimeout(() => {
         void reportCurrentPlaybackProgress(video.paused)
