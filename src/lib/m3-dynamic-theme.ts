@@ -3,12 +3,16 @@
  * Maps M3 dynamic color roles onto the app's shadcn theme tokens so any
  * component consuming the standard tokens picks up the dynamic scheme when
  * rendered inside a DynamicThemeScope.
+ * The only module that imports material-color-utilities; use-artwork-color
+ * loads it lazily so the library stays out of the initial chunk.
  */
 
 import {
   Hct,
   MaterialDynamicColors,
+  QuantizerCelebi,
   SchemeContent,
+  Score,
   argbFromHex,
   hexFromArgb,
 } from '@material/material-color-utilities'
@@ -22,6 +26,32 @@ export type DynamicThemeVars = Record<string, string>
  * tune how far the scheme is allowed to drift from the source color.
  */
 const SchemeVariant = SchemeContent
+
+const MAX_QUANTIZE_COLORS = 128
+
+/**
+ * Quantizes sampled artwork pixels with QuantizerCelebi + Score (the Material
+ * You source-color pipeline) to a single seed color, or null when every pixel
+ * is translucent.
+ */
+export function quantizeSeed(imageData: ImageData): string | null {
+  const { data } = imageData
+  const pixels: Array<number> = []
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3]
+    if (alpha < 255) continue
+    pixels.push(
+      ((alpha << 24) | (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]) >>>
+        0,
+    )
+  }
+  if (pixels.length === 0) return null
+
+  const ranked = Score.score(
+    QuantizerCelebi.quantize(pixels, MAX_QUANTIZE_COLORS),
+  )
+  return hexFromArgb(ranked[0])
+}
 
 const schemeCache = new Map<string, DynamicThemeVars>()
 

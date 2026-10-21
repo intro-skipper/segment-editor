@@ -13,7 +13,7 @@ import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { isSpecialSeason } from '@/lib/series-utils'
+import { isSpecialSeason, resolveSelectedSeasonId } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
@@ -275,22 +275,10 @@ export function SeriesView({
 }: SeriesViewProps) {
   const { t } = useTranslation()
 
-  const findDefaultSeasonId = () => {
-    const firstNonSpecial = seasons.find((s) => !isSpecialSeason(s))
-    return firstNonSpecial?.Id ?? seasons[0]?.Id ?? null
-  }
-
-  const resolvedSelectedSeasonId = (() => {
-    if (seasons.length === 0) {
-      return null
-    }
-
-    const hasSelected = selectedSeasonIdProp
-      ? seasons.some((s) => s.Id === selectedSeasonIdProp)
-      : false
-
-    return hasSelected ? (selectedSeasonIdProp ?? null) : findDefaultSeasonId()
-  })()
+  const resolvedSelectedSeasonId = resolveSelectedSeasonId(
+    seasons,
+    selectedSeasonIdProp,
+  )
 
   const selectedSeason = seasons.find((s) => s.Id === resolvedSelectedSeasonId)
 

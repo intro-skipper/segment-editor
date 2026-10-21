@@ -490,7 +490,38 @@ describe('switchSubtitleTrack direct play', () => {
     expect(textTracks[0].mode).toBe('showing')
   })
 
-  it('hides existing text tracks and disables HLS subtitles when subtitles are turned off', async () => {
+  it('shows the selected native text track and disables the rest', async () => {
+    const video = document.createElement('video')
+    const textTracks: Array<{ mode: TextTrackMode }> = [
+      { mode: 'showing' },
+      { mode: 'hidden' },
+      { mode: 'hidden' },
+    ]
+    Object.defineProperty(video, 'textTracks', {
+      configurable: true,
+      value: textTracks,
+    })
+
+    await expect(
+      switchSubtitleTrack(5, {
+        strategy: 'direct',
+        videoElement: video,
+        subtitleTracks: [
+          createSubtitleTrack(3, 0),
+          createSubtitleTrack(4, 1),
+          createSubtitleTrack(5, 2),
+        ],
+      }),
+    ).resolves.toEqual({ success: true })
+
+    expect(textTracks.map((track) => track.mode)).toEqual([
+      'disabled',
+      'disabled',
+      'showing',
+    ])
+  })
+
+  it('disables existing text tracks and HLS subtitles when subtitles are turned off', async () => {
     const video = document.createElement('video')
     const textTracks: Array<{ mode: TextTrackMode }> = [
       { mode: 'showing' },
@@ -515,15 +546,18 @@ describe('switchSubtitleTrack direct play', () => {
       }),
     ).resolves.toEqual({ success: true, jassubAction: 'dispose' })
 
-    expect(textTracks.map((track) => track.mode)).toEqual(['hidden', 'hidden'])
+    expect(textTracks.map((track) => track.mode)).toEqual([
+      'disabled',
+      'disabled',
+    ])
     expect(hlsInstance.subtitleTrack).toBe(-1)
   })
 
-  it('hides existing text tracks before initializing ASS subtitles', async () => {
+  it('disables existing text tracks before initializing ASS subtitles', async () => {
     const video = document.createElement('video')
     const textTracks: Array<{ mode: TextTrackMode }> = [
       { mode: 'showing' },
-      { mode: 'disabled' },
+      { mode: 'hidden' },
     ]
     Object.defineProperty(video, 'textTracks', {
       configurable: true,
@@ -553,7 +587,10 @@ describe('switchSubtitleTrack direct play', () => {
       track: assTrack,
     })
 
-    expect(textTracks.map((track) => track.mode)).toEqual(['hidden', 'hidden'])
+    expect(textTracks.map((track) => track.mode)).toEqual([
+      'disabled',
+      'disabled',
+    ])
     expect(hlsInstance.subtitleTrack).toBe(-1)
   })
 })

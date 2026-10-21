@@ -199,45 +199,47 @@ interface PlayerProps {
     value: string
     onSelect: (mediaSourceId: string) => void
   }
-  timestamp?: number
   segments?: Array<MediaSegmentDto>
   frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
-  getCurrentTimeRef?: React.MutableRefObject<(() => number) | null>
+  handleRef?: React.RefObject<PlayerHandle | null>
+}
+
+/** Imperative access for the editor: read the playhead and seek it. */
+export interface PlayerHandle {
+  getCurrentTime: () => number
+  seek: (time: number) => void
 }
 
 export function Player({
   item,
   mediaSourceControls,
-  timestamp,
   segments,
   frameStepSeconds,
   onCreateSegment,
   onUpdateSegmentTimestamp,
-  getCurrentTimeRef,
+  handleRef,
 }: PlayerProps) {
   return useRenderPlayer({
     item,
     mediaSourceControls,
-    timestamp,
     segments,
     frameStepSeconds,
     onCreateSegment,
     onUpdateSegmentTimestamp,
-    getCurrentTimeRef,
+    handleRef,
   })
 }
 
 function useRenderPlayer({
   item,
   mediaSourceControls,
-  timestamp,
   segments,
   frameStepSeconds: frameStep,
   onCreateSegment,
   onUpdateSegmentTimestamp,
-  getCurrentTimeRef,
+  handleRef,
 }: PlayerProps) {
   const { t } = useTranslation()
 
@@ -327,17 +329,6 @@ function useRenderPlayer({
       buffered: 0,
     })
   }, [item.Id, timelineStore])
-
-  useLayoutEffect(() => {
-    if (getCurrentTimeRef) {
-      getCurrentTimeRef.current = () => currentTimeRef.current
-    }
-    return () => {
-      if (getCurrentTimeRef) {
-        getCurrentTimeRef.current = null
-      }
-    }
-  }, [getCurrentTimeRef])
 
   const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
@@ -440,12 +431,6 @@ function useRenderPlayer({
     dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
     setJassubUserOffset(offset)
   }
-
-  useLayoutEffect(() => {
-    if (timestamp !== undefined && videoRef.current) {
-      videoRef.current.currentTime = timestamp
-    }
-  }, [timestamp, videoRef])
 
   useLayoutEffect(() => {
     const video = videoRef.current
@@ -632,6 +617,18 @@ function useRenderPlayer({
     lastPlaybackUpdateAtRef.current = getPlaybackTimestampMs()
     publishTimelineTime(time)
   }
+
+  // No deps: re-publish every commit so `seek` never closes over stale state.
+  useLayoutEffect(() => {
+    if (!handleRef) return
+    handleRef.current = {
+      getCurrentTime: () => currentTimeRef.current,
+      seek: handleSeek,
+    }
+    return () => {
+      handleRef.current = null
+    }
+  })
 
   const skipForward = () => {
     const step = getSkipStepSeconds(skipTimeIndex, frameStep)

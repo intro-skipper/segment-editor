@@ -230,11 +230,24 @@ export function createSegmentFormSchema(maxDuration?: number | null) {
     })
 }
 
+// Every row validates on each keystroke and render against the same media
+// duration, so keep the schema built for the last duration instead of
+// rebuilding it per call. Keyed by the normalized bound so NaN, null and
+// undefined all share the unbounded schema.
+let lastSchema: {
+  max: number
+  schema: ReturnType<typeof createSegmentFormSchema>
+} | null = null
+
 function safeParseSegmentFormValues(
   values: SegmentFormValues,
   maxDuration?: number | null,
 ) {
-  return createSegmentFormSchema(maxDuration).safeParse(values)
+  const { max } = getSegmentTimeBounds(maxDuration)
+  if (lastSchema?.max !== max) {
+    lastSchema = { max, schema: createSegmentFormSchema(max) }
+  }
+  return lastSchema.schema.safeParse(values)
 }
 
 export function validateSegmentFormValues(

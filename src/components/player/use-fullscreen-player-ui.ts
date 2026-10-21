@@ -49,10 +49,11 @@ function fullscreenUiReducer(
         videoFitMode: 'contain',
       }
     case 'SHOW_CONTROLS':
-      return {
-        ...state,
-        showFullscreenControls: true,
-      }
+      // Mouse movement dispatches this repeatedly; keeping the same state
+      // lets Player's children bail out when the controls are already shown.
+      return state.showFullscreenControls
+        ? state
+        : { ...state, showFullscreenControls: true }
     case 'HIDE_CONTROLS':
       return {
         ...state,

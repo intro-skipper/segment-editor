@@ -79,7 +79,7 @@ export function MediaGrid({
           key={item.Id}
           style={{
             contentVisibility: 'auto',
-            containIntrinsicSize: '0 320px',
+            containIntrinsicSize: '0px auto 320px',
           }}
         >
           <MediaCard item={item} index={index} {...getItemProps(index)} />

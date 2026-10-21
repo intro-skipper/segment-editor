@@ -1,18 +1,13 @@
 /**
  * Artwork seed color extraction.
- * Downscales item artwork and quantizes it with material-color-utilities
- * (QuantizerCelebi + Score — the Material You source-color pipeline) to a
- * single seed color. The seed feeds the M3 dynamic scheme in
- * DynamicThemeScope; all role colors derive from it there.
+ * Downscales item artwork and quantizes it (see quantizeSeed in
+ * m3-dynamic-theme) to a single seed color. The seed feeds the M3 dynamic
+ * scheme in DynamicThemeScope; all role colors derive from it there.
  */
 
 import { useSyncExternalStore } from 'react'
-import {
-  QuantizerCelebi,
-  Score,
-  hexFromArgb,
-} from '@material/material-color-utilities'
 
+import type * as M3Theme from '@/lib/m3-dynamic-theme'
 import type { Theme } from '@/stores/app-store'
 import { LRUCache, blobCache, fetchBlobUrl } from '@/lib/cache-manager'
 import { CACHE_CONFIG } from '@/lib/constants'
@@ -110,28 +105,26 @@ const getCanvas = () => {
 
 const EXTRACTION_TIMEOUT_MS = 5000
 const MAX_SAMPLE_DIMENSION = 50
-const MAX_QUANTIZE_COLORS = 128
 
-function quantizeSeed(imageData: ImageData): string | null {
-  const { data } = imageData
-  const pixels: Array<number> = []
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3]
-    if (alpha < 255) continue
-    pixels.push(
-      ((alpha << 24) | (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]) >>>
-        0,
-    )
-  }
-  if (pixels.length === 0) return null
+// Set once the first extraction loads it; every cached seed was produced
+// after that, so a non-null seed implies the module is here.
+let m3Theme: typeof M3Theme | null = null
 
-  const ranked = Score.score(
-    QuantizerCelebi.quantize(pixels, MAX_QUANTIZE_COLORS),
-  )
-  return hexFromArgb(ranked[0])
+/**
+ * M3 dynamic theme vars for a seed returned by useArtworkColor. Null only if
+ * called with a seed that did not come from this module.
+ */
+export function getDynamicThemeVars(
+  seedColor: string,
+  isDark: boolean,
+): M3Theme.DynamicThemeVars | null {
+  return m3Theme?.buildDynamicThemeVars(seedColor, isDark) ?? null
 }
 
-async function extractSeed(blobUrl: string): Promise<string | null> {
+async function extractSeed(
+  blobUrl: string,
+  quantizeSeed: (imageData: ImageData) => string | null,
+): Promise<string | null> {
   const shared = getCanvas()
   if (!shared) return null
 
@@ -193,13 +186,17 @@ async function getSeedColor(url: string): Promise<string | null> {
       const cachedSeed = seedCache.get(url)
       if (cachedSeed) return cachedSeed
 
-      const blobUrl = blobCache.get(url) ?? (await fetchBlobUrl(url))
+      const [blobUrl, theme] = await Promise.all([
+        blobCache.get(url) ?? fetchBlobUrl(url),
+        import('@/lib/m3-dynamic-theme'),
+      ])
+      m3Theme = theme
       if (!blobUrl) return null
 
-      const seed = await extractSeed(blobUrl)
+      const seed = await extractSeed(blobUrl, theme.quantizeSeed)
       if (seed) seedCache.set(url, seed)
       return seed
-    })()
+    })().catch(() => null)
     pendingSeeds.set(url, promise)
     void promise.finally(() => pendingSeeds.delete(url))
   }

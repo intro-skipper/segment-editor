@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import Hls from 'hls.js'
+import type Hls from 'hls.js'
 import type { ErrorData } from 'hls.js'
 import type { VideoPlayerError } from '@/services/video/playback-error'
 import { PLAYER_CONFIG } from '@/lib/constants'
@@ -18,6 +18,12 @@ interface UseHlsPlayerReturn {
   hlsRef: React.RefObject<Hls | null>
   retry: () => void
 }
+
+// Outside the hook: React Compiler cannot lower import() expressions.
+const loadHls = () => import('hls.js')
+// Set by the first successful load, so later mounts start with the class and
+// skip the async gap and its extra render.
+let loadedHls: typeof Hls | null = null
 
 const HLS_CONFIG = {
   testBandwidth: false,
@@ -55,6 +61,8 @@ export function useHlsPlayer({
   const [reloadToken, setReloadToken] = useState(0)
   /** Position to resume from when retry() rebuilds the instance (-1 = hls.js default) */
   const retryStartPositionRef = useRef(-1)
+  /** hls.js, loaded once an HLS url needs it so direct play never downloads it */
+  const [HlsClass, setHlsClass] = useState<typeof Hls | null>(() => loadedHls)
 
   const reportError = useEffectEvent((error: VideoPlayerError | null) => {
     hasPendingErrorRef.current = error !== null
@@ -86,10 +94,34 @@ export function useHlsPlayer({
   )
 
   useEffect(() => {
+    if (!videoUrl || HlsClass) return
+
+    let cancelled = false
+    loadHls()
+      .then(({ default: Hls }) => {
+        loadedHls = Hls
+        if (!cancelled) setHlsClass(() => Hls)
+      })
+      .catch((error: unknown) => {
+        // A failed chunk load; Retry attempts the import again.
+        console.error('HLS setup failed', error)
+        if (!cancelled) {
+          reportError(
+            createLocalizedError('unknown_error', 'player.error.unknown', true),
+          )
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [videoUrl, reloadToken, HlsClass])
+
+  useEffect(() => {
     const video = videoRef.current
     const recoveryTimer = recoveryTimerRef
 
-    if (!video || !videoUrl) {
+    if (!video || !videoUrl || !HlsClass) {
       isActiveRef.current = false
       return () => {
         clearRecoveryTimer(recoveryTimer)
@@ -101,126 +133,111 @@ export function useHlsPlayer({
 
     reportError(null)
     clearRecoveryTimer(recoveryTimerRef)
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
+
+    if (!HlsClass.isSupported()) {
+      // Native HLS (Safari): the element plays the stream itself, so there is
+      // no Hls instance or listener to destroy.
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = videoUrl
+      }
+      return
     }
 
-    if (Hls.isSupported()) {
-      const startPosition = retryStartPositionRef.current
-      retryStartPositionRef.current = -1
-      const hls = new Hls({ ...HLS_CONFIG, startPosition })
-      hls.attachMedia(video)
+    const startPosition = retryStartPositionRef.current
+    retryStartPositionRef.current = -1
+    const hls = new HlsClass({ ...HLS_CONFIG, startPosition })
+    hls.attachMedia(video)
 
-      const handleRecovery = (
-        type: 'network_error' | 'media_error',
-        msgKey: string,
-        recoveryFn: () => void,
-      ) => {
-        if (!isActiveRef.current) return
+    const handleRecovery = (
+      type: 'network_error' | 'media_error',
+      msgKey: string,
+      recoveryFn: () => void,
+    ) => {
+      if (!isActiveRef.current) return
 
-        reportError(createLocalizedError(type, msgKey, true))
-        reportRecoveryStart()
-        recoveryFn()
+      reportError(createLocalizedError(type, msgKey, true))
+      reportRecoveryStart()
+      recoveryFn()
 
-        // Fallback timer: FRAG_BUFFERED / MANIFEST_PARSED normally clear the
-        // error as soon as playback actually makes progress again; this timer
-        // clears it blindly if neither signal arrives in time.
-        clearRecoveryTimer(recoveryTimerRef)
-        recoveryTimerRef.current = setTimeout(() => {
-          if (isActiveRef.current) reportRecoveryTimedOut()
-        }, RECOVERY_TIMEOUT_MS)
-      }
-
-      const handleError = (
-        _event: typeof Hls.Events.ERROR,
-        data: ErrorData,
-      ) => {
-        if (!isActiveRef.current || !data.fatal) return
-
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            handleRecovery('network_error', 'player.error.network', () =>
-              hls.startLoad(),
-            )
-            break
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            handleRecovery('media_error', 'player.error.media', () => {
-              const now = performance.now()
-              if (
-                now - lastMediaRecoveryAtRef.current <
-                MEDIA_ERROR_SWAP_WINDOW_MS
-              ) {
-                // Second media error shortly after a recovery attempt:
-                // hls.js docs require swapping the audio codec before retrying.
-                hls.swapAudioCodec()
-              }
-              lastMediaRecoveryAtRef.current = now
-              hls.recoverMediaError()
-            })
-            break
-          default:
-            // Recoverable via the Retry button, which rebuilds the Hls
-            // instance. Marking it non-recoverable would strand the user on
-            // a permanent error overlay with no way out.
-            reportError(
-              createLocalizedError(
-                'unknown_error',
-                'player.error.unknown',
-                true,
-              ),
-            )
-        }
-      }
-
-      const markPlaybackHealthy = () => {
-        lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
-        reportError(null)
-        clearRecoveryTimer(recoveryTimerRef)
-      }
-
-      const handleFragBuffered = () => {
-        if (!isActiveRef.current || !hasPendingErrorRef.current) return
-        // A fragment appended successfully after an error: playback has
-        // genuinely recovered, so clear the error overlay now instead of
-        // waiting for the blind recovery timer.
-        markPlaybackHealthy()
-      }
-
-      const handleManifestParsed = () => {
-        if (!isActiveRef.current) return
-        markPlaybackHealthy()
-      }
-
-      hls.on(Hls.Events.ERROR, handleError)
-      hls.on(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
-      hls.on(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
-
-      hls.loadSource(videoUrl)
-      hlsRef.current = hls
-
-      return () => {
-        isActiveRef.current = false
-        clearRecoveryTimer(recoveryTimer)
-        hls.off(Hls.Events.ERROR, handleError)
-        hls.off(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
-        hls.off(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
-        hls.destroy()
-        if (hlsRef.current === hls) hlsRef.current = null
-      }
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = videoUrl
+      // Fallback timer: FRAG_BUFFERED / MANIFEST_PARSED normally clear the
+      // error as soon as playback actually makes progress again; this timer
+      // clears it blindly if neither signal arrives in time.
+      clearRecoveryTimer(recoveryTimerRef)
+      recoveryTimerRef.current = setTimeout(() => {
+        if (isActiveRef.current) reportRecoveryTimedOut()
+      }, RECOVERY_TIMEOUT_MS)
     }
+
+    const handleError = (
+      _event: typeof HlsClass.Events.ERROR,
+      data: ErrorData,
+    ) => {
+      if (!isActiveRef.current || !data.fatal) return
+
+      // An if-chain, not a switch: React Compiler cannot reorder the
+      // member-expression case tests of a locally bound HlsClass.
+      if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
+        handleRecovery('network_error', 'player.error.network', () =>
+          hls.startLoad(),
+        )
+      } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) {
+        handleRecovery('media_error', 'player.error.media', () => {
+          const now = performance.now()
+          if (
+            now - lastMediaRecoveryAtRef.current <
+            MEDIA_ERROR_SWAP_WINDOW_MS
+          ) {
+            // Second media error shortly after a recovery attempt:
+            // hls.js docs require swapping the audio codec before retrying.
+            hls.swapAudioCodec()
+          }
+          lastMediaRecoveryAtRef.current = now
+          hls.recoverMediaError()
+        })
+      } else {
+        // Recoverable via the Retry button, which rebuilds the Hls
+        // instance. Marking it non-recoverable would strand the user on
+        // a permanent error overlay with no way out.
+        reportError(
+          createLocalizedError('unknown_error', 'player.error.unknown', true),
+        )
+      }
+    }
+
+    const markPlaybackHealthy = () => {
+      lastMediaRecoveryAtRef.current = Number.NEGATIVE_INFINITY
+      reportError(null)
+      clearRecoveryTimer(recoveryTimerRef)
+    }
+
+    const handleFragBuffered = () => {
+      if (!isActiveRef.current || !hasPendingErrorRef.current) return
+      // A fragment appended successfully after an error: playback has
+      // genuinely recovered, so clear the error overlay now instead of
+      // waiting for the blind recovery timer.
+      markPlaybackHealthy()
+    }
+
+    const handleManifestParsed = () => {
+      if (!isActiveRef.current) return
+      markPlaybackHealthy()
+    }
+
+    hls.on(HlsClass.Events.ERROR, handleError)
+    hls.on(HlsClass.Events.MANIFEST_PARSED, handleManifestParsed)
+    hls.on(HlsClass.Events.FRAG_BUFFERED, handleFragBuffered)
+
+    hls.loadSource(videoUrl)
+    hlsRef.current = hls
 
     return () => {
       isActiveRef.current = false
       clearRecoveryTimer(recoveryTimer)
-      if (hlsRef.current) {
-        hlsRef.current.destroy()
-        hlsRef.current = null
-      }
+      // destroy() also removes every listener registered above.
+      hls.destroy()
+      if (hlsRef.current === hls) hlsRef.current = null
     }
-  }, [videoUrl, reloadToken])
+  }, [videoUrl, reloadToken, HlsClass])
 
   const retry = () => {
     // Rebuild the Hls instance from scratch: after a fatal error the current

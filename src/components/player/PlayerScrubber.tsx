@@ -220,12 +220,7 @@ function useScrubberInteraction({
   // Drag position, null when idle. Committed as the seek on release.
   const pendingScrubTimeRef = React.useRef<number | null>(null)
   const [scrubTime, setScrubTime] = React.useState<number | null>(null)
-  const hoverFrameRef = React.useRef<number | null>(null)
   const scrubberRectRef = React.useRef<DOMRect | null>(null)
-  const pendingHoverRef = React.useRef<{
-    time: number
-    position: number
-  } | null>(null)
   const lastHoverTimeRef = React.useRef<number | null>(null)
   const lastHoverPositionRef = React.useRef<number | null>(null)
 
@@ -256,34 +251,25 @@ function useScrubberInteraction({
     return { time, position: x }
   }
 
-  const scheduleHoverUpdate = (time: number, position: number) => {
-    pendingHoverRef.current = { time, position }
-    if (hoverFrameRef.current !== null) return
+  // Called from pointer events, which browsers already coalesce to one per
+  // frame, so the hover state and the drag's scrubTime share one commit.
+  const updateHover = (time: number, position: number) => {
+    if (
+      lastHoverTimeRef.current === null ||
+      Math.abs(time - lastHoverTimeRef.current) >= HOVER_TIME_EPSILON_SECONDS
+    ) {
+      lastHoverTimeRef.current = time
+      setHoverTime(time)
+    }
 
-    hoverFrameRef.current = requestAnimationFrame(() => {
-      hoverFrameRef.current = null
-      const next = pendingHoverRef.current
-      if (!next) return
-
-      const shouldUpdateTime =
-        lastHoverTimeRef.current === null ||
-        Math.abs(next.time - lastHoverTimeRef.current) >=
-          HOVER_TIME_EPSILON_SECONDS
-      const shouldUpdatePosition =
-        lastHoverPositionRef.current === null ||
-        Math.abs(next.position - lastHoverPositionRef.current) >=
-          HOVER_POSITION_EPSILON_PX
-
-      if (shouldUpdateTime) {
-        lastHoverTimeRef.current = next.time
-        setHoverTime(next.time)
-      }
-
-      if (shouldUpdatePosition) {
-        lastHoverPositionRef.current = next.position
-        setHoverPosition(next.position)
-      }
-    })
+    if (
+      lastHoverPositionRef.current === null ||
+      Math.abs(position - lastHoverPositionRef.current) >=
+        HOVER_POSITION_EPSILON_PX
+    ) {
+      lastHoverPositionRef.current = position
+      setHoverPosition(position)
+    }
   }
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -295,13 +281,13 @@ function useScrubberInteraction({
     const { time, position } = getPositionFromClientX(e.clientX)
     pendingScrubTimeRef.current = time
     setScrubTime(time)
-    scheduleHoverUpdate(time, position)
+    updateHover(time, position)
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!e.isPrimary) return
     const { time, position } = getPositionFromClientX(e.clientX)
-    scheduleHoverUpdate(time, position)
+    updateHover(time, position)
 
     // The seek waits for release; only the thumb and preview follow the pointer.
     if (pendingScrubTimeRef.current !== null) {
@@ -324,11 +310,6 @@ function useScrubberInteraction({
 
   const handlePointerLeave = () => {
     scrubberRectRef.current = null
-    if (hoverFrameRef.current !== null) {
-      cancelAnimationFrame(hoverFrameRef.current)
-      hoverFrameRef.current = null
-    }
-    pendingHoverRef.current = null
     lastHoverTimeRef.current = null
     lastHoverPositionRef.current = null
     setHoverTime(null)
@@ -351,15 +332,6 @@ function useScrubberInteraction({
     return () => {
       resizeObserver?.disconnect()
       window.removeEventListener('scroll', handler)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    const hoverFrame = hoverFrameRef
-    return () => {
-      if (hoverFrame.current !== null) {
-        cancelAnimationFrame(hoverFrame.current)
-      }
     }
   }, [])
 

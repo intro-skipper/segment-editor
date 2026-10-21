@@ -5,6 +5,7 @@ import { useBlocker } from '@tanstack/react-router'
 import { ClipboardPaste, Eye, Plus } from 'lucide-react'
 
 import { Player } from './Player'
+import type { PlayerHandle } from './Player'
 import { EditorActionBar } from './EditorActionBar'
 import {
   ImportSegmentsDialog,
@@ -323,13 +324,12 @@ function useRenderPlayerEditor({
       activeIndex: 0,
     })
   const editingSegments = localEditingSegments ?? sortedServerSegments
-  const [playerTimestamp, setPlayerTimestamp] = React.useState<number>()
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
     number | null
   >(null)
 
-  const getCurrentTimeRef = React.useRef<(() => number) | null>(null)
+  const playerRef = React.useRef<PlayerHandle | null>(null)
 
   const [pendingImport, setPendingImport] =
     React.useState<ParsedImportResult | null>(null)
@@ -388,14 +388,6 @@ function useRenderPlayerEditor({
   React.useEffect(() => {
     editingSegmentsRef.current = editingSegments
   }, [editingSegments])
-  const timestampTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(null)
-
-  React.useEffect(
-    () => () => {
-      if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
-    },
-    [],
-  )
 
   const updateEditingSegments = (updater: SegmentUpdater): void => {
     setEditingState((previous) => {
@@ -457,7 +449,7 @@ function useRenderPlayerEditor({
   }
 
   const getPlayerTime = () => {
-    const raw = getCurrentTimeRef.current?.()
+    const raw = playerRef.current?.getCurrentTime()
     if (raw === undefined) return undefined
     return snapToFrame(raw, frameStepSeconds)
   }
@@ -518,19 +510,17 @@ function useRenderPlayerEditor({
   }
 
   const handlePlayerTimestamp = (timestamp: number) => {
-    if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current)
-    setPlayerTimestamp(timestamp)
-    timestampTimeoutRef.current = setTimeout(
-      () => setPlayerTimestamp(undefined),
-      100,
-    )
+    playerRef.current?.seek(timestamp)
   }
 
+  // Rows call this on every pointerdown and focus inside them; returning the
+  // same state for an unchanged index lets React skip the re-render.
   const handleSetActiveIndex = (nextActiveIndex: number) => {
-    setEditingState((previous) => ({
-      ...previous,
-      activeIndex: nextActiveIndex,
-    }))
+    setEditingState((previous) =>
+      previous.activeIndex === nextActiveIndex
+        ? previous
+        : { ...previous, activeIndex: nextActiveIndex },
+    )
   }
 
   const handleOpenEditDialog = (index: number) => {
@@ -755,12 +745,11 @@ function useRenderPlayerEditor({
             value: effectiveMediaSourceId,
             onSelect: setSelectedMediaSourceId,
           }}
-          timestamp={playerTimestamp}
           segments={editingSegments}
           frameStepSeconds={frameStepSeconds}
           onCreateSegment={handleCreateSegment}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
-          getCurrentTimeRef={getCurrentTimeRef}
+          handleRef={playerRef}
         />
       ) : (
         <div className="flex justify-center gap-3">

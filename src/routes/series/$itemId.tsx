@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
+import { resolveSelectedSeasonId } from '@/lib/series-utils'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
 import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
@@ -31,18 +32,28 @@ export const Route = createFileRoute('/series/$itemId')({
     stringify: (params) => params,
   },
   validateSearch: seriesSearchSchema,
-  loader: async ({ params, context, abortController }) => {
+  loaderDeps: ({ search }) => ({ seasonId: search.seasonId }),
+  loader: async ({ params, deps, context, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
 
     assertJellyfinCredentials()
 
-    const [series] = await Promise.all([
+    const [series, seasons] = await Promise.all([
       queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
       queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId)),
       import('@/components/views/SeriesView'),
     ])
     assertItemFound(series, abortController.signal)
+
+    // Warm the shown season's episodes without awaiting them, so a slow
+    // request never holds up navigation.
+    const seasonId = resolveSelectedSeasonId(seasons, deps.seasonId)
+    if (series.Id && seasonId) {
+      void queryClient.prefetchQuery(
+        seriesQueryOptions.episodes(series.Id, seasonId),
+      )
+    }
   },
   errorComponent: DetailRouteErrorComponent,
   pendingComponent: SeriesSkeleton,

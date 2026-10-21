@@ -423,9 +423,13 @@ async function waitForNativeAudioTracks(
   })
 }
 
-function hideTextTracks(textTracks: ArrayLike<TextTrack>): void {
+/**
+ * Turns every text track off. 'disabled', not 'hidden': the browser fetches
+ * a hidden <track>, so hiding would download every subtitle stream.
+ */
+function disableTextTracks(textTracks: ArrayLike<TextTrack>): void {
   Array.from(textTracks).forEach((track) => {
-    track.mode = 'hidden'
+    track.mode = 'disabled'
   })
 }
 
@@ -748,9 +752,9 @@ async function switchDirectPlaySubtitleTrack(
   const { videoElement, itemId, subtitleTracks, signal } = options
   const textTracks = videoElement.textTracks
 
-  // Handle "Off" selection - hide all tracks
+  // Handle "Off" selection - disable all tracks
   if (trackIndex === null) {
-    hideTextTracks(textTracks)
+    disableTextTracks(textTracks)
     removeManagedSubtitleTracks(videoElement)
     return { success: true }
   }
@@ -766,7 +770,7 @@ async function switchDirectPlaySubtitleTrack(
 
   // Check if track exists in TextTracks using relativeIndex
   if (relativeIndex >= 0 && relativeIndex < textTracks.length) {
-    hideTextTracks(textTracks)
+    disableTextTracks(textTracks)
     // Show the selected track using relativeIndex
     textTracks[relativeIndex].mode = 'showing'
     return { success: true }
@@ -808,7 +812,7 @@ async function switchDirectPlaySubtitleTrack(
     trackElement.default = true
     trackElement.setAttribute(SUBTITLE_TRACK_MARKER_ATTR, 'true')
 
-    hideTextTracks(textTracks)
+    disableTextTracks(textTracks)
 
     // Add and show the new track
     videoElement.appendChild(trackElement)
@@ -920,7 +924,7 @@ export async function switchSubtitleTrack(
 ): Promise<TrackSwitchResult> {
   // Handle "off" selection - signal JASSUB to dispose if active
   if (trackIndex === null) {
-    hideTextTracks(options.videoElement.textTracks)
+    disableTextTracks(options.videoElement.textTracks)
 
     // Also disable HLS subtitles if in HLS mode
     if (options.strategy === 'hls' && options.hlsInstance) {
@@ -945,7 +949,7 @@ export async function switchSubtitleTrack(
 
   // Check if ASS/SSA - delegate to JASSUB renderer
   if (requiresJassubRenderer(track)) {
-    hideTextTracks(options.videoElement.textTracks)
+    disableTextTracks(options.videoElement.textTracks)
 
     // Also disable HLS subtitles if in HLS mode
     if (options.strategy === 'hls' && options.hlsInstance) {
