@@ -56,23 +56,14 @@ export function useVirtualWindow<TElement extends HTMLElement>({
 
     element.addEventListener('scroll', scheduleStoreChange, { passive: true })
 
-    let resizeObserver: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(scheduleStoreChange)
-      resizeObserver.observe(element)
-    } else {
-      window.addEventListener('resize', scheduleStoreChange)
-    }
+    const resizeObserver = new ResizeObserver(scheduleStoreChange)
+    resizeObserver.observe(element)
 
     scheduleStoreChange()
 
     return () => {
       element.removeEventListener('scroll', scheduleStoreChange)
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-      } else {
-        window.removeEventListener('resize', scheduleStoreChange)
-      }
+      resizeObserver.disconnect()
 
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId)

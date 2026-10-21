@@ -254,7 +254,7 @@ export async function batchSaveSegments(
         existingSegments.map((segment) => deleteSegment(segment, options)),
       )
       const failures = deleteResults.filter(
-        (result) => result.status === 'rejected',
+        (settled) => settled.status === 'rejected',
       ).length
       if (failures > 0) {
         console.warn(`[Segments] ${failures} deletions failed`)
@@ -267,9 +267,9 @@ export async function batchSaveSegments(
           createSegment({ ...segment, ItemId: itemId }, options),
         ),
       )
-      return createResults.reduce<Array<MediaSegmentDto>>((saved, result) => {
-        if (result.status === 'fulfilled' && result.value !== false) {
-          saved.push(result.value)
+      return createResults.reduce<Array<MediaSegmentDto>>((saved, settled) => {
+        if (settled.status === 'fulfilled' && settled.value !== false) {
+          saved.push(settled.value)
         }
         return saved
       }, [])
@@ -294,9 +294,9 @@ export async function batchSaveSegments(
           headers: { 'If-Match': etag },
           signal: options?.signal,
           timeout: options?.timeout ?? API_CONFIG.SEGMENT_TIMEOUT_MS,
-          onResponse: (result) => {
-            responseStatus = result.status
-            responseEtag = result.headers.get('ETag') ?? undefined
+          onResponse: (httpResponse) => {
+            responseStatus = httpResponse.status
+            responseEtag = httpResponse.headers.get('ETag') ?? undefined
           },
         })
 
