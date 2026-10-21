@@ -32,7 +32,7 @@ export const pwaPlugin = VitePWA({
         type: 'image/png',
       },
       {
-        src: '/logo512.png',
+        src: '/logo512-maskable.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',

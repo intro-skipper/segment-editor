@@ -49,7 +49,7 @@ function HeaderFallback() {
     <header className="sticky inset-bs-0 z-40 bg-background">
       <nav className="px-fluid-md py-4">
         <div className="flex items-center justify-between gap-4">
-          <Link to="/" className="text-xl font-bold">
+          <Link to="/" className="font-display text-xl font-semibold">
             {t('app.name', 'Segment Editor')}
           </Link>
           <Button variant="ghost" size="sm" onClick={handleRefresh}>

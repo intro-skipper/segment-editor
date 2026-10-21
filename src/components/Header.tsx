@@ -71,7 +71,7 @@ function CollectionSelector({
       <TitleMenuTrigger
         aria-label={t('items.filter.selectCollection', 'Select collection')}
       >
-        <h1 className="text-fluid-display font-semibold tracking-tight truncate">
+        <h1 className="font-display text-fluid-display font-semibold tracking-tight truncate">
           {currentName ?? t('items.filter.collection', 'All Libraries')}
         </h1>
       </TitleMenuTrigger>
@@ -158,7 +158,7 @@ function DetailHeaderContent({
           <h1 className="sr-only">{pageTitle}</h1>
           <Suspense
             fallback={
-              <span className="text-fluid-title font-semibold tracking-tight truncate">
+              <span className="font-display text-fluid-title font-semibold tracking-tight truncate">
                 {pageTitle}
               </span>
             }
@@ -170,7 +170,7 @@ function DetailHeaderContent({
           </Suspense>
         </>
       ) : (
-        <h1 className="text-fluid-title font-semibold tracking-tight truncate">
+        <h1 className="font-display text-fluid-title font-semibold tracking-tight truncate">
           {pageTitle}
         </h1>
       )}
