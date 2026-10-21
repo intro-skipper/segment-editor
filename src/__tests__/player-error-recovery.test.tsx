@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect } from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
+import { useHlsPlayer } from '@/hooks/use-hls-player'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { getPlaybackConfig } from '@/services/video/api'
 import type * as VideoApiModule from '@/services/video/api'
@@ -332,5 +333,36 @@ describe('HLS error recovery overlay lifecycle', () => {
     emitHlsEvent(hls, 'hlsError', fatalMediaError)
     expect(hls.swapAudioCodecCalls).toBe(0)
     expect(hls.recoverCalls).toBe(2)
+  })
+})
+
+describe('useHlsPlayer on-demand hls.js loading', () => {
+  function HlsHarness() {
+    const { videoRef } = useHlsPlayer({
+      videoUrl: HLS_URL,
+      onError: () => {},
+      onRecoveryStart: () => {},
+      t: (key: string) => key,
+    })
+    return (
+      <video ref={videoRef} muted>
+        <track kind="captions" />
+      </video>
+    )
+  }
+
+  beforeEach(() => {
+    hlsState.instances.length = 0
+  })
+
+  it('creates no Hls instance when it unmounts before hls.js finishes loading', async () => {
+    const { unmount } = render(<HlsHarness />)
+    unmount()
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+
+    expect(hlsState.instances).toHaveLength(0)
   })
 })

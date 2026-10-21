@@ -13,6 +13,9 @@ import {
 } from '@/services/video/transcode-session'
 import { secondsToTicks } from '@/lib/time-utils'
 
+/** Trailing window that coalesces a burst of seeks into one progress report. */
+const SEEK_REPORT_DELAY_MS = 500
+
 export interface JellyfinSessionDescriptor {
   itemId: string
   mediaSourceId: string
@@ -387,8 +390,14 @@ export function useJellyfinSession({
     const handlePause = () => {
       void reportCurrentPlaybackProgress(true)
     }
+    // Frame-stepping and key-repeat skips seek many times a second; report
+    // only the position the burst settles on.
+    let seekReportTimer: number | undefined
     const handleSeeked = () => {
-      void reportCurrentPlaybackProgress(video.paused)
+      window.clearTimeout(seekReportTimer)
+      seekReportTimer = window.setTimeout(() => {
+        void reportCurrentPlaybackProgress(video.paused)
+      }, SEEK_REPORT_DELAY_MS)
     }
     const intervalId = window.setInterval(() => {
       if (!video.paused) void reportCurrentPlaybackProgress(false)
@@ -400,6 +409,7 @@ export function useJellyfinSession({
 
     return () => {
       window.clearInterval(intervalId)
+      window.clearTimeout(seekReportTimer)
       video.removeEventListener('playing', handlePlaying)
       video.removeEventListener('pause', handlePause)
       video.removeEventListener('seeked', handleSeeked)

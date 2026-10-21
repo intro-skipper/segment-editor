@@ -119,8 +119,12 @@ const router = createRouter({
           const fromDepth = from.split('/').filter(Boolean).length
           const toDepth = to.split('/').filter(Boolean).length
 
-          // Special case: navigating to player
-          if (to.includes('/player/')) return ['to-player']
+          // Entering the player expands into it. Switching episodes inside the
+          // player skips the transition, so React commits the new episode
+          // normally instead of synchronously behind a full-page snapshot.
+          if (to.includes('/player/')) {
+            return from.includes('/player/') ? false : ['to-player']
+          }
 
           // Forward navigation (drilling down)
           if (toDepth > fromDepth) return ['forward']

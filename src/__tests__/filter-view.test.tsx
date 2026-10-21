@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { UseItemsOptions } from '@/services/items/queries'
 import { isTranslationOptions, resolveTranslation } from './helpers/i18n-mock'
 import type { TranslationArg } from './helpers/i18n-mock'
@@ -497,6 +497,24 @@ describe('FilterView', () => {
 
     fireEvent.keyDown(grid, { key: 'ArrowUp' })
     expect(document.activeElement?.textContent).toBe('Movie b')
+  })
+
+  it('keeps focus on a clicked card instead of jumping to the first one', () => {
+    useSessionStore.setState({ viewMode: 'card' })
+    routeSearchState.current = { collection: 'movies' }
+    setItemsQuery({
+      data: {
+        items: ['a', 'b', 'c'].map((id) => mediaItem(id, `Movie ${id}`)),
+        totalCount: 3,
+      },
+    })
+
+    render(<FilterView />)
+
+    const third = screen.getByRole('button', { name: 'Movie c' })
+    act(() => third.focus())
+
+    expect(document.activeElement).toBe(third)
   })
 
   it('retries item errors through the items query', () => {

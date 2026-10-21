@@ -5,6 +5,7 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import { getBestImageUrl, getImageBlurhash } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { cn } from '@/lib/utils'
+import { PAGE_SIZE_OPTIONS } from '@/stores/session-store'
 
 interface ItemImageProps {
   /** The Jellyfin item to display an image for */
@@ -20,7 +21,8 @@ interface ItemImageProps {
 }
 
 const blurhashCache = new Map<string, string>()
-const MAX_CACHE_SIZE = 100
+// Holds a full library page, so rendering one never evicts its own entries.
+const MAX_CACHE_SIZE = Math.max(...PAGE_SIZE_OPTIONS)
 
 function decodeBlurhashToDataUrl(
   blurhash: string,

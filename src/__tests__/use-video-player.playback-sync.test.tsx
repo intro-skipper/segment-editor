@@ -889,15 +889,57 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
     })
 
-    act(() => {
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('pause'))
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('seeked'))
-    })
+    // Seek reports are debounced; advance past the window instead of
+    // relying on waitFor's timeout.
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('pause'))
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('seeked'))
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
 
     await waitFor(() => {
       expect(reportPlaybackProgress).toHaveBeenCalledTimes(3)
     })
+  })
+
+  it('coalesces a burst of seeks into one trailing progress report', async () => {
+    renderVideoPlayer({ jellyfinPlaybackSyncEnabled: true })
+
+    await waitFor(() => {
+      expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
+    })
+    // Let the start promise settle so the session is active.
+    await act(async () => {})
+
+    vi.useFakeTimers()
+    try {
+      const video = hlsMocks.videoRef.current!
+      act(() => {
+        for (let i = 0; i < 5; i++) {
+          video.currentTime = 20 + i
+          video.dispatchEvent(new Event('seeked'))
+        }
+      })
+      expect(reportPlaybackProgress).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(reportPlaybackProgress).toHaveBeenCalledTimes(1)
+      expect(reportPlaybackProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ positionTicks: 240_000_000 }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('starts direct-play sync with a generated direct play session id', async () => {
@@ -935,11 +977,21 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
     vi.mocked(reportPlaybackProgress).mockClear()
     directVideo.currentTime = 35
 
-    act(() => {
-      directVideo.dispatchEvent(new Event('playing'))
-      directVideo.dispatchEvent(new Event('pause'))
-      directVideo.dispatchEvent(new Event('seeked'))
-    })
+    // Seek reports are debounced; advance past the window instead of
+    // relying on waitFor's timeout.
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        directVideo.dispatchEvent(new Event('playing'))
+        directVideo.dispatchEvent(new Event('pause'))
+        directVideo.dispatchEvent(new Event('seeked'))
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
 
     await waitFor(() => {
       expect(reportPlaybackProgress).toHaveBeenCalledTimes(3)
@@ -995,12 +1047,22 @@ describe('useVideoPlayer Jellyfin playback sync', () => {
       )
     })
 
-    act(() => {
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('pause'))
-      hlsMocks.videoRef.current?.dispatchEvent(new Event('seeked'))
-      window.dispatchEvent(new Event('pagehide'))
-    })
+    // Seek reports are debounced; advance past the window instead of
+    // relying on waitFor's timeout.
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('playing'))
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('pause'))
+        hlsMocks.videoRef.current?.dispatchEvent(new Event('seeked'))
+        window.dispatchEvent(new Event('pagehide'))
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
 
     expect(reportPlaybackProgress).not.toHaveBeenCalled()
     expect(stopPlaybackStatusKeepalive).not.toHaveBeenCalled()

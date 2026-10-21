@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 
-import { useResolvedTheme } from '@/hooks/use-artwork-color'
-import { buildDynamicThemeVars } from '@/lib/m3-dynamic-theme'
+import {
+  getDynamicThemeVars,
+  useResolvedTheme,
+} from '@/hooks/use-artwork-color'
 import { cn } from '@/lib/utils'
 
 interface DynamicThemeScopeProps {
@@ -24,7 +26,7 @@ export function DynamicThemeScope({
   children,
 }: DynamicThemeScopeProps) {
   const isDark = useResolvedTheme() === 'dark'
-  const vars = seedColor ? buildDynamicThemeVars(seedColor, isDark) : null
+  const vars = seedColor ? getDynamicThemeVars(seedColor, isDark) : null
 
   return (
     <div

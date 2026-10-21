@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { getDynamicThemeVars, useArtworkColor } from '@/hooks/use-artwork-color'
 import type * as ConstantsModule from '@/lib/constants'
 import { blobCache } from '@/lib/cache-manager'
 import { useAppStore } from '@/stores/app-store'
@@ -113,6 +113,8 @@ describe('useArtworkColor', () => {
     await completeImage(activeBlob, 1)
     await waitFor(() => expect(active.result.current).not.toBeNull())
     const seed = active.result.current
+    // The lazily loaded scheme builder must be ready once a seed is.
+    expect(getDynamicThemeVars(seed!, false)).toHaveProperty('--primary')
 
     const firstFillerUrl = 'https://example.test/filler-1.jpg'
     const firstFillerBlob = 'blob:filler-1'

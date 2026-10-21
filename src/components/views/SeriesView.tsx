@@ -267,6 +267,21 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
   )
 }
 
+/**
+ * The season the series page shows: `selectedSeasonId` when it names one of
+ * `seasons`, else the first regular season, else the first season. The route
+ * loader uses it to prefetch that season's episodes.
+ */
+export function resolveSelectedSeasonId(
+  seasons: Array<BaseItemDto>,
+  selectedSeasonId?: string | null,
+): string | null {
+  if (selectedSeasonId && seasons.some((s) => s.Id === selectedSeasonId)) {
+    return selectedSeasonId
+  }
+  return seasons.find((s) => !isSpecialSeason(s))?.Id ?? seasons[0]?.Id ?? null
+}
+
 export function SeriesView({
   series,
   seasons,
@@ -275,22 +290,10 @@ export function SeriesView({
 }: SeriesViewProps) {
   const { t } = useTranslation()
 
-  const findDefaultSeasonId = () => {
-    const firstNonSpecial = seasons.find((s) => !isSpecialSeason(s))
-    return firstNonSpecial?.Id ?? seasons[0]?.Id ?? null
-  }
-
-  const resolvedSelectedSeasonId = (() => {
-    if (seasons.length === 0) {
-      return null
-    }
-
-    const hasSelected = selectedSeasonIdProp
-      ? seasons.some((s) => s.Id === selectedSeasonIdProp)
-      : false
-
-    return hasSelected ? (selectedSeasonIdProp ?? null) : findDefaultSeasonId()
-  })()
+  const resolvedSelectedSeasonId = resolveSelectedSeasonId(
+    seasons,
+    selectedSeasonIdProp,
+  )
 
   const selectedSeason = seasons.find((s) => s.Id === resolvedSelectedSeasonId)
 

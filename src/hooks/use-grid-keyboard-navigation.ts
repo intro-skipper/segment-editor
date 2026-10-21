@@ -18,7 +18,7 @@ interface GridProps {
   role: 'grid'
   tabIndex: number
   onKeyDown: (e: React.KeyboardEvent) => void
-  onFocus: () => void
+  onFocus: (e: React.FocusEvent<HTMLElement>) => void
 }
 
 interface GridItemProps {
@@ -109,7 +109,10 @@ export function useGridKeyboardNavigation({
     }
   }
 
-  const handleGridFocus = () => {
+  // Only focus landing on the container itself (tabbing in) picks card 0; focus
+  // bubbling up from a clicked card stays on that card.
+  const handleGridFocus = (e: React.FocusEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return
     if (validFocusedIndex < 0 && itemCount > 0) {
       setFocusedIndex(0)
       focusIndex(0)

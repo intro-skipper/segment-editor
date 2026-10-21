@@ -244,9 +244,6 @@
       )
       transparent;
   }
-  html {
-    @apply font-sans motion-safe:scroll-smooth;
-  }
   body {
     @apply font-sans bg-background text-foreground antialiased;
   }
