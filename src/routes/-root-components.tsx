@@ -1,10 +1,9 @@
-import { Suspense, lazy, useEffect, useEffectEvent, useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router'
 
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Home, SearchX } from 'lucide-react'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
-import { toast } from 'sonner'
 
 import Header from '../components/Header'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -14,7 +13,6 @@ import { buttonVariants } from '../components/ui/button-variants'
 import { ErrorCard } from '../components/ui/error-card'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
-import { registerPwaUpdates } from '../lib/pwa'
 import { isPluginMode } from '../services/jellyfin/core'
 import { useSessionStore } from '../stores/session-store'
 
@@ -99,41 +97,6 @@ export function NotFoundComponent() {
 export function RootComponent() {
   const { t } = useTranslation()
   const showSkipToMain = !pluginMode
-
-  const updateToastId = 'pwa-update-available'
-
-  const onNeedRefresh = useEffectEvent((applyUpdate: () => Promise<void>) => {
-    toast.info(t('pwa.updateAvailableTitle', 'New version available'), {
-      id: updateToastId,
-      description: t(
-        'pwa.updateAvailableDescription',
-        'A new app version is ready. Refresh to apply the update.',
-      ),
-      duration: Infinity,
-      action: {
-        label: t('pwa.updateNow', 'Update now'),
-        onClick: () => {
-          void applyUpdate()
-        },
-      },
-      cancel: {
-        label: t('pwa.later', 'Later'),
-        onClick: () => {
-          toast.dismiss(updateToastId)
-        },
-      },
-    })
-  })
-
-  useEffect(() => {
-    if (pluginMode) return
-
-    void registerPwaUpdates({ onNeedRefresh })
-
-    return () => {
-      toast.dismiss(updateToastId)
-    }
-  }, [])
 
   const { showWizard } = useConnectionInit()
   const settingsOpen = useSessionStore(selectSettingsOpen)

@@ -22,7 +22,6 @@ export default defineConfig(
     build: {
       outDir: 'dist-plugin',
       rolldownOptions: {
-        external: ['virtual:pwa-register'],
         output: {
           entryFileNames: 'assets/[name].js',
           chunkFileNames: 'assets/[name]-[hash].js',

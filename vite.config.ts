@@ -8,13 +8,10 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export const pwaPlugin = VitePWA({
-  registerType: 'prompt',
-  workbox: {
-    globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,woff2}'],
-    maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-    navigateFallbackDenylist: [/^\/api\//],
-    cleanupOutdatedCaches: true,
-  },
+  // Emits a sw.js that unregisters itself and clears its caches. Installed
+  // workers fetch it on their next navigation, so nothing registers it.
+  selfDestroying: true,
+  injectRegister: false,
   manifest: {
     name: 'Segment Editor',
     short_name: 'Segment Editor',
