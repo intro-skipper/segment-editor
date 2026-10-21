@@ -3,6 +3,7 @@
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';
+@import '@fontsource/albert-sans/600.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -189,6 +190,9 @@
 @theme inline {
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  /* Wordmark and page titles only, matching the sibling plugins' logos. */
+  --font-display:
+    'Albert Sans', 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   /* Segment colors */
   --color-segment-intro: var(--segment-intro);
   --color-segment-outro: var(--segment-outro);

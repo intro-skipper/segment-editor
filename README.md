@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <img alt="Segment Editor" src="images/logo_rounded.png" />
+    <img alt="" src="images/icon.png" width="140" />
   </p>
   <p>
     Segment editing UI for Jellyfin (Intro/Recap/Outro/Preview/...).

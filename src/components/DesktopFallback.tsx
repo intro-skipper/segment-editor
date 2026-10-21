@@ -14,7 +14,9 @@ export function DesktopFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8 font-sans text-foreground">
       <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card p-10 text-center">
-        <h1 className="mbe-3 text-xl font-semibold">Segment Editor</h1>
+        <h1 className="mbe-3 font-display text-xl font-semibold">
+          Segment Editor
+        </h1>
         <p className="mbe-6 text-sm leading-relaxed text-muted-foreground">
           This app is not supported in the Jellyfin desktop client. Please open
           it in your browser instead.

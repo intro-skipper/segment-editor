@@ -376,7 +376,7 @@ export default function EpisodeSwitcher({
         className={className}
         aria-label={t('player.selectEpisode', 'Select episode')}
       >
-        <span className="text-fluid-title font-semibold tracking-tight truncate">
+        <span className="font-display text-fluid-title font-semibold tracking-tight truncate">
           {displayTitle}
         </span>
       </TitleMenuTrigger>
