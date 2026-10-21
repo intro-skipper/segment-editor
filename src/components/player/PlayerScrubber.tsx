@@ -131,7 +131,7 @@ function ScrubberChapterMarkers({
         <button
           key={`chapter-${marker.time}-${marker.position}-${marker.name}`}
           type="button"
-          className="absolute inset-bs-1/2 w-1 h-3 rounded-sm bg-current/80 shadow-sm pointer-events-auto cursor-pointer transition-colors motion-safe:transition-[height,background-color] hover:h-4 hover:bg-current active:scale-97 z-10"
+          className="absolute inset-bs-1/2 w-1 h-3 rounded-sm bg-current/80 shadow-sm pointer-events-auto cursor-pointer transition-colors motion-safe:transition-[height,background-color] hover:h-4 hover:bg-current motion-safe:active:scale-97 z-10"
           style={{
             left: `${marker.position}%`,
             transform: 'translate(-50%, -50%)',

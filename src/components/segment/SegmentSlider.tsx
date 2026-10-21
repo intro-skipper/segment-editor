@@ -201,7 +201,7 @@ function SegmentSliderHeader({
                 title={t('segment.type', 'Segment type')}
                 className={cn(
                   chipClassName,
-                  'cursor-pointer transition-opacity ease-(--ease-out-expo) hover:opacity-90 active:scale-97 aria-expanded:opacity-90 motion-safe:transition-[opacity,scale]',
+                  'cursor-pointer transition-opacity ease-(--ease-out-expo) hover:opacity-90 motion-safe:active:scale-97 aria-expanded:opacity-90 motion-safe:transition-[opacity,scale]',
                 )}
               />
             }
