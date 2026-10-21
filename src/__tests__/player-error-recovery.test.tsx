@@ -14,7 +14,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect } from 'react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { useHlsPlayer } from '@/hooks/use-hls-player'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import { getPlaybackConfig } from '@/services/video/api'
 import type * as VideoApiModule from '@/services/video/api'
@@ -337,18 +336,25 @@ describe('HLS error recovery overlay lifecycle', () => {
 })
 
 describe('useHlsPlayer on-demand hls.js loading', () => {
-  function HlsHarness() {
-    const { videoRef } = useHlsPlayer({
-      videoUrl: HLS_URL,
-      onError: () => {},
-      onRecoveryStart: () => {},
-      t: (key: string) => key,
-    })
-    return (
-      <video ref={videoRef} muted>
-        <track kind="captions" />
-      </video>
-    )
+  // A fresh module per test: use-hls-player caches the loaded class at module
+  // scope, which would otherwise leak between tests.
+  async function loadHarness() {
+    vi.resetModules()
+    const { useHlsPlayer: freshUseHlsPlayer } =
+      await import('@/hooks/use-hls-player')
+    return function HlsHarness() {
+      const { videoRef } = freshUseHlsPlayer({
+        videoUrl: HLS_URL,
+        onError: () => {},
+        onRecoveryStart: () => {},
+        t: (key: string) => key,
+      })
+      return (
+        <video ref={videoRef} muted>
+          <track kind="captions" />
+        </video>
+      )
+    }
   }
 
   beforeEach(() => {
@@ -356,6 +362,7 @@ describe('useHlsPlayer on-demand hls.js loading', () => {
   })
 
   it('creates no Hls instance when it unmounts before hls.js finishes loading', async () => {
+    const HlsHarness = await loadHarness()
     const { unmount } = render(<HlsHarness />)
     unmount()
 
@@ -364,5 +371,19 @@ describe('useHlsPlayer on-demand hls.js loading', () => {
     })
 
     expect(hlsState.instances).toHaveLength(0)
+  })
+
+  it('builds the Hls instance on mount once hls.js has loaded', async () => {
+    const HlsHarness = await loadHarness()
+    const first = render(<HlsHarness />)
+    await waitFor(() => {
+      expect(hlsState.instances).toHaveLength(1)
+    })
+    first.unmount()
+    hlsState.instances.length = 0
+
+    render(<HlsHarness />)
+
+    expect(hlsState.instances).toHaveLength(1)
   })
 })
