@@ -32,6 +32,32 @@ const HLS_CONFIG = {
   abrEwmaDefaultEstimate: 500000,
 } as const
 
+interface HlsListeners {
+  error: (data: ErrorData) => void
+  manifestParsed: () => void
+  fragBuffered: () => void
+}
+
+/**
+ * Starts `url` in `video` through a new Hls instance. The caller owns the
+ * instance: destroy() releases it together with these listeners.
+ */
+function createHls(
+  HlsClass: typeof Hls,
+  video: HTMLVideoElement,
+  url: string,
+  startPosition: number,
+  listeners: HlsListeners,
+): Hls {
+  const hls = new HlsClass({ ...HLS_CONFIG, startPosition })
+  hls.attachMedia(video)
+  hls.on(HlsClass.Events.ERROR, (_event, data) => listeners.error(data))
+  hls.on(HlsClass.Events.MANIFEST_PARSED, listeners.manifestParsed)
+  hls.on(HlsClass.Events.FRAG_BUFFERED, listeners.fragBuffered)
+  hls.loadSource(url)
+  return hls
+}
+
 function clearRecoveryTimer(
   recoveryTimerRef: React.RefObject<ReturnType<typeof setTimeout> | null>,
 ) {
@@ -119,12 +145,6 @@ export function useHlsPlayer({
           return
         }
 
-        const startPosition = retryStartPositionRef.current
-        retryStartPositionRef.current = -1
-        const instance = new Hls({ ...HLS_CONFIG, startPosition })
-        hls = instance
-        instance.attachMedia(video)
-
         const handleRecovery = (
           type: 'network_error' | 'media_error',
           msgKey: string,
@@ -145,17 +165,14 @@ export function useHlsPlayer({
           }, RECOVERY_TIMEOUT_MS)
         }
 
-        const handleError = (
-          _event: typeof Hls.Events.ERROR,
-          data: ErrorData,
-        ) => {
+        const handleError = (data: ErrorData) => {
           if (!isActiveRef.current || !data.fatal) return
 
           // An if-chain, not a switch: React Compiler cannot reorder the
           // member-expression case tests of a locally bound Hls.
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             handleRecovery('network_error', 'player.error.network', () =>
-              instance.startLoad(),
+              hls?.startLoad(),
             )
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             handleRecovery('media_error', 'player.error.media', () => {
@@ -166,10 +183,10 @@ export function useHlsPlayer({
               ) {
                 // Second media error shortly after a recovery attempt:
                 // hls.js docs require swapping the audio codec before retrying.
-                instance.swapAudioCodec()
+                hls?.swapAudioCodec()
               }
               lastMediaRecoveryAtRef.current = now
-              instance.recoverMediaError()
+              hls?.recoverMediaError()
             })
           } else {
             // Recoverable via the Retry button, which rebuilds the Hls
@@ -204,12 +221,14 @@ export function useHlsPlayer({
           markPlaybackHealthy()
         }
 
-        instance.on(Hls.Events.ERROR, handleError)
-        instance.on(Hls.Events.MANIFEST_PARSED, handleManifestParsed)
-        instance.on(Hls.Events.FRAG_BUFFERED, handleFragBuffered)
-
-        instance.loadSource(videoUrl)
-        hlsRef.current = instance
+        const startPosition = retryStartPositionRef.current
+        retryStartPositionRef.current = -1
+        hls = createHls(Hls, video, videoUrl, startPosition, {
+          error: handleError,
+          manifestParsed: handleManifestParsed,
+          fragBuffered: handleFragBuffered,
+        })
+        hlsRef.current = hls
       })
       .catch((error: unknown) => {
         // A failed chunk load or a setup throw; Retry runs both again.
@@ -226,7 +245,7 @@ export function useHlsPlayer({
       isActiveRef.current = false
       clearRecoveryTimer(recoveryTimer)
       if (hls) {
-        // destroy() also removes every listener registered above.
+        // destroy() also removes the listeners createHls registered.
         hls.destroy()
         if (hlsRef.current === hls) hlsRef.current = null
       }
