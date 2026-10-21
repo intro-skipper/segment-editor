@@ -6,7 +6,7 @@
  * @module components/connection/WizardActions
  */
 
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 
@@ -84,11 +84,7 @@ export function WizardSubmitAction({
 
   return (
     <Button type="submit" disabled={isLoading} className="flex-1">
-      {isLoading && (
-        <div className="animate-spin" aria-hidden>
-          <Loader2 className="size-4" />
-        </div>
-      )}
+      {isLoading && <Loader className="size-4" aria-hidden />}
       {submitLabel}
     </Button>
   )

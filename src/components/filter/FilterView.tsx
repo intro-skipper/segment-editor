@@ -311,7 +311,7 @@ function useRenderFilterView() {
     )
 
   return (
-    <div className="relative px-4 pb-8 sm:px-6">
+    <div className="relative px-fluid-md pbe-8">
       <div className="max-w-7xl mx-auto">
         {connectionStatus !== 'connected' && (
           <ConnectionStatusNotice

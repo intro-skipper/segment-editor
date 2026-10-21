@@ -782,7 +782,7 @@ function useRenderPlayerEditor({
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {isLoadingSegments ? (
           <SegmentLoadingState count={2} />
         ) : editingSegments.length === 0 ? (
@@ -815,7 +815,7 @@ function useRenderPlayerEditor({
             </EmptyContent>
           </Empty>
         ) : (
-          <div className="space-y-3 pb-2">
+          <div className="flex flex-col gap-3 pbe-2">
             {editingSegments.map((segment, index) => (
               <SegmentListRow
                 key={segment.Id}

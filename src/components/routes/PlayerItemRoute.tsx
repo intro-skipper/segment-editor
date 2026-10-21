@@ -21,15 +21,15 @@ const PlayerEditor = lazy(() =>
 export function PlayerSkeleton() {
   return (
     <div
-      className="flex-1 px-4 py-6 sm:px-6"
+      className="flex-1 px-fluid-md py-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <span className="sr-only">Loading player</span>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto flex flex-col gap-6">
         <Skeleton className="aspect-video w-full rounded-2xl" />
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Skeleton className="h-20 w-full rounded-2xl" />
           <Skeleton className="h-20 w-full rounded-2xl" />
         </div>
@@ -56,7 +56,7 @@ export function PlayerPage() {
   return (
     <DynamicThemeScope
       seedColor={seedColor}
-      className="relative z-10 flex flex-1 flex-col px-4 py-6 sm:px-6"
+      className="relative z-10 flex flex-1 flex-col px-fluid-md py-6"
     >
       <FeatureErrorBoundary featureName="Player">
         <Suspense fallback={<PlayerSkeleton />}>

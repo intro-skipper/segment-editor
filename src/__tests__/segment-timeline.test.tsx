@@ -77,12 +77,12 @@ describe('SegmentTimeline', () => {
     )
     expect(regions).toHaveLength(2)
 
-    expect(regions[0].style.left).toBe('0%')
+    expect(regions[0].style.insetInlineStart).toBe('0%')
     expect(regions[0].style.width).toBe('6.25%')
     expect(regions[0].style.backgroundColor).toBe('var(--segment-intro)')
     expect(regions[0].title).toBe('Intro 0:00 – 1:30')
 
-    expect(regions[1].style.left).toBe(`${(1200 / 1440) * 100}%`)
+    expect(regions[1].style.insetInlineStart).toBe(`${(1200 / 1440) * 100}%`)
     expect(regions[1].style.backgroundColor).toBe('var(--segment-outro)')
   })
 
@@ -131,7 +131,6 @@ describe('SegmentTimeline', () => {
 
     expect(screen.queryByRole('img')).toBeNull()
     const placeholder = container.firstElementChild
-    expect(placeholder?.className).toContain('animate-pulse')
     expect(placeholder?.getAttribute('aria-hidden')).toBe('true')
   })
 
@@ -149,6 +148,6 @@ describe('SegmentTimeline', () => {
     )
     expect(regions).toHaveLength(2)
     expect(regions[0].style.width).toBe('10%')
-    expect(regions[1].style.left).toBe('90%')
+    expect(regions[1].style.insetInlineStart).toBe('90%')
   })
 })

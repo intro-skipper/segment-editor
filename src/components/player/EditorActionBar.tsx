@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { formatForDisplay } from '@tanstack/react-hotkeys'
-import { ClipboardPaste, Loader2, Save, Undo2 } from 'lucide-react'
+import { ClipboardPaste, Loader, Save, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 /** Pre-computed platform-aware shortcut display for the save button title */
@@ -25,7 +25,7 @@ export function EditorActionBar({
   const { t } = useTranslation()
 
   return (
-    <div className="sticky bottom-0 z-20 bg-background border-t border-border/40 pb-safe">
+    <div className="sticky inset-be-0 z-20 bg-background border-bs border-border/40 pbe-safe">
       <div
         className="flex items-center justify-between gap-3 py-3"
         role="toolbar"
@@ -87,9 +87,7 @@ export function EditorActionBar({
             title={`${t('editor.saveSegment', 'Save')} (${MOD_S_DISPLAY})`}
           >
             {isSaving ? (
-              <div className="animate-spin" aria-hidden="true">
-                <Loader2 className="size-4" />
-              </div>
+              <Loader className="size-4" aria-hidden="true" />
             ) : (
               <Save className="size-4" aria-hidden="true" />
             )}

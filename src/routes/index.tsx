@@ -28,7 +28,7 @@ const indexSearchSchema = z.object({
 function IndexSkeleton() {
   return (
     <div
-      className="flex-1 px-4 pb-8 sm:px-6"
+      className="flex-1 px-fluid-md pbe-8"
       role="status"
       aria-live="polite"
       aria-busy="true"

@@ -119,7 +119,7 @@ function ItemImageFallback({
   return (
     <div
       className={cn(
-        'bg-muted flex items-center justify-center rounded-lg overflow-hidden',
+        'bg-muted flex items-center justify-center rounded-lg overflow-clip',
         aspectRatio,
         className,
       )}
@@ -172,7 +172,7 @@ export function ItemImage({
     <div
       key={imageKey}
       className={cn(
-        'relative overflow-hidden rounded-lg bg-muted',
+        'relative overflow-clip rounded-lg bg-muted',
         aspectRatio,
         className,
       )}

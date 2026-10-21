@@ -182,7 +182,7 @@ function SegmentEditDialogContent({
           <DialogHeader>
             <DialogTitle className="flex items-center">
               {t('segment.edit')}
-              <span className={cn(getSegmentChipClass(values.type), 'ml-4')}>
+              <span className={cn(getSegmentChipClass(values.type), 'ms-4')}>
                 {t(`segmentType.${values.type}`, values.type)}
               </span>
             </DialogTitle>
@@ -198,7 +198,7 @@ function SegmentEditDialogContent({
             <form.Field name="type">
               {(field) => (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
-                  <Label htmlFor="segment-type" className="sm:text-right">
+                  <Label htmlFor="segment-type" className="sm:text-end">
                     {t('segment.type')}
                   </Label>
                   <div className="sm:col-span-3">
@@ -243,7 +243,7 @@ function SegmentEditDialogContent({
             <form.Field name="startText">
               {(field) => (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
-                  <Label htmlFor="segment-start" className="sm:text-right">
+                  <Label htmlFor="segment-start" className="sm:text-end">
                     {t('segment.start')}
                   </Label>
                   <div className="sm:col-span-3 flex items-center gap-2">
@@ -276,7 +276,7 @@ function SegmentEditDialogContent({
             <form.Field name="endText">
               {(field) => (
                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
-                  <Label htmlFor="segment-end" className="sm:text-right">
+                  <Label htmlFor="segment-end" className="sm:text-end">
                     {t('segment.end')}
                   </Label>
                   <div className="sm:col-span-3 flex items-center gap-2">
@@ -306,12 +306,12 @@ function SegmentEditDialogContent({
             </form.Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
-              <Label className="sm:text-right">{t('segment.duration')}</Label>
+              <Label className="sm:text-end">{t('segment.duration')}</Label>
               <div className="sm:col-span-3">
                 <span className="text-sm tabular-nums">
                   {formatTime(duration)}
                 </span>
-                <span className="text-sm text-muted-foreground ml-2 tabular-nums">
+                <span className="text-sm text-muted-foreground ms-2 tabular-nums">
                   ({duration.toFixed(3)}s)
                 </span>
               </div>

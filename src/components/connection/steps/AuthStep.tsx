@@ -87,9 +87,9 @@ export function AuthStep({
   }
 
   return (
-    <form action={handleSubmitAction} className="space-y-6">
+    <form action={handleSubmitAction} className="flex flex-col gap-6">
       {/* Server Address Display */}
-      <div className="text-center pb-2">
+      <div className="text-center pbe-2">
         <p className="text-sm text-muted-foreground">Connecting to</p>
         <p className="font-medium truncate">{serverAddress}</p>
       </div>
@@ -115,11 +115,11 @@ export function AuthStep({
       </div>
 
       {/* Form Fields */}
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {authMethod === 'apiKey' ? (
           <form.Field name="apiKey">
             {(field) => (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="api-key">API Key</Label>
                 <Input
                   ref={apiKeyInputRef}
@@ -149,7 +149,7 @@ export function AuthStep({
           <>
             <form.Field name="username">
               {(field) => (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="username">Username</Label>
                   <Input
                     ref={usernameInputRef}
@@ -173,7 +173,7 @@ export function AuthStep({
             </form.Field>
             <form.Field name="password">
               {(field) => (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Input
@@ -192,14 +192,14 @@ export function AuthStep({
                       aria-describedby={displayError ? 'auth-error' : undefined}
                       autoComplete="current-password"
                       spellCheck={false}
-                      className="pr-10"
+                      className="pe-10"
                     />
                     <Button
                       type="button"
                       variant="ghost-muted"
                       size="icon-sm"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-0.5 top-1/2 -translate-y-1/2"
+                      className="absolute inset-e-0.5 inset-bs-1/2 -translate-y-1/2"
                       aria-label={
                         showPassword ? 'Hide password' : 'Show password'
                       }

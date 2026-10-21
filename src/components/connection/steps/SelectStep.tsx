@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import {
   AlertTriangle,
   Check,
-  Loader2,
+  Loader,
   Server,
   Shield,
   ShieldAlert,
@@ -76,11 +76,12 @@ function ServerItem({
       onClick={onSelect}
       onKeyDown={onKeyDown}
       aria-pressed={isSelected}
+      data-interactive-transition="true"
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
-        'w-full text-left p-4 rounded-xl border-2 border-transparent hover:bg-muted/60',
+        'w-full text-start p-4 rounded-xl border-2 border-transparent hover:bg-muted/60',
         isSelected && 'border-primary bg-primary/10',
-        'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
+        'animate-in fade-in motion-safe:slide-in-from-bottom-2 fill-mode-both',
       )}
       style={{ animationDelay: staggerDelay(index, STAGGER_SLOW) }}
     >
@@ -101,14 +102,14 @@ function ServerItem({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mbe-1">
             <span className="font-medium truncate">{serverName}</span>
             {isSelected && (
               <Check className="size-4 text-primary shrink-0" aria-hidden />
             )}
           </div>
 
-          <div className="text-sm text-muted-foreground truncate mb-2">
+          <div className="text-sm text-muted-foreground truncate mbe-2">
             {server.address}
           </div>
 
@@ -126,7 +127,7 @@ function ServerItem({
             <Badge variant="outline">v{serverVersion}</Badge>
             {isHttps && <Badge variant="success">HTTPS</Badge>}
             {server.responseTime > 0 && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {server.responseTime}ms
               </span>
             )}
@@ -200,16 +201,7 @@ function ServerList({
   }
 
   if (isLoading) {
-    return (
-      <EmptyState
-        icon={
-          <div className="animate-spin">
-            <Loader2 />
-          </div>
-        }
-        message="Discovering servers…"
-      />
-    )
+    return <EmptyState icon={<Loader />} message="Discovering servers…" />
   }
 
   if (error) {
@@ -234,7 +226,11 @@ function ServerList({
   }
 
   return (
-    <div ref={listRef} aria-label="Discovered servers" className="space-y-2">
+    <div
+      ref={listRef}
+      aria-label="Discovered servers"
+      className="flex flex-col gap-2"
+    >
       {servers.map((server, index) => (
         <ServerItem
           key={server.address}
@@ -270,9 +266,9 @@ export function SelectStep({
     !selectedServer.address.toLowerCase().startsWith('https://')
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="text-center">
-        <h2 className="text-lg font-semibold mb-1">Select Server</h2>
+        <h2 className="text-lg font-semibold mbe-1">Select Server</h2>
         <p className="text-sm text-muted-foreground">{serverCountText}</p>
       </div>
 
@@ -289,15 +285,15 @@ export function SelectStep({
           className="flex items-start gap-3 p-4 rounded-xl border border-warning/20 bg-warning/10"
           role="alert"
         >
-          <AlertTriangle className="size-5 text-warning shrink-0 mt-0.5" />
-          <div className="space-y-1">
+          <AlertTriangle className="size-5 text-warning shrink-0 mbs-0.5" />
+          <div className="flex flex-col gap-1">
             <p className="font-medium text-warning">
               {t('login.http_warning.title')}
             </p>
             <p className="text-sm text-warning">
               {t('login.http_warning.message')}
             </p>
-            <p className="text-xs text-warning mt-2">
+            <p className="text-xs text-warning mbs-1">
               {t('login.http_warning.browser_recommendation')}
             </p>
           </div>

@@ -19,13 +19,13 @@ const ArtistView = lazy(() =>
 export function ArtistSkeleton() {
   return (
     <div
-      className="flex-1 px-4 py-6 sm:px-6"
+      className="flex-1 px-fluid-md py-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <span className="sr-only">Loading artist</span>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <Skeleton className="h-9 w-24" />
           <Skeleton className="h-8 w-48" />
@@ -34,7 +34,7 @@ export function ArtistSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="space-y-2 animate-in fade-in animation-duration-300"
+              className="flex flex-col gap-2 animate-in fade-in animation-duration-300"
               style={{ animationDelay: staggerDelay(i) }}
             >
               <Skeleton className="aspect-square w-full rounded-2xl" />
@@ -58,7 +58,7 @@ export function ArtistPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
+    <div className="flex flex-1 flex-col px-fluid-md py-6">
       <FeatureErrorBoundary featureName="Artist">
         <Suspense fallback={<ArtistSkeleton />}>
           <ArtistView artist={artist} albums={albums} />

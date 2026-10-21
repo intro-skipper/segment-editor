@@ -82,7 +82,7 @@ export const LibraryCard = function LibraryCardComponent({
       className={className}
     >
       {/* Library Image - 16:9 aspect ratio */}
-      <div className="relative aspect-video bg-muted overflow-hidden">
+      <div className="relative aspect-video bg-muted overflow-clip">
         {imageUrl && !imageError ? (
           <img
             src={imageUrl}
@@ -109,13 +109,13 @@ export const LibraryCard = function LibraryCardComponent({
       </div>
 
       {/* Library Name and Icon */}
-      <div className="px-3 py-2.5 md:px-4 md:py-3 flex items-center gap-2 bg-card border-t border-border/50">
+      <div className="px-fluid-sm py-2.5 md:py-3 flex items-center gap-2 bg-card border-bs border-border/50">
         <Icon
           className="size-5 flex-shrink-0 text-muted-foreground"
           aria-hidden="true"
         />
         <p
-          className="min-w-0 text-sm md:text-base font-semibold line-clamp-1 leading-snug text-foreground group-hover:text-primary"
+          className="min-w-0 text-fluid-body font-semibold line-clamp-1 leading-snug text-foreground group-hover:text-primary"
           title={collection.Name || undefined}
         >
           {collection.Name || 'Unknown'}

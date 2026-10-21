@@ -90,9 +90,9 @@ export const MediaCard = function MediaCardComponent({
           className="w-full"
         />
 
-        <div className="px-3 py-2.5 md:px-4 md:py-3">
+        <div className="px-fluid-sm py-2.5 md:py-3">
           <p
-            className="text-sm md:text-base font-semibold truncate leading-snug text-foreground"
+            className="text-fluid-body font-semibold truncate leading-snug text-foreground"
             title={item.Name || undefined}
           >
             {item.Name || 'Unknown'}

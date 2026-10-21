@@ -24,7 +24,7 @@ interface SegmentTimelineProps {
   segments: Array<MediaSegmentDto>
   /** Total runtime of the item in seconds */
   runtimeSeconds: number
-  /** Renders a pulsing placeholder track while segment data loads */
+  /** Renders a static placeholder track while segment data loads */
   isLoading?: boolean
 }
 
@@ -43,12 +43,7 @@ export function SegmentTimeline({
   }
 
   if (isLoading) {
-    return (
-      <div
-        className="h-1.5 rounded-full bg-muted/70 animate-pulse"
-        aria-hidden="true"
-      />
-    )
+    return <div className="h-1.5 rounded-full bg-muted" aria-hidden="true" />
   }
 
   // Fall back to the furthest segment end so existing segments still render
@@ -74,14 +69,14 @@ export function SegmentTimeline({
     <div
       role="img"
       aria-label={label}
-      className="relative h-1.5 rounded-full overflow-hidden bg-primary/15"
+      className="relative h-1.5 rounded-full overflow-clip bg-primary/15"
     >
       {regions.map((region) => (
         <div
           key={region.id}
           className="absolute inset-y-0 opacity-90"
           style={{
-            left: `${region.start}%`,
+            insetInlineStart: `${region.start}%`,
             width: `${region.width}%`,
             backgroundColor: region.color,
           }}

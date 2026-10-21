@@ -19,28 +19,28 @@ interface SuccessStepProps {
 
 export function SuccessStep({ selectedServer, onComplete }: SuccessStepProps) {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Inline header with success icon */}
       <div className="text-center">
-        <IconDisc tone="success" className="mx-auto mb-4">
+        <IconDisc tone="success" className="mx-auto mbe-4">
           <CheckCircle />
         </IconDisc>
-        <h2 className="text-lg font-semibold mb-1">Connected!</h2>
+        <h2 className="text-lg font-semibold mbe-1">Connected!</h2>
         <p className="text-sm text-muted-foreground">
           Successfully connected to your Jellyfin server
         </p>
       </div>
 
       {selectedServer && (
-        <div className="p-3 rounded-xl bg-muted/60 text-left">
-          <p className="font-medium">
+        <div className="p-3 rounded-xl bg-muted/60 text-start">
+          <p className="font-medium truncate">
             {selectedServer.systemInfo?.ServerName ?? 'Jellyfin Server'}
           </p>
           <p className="text-sm text-muted-foreground truncate">
             {selectedServer.address}
           </p>
           {selectedServer.systemInfo?.Version && (
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mbs-1">
               Version {selectedServer.systemInfo.Version}
             </p>
           )}

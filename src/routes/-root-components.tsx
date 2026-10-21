@@ -46,8 +46,8 @@ function HeaderFallback() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-background">
-      <nav className="px-4 py-4 sm:px-6">
+    <header className="sticky inset-bs-0 z-40 bg-background">
+      <nav className="px-fluid-md py-4">
         <div className="flex items-center justify-between gap-4">
           <Link to="/" className="text-xl font-bold">
             {t('app.name', 'Segment Editor')}
@@ -84,7 +84,11 @@ export function NotFoundComponent() {
             <ArrowLeft className="size-4" />
             {t('common.go_back', 'Go Back')}
           </Button>
-          <Link to="/" className={buttonVariants()}>
+          <Link
+            to="/"
+            className={buttonVariants()}
+            data-interactive-transition="true"
+          >
             <Home className="size-4" />
             {t('common.home', 'Home')}
           </Link>
@@ -126,7 +130,7 @@ export function RootComponent() {
         {showSkipToMain ? (
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl"
+            className="sr-only focus:not-sr-only focus:absolute focus:inset-bs-4 focus:inset-s-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl"
           >
             {t('accessibility.skipToMain', 'Skip to main content')}
           </a>
@@ -138,7 +142,7 @@ export function RootComponent() {
           id="main-content"
           aria-label={t('accessibility.mainContent', 'Main content')}
           tabIndex={-1}
-          className="flex flex-1 flex-col pb-safe outline-none"
+          className="flex flex-1 flex-col pbe-safe outline-hidden"
         >
           <ErrorBoundary componentName="MainContent">
             <Outlet />

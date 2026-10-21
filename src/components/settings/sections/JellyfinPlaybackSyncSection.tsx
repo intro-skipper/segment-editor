@@ -33,7 +33,7 @@ export function JellyfinPlaybackSyncSection() {
 
   return (
     <SettingsSection icon={Radio} title={title}>
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <SettingsSelect
           value={jellyfinPlaybackSyncEnabled ? 'enabled' : 'disabled'}
           onValueChange={(value) => {

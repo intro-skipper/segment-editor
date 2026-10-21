@@ -14,7 +14,7 @@ import { MediaListRow } from '@/components/filter/MediaListRow'
 import { getMediaItemLabel } from '@/components/filter/media-item-label'
 
 export const GRID_CLASS =
-  'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6'
+  'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-fluid-md'
 /** Estimated row height the virtualized grid positions rows by. */
 export const GRID_ROW_ESTIMATE_PX = 360
 const LIST_CLASS = 'flex flex-col gap-3'
@@ -122,7 +122,7 @@ export function VirtualizedMediaGrid({
       aria-label={t('items.mediaGrid', {
         defaultValue: 'Media items',
       })}
-      className="max-h-(--spacing-media-grid-max-height) overflow-auto overscroll-contain pr-1"
+      className="max-h-(--spacing-media-grid-max-height) overflow-auto overscroll-contain pe-1"
     >
       <div
         style={{
@@ -140,9 +140,9 @@ export function VirtualizedMediaGrid({
               key={`grid-row-${rowIndex}`}
               style={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
+                insetBlockStart: 0,
+                insetInlineStart: 0,
+                insetInlineEnd: 0,
                 width: '100%',
                 transform: `translateY(${rowIndex * GRID_ROW_ESTIMATE_PX}px)`,
               }}

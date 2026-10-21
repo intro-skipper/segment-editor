@@ -9,7 +9,7 @@ type TitleMenuTriggerProps = Omit<
   'className'
 > & { className?: string }
 
-/** Page-title dropdown trigger: the heading passed as children plus a chevron, dimming on hover. */
+/** Page-title dropdown trigger: the heading passed as children plus a chevron, dimming on hover and scaling on press. */
 export function TitleMenuTrigger({
   className,
   children,
@@ -17,8 +17,9 @@ export function TitleMenuTrigger({
 }: TitleMenuTriggerProps) {
   return (
     <DropdownMenuTrigger
+      data-interactive-transition="true"
       className={cn(
-        'flex min-w-0 max-w-full items-center gap-2 rounded-lg transition-opacity hover:opacity-80',
+        'flex min-w-0 max-w-full items-center gap-2 rounded-lg hover:opacity-80',
         className,
       )}
       {...props}

@@ -53,7 +53,7 @@ export function PaginationControls({
   const pageNumbers = getPageNumbers(currentPage, totalPages)
 
   return (
-    <div className="mt-10">
+    <div className="mbs-10">
       <Pagination>
         <PaginationContent>
           <PaginationItem>

@@ -14,8 +14,8 @@ export function DesktopFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8 font-sans text-foreground">
       <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card p-10 text-center">
-        <h1 className="mb-3 text-xl font-semibold">Segment Editor</h1>
-        <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
+        <h1 className="mbe-3 text-xl font-semibold">Segment Editor</h1>
+        <p className="mbe-6 text-sm leading-relaxed text-muted-foreground">
           This app is not supported in the Jellyfin desktop client. Please open
           it in your browser instead.
         </p>
@@ -24,11 +24,11 @@ export function DesktopFallback() {
           target="_blank"
           rel="noopener noreferrer"
           data-interactive-transition="true"
-          className={cn(buttonVariants({ size: 'lg' }), 'mb-4')}
+          className={cn(buttonVariants({ size: 'lg' }), 'mbe-4')}
         >
           Open in Browser
         </a>
-        <div className="mt-1 cursor-text select-all break-all rounded-md border border-border bg-background px-4 py-2.5 font-mono text-xs text-muted-foreground">
+        <div className="mbs-1 cursor-text select-all break-all rounded-md border border-border bg-background px-4 py-2.5 font-mono text-xs text-muted-foreground">
           {editorUrl}
         </div>
       </div>

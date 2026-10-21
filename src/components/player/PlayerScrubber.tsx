@@ -26,7 +26,7 @@ function clamp(value: number, min: number, max: number) {
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
-      className="rounded overflow-hidden shadow-lg mb-1 bg-black"
+      className="rounded overflow-clip shadow-lg mbe-1 bg-black"
       style={{
         width: position.thumbnailWidth,
         height: position.thumbnailHeight,
@@ -88,7 +88,7 @@ function ScrubberTrack({
   segmentRegions: Array<SegmentRegion>
 }) {
   return (
-    <div className="absolute inset-0 rounded-full overflow-hidden bg-primary/20">
+    <div className="absolute inset-0 rounded-full overflow-clip bg-primary/20">
       <div
         className="absolute inset-y-0 left-0 bg-muted-foreground/30 rounded-full"
         style={bufferedStyle}
@@ -131,7 +131,7 @@ function ScrubberChapterMarkers({
         <button
           key={`chapter-${marker.time}-${marker.position}-${marker.name}`}
           type="button"
-          className="absolute top-1/2 w-1 h-3 rounded-sm bg-current/80 shadow-sm pointer-events-auto cursor-pointer transition-[height,background-color] hover:h-4 hover:bg-current z-10"
+          className="absolute inset-bs-1/2 w-1 h-3 rounded-sm bg-current/80 shadow-sm pointer-events-auto cursor-pointer transition-colors motion-safe:transition-[height,background-color] hover:h-4 hover:bg-current active:scale-97 z-10"
           style={{
             left: `${marker.position}%`,
             transform: 'translate(-50%, -50%)',
@@ -160,7 +160,7 @@ function ChapterTooltip({
   if (!chapter) return null
   return (
     <div
-      className="absolute -top-8 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-20"
+      className="absolute -inset-bs-8 max-w-xs truncate bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none z-20"
       style={{
         left: `${chapter.position}%`,
         transform: 'translateX(-50%)',
@@ -183,7 +183,7 @@ function HoverTimePreview({
   if (hoverTime === null) return null
   return (
     <div
-      className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none z-30"
+      className="absolute inset-be-full mbe-2 flex flex-col items-center pointer-events-none z-30"
       style={hoverIndicatorStyle}
     >
       {trickplayPosition && <TrickplayPreview position={trickplayPosition} />}
@@ -197,7 +197,7 @@ function HoverTimePreview({
 function ScrubberThumb({ thumbStyle }: { thumbStyle: React.CSSProperties }) {
   return (
     <div
-      className="absolute top-1/2 size-4 rounded-full shadow-md ring-2 ring-background transition-transform group-hover:scale-110 bg-primary"
+      className="absolute inset-bs-1/2 size-4 rounded-full shadow-md ring-2 ring-background motion-safe:transition-transform ease-(--ease-out-expo) group-hover:scale-110 bg-primary"
       style={thumbStyle}
     />
   )
@@ -552,7 +552,7 @@ export function PlayerScrubber({
 
         <div
           className={cn(
-            'absolute top-0 w-0.5 h-full bg-current/50 pointer-events-none transition-opacity',
+            'absolute inset-bs-0 w-0.5 h-full bg-current/50 pointer-events-none transition-opacity',
             hoverTime !== null ? 'opacity-100' : 'opacity-0',
           )}
           style={hoverIndicatorStyle}
@@ -567,7 +567,7 @@ export function PlayerScrubber({
         />
       </div>
 
-      <span className="text-xs font-medium tabular-nums opacity-80 min-w-(--spacing-time-display) text-right">
+      <span className="text-xs font-medium tabular-nums opacity-80 min-w-(--spacing-time-display) text-end">
         {formatTime(safeDuration)}
       </span>
     </div>

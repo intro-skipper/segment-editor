@@ -47,7 +47,7 @@ const SeasonTabs = function SeasonTabsComponent({
 
   return (
     <div
-      className="flex gap-2 md:gap-3 overflow-x-auto pb-2 md:pb-3 no-scrollbar relative z-10"
+      className="flex gap-2 md:gap-3 overflow-x-auto pbe-2 md:pbe-3 no-scrollbar relative z-10"
       role="tablist"
       aria-label="Seasons"
     >
@@ -104,7 +104,7 @@ function EpisodeSegmentTimeline({
   if (!episodeId) return null
 
   return (
-    <div ref={ref} className="mt-2 md:mt-2.5">
+    <div ref={ref} className="mbs-2 md:mbs-2.5">
       {!isError && (
         <SegmentTimeline
           segments={segments ?? NO_SEGMENTS}
@@ -152,7 +152,7 @@ const EpisodeCard = function EpisodeCardComponent({
       animationDelay={animationDelay}
       aria-label={ariaLabel}
     >
-      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-lg overflow-hidden bg-muted shadow-md">
+      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-lg overflow-clip bg-muted shadow-md">
         <ItemImage
           item={episode}
           maxWidth={192}
@@ -174,7 +174,7 @@ const EpisodeCard = function EpisodeCardComponent({
         <p className="font-semibold truncate leading-tight text-base md:text-lg text-foreground">
           {episode.Name || episodeLabel}
         </p>
-        <p className="text-sm md:text-base truncate mt-0.5 md:mt-1 text-muted-foreground tabular-nums">
+        <p className="text-fluid-body truncate mbs-0.5 md:mbs-1 text-muted-foreground tabular-nums">
           {episode.Name ? episodeLabel : t('series.episode')}
           {runtime && ` · ${runtime} min`}
         </p>
@@ -243,7 +243,7 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
 
   return (
     <div
-      className="space-y-2 md:space-y-3"
+      className="flex flex-col gap-2 md:gap-3"
       role="tabpanel"
       id={`season-panel-${season.Id}`}
     >
@@ -303,14 +303,14 @@ export function SeriesView({
   }
 
   return (
-    <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10">
+    <div className="w-full max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10">
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
         onSeasonSelect={onSeasonSelect}
       />
 
-      <div className="mt-2 md:mt-4">
+      <div className="mbs-2 md:mbs-4">
         {selectedSeason && series.Id && (
           <SeasonEpisodes
             key={selectedSeason.Id}
