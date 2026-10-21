@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
+import { resolveSelectedSeasonId } from '@/lib/series-utils'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
 import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
@@ -38,7 +39,7 @@ export const Route = createFileRoute('/series/$itemId')({
 
     assertJellyfinCredentials()
 
-    const [series, seasons, { resolveSelectedSeasonId }] = await Promise.all([
+    const [series, seasons] = await Promise.all([
       queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
       queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId)),
       import('@/components/views/SeriesView'),

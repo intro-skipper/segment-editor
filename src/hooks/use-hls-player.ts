@@ -19,6 +19,9 @@ interface UseHlsPlayerReturn {
   retry: () => void
 }
 
+// Outside the hook: React Compiler cannot lower import() expressions.
+const loadHls = () => import('hls.js')
+
 const HLS_CONFIG = {
   testBandwidth: false,
   enableWorker: true,
@@ -106,8 +109,8 @@ export function useHlsPlayer({
     // stays null when cleanup runs before the import resolves.
     let cancelled = false
     let hls: Hls | null = null
-    void import('hls.js').then(
-      ({ default: Hls }) => {
+    loadHls()
+      .then(({ default: Hls }) => {
         if (cancelled) return
         if (!Hls.isSupported()) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -148,38 +151,37 @@ export function useHlsPlayer({
         ) => {
           if (!isActiveRef.current || !data.fatal) return
 
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              handleRecovery('network_error', 'player.error.network', () =>
-                instance.startLoad(),
-              )
-              break
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              handleRecovery('media_error', 'player.error.media', () => {
-                const now = performance.now()
-                if (
-                  now - lastMediaRecoveryAtRef.current <
-                  MEDIA_ERROR_SWAP_WINDOW_MS
-                ) {
-                  // Second media error shortly after a recovery attempt:
-                  // hls.js docs require swapping the audio codec before retrying.
-                  instance.swapAudioCodec()
-                }
-                lastMediaRecoveryAtRef.current = now
-                instance.recoverMediaError()
-              })
-              break
-            default:
-              // Recoverable via the Retry button, which rebuilds the Hls
-              // instance. Marking it non-recoverable would strand the user on
-              // a permanent error overlay with no way out.
-              reportError(
-                createLocalizedError(
-                  'unknown_error',
-                  'player.error.unknown',
-                  true,
-                ),
-              )
+          // An if-chain, not a switch: React Compiler cannot reorder the
+          // member-expression case tests of a locally bound Hls.
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            handleRecovery('network_error', 'player.error.network', () =>
+              instance.startLoad(),
+            )
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            handleRecovery('media_error', 'player.error.media', () => {
+              const now = performance.now()
+              if (
+                now - lastMediaRecoveryAtRef.current <
+                MEDIA_ERROR_SWAP_WINDOW_MS
+              ) {
+                // Second media error shortly after a recovery attempt:
+                // hls.js docs require swapping the audio codec before retrying.
+                instance.swapAudioCodec()
+              }
+              lastMediaRecoveryAtRef.current = now
+              instance.recoverMediaError()
+            })
+          } else {
+            // Recoverable via the Retry button, which rebuilds the Hls
+            // instance. Marking it non-recoverable would strand the user on
+            // a permanent error overlay with no way out.
+            reportError(
+              createLocalizedError(
+                'unknown_error',
+                'player.error.unknown',
+                true,
+              ),
+            )
           }
         }
 
@@ -208,16 +210,16 @@ export function useHlsPlayer({
 
         instance.loadSource(videoUrl)
         hlsRef.current = instance
-      },
-      () => {
-        // The chunk failed to load; Retry re-runs the import.
+      })
+      .catch((error: unknown) => {
+        // A failed chunk load or a setup throw; Retry runs both again.
+        console.error('HLS setup failed', error)
         if (!cancelled) {
           reportError(
             createLocalizedError('unknown_error', 'player.error.unknown', true),
           )
         }
-      },
-    )
+      })
 
     return () => {
       cancelled = true

@@ -13,7 +13,7 @@ import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { isSpecialSeason } from '@/lib/series-utils'
+import { isSpecialSeason, resolveSelectedSeasonId } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
@@ -265,21 +265,6 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
       ))}
     </div>
   )
-}
-
-/**
- * The season the series page shows: `selectedSeasonId` when it names one of
- * `seasons`, else the first regular season, else the first season. The route
- * loader uses it to prefetch that season's episodes.
- */
-export function resolveSelectedSeasonId(
-  seasons: Array<BaseItemDto>,
-  selectedSeasonId?: string | null,
-): string | null {
-  if (selectedSeasonId && seasons.some((s) => s.Id === selectedSeasonId)) {
-    return selectedSeasonId
-  }
-  return seasons.find((s) => !isSpecialSeason(s))?.Id ?? seasons[0]?.Id ?? null
 }
 
 export function SeriesView({

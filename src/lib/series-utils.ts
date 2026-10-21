@@ -8,3 +8,18 @@ import type { BaseItemDto } from '@/types/jellyfin'
 export const isSpecialSeason = (season: BaseItemDto): boolean =>
   season.IndexNumber === 0 ||
   (season.Name ?? '').toLowerCase().includes('special')
+
+/**
+ * The season the series page shows: `selectedSeasonId` when it names one of
+ * `seasons`, else the first regular season, else the first season. The route
+ * loader uses it to prefetch that season's episodes.
+ */
+export function resolveSelectedSeasonId(
+  seasons: Array<BaseItemDto>,
+  selectedSeasonId?: string | null,
+): string | null {
+  if (selectedSeasonId && seasons.some((s) => s.Id === selectedSeasonId)) {
+    return selectedSeasonId
+  }
+  return seasons.find((s) => !isSpecialSeason(s))?.Id ?? seasons[0]?.Id ?? null
+}
