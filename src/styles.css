@@ -93,7 +93,6 @@
   /* Layout spacing tokens */
   --spacing-dialog-max-width: calc(100% - 2rem);
   --spacing-empty-state-min-height: 50svh;
-  --spacing-media-grid-max-height: 72dvh;
   /* Scroll areas inside menus and dialogs */
   --spacing-popup-max-height: min(30rem, 60dvh);
   /* Touch target minimum size (WCAG 2.5.5) */
@@ -297,6 +296,16 @@
 /* Safe-area padding for sticky bottom UI (notched devices) */
 @utility pbe-safe {
   padding-block-end: env(safe-area-inset-bottom, 0px);
+}
+
+/* Media card columns, at least 10.25rem wide (six across the max-w-7xl page)
+   and never fewer than two. Pair with gap-fluid-md. Keyboard navigation
+   counts the resulting tracks. */
+@utility grid-cols-media {
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(10.25rem, (100% - var(--spacing-fluid-md)) / 2), 1fr)
+  );
 }
 
 /* Vertical range input whose track fills from the bottom up */

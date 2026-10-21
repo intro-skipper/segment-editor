@@ -1,8 +1,7 @@
 /**
- * The three layouts a page of media items renders in: a list, a plain grid,
- * and a row-windowed grid for large pages. Keyboard navigation wiring comes
- * from the parent's useGridKeyboardNavigation so focus state stays in one
- * place across layout switches.
+ * The two layouts a page of media items renders in: a list and a grid.
+ * Keyboard navigation wiring comes from the parent's useGridKeyboardNavigation
+ * so focus state stays in one place across layout switches.
  */
 
 import type { Ref } from 'react'
@@ -13,17 +12,14 @@ import { MediaCard } from '@/components/filter/MediaCard'
 import { MediaListRow } from '@/components/filter/MediaListRow'
 import { getMediaItemLabel } from '@/components/filter/media-item-label'
 
-export const GRID_CLASS =
-  'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-fluid-md'
-/** Estimated row height the virtualized grid positions rows by. */
-export const GRID_ROW_ESTIMATE_PX = 360
+const GRID_CLASS = 'grid grid-cols-media gap-fluid-md'
 const LIST_CLASS = 'flex flex-col gap-3'
 
 type GridNavigation = ReturnType<typeof useGridKeyboardNavigation>
 
 interface MediaCollectionProps {
   items: Array<BaseItemDto>
-  /** Attached to the navigable container; a ref object or a callback ref. */
+  /** Attached to the navigable container, which keyboard navigation measures. */
   gridRef: Ref<HTMLDivElement>
   gridProps: GridNavigation['gridProps']
   getItemProps: GridNavigation['getItemProps']
@@ -89,81 +85,6 @@ export function MediaGrid({
           <MediaCard item={item} index={index} {...getItemProps(index)} />
         </div>
       ))}
-    </div>
-  )
-}
-
-/**
- * Row-windowed grid for large pages. The scroll container is handed back
- * through `gridRef` so the parent's virtual window and keyboard navigation
- * can measure and scroll it.
- */
-export function VirtualizedMediaGrid({
-  items,
-  columns,
-  rowIndexes,
-  totalHeight,
-  gridRef,
-  gridProps,
-  getItemProps,
-}: MediaCollectionProps & {
-  columns: number
-  rowIndexes: ReadonlyArray<number>
-  totalHeight: number
-}) {
-  const { t } = useTranslation()
-  const rowCount = Math.ceil(items.length / columns)
-
-  return (
-    <div
-      ref={gridRef}
-      {...gridProps}
-      aria-rowcount={rowCount}
-      aria-label={t('items.mediaGrid', {
-        defaultValue: 'Media items',
-      })}
-      className="max-h-(--spacing-media-grid-max-height) overflow-auto overscroll-contain pe-1"
-    >
-      <div
-        style={{
-          height: totalHeight,
-          width: '100%',
-          position: 'relative',
-        }}
-      >
-        {rowIndexes.map((rowIndex) => {
-          const rowStartIndex = rowIndex * columns
-          const rowItems = items.slice(rowStartIndex, rowStartIndex + columns)
-
-          return (
-            <div
-              key={`grid-row-${rowIndex}`}
-              style={{
-                position: 'absolute',
-                insetBlockStart: 0,
-                insetInlineStart: 0,
-                insetInlineEnd: 0,
-                width: '100%',
-                transform: `translateY(${rowIndex * GRID_ROW_ESTIMATE_PX}px)`,
-              }}
-            >
-              <div className={GRID_CLASS}>
-                {rowItems.map((item, columnIndex) => {
-                  const index = rowStartIndex + columnIndex
-                  return (
-                    <MediaCard
-                      key={item.Id}
-                      {...getItemProps(index)}
-                      item={item}
-                      index={index}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }

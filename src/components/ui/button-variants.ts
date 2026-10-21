@@ -7,10 +7,6 @@ import { cva } from 'class-variance-authority'
  * - All interactive sizes meet 44x44px minimum on touch devices via CSS media query
  * - Visual sizes may be smaller but touch area is expanded via CSS
  * - See styles.css `@media (pointer: coarse)` for touch target expansion
- *
- * Responsive breakpoints:
- * - Uses Tailwind's responsive classes which align with VIEWPORT_BREAKPOINTS
- * - sm: 640px, md: 768px, lg: 1024px, xl: 1280px
  */
 export const buttonVariants = cva(
   "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-full border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-4 inline-flex items-center justify-center whitespace-nowrap disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none shrink-0 [&_svg]:shrink-0 outline-hidden group/button select-none",

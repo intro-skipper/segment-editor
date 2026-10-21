@@ -1,21 +1,17 @@
 /**
  * useGridKeyboardNavigation - Hook for keyboard navigation in grid layouts.
  * Enables arrow key navigation, Home/End support, and proper focus management.
- * Supports virtualized grids via onScrollToIndex + retry-focus after scroll.
+ * Attach `gridRef` to the item container: CSS decides the column count, and
+ * the hook reads it from that container on each key press.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { lookup } from '@/lib/utils'
 
 interface UseGridKeyboardNavigationOptions {
   itemCount: number
-  columns: number
-  enabled?: boolean
   onActivate?: (index: number) => void
-  /** Called when keyboard navigation targets an off-screen virtualized item.
-   *  The consumer should scroll the item into view; focus will be retried after render. */
-  onScrollToIndex?: (index: number) => void
 }
 
 interface GridProps {
@@ -34,11 +30,10 @@ interface GridItemProps {
 }
 
 interface UseGridKeyboardNavigationReturn {
-  focusedIndex: number
   setFocusedIndex: (index: number) => void
   gridProps: GridProps
   getItemProps: (index: number) => GridItemProps
-  gridRef: React.MutableRefObject<HTMLDivElement | null>
+  gridRef: React.RefObject<HTMLDivElement | null>
 }
 
 /** Navigation key handlers mapped to index calculations */
@@ -59,103 +54,16 @@ const NAV_KEYS = {
   (cur: number, cols: number, count: number, ctrl: boolean) => number
 >
 
-/** Max retry attempts to focus an element after scrolling it into view */
-const FOCUS_RETRY_MAX = 5
-/** Delay between retry attempts in ms (allows render after scroll) */
-const FOCUS_RETRY_DELAY_MS = 60
-
-// ---------------------------------------------------------------------------
-// useVirtualizedGridFocus – scroll-into-view + retry-focus state machine
-// ---------------------------------------------------------------------------
-
-interface UseVirtualizedGridFocusOptions {
-  enabled: boolean
-  gridRef: React.RefObject<HTMLDivElement | null>
-  onScrollToIndex?: (index: number) => void
+/** Track count of a CSS grid container; 1 for any other layout, such as a list. */
+function countColumns(container: HTMLElement | null): number {
+  if (!container) return 1
+  const tracks = getComputedStyle(container).gridTemplateColumns
+  return tracks && tracks !== 'none' ? tracks.split(' ').length : 1
 }
-
-/**
- * Encapsulates the "try to focus a grid cell by data-attribute; if missing,
- * scroll it into view and retry until it appears" state machine.
- *
- * Returns a single `focusIndex` function that the parent navigation hook
- * can call whenever the focused index changes.
- */
-function useVirtualizedGridFocus({
-  enabled,
-  gridRef,
-  onScrollToIndex,
-}: UseVirtualizedGridFocusOptions) {
-  const pendingFocusRef = useRef<number | null>(null)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const tryFocusElement = (index: number): boolean => {
-    if (!enabled || index < 0 || !gridRef.current) return false
-    const el = gridRef.current.querySelector<HTMLElement>(
-      `[data-grid-index="${index}"]`,
-    )
-    if (!el) return false
-
-    if (document.activeElement !== el) {
-      el.focus({ preventScroll: true })
-    }
-    return document.activeElement === el
-  }
-
-  const focusIndex = (index: number) => {
-    // Clear any pending retry
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current)
-      retryTimerRef.current = null
-    }
-    pendingFocusRef.current = null
-
-    if (tryFocusElement(index)) return
-
-    // Element not in DOM — request scroll and schedule retries
-    if (!onScrollToIndex) return
-
-    onScrollToIndex(index)
-    pendingFocusRef.current = index
-
-    let attempt = 0
-    const retry = () => {
-      attempt += 1
-      if (pendingFocusRef.current !== index || attempt > FOCUS_RETRY_MAX) {
-        pendingFocusRef.current = null
-        return
-      }
-      if (tryFocusElement(index)) {
-        pendingFocusRef.current = null
-        return
-      }
-      retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
-    }
-
-    retryTimerRef.current = setTimeout(retry, FOCUS_RETRY_DELAY_MS)
-  }
-
-  // Clean up retry timer on unmount
-  useEffect(
-    () => () => {
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-    },
-    [],
-  )
-
-  return focusIndex
-}
-
-// ---------------------------------------------------------------------------
-// useGridKeyboardNavigation – index computation + event wiring
-// ---------------------------------------------------------------------------
 
 export function useGridKeyboardNavigation({
   itemCount,
-  columns,
-  enabled = true,
   onActivate,
-  onScrollToIndex,
 }: UseGridKeyboardNavigationOptions): UseGridKeyboardNavigationReturn {
   const [focusedIndex, setFocusedIndex] = useState(-1)
   const gridRef = useRef<HTMLDivElement | null>(null)
@@ -168,14 +76,14 @@ export function useGridKeyboardNavigation({
         ? itemCount - 1
         : focusedIndex
 
-  const focusIndex = useVirtualizedGridFocus({
-    enabled,
-    gridRef,
-    onScrollToIndex,
-  })
+  const focusIndex = (index: number) => {
+    gridRef.current
+      ?.querySelector<HTMLElement>(`[data-grid-index="${index}"]`)
+      ?.focus()
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!enabled || itemCount === 0) return
+    if (itemCount === 0) return
 
     if ((e.key === 'Enter' || e.key === ' ') && validFocusedIndex >= 0) {
       e.preventDefault()
@@ -189,7 +97,7 @@ export function useGridKeyboardNavigation({
     const current = validFocusedIndex < 0 ? 0 : validFocusedIndex
     const newIndex = handler(
       current,
-      columns,
+      countColumns(gridRef.current),
       itemCount,
       e.ctrlKey || e.metaKey,
     )
@@ -227,7 +135,6 @@ export function useGridKeyboardNavigation({
   })
 
   return {
-    focusedIndex: validFocusedIndex,
     setFocusedIndex,
     gridProps: {
       role: 'grid',
