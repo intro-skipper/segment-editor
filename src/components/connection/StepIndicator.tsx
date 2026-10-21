@@ -24,7 +24,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStep)
 
   return (
-    <div className="flex items-center justify-center gap-2 mb-6">
+    <div className="flex items-center justify-center gap-2 mbe-6">
       {STEPS.map((step, index) => {
         const isActive = index === currentIndex
         const isCompleted = index < currentIndex
@@ -33,7 +33,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
           <div key={step.key} className="flex items-center">
             <div
               className={cn(
-                'size-2 rounded-full transition-[scale,background-color]',
+                'size-2 rounded-full transition-colors ease-(--ease-out-expo) motion-safe:transition-[background-color,scale]',
                 isActive && 'bg-primary scale-125',
                 isCompleted && 'bg-primary/60',
                 !isActive && !isCompleted && 'bg-muted-foreground/30',

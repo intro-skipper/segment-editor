@@ -6,27 +6,78 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Hover styles only on devices with a real hover pointer, so a tap never
+   leaves a hover state stuck. Covers every hover:, group-hover: and peer-hover:. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
+/* Every color token holds its light and dark value. The theme switches by
+   setting color-scheme (app-store writes it on <html>), never by redefining
+   tokens. Theme classes all sit on <html>, so aliases such as
+   var(--foreground) resolve against the active theme. */
 :root {
+  color-scheme: light dark;
   /* Base theme generated from brand seed #d87943 using the same Material 3
      pipeline as the artwork-derived dynamic schemes. */
-  --background: #fff8f6;
-  --foreground: #221a15;
-  --card: #fff1eb;
-  --card-foreground: #221a15;
-  --popover: #f6e5dd;
-  --popover-foreground: #221a15;
-  --primary: #944512;
-  --primary-foreground: #ffffff;
-  --secondary: #ffc5a8;
-  --secondary-foreground: #7a5039;
-  --muted: #f6e5dd;
-  --muted-foreground: #55433a;
-  --accent: #949627;
-  --accent-foreground: #2b2c00;
-  --destructive: #ba1a1a;
-  --border: #dbc1b6;
-  --input: #dbc1b6;
-  --ring: #944512;
+  --background: light-dark(
+    oklch(0.984 0.008 36.55),
+    oklch(0.1911 0.0156 47.89)
+  );
+  --foreground: light-dark(
+    oklch(0.2257 0.0159 53.71),
+    oklch(0.9154 0.021 43.84)
+  );
+  --card: light-dark(oklch(0.9675 0.0172 44.81), oklch(0.2257 0.0159 53.71));
+  --card-foreground: var(--foreground);
+  --popover: light-dark(oklch(0.9333 0.0216 46.98), oklch(0.2865 0.0175 48.09));
+  --popover-foreground: var(--foreground);
+  --primary: light-dark(oklch(0.4845 0.1219 48.05), oklch(0.8361 0.0994 48.43));
+  --primary-foreground: light-dark(oklch(1 0 none), oklch(0.318 0.0867 47.9));
+  --secondary: light-dark(
+    oklch(0.8682 0.0773 47.81),
+    oklch(0.4025 0.0659 48.94)
+  );
+  --secondary-foreground: light-dark(
+    oklch(0.4723 0.0666 49.28),
+    oklch(0.779 0.0757 48.15)
+  );
+  --muted: var(--popover);
+  --muted-foreground: light-dark(
+    oklch(0.3992 0.0291 47.97),
+    oklch(0.8299 0.0334 44.32)
+  );
+  --accent: oklch(0.6513 0.1286 110.53);
+  --accent-foreground: oklch(0.2827 0.0622 111.12);
+  --destructive: light-dark(
+    oklch(0.506 0.1927 27.7),
+    oklch(0.8383 0.0891 26.76)
+  );
+  --border: light-dark(oklch(0.8299 0.0334 44.32), oklch(0.3992 0.0291 47.97));
+  --input: var(--border);
+  --ring: var(--primary);
+  /* Status colors, fixed across brand, artwork, and monochrome themes (Tailwind green/yellow/blue 600 light, 400 dark) */
+  --success: light-dark(oklch(62.7% 0.194 149.214), oklch(79.2% 0.209 151.711));
+  --warning: light-dark(oklch(68.1% 0.162 75.834), oklch(85.2% 0.199 91.936));
+  --info: light-dark(oklch(54.6% 0.245 262.881), oklch(70.7% 0.165 254.624));
+  /* Segment type colors, slightly brighter in dark mode */
+  --segment-intro: light-dark(oklch(0.723 0.191 142.5), oklch(0.75 0.18 142.5));
+  --segment-outro: light-dark(oklch(0.627 0.265 303.9), oklch(0.68 0.24 303.9));
+  --segment-preview: light-dark(oklch(0.841 0.238 116), oklch(0.86 0.22 116));
+  --segment-recap: light-dark(oklch(0.795 0.184 86), oklch(0.82 0.17 86));
+  --segment-commercial: light-dark(
+    oklch(0.637 0.237 25.3),
+    oklch(0.68 0.22 25.3)
+  );
+  --segment-unknown: light-dark(
+    oklch(0.551 0.027 264.5),
+    oklch(0.6 0.025 264.5)
+  );
+
   --radius: 0.5rem;
   --spacing: 0.25rem;
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
@@ -41,145 +92,98 @@
   --spacing-thumbnail-md: 12.5rem;
   /* Layout spacing tokens */
   --spacing-dialog-max-width: calc(100% - 2rem);
-  --spacing-empty-state-min-height: 50vh;
-  --spacing-media-grid-max-height: 72vh;
+  --spacing-empty-state-min-height: 50svh;
   /* Scroll areas inside menus and dialogs */
-  --spacing-popup-max-height: min(30rem, 60vh);
+  --spacing-popup-max-height: min(30rem, 60dvh);
   /* Touch target minimum size (WCAG 2.5.5) */
   --spacing-touch-target-min: 2.75rem;
-  /* Segment type colors */
-  --segment-intro: oklch(0.723 0.191 142.5);
-  --segment-outro: oklch(0.627 0.265 303.9);
-  --segment-preview: oklch(0.841 0.238 116);
-  --segment-recap: oklch(0.795 0.184 86);
-  --segment-commercial: oklch(0.637 0.237 25.3);
-  --segment-unknown: oklch(0.551 0.027 264.5);
+}
+
+/* The build polyfills light-dark() from these rules, so the inline
+   color-scheme alone would not switch the tokens. */
+.light {
+  color-scheme: light;
 }
 
 .dark {
-  --background: #1a120e;
-  --foreground: #f0dfd8;
-  --card: #221a15;
-  --card-foreground: #f0dfd8;
-  --popover: #322823;
-  --popover-foreground: #f0dfd8;
-  --primary: #ffb690;
-  --primary-foreground: #542100;
-  --secondary: #653d27;
-  --secondary-foreground: #e0a98d;
-  --muted: #322823;
-  --muted-foreground: #dbc1b6;
-  --destructive: #ffb4ab;
-  --border: #55433a;
-  --input: #55433a;
-  --ring: #ffb690;
-  /* Segment type colors (dark mode - slightly brighter) */
-  --segment-intro: oklch(0.75 0.18 142.5);
-  --segment-outro: oklch(0.68 0.24 303.9);
-  --segment-preview: oklch(0.86 0.22 116);
-  --segment-recap: oklch(0.82 0.17 86);
-  --segment-commercial: oklch(0.68 0.22 25.3);
-  --segment-unknown: oklch(0.6 0.025 264.5);
+  color-scheme: dark;
 }
 
 .monochrome {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.2101 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2101 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2101 0 0);
-  --muted: oklch(0.967 0 0);
-  --muted-foreground: oklch(0.551 0 0);
-  --accent: oklch(0.9491 0 0);
-  --accent-foreground: oklch(0.2101 0 0);
-  --border: oklch(0.9276 0 0);
-  --input: oklch(0.9276 0 0);
-  --primary: oklch(0.48 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.62 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --ring: oklch(0.48 0 0);
-  --segment-intro: oklch(0.42 0 0);
-  --segment-outro: oklch(0.5 0 0);
-  --segment-preview: oklch(0.58 0 0);
-  --segment-recap: oklch(0.66 0 0);
-  --segment-commercial: oklch(0.34 0 0);
-  --segment-unknown: oklch(0.54 0 0);
+  --background: light-dark(oklch(1 0 none), oklch(0.1797 0 none));
+  --foreground: light-dark(oklch(0.2101 0 none), oklch(0.8109 0 none));
+  --card: light-dark(oklch(1 0 none), oklch(0.1822 0 none));
+  --popover: light-dark(oklch(1 0 none), oklch(0.2101 0 none));
+  --muted: light-dark(oklch(0.967 0 none), oklch(0.252 0 none));
+  --muted-foreground: light-dark(oklch(0.551 0 none), oklch(0.6268 0 none));
+  --accent: light-dark(oklch(0.9491 0 none), oklch(0.3211 0 none));
+  --accent-foreground: var(--foreground);
+  --border: light-dark(oklch(0.9276 0 none), oklch(0.252 0 none));
+  --primary: light-dark(oklch(0.48 0 none), oklch(0.76 0 none));
+  --primary-foreground: light-dark(oklch(0.985 0 none), oklch(0.18 0 none));
+  --secondary: light-dark(oklch(0.62 0 none), oklch(0.58 0 none));
+  --secondary-foreground: var(--primary-foreground);
+  --segment-intro: oklch(0.42 0 none);
+  --segment-outro: oklch(0.5 0 none);
+  --segment-preview: oklch(0.58 0 none);
+  --segment-recap: oklch(0.66 0 none);
+  --segment-commercial: light-dark(oklch(0.34 0 none), oklch(0.74 0 none));
+  --segment-unknown: light-dark(oklch(0.54 0 none), oklch(0.6 0 none));
 }
 
-.dark.monochrome {
-  --background: oklch(0.1797 0 0);
-  --foreground: oklch(0.8109 0 0);
-  --card: oklch(0.1822 0 0);
-  --card-foreground: oklch(0.8109 0 0);
-  --popover: oklch(0.2101 0 0);
-  --popover-foreground: oklch(0.8109 0 0);
-  --muted: oklch(0.252 0 0);
-  --muted-foreground: oklch(0.6268 0 0);
-  --accent: oklch(0.3211 0 0);
-  --accent-foreground: oklch(0.8109 0 0);
-  --border: oklch(0.252 0 0);
-  --input: oklch(0.252 0 0);
-  --primary: oklch(0.76 0 0);
-  --primary-foreground: oklch(0.18 0 0);
-  --secondary: oklch(0.58 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --ring: oklch(0.76 0 0);
-  --segment-intro: oklch(0.42 0 0);
-  --segment-outro: oklch(0.5 0 0);
-  --segment-preview: oklch(0.58 0 0);
-  --segment-recap: oklch(0.66 0 0);
-  --segment-commercial: oklch(0.74 0 0);
-  --segment-unknown: oklch(0.6 0 0);
-}
-
-/* Status colors, fixed across brand, artwork, and monochrome themes (Tailwind green/yellow/blue 600 light, 400 dark) */
+/* Chip text on segment colors: dark on light segments, white on dark ones */
 :root {
-  --success: oklch(62.7% 0.194 149.214);
-  --warning: oklch(68.1% 0.162 75.834);
-  --info: oklch(54.6% 0.245 262.881);
-  /* Chip text on segment colors: dark on light segments, white on dark ones */
   --segment-intro-foreground: oklch(
-    from var(--segment-intro) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-intro) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
   --segment-outro-foreground: oklch(
-    from var(--segment-outro) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-outro) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
   --segment-preview-foreground: oklch(
-    from var(--segment-preview) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-preview) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
   --segment-recap-foreground: oklch(
-    from var(--segment-recap) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-recap) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
   --segment-commercial-foreground: oklch(
-    from var(--segment-commercial) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-commercial) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
   --segment-unknown-foreground: oklch(
-    from var(--segment-unknown) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 0
+    from var(--segment-unknown) clamp(0.2, (0.6 - l) * 1000, 0.99) 0 none
   );
 }
 
-.dark {
-  --success: oklch(79.2% 0.209 151.711);
-  --warning: oklch(85.2% 0.199 91.936);
-  --info: oklch(70.7% 0.165 254.624);
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --border: light-dark(oklch(0.3 0 none), oklch(0.8 0 none));
+  }
 }
 
 @theme {
-  --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-  --shadow-xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
+  --shadow-2xs: 0 1px 4px 0 oklch(0 0 none / 0.03);
+  --shadow-xs: 0 1px 4px 0 oklch(0 0 none / 0.03);
   --shadow-sm:
-    0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
+    0 1px 4px 0 oklch(0 0 none / 0.05), 0 1px 2px -1px oklch(0 0 none / 0.05);
   --shadow:
-    0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
+    0 1px 4px 0 oklch(0 0 none / 0.05), 0 1px 2px -1px oklch(0 0 none / 0.05);
   --shadow-md:
-    0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
+    0 1px 4px 0 oklch(0 0 none / 0.05), 0 2px 4px -1px oklch(0 0 none / 0.05);
   --shadow-lg:
-    0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
+    0 1px 4px 0 oklch(0 0 none / 0.05), 0 4px 6px -1px oklch(0 0 none / 0.05);
   --shadow-xl:
-    0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 8px 10px -1px hsl(0 0% 0% / 0.05);
-  --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
+    0 1px 4px 0 oklch(0 0 none / 0.05), 0 8px 10px -1px oklch(0 0 none / 0.05);
+  --shadow-2xl: 0 1px 4px 0 oklch(0 0 none / 0.13);
+  /* Fluid sizes, growing from a 320px to a 640px viewport (768px for body
+     text). Each replaces a breakpoint pair such as px-4 sm:px-6. */
+  --spacing-fluid-sm: clamp(0.75rem, 0.5rem + 1.25vw, 1rem);
+  --spacing-fluid-md: clamp(1rem, 0.5rem + 2.5vw, 1.5rem);
+  --text-fluid-body: clamp(0.875rem, 0.7857rem + 0.4464vw, 1rem);
+  --text-fluid-body--line-height: 1.5;
+  --text-fluid-title: clamp(1.5rem, 1.125rem + 1.875vw, 1.875rem);
+  --text-fluid-title--line-height: 1.25;
+  --text-fluid-display: clamp(1.875rem, 1.5rem + 1.875vw, 2.25rem);
+  --text-fluid-display--line-height: 1.15;
 }
 
 @theme inline {
@@ -232,18 +236,76 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklch,
+        var(--muted-foreground) 30%,
+        transparent
+      )
+      transparent;
+  }
+  html {
+    @apply font-sans motion-safe:scroll-smooth;
   }
   body {
     @apply font-sans bg-background text-foreground antialiased;
   }
-  html {
-    @apply font-sans scroll-smooth;
+  :is(h1, h2, h3, h4) {
+    text-wrap: balance;
+  }
+
+  /* Same geometry as the design system's focus ring (ring-3 ring-ring/50), for
+     plain elements that have no focus style of their own. */
+  :focus-visible {
+    outline-style: solid;
+    outline-width: 3px;
+    outline-offset: 0;
+  }
+
+  /* Opt-in transitions and press feedback for buttons, cards and rows. */
+  [data-interactive-transition='true'] {
+    transition-property:
+      color, background-color, border-color, box-shadow, opacity;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out-expo);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    @media (prefers-reduced-motion: no-preference) {
+      transition-property:
+        color, background-color, border-color, box-shadow, opacity, scale;
+
+      &:active:not(:disabled) {
+        scale: 0.97;
+      }
+    }
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 0.75em;
+    padding-block: 0.15em;
+    padding-inline: 0.4em;
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 0 var(--border);
   }
 }
 
 /* Safe-area padding for sticky bottom UI (notched devices) */
-@utility pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+@utility pbe-safe {
+  padding-block-end: env(safe-area-inset-bottom, 0px);
+}
+
+/* Media card columns, at least 10.25rem wide (six across the max-w-7xl page)
+   and never fewer than two. Pair with gap-fluid-md. Keyboard navigation
+   counts the resulting tracks. */
+@utility grid-cols-media {
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(10.25rem, (100% - var(--spacing-fluid-md)) / 2), 1fr)
+  );
 }
 
 /* Vertical range input whose track fills from the bottom up */
@@ -257,124 +319,96 @@
  * Uses typed transitions for different navigation patterns:
  * - forward: drilling down (library -> series -> episode -> player)
  * - back: navigating up
+ * - to-player: expand into the player
  * - instant: no animation (for rapid state changes)
+ * Without a motion preference every type falls back to the root crossfade.
  * ============================================================================ */
 
-/* Shared timing for typed view transitions */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--duration-normal);
   animation-timing-function: var(--ease-out-expo);
 }
 
-/* Forward navigation - zoom in + fade (drilling down into content) */
+/* Keyframes name only the hidden end; the other end is the resting state. */
 @keyframes vt-zoom-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
+    scale: 0.96;
   }
 }
 
 @keyframes vt-zoom-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
   to {
     opacity: 0;
-    transform: scale(1.02);
+    scale: 1.02;
   }
 }
 
-:root:active-view-transition-type(forward) {
-  &::view-transition-old(root) {
-    animation-name: vt-zoom-out;
-    animation-duration: var(--duration-fast);
-  }
-
-  &::view-transition-new(root) {
-    animation-name: vt-zoom-in;
-    animation-duration: var(--duration-normal);
-  }
-}
-
-/* Back navigation - zoom out + fade (returning to parent) */
 @keyframes vt-shrink-in {
   from {
     opacity: 0;
-    transform: scale(1.02);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
+    scale: 1.02;
   }
 }
 
 @keyframes vt-shrink-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
   to {
     opacity: 0;
-    transform: scale(0.96);
+    scale: 0.96;
   }
 }
 
-:root:active-view-transition-type(back) {
-  &::view-transition-old(root) {
-    animation-name: vt-shrink-out;
-    animation-duration: var(--duration-fast);
-  }
-
-  &::view-transition-new(root) {
-    animation-name: vt-shrink-in;
-    animation-duration: var(--duration-normal);
-  }
-}
-
-/* Player transition - expand from center */
 @keyframes vt-expand-in {
   from {
     opacity: 0;
-    transform: scale(0.92);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
+    scale: 0.92;
   }
 }
 
 @keyframes vt-expand-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
   to {
     opacity: 0;
-    transform: scale(1.04);
+    scale: 1.04;
   }
 }
 
-:root:active-view-transition-type(to-player) {
-  &::view-transition-old(root) {
-    animation-name: vt-expand-out;
-    animation-duration: var(--duration-player-exit);
+@media (prefers-reduced-motion: no-preference) {
+  :root:active-view-transition-type(forward) {
+    &::view-transition-old(root) {
+      animation-name: vt-zoom-out;
+      animation-duration: var(--duration-fast);
+    }
+
+    &::view-transition-new(root) {
+      animation-name: vt-zoom-in;
+    }
   }
 
-  &::view-transition-new(root) {
-    animation-name: vt-expand-in;
-    animation-duration: var(--duration-player-enter);
+  :root:active-view-transition-type(back) {
+    &::view-transition-old(root) {
+      animation-name: vt-shrink-out;
+      animation-duration: var(--duration-fast);
+    }
+
+    &::view-transition-new(root) {
+      animation-name: vt-shrink-in;
+    }
+  }
+
+  :root:active-view-transition-type(to-player) {
+    &::view-transition-old(root) {
+      animation-name: vt-expand-out;
+      animation-duration: var(--duration-player-exit);
+    }
+
+    &::view-transition-new(root) {
+      animation-name: vt-expand-in;
+      animation-duration: var(--duration-player-enter);
+    }
   }
 }
 
-/* Instant transition - no animation (for hash-only or rapid changes) */
 :root:active-view-transition-type(instant) {
   &::view-transition-old(root),
   &::view-transition-new(root) {
@@ -382,110 +416,22 @@
   }
 }
 
-@layer base {
-  /* Same geometry as the design system's focus ring (ring-3 ring-ring/50), for
-     plain elements that have no focus style of their own. */
-  :focus-visible {
-    outline-style: solid;
-    outline-width: 3px;
-    outline-offset: 0;
-  }
-
-  /* Opt-in transitions and press feedback for buttons, cards and rows. */
-  [data-interactive-transition='true'] {
-    transition-property:
-      color, background-color, border-color, box-shadow, opacity, scale;
-    transition-duration: var(--duration-fast);
-    transition-timing-function: var(--ease-out-expo);
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  [data-interactive-transition='true']:active:not(:disabled) {
-    scale: 0.97;
-  }
-
-  kbd {
-    font-family: var(--font-mono);
-    font-size: 0.75em;
-    padding: 0.15em 0.4em;
-    border-radius: var(--radius-sm);
-    background: var(--muted);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 0 var(--border);
-  }
-}
-
-/* Touch target sizing for mobile (WCAG 2.5.5 compliance)
- * Ensures all interactive elements have minimum 44x44px touch area
- * This applies to touch devices (phones, tablets with touch)
- * Visual size may be smaller but touch area is expanded
- */
+/* Touch target sizing for touch screens (WCAG 2.5.5): every control is at
+   least 44x44px. */
 @media (pointer: coarse) {
-  button,
-  [role='button'],
-  input[type='checkbox'],
-  input[type='radio'],
-  a[href] {
-    min-height: var(--spacing-touch-target-min);
-    min-width: var(--spacing-touch-target-min);
-  }
-
-  /* Ensure small icon buttons have adequate touch area */
-  button[class*='size-6']:not(.absolute, .fixed, .sticky),
-  button[class*='size-8']:not(.absolute, .fixed, .sticky),
-  [role='button'][class*='size-6']:not(.absolute, .fixed, .sticky),
-  [role='button'][class*='size-8']:not(.absolute, .fixed, .sticky) {
-    position: relative;
-  }
-
-  /* Expand touch area for small buttons without changing visual size */
-  button[class*='size-6']:not(.absolute, .fixed, .sticky)::before,
-  button[class*='size-8']:not(.absolute, .fixed, .sticky)::before,
-  [role='button'][class*='size-6']:not(.absolute, .fixed, .sticky)::before,
-  [role='button'][class*='size-8']:not(.absolute, .fixed, .sticky)::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: var(--spacing-touch-target-min);
-    min-height: var(--spacing-touch-target-min);
+  :is(
+    button,
+    [role='button'],
+    input[type='checkbox'],
+    input[type='radio'],
+    a[href]
+  ) {
+    min-block-size: var(--spacing-touch-target-min);
+    min-inline-size: var(--spacing-touch-target-min);
   }
 }
 
-/* Reduced motion - respect user preferences */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none !important;
-  }
-  [data-interactive-transition='true']:active {
-    scale: none !important;
-  }
-}
-
-/* High contrast mode */
-@media (prefers-contrast: more) {
-  :root {
-    --border: oklch(0.3 0 0);
-  }
-  .dark {
-    --border: oklch(0.8 0 0);
-  }
-}
-
-/* Segment slider - enhanced touch and visual feedback */
+/* Segment slider handles */
 .segment-handle {
   touch-action: none;
 }
@@ -497,77 +443,62 @@
 .segment-handle::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 0;
-  height: 0;
+  inline-size: 0;
+  block-size: 0;
   border: 0;
   background: transparent;
 }
 
 .segment-handle::-moz-range-thumb {
-  width: 0;
-  height: 0;
+  inline-size: 0;
+  block-size: 0;
   border: 0;
   background: transparent;
 }
 
 .segment-handle-hit-area {
-  width: 0.875rem;
-  height: 100%;
-  transform: translate(-50%, -50%);
+  inline-size: 0.875rem;
+  block-size: 100%;
+  translate: -50% -50%;
+
+  @media (pointer: coarse) {
+    inline-size: var(--spacing-touch-target-min);
+    block-size: var(--spacing-touch-target-min);
+  }
 }
 
 /* Deliberately no will-change here: these transitions only run for
    --duration-fast on hover/active, but will-change would hold a compositor
    layer for both handles of every segment slider for the whole session. */
 .segment-handle-visual {
-  transition:
-    filter var(--duration-fast) var(--ease-out-expo),
-    box-shadow var(--duration-fast) ease,
-    transform var(--duration-fast) ease;
+  transition-property: filter, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out-expo);
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition-property: filter, box-shadow, scale;
+  }
 }
 
-.segment-handle:hover + .segment-handle-visual {
-  filter: brightness(1.1);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-  transform: scaleY(1.1);
-}
-
-.segment-handle:active + .segment-handle-visual {
-  filter: brightness(1.2);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
-  transform: scaleY(1.15);
-}
-
-/* Touch devices: expanded touch target (44px minimum per WCAG) */
-@media (pointer: coarse) {
-  .segment-handle-hit-area {
-    width: var(--spacing-touch-target-min);
-    height: var(--spacing-touch-target-min);
+/* Touch screens keep the pill still: a finger covers it anyway. */
+@media (hover: hover) and (pointer: fine) {
+  .segment-handle:hover + .segment-handle-visual {
+    filter: brightness(1.1);
+    box-shadow: 0 0 0 2px oklch(1 0 none / 0.2);
   }
 
-  .segment-handle:hover + .segment-handle-visual,
   .segment-handle:active + .segment-handle-visual {
-    filter: none;
-    box-shadow: none;
-    transform: none;
+    filter: brightness(1.2);
+    box-shadow: 0 0 0 3px oklch(1 0 none / 0.3);
   }
 }
 
-/* Subtle scrollbar with fade-in on hover */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .segment-handle:hover + .segment-handle-visual {
+    scale: 1 1.1;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: oklch(from var(--muted-foreground) l c h / 30%);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: oklch(from var(--foreground) l c h / 50%);
+  .segment-handle:active + .segment-handle-visual {
+    scale: 1 1.15;
+  }
 }

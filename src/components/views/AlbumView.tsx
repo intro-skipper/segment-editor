@@ -77,9 +77,9 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-        <div className="flex-shrink-0 w-(--spacing-thumbnail-sm) h-(--spacing-thumbnail-sm) sm:w-(--spacing-thumbnail-md) sm:h-(--spacing-thumbnail-md) bg-muted rounded-lg overflow-hidden mx-auto sm:mx-0">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row gap-fluid-md">
+        <div className="flex-shrink-0 w-(--spacing-thumbnail-sm) h-(--spacing-thumbnail-sm) sm:w-(--spacing-thumbnail-md) sm:h-(--spacing-thumbnail-md) bg-muted rounded-lg overflow-clip mx-auto sm:mx-0">
           <ItemImage
             item={album}
             maxWidth={200}
@@ -88,16 +88,18 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
           />
         </div>
 
-        <div className="flex flex-col justify-end text-center sm:text-left">
+        <div className="flex min-w-0 flex-col justify-end text-center sm:text-start">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Album
           </p>
-          <h2 className="text-xl sm:text-2xl font-semibold mt-1 text-balance">
+          <h2 className="text-xl sm:text-2xl font-semibold mbs-1 text-balance break-words">
             {albumName}
           </h2>
-          <p className="text-muted-foreground mt-2">{artistName}</p>
+          <p className="text-muted-foreground mbs-2 break-words">
+            {artistName}
+          </p>
           {album.ProductionYear && (
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mbs-1">
               {album.ProductionYear} • {tracks.length} tracks
             </p>
           )}
@@ -108,7 +110,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
         <EmptyState icon={<Music />} message="No tracks found for this album" />
       ) : (
         <ul
-          className="space-y-2 md:space-y-3"
+          className="flex flex-col gap-2 md:gap-3"
           aria-label={`${tracks.length} tracks in ${albumName}`}
         >
           {tracks.map((track, index) => (

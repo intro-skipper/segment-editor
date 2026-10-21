@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   Expand,
+  Loader,
   RefreshCw,
   Shrink,
   SkipForward,
@@ -89,7 +90,7 @@ function PlayerVideoButton({
       type="button"
       tabIndex={0}
       className={cn(
-        'relative block w-full border-0 bg-transparent p-0 text-left text-inherit',
+        'relative block w-full border-0 bg-transparent p-0 text-start text-inherit',
         isFullscreen
           ? cn('w-full h-full', showControls ? 'cursor-default' : 'cursor-none')
           : 'aspect-video cursor-pointer rounded-2xl bg-black',
@@ -99,7 +100,7 @@ function PlayerVideoButton({
       onKeyDown={video.onKeyDown}
       aria-label={t('player.videoPlayer')}
     >
-      {/* The rounded frame must NOT clip the video via an ancestor (overflow-hidden):
+      {/* The rounded frame must NOT clip the video via an ancestor (overflow-clip/hidden):
           combining an ancestor border-radius clip with the composited JASSUB
           subtitle canvas forces Chromium to mask the hardware video layer, which
           renders the video black on some GPUs once the first subtitle paints.
@@ -109,7 +110,7 @@ function PlayerVideoButton({
       {!isFullscreen && video.posterUrl ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
+          className="pointer-events-none absolute inset-0 overflow-clip rounded-2xl"
         >
           <img
             src={video.posterUrl}
@@ -172,15 +173,15 @@ function PlayerErrorOverlay({
     <div
       role="alert"
       className={cn(
-        'absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white',
+        'absolute inset-0 flex flex-col items-center justify-center bg-black/80 px-4 text-center text-white',
         !isFullscreen && 'rounded-2xl',
       )}
     >
       <AlertTriangle
-        className="size-12 text-destructive mb-4"
+        className="size-12 text-destructive mbe-4"
         aria-hidden="true"
       />
-      <p className="text-lg font-medium mb-2">{error.message}</p>
+      <p className="text-lg font-medium mbe-2 break-words">{error.message}</p>
       {error.recoverable ? (
         <Button
           variant="overlay"
@@ -189,7 +190,7 @@ function PlayerErrorOverlay({
             event.stopPropagation()
             onRetry()
           }}
-          className="mt-2"
+          className="mbs-2"
         >
           <RefreshCw />
           {t('player.retry')}
@@ -219,9 +220,7 @@ function PlayerLoadingOverlay({
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="animate-spin" aria-hidden="true">
-        <RefreshCw className="size-8 text-white" />
-      </div>
+      <Loader className="size-8 text-white" aria-hidden="true" />
       <span className="sr-only">
         {isRecovering
           ? t('player.recovering', 'Recovering playback')
@@ -247,7 +246,7 @@ function SegmentSkipOverlay({
 
   return (
     <div
-      className="absolute bottom-4 right-4 z-20"
+      className="absolute inset-be-4 inset-e-4 z-20"
       data-player-controls-overlay="true"
     >
       <Button
@@ -280,14 +279,14 @@ function FullscreenControlsOverlay({
   return (
     <div
       className={cn(
-        'absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
+        'absolute inset-x-0 inset-be-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
         showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
       )}
       aria-hidden={!showControls}
       inert={!showControls || undefined}
     >
       <div className="max-w-9/10 mx-auto" data-player-controls-overlay="true">
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end mbe-2">
           <Button
             variant="overlay"
             size="xs"
@@ -312,7 +311,7 @@ function FullscreenControlsOverlay({
           </Button>
         </div>
 
-        <div className="mb-4 text-white">{timelineScrubber}</div>
+        <div className="mbe-4 text-white">{timelineScrubber}</div>
 
         <PlayerControls {...controlsProps} />
       </div>
@@ -339,7 +338,8 @@ export function PlayerSurface({
         aria-label={t('player.videoPlayer')}
         className={cn(
           'relative',
-          fullscreen.isFullscreen && 'fixed inset-0 z-50 bg-black outline-none',
+          fullscreen.isFullscreen &&
+            'fixed inset-0 z-50 bg-black outline-hidden',
         )}
         onMouseMove={fullscreen.onMouseMove}
         onMouseLeave={fullscreen.onMouseLeave}

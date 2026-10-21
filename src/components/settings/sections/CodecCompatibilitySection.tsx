@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from 'react'
 import type { Dispatch } from 'react'
-import { CheckCircle, Loader2, Monitor, XCircle } from 'lucide-react'
+import { CheckCircle, Loader, Monitor, XCircle } from 'lucide-react'
 
 import { SettingsSection } from '../primitives/SettingsSection'
 import {
@@ -149,7 +149,7 @@ async function runCodecProbe(
 
 function CodecList({ title, codecs }: CodecListProps) {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <h4 className="text-sm font-medium text-foreground">{title}</h4>
       <div className="grid grid-cols-2 gap-2">
         {codecs.map(({ codec, supported, loading }) => (
@@ -158,9 +158,7 @@ function CodecList({ title, codecs }: CodecListProps) {
             className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
           >
             {loading ? (
-              <div className="animate-spin" aria-hidden>
-                <Loader2 className="size-4 text-muted-foreground" />
-              </div>
+              <Loader className="size-4 text-muted-foreground" aria-hidden />
             ) : supported ? (
               <CheckCircle className="size-4 text-success" />
             ) : (
@@ -196,8 +194,8 @@ export function CodecCompatibilitySection() {
 
   return (
     <SettingsSection icon={Monitor} title="Direct play compatibility">
-      <div className="space-y-4">
-        <div className="text-xs text-muted-foreground mb-3">
+      <div className="flex flex-col gap-4">
+        <div className="text-xs text-muted-foreground">
           Browser codec support for direct video playback
         </div>
 
@@ -212,7 +210,7 @@ export function CodecCompatibilitySection() {
           </Button>
         ) : (
           <>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <h4 className="text-sm font-medium text-foreground">
                 Supported containers
               </h4>
@@ -238,7 +236,7 @@ export function CodecCompatibilitySection() {
             <CodecList title="Video codecs" codecs={state.videoCodecs} />
             <CodecList title="Audio codecs" codecs={state.audioCodecs} />
 
-            <div className="pt-2 border-t border-border/50">
+            <div className="pbs-2 border-bs border-border/50">
               <Button
                 variant="outline"
                 size="sm"
@@ -248,9 +246,7 @@ export function CodecCompatibilitySection() {
               >
                 {state.isRefreshing ? (
                   <>
-                    <div className="animate-spin" aria-hidden>
-                      <Loader2 className="size-4" />
-                    </div>
+                    <Loader className="size-4" aria-hidden />
                     Checking…
                   </>
                 ) : (
@@ -259,13 +255,13 @@ export function CodecCompatibilitySection() {
               </Button>
             </div>
 
-            <div className="text-xs text-muted-foreground space-y-1">
+            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
               <p>
-                <CheckCircle className="size-3 inline text-success mr-1" />
+                <CheckCircle className="size-3 inline text-success me-1" />
                 Green: Supported for direct play
               </p>
               <p>
-                <XCircle className="size-3 inline text-destructive mr-1" />
+                <XCircle className="size-3 inline text-destructive me-1" />
                 Red: Requires transcoding (HLS)
               </p>
             </div>

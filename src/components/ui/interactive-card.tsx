@@ -4,12 +4,13 @@ import type { VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const interactiveCardVariants = cva(
-  'group w-full cursor-pointer overflow-hidden rounded-2xl border border-border/50 bg-card text-left',
+  'group w-full cursor-pointer overflow-clip rounded-2xl border border-border/50 bg-card text-start',
   {
     variants: {
       variant: {
-        tile: 'hover:scale-102',
-        row: 'flex items-center gap-3 p-3 hover:border-border md:gap-4',
+        // not-active lets the shared press scale win over the hover lift.
+        tile: 'motion-safe:hover:not-active:scale-102',
+        row: 'flex items-center gap-fluid-sm p-3 hover:border-border',
       },
     },
     defaultVariants: {
@@ -49,7 +50,8 @@ export function InteractiveCard({
       data-interactive-transition="true"
       className={cn(
         interactiveCardVariants({ variant }),
-        animate && 'animate-in fade-in slide-in-from-bottom-2 fill-mode-both',
+        animate &&
+          'animate-in fade-in motion-safe:slide-in-from-bottom-2 fill-mode-both',
         className,
       )}
       style={{ ...animationStyle, ...style }}

@@ -41,7 +41,7 @@ export function ErrorCard({
     >
       <Card className="w-full max-w-md text-center">
         <CardHeader>
-          <IconDisc tone={tone} size="lg" className="mx-auto mb-2">
+          <IconDisc tone={tone} size="lg" className="mx-auto mbe-2">
             {icon}
           </IconDisc>
           <CardTitle className="text-xl">{title}</CardTitle>

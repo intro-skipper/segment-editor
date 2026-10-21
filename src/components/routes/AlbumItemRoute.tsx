@@ -18,25 +18,25 @@ const AlbumView = lazy(() =>
 export function AlbumSkeleton() {
   return (
     <div
-      className="flex-1 px-4 py-6 sm:px-6"
+      className="flex-1 px-fluid-md py-6"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <span className="sr-only">Loading album</span>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <Skeleton className="h-9 w-24" />
           <Skeleton className="h-8 w-48" />
         </div>
         <div className="flex gap-6">
           <Skeleton className="size-32 rounded-lg shrink-0" />
-          <div className="space-y-2 flex-1">
+          <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-4 w-32" />
           </div>
         </div>
-        <div className="space-y-2 md:space-y-3">
+        <div className="flex flex-col gap-2 md:gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-12 w-full rounded-2xl" />
           ))}
@@ -57,7 +57,7 @@ export function AlbumPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
+    <div className="flex flex-1 flex-col px-fluid-md py-6">
       <FeatureErrorBoundary featureName="Album">
         <Suspense fallback={<AlbumSkeleton />}>
           <AlbumView album={album} tracks={tracks} />

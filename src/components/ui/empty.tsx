@@ -29,7 +29,7 @@ function EmptyMedia({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="empty-icon"
       className={cn(
-        'mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0',
+        'mbe-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0',
         className,
       )}
       {...props}

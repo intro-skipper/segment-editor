@@ -1,23 +1,12 @@
-import {
-  useEffect,
-  startTransition,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { useEffect, startTransition } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { useCollections, useItems } from '@/services/items/queries'
 import { usePluginMode } from '@/hooks/use-connection-init'
 import { useGridKeyboardNavigation } from '@/hooks/use-grid-keyboard-navigation'
-import { useVirtualWindow } from '@/hooks/use-virtual-window'
 import { LibraryPicker } from '@/components/filter/LibraryPicker'
 import { PaginationControls } from '@/components/filter/PaginationControls'
-import {
-  GRID_ROW_ESTIMATE_PX,
-  MediaGrid,
-  MediaList,
-  VirtualizedMediaGrid,
-} from '@/components/filter/MediaCollections'
+import { MediaGrid, MediaList } from '@/components/filter/MediaCollections'
 import type { ConnectionStatus } from '@/components/filter/MediaViewStates'
 import {
   ConnectionStatusNotice,
@@ -27,8 +16,6 @@ import {
   ResultsSummary,
 } from '@/components/filter/MediaViewStates'
 import { useSessionStore } from '@/stores/session-store'
-import { getGridColumns } from '@/lib/responsive-utils'
-import { COLUMN_BREAKPOINTS } from '@/lib/constants'
 import { navigateToMediaItem } from '@/lib/navigation-utils'
 
 const selectPageSize = (state: ReturnType<typeof useSessionStore.getState>) =>
@@ -41,44 +28,7 @@ const selectSetSettingsOpen = (
   state: ReturnType<typeof useSessionStore.getState>,
 ) => state.setSettingsOpen
 
-const VIRTUALIZED_GRID_THRESHOLD = 180
-const GRID_OVERSCAN_ROWS = 3
-
 const EMPTY_ITEMS: Array<BaseItemDto> = []
-
-function subscribeToResize(callback: () => void) {
-  let frameId: number | null = null
-  const onResize = () => {
-    if (frameId !== null) return
-    frameId = requestAnimationFrame(() => {
-      frameId = null
-      callback()
-    })
-  }
-  window.addEventListener('resize', onResize)
-  return () => {
-    window.removeEventListener('resize', onResize)
-    if (frameId !== null) {
-      cancelAnimationFrame(frameId)
-    }
-  }
-}
-
-function getColumnsSnapshot() {
-  return getGridColumns(window.innerWidth)
-}
-
-function getServerColumnsSnapshot() {
-  return COLUMN_BREAKPOINTS.default
-}
-
-function useGridColumns(): number {
-  return useSyncExternalStore(
-    subscribeToResize,
-    getColumnsSnapshot,
-    getServerColumnsSnapshot,
-  )
-}
 
 const routeApi = getRouteApi('/')
 
@@ -192,9 +142,6 @@ function useRenderFilterView() {
   const requestedPage = Math.max(1, currentPage)
   const startIndex = (requestedPage - 1) * pageSize
 
-  const columns = useGridColumns()
-  const navigationColumns = viewMode === 'list' ? 1 : columns
-
   const connectionStatus = getConnectionStatus(usePluginMode())
   const setSettingsOpen = useSessionStore(selectSetSettingsOpen)
 
@@ -215,20 +162,6 @@ function useRenderFilterView() {
     validCurrentPage,
   } = getPageWindow(itemsQuery.data, currentPage, pageSize)
 
-  const shouldVirtualizeGrid =
-    viewMode === 'card' && paginatedItems.length > VIRTUALIZED_GRID_THRESHOLD
-  const [virtualizedGridElement, setVirtualizedGridElement] =
-    useState<HTMLDivElement | null>(null)
-  const rowCount = Math.ceil(paginatedItems.length / columns)
-  const { totalSize: totalVirtualGridHeight, indexes: virtualRowIndexes } =
-    useVirtualWindow({
-      enabled: shouldVirtualizeGrid,
-      scrollElement: virtualizedGridElement,
-      itemCount: rowCount,
-      itemSize: GRID_ROW_ESTIMATE_PX,
-      overscan: GRID_OVERSCAN_ROWS,
-    })
-
   useEffect(() => {
     if (currentPage !== validCurrentPage) {
       navigateToPage(navigate, validCurrentPage)
@@ -241,29 +174,11 @@ function useRenderFilterView() {
     navigateToMediaItem(navigate, item)
   }
 
-  const handleScrollToIndex = (index: number) => {
-    const container = virtualizedGridElement
-    if (!container) return
-    const rowIndex = Math.floor(index / columns)
-    const targetScrollTop = rowIndex * GRID_ROW_ESTIMATE_PX
-    container.scrollTo({ top: targetScrollTop, behavior: 'auto' })
-  }
-
   const { setFocusedIndex, gridProps, getItemProps, gridRef } =
     useGridKeyboardNavigation({
       itemCount: paginatedItems.length,
-      columns: navigationColumns,
-      enabled: paginatedItems.length > 0,
       onActivate: handleItemActivate,
-      onScrollToIndex: shouldVirtualizeGrid ? handleScrollToIndex : undefined,
     })
-
-  const setVirtualizedGridRef = (node: HTMLDivElement | null) => {
-    setVirtualizedGridElement((currentElement) =>
-      currentElement === node ? currentElement : node,
-    )
-    gridRef.current = node
-  }
 
   const handleCollectionChange = (value: string | null) => {
     setFocusedIndex(-1)
@@ -311,7 +226,7 @@ function useRenderFilterView() {
     )
 
   return (
-    <div className="relative px-4 pb-8 sm:px-6">
+    <div className="relative px-fluid-md pbe-8">
       <div className="max-w-7xl mx-auto">
         {connectionStatus !== 'connected' && (
           <ConnectionStatusNotice
@@ -352,16 +267,6 @@ function useRenderFilterView() {
                 gridProps={gridProps}
                 getItemProps={getItemProps}
                 onActivate={(item) => navigateToMediaItem(navigate, item)}
-              />
-            ) : shouldVirtualizeGrid ? (
-              <VirtualizedMediaGrid
-                items={paginatedItems}
-                columns={columns}
-                rowIndexes={virtualRowIndexes}
-                totalHeight={totalVirtualGridHeight}
-                gridRef={setVirtualizedGridRef}
-                gridProps={gridProps}
-                getItemProps={getItemProps}
               />
             ) : (
               <MediaGrid

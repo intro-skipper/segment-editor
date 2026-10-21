@@ -4,7 +4,7 @@
  * LoadingState includes proper ARIA attributes for accessibility.
  */
 
-import { Loader2 } from 'lucide-react'
+import { Loader } from 'lucide-react'
 
 interface LoadingStateProps {
   /** Loading message to display */
@@ -12,7 +12,7 @@ interface LoadingStateProps {
 }
 
 /**
- * Centered loading spinner with optional message.
+ * Centered loading indicator with optional message.
  * Use for inline loading states within components.
  */
 export function LoadingState({ message }: LoadingStateProps) {
@@ -22,9 +22,7 @@ export function LoadingState({ message }: LoadingStateProps) {
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="animate-spin" aria-hidden="true">
-        <Loader2 className="size-4" />
-      </div>
+      <Loader className="size-4" aria-hidden="true" />
       <span className="sr-only">Loading</span>
       {message && <span>{message}</span>}
     </output>

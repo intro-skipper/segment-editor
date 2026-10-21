@@ -55,7 +55,11 @@ export function RouteErrorFallback({
             </Button>
           )}
           {showNavigation && (
-            <Link to="/" className={buttonVariants()}>
+            <Link
+              to="/"
+              className={buttonVariants()}
+              data-interactive-transition="true"
+            >
               <Home className="size-4" aria-hidden="true" />
               {t('common.home', 'Home')}
             </Link>

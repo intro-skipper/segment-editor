@@ -26,7 +26,7 @@ export function AppearanceSection() {
 
   return (
     <SettingsSection icon={Palette} title={title}>
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <SettingsSelect
           value={theme}
           onValueChange={setTheme}
@@ -36,9 +36,10 @@ export function AppearanceSection() {
         <button
           type="button"
           aria-pressed={monochrome}
+          data-interactive-transition="true"
           onClick={() => setMonochrome(!monochrome)}
           className={cn(
-            'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-[background-color,border-color,color,box-shadow]',
+            'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-start text-sm',
             monochrome
               ? 'border-primary/40 bg-primary/10 text-foreground'
               : 'border-border/70 bg-input/20 hover:bg-muted/50',
@@ -64,7 +65,7 @@ export function AppearanceSection() {
           >
             <span
               className={cn(
-                'absolute top-1/2 size-4 -translate-y-1/2 rounded-full bg-background shadow-sm transition-transform',
+                'absolute inset-bs-1/2 size-4 -translate-y-1/2 rounded-full bg-background shadow-sm ease-(--ease-out-expo) motion-safe:transition-transform',
                 monochrome ? 'translate-x-4' : 'translate-x-0.5',
               )}
             />

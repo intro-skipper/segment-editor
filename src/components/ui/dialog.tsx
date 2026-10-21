@@ -41,7 +41,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          'bg-popover shadow-2xl data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 grid max-w-(--spacing-dialog-max-width) gap-6 rounded-4xl p-6 text-sm ring-1 animation-duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none',
+          'bg-popover shadow-2xl data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:motion-safe:zoom-out-95 data-open:motion-safe:zoom-in-95 ring-foreground/5 grid max-w-(--spacing-dialog-max-width) gap-6 rounded-4xl p-6 text-sm ring-1 animation-duration-100 sm:max-w-md fixed inset-x-0 inset-bs-1/2 z-50 mx-auto w-full -translate-y-1/2 outline-hidden',
           className,
         )}
         render={withFreezeOnExit(children)}
@@ -61,7 +61,7 @@ function DialogCloseButton({
       render={
         <Button
           variant="ghost"
-          className={cn('absolute top-4 right-4', className)}
+          className={cn('absolute inset-bs-4 inset-e-4', className)}
           size="icon-sm"
           aria-label="Close dialog"
           {...props}
@@ -93,7 +93,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        'gap-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+        'gap-2 flex flex-col-reverse sm:flex-row sm:justify-end',
         className,
       )}
       {...props}

@@ -37,7 +37,7 @@ export function MediaListRow({
       animate
       animationDelay={animationDelay}
     >
-      <div className="relative flex-shrink-0 w-12 md:w-14 rounded-lg overflow-hidden bg-muted">
+      <div className="relative flex-shrink-0 w-12 md:w-14 rounded-lg overflow-clip bg-muted">
         <ItemImage
           item={item}
           maxWidth={160}
@@ -48,13 +48,13 @@ export function MediaListRow({
       </div>
       <div className="flex-grow min-w-0">
         <p
-          className="font-medium text-sm md:text-base leading-snug line-clamp-2 text-foreground"
+          className="font-medium text-fluid-body leading-snug line-clamp-2 text-foreground"
           title={item.Name || undefined}
         >
           {item.Name || 'Unknown'}
         </p>
         {secondaryParts.length > 0 && (
-          <p className="text-xs truncate mt-0.5 text-muted-foreground">
+          <p className="text-xs truncate mbs-0.5 text-muted-foreground">
             {secondaryParts.join(' · ')}
           </p>
         )}

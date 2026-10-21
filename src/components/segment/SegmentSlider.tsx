@@ -189,7 +189,7 @@ function SegmentSliderHeader({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="flex items-center justify-between gap-3 mbe-4">
       <div className="flex items-center gap-3 min-w-0">
         {onChangeType ? (
           <SegmentTypeMenu
@@ -201,7 +201,7 @@ function SegmentSliderHeader({
                 title={t('segment.type', 'Segment type')}
                 className={cn(
                   chipClassName,
-                  'cursor-pointer transition-opacity hover:opacity-90 aria-expanded:opacity-90',
+                  'cursor-pointer transition-opacity ease-(--ease-out-expo) hover:opacity-90 motion-safe:active:scale-97 aria-expanded:opacity-90 motion-safe:transition-[opacity,scale]',
                 )}
               />
             }
@@ -870,8 +870,8 @@ export function SegmentSlider({
       {/* Slider track - with proper overflow handling */}
       <fieldset
         ref={sliderRef}
-        className="relative h-11 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mb-4 touch-none overflow-visible"
-        style={{ padding: `0 ${HANDLE_WIDTH / 2}px` }}
+        className="relative h-11 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mbe-4 touch-none overflow-visible"
+        style={{ paddingInline: `${HANDLE_WIDTH / 2}px` }}
         aria-label={t('segment.sliderGroup', { type: segment.Type })}
         aria-describedby={`segment-${segment.Id}-description`}
         onPointerMove={handlePointerMove}
@@ -891,13 +891,13 @@ export function SegmentSlider({
         <div className="relative h-full w-full">
           {/* Segment range visualization */}
           <div
-            className="absolute top-1 bottom-1 rounded-md transition-[left,width,background-color,opacity] duration-75"
+            className="absolute inset-y-1 rounded-md transition-[background-color,opacity] duration-75 motion-safe:transition-[left,width,background-color,opacity]"
             style={segmentRangeStyle}
           />
 
           {/* Start handle */}
           <span
-            className="segment-handle-hit-area absolute top-1/2 z-10"
+            className="segment-handle-hit-area absolute inset-bs-1/2 z-10"
             style={startHandlePositionStyle}
           >
             <input
@@ -916,14 +916,14 @@ export function SegmentSlider({
             />
             <span
               aria-hidden="true"
-              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-xs"
+              className="segment-handle-visual pointer-events-none absolute inset-0 mx-auto w-3.5 rounded-xs"
               style={handleVisualStyle}
             />
           </span>
 
           {/* End handle */}
           <span
-            className="segment-handle-hit-area absolute top-1/2 z-10"
+            className="segment-handle-hit-area absolute inset-bs-1/2 z-10"
             style={endHandlePositionStyle}
           >
             <input
@@ -942,7 +942,7 @@ export function SegmentSlider({
             />
             <span
               aria-hidden="true"
-              className="segment-handle-visual pointer-events-none absolute top-0 bottom-0 left-1/2 w-3.5 -translate-x-1/2 rounded-xs"
+              className="segment-handle-visual pointer-events-none absolute inset-0 mx-auto w-3.5 rounded-xs"
               style={handleVisualStyle}
             />
           </span>
@@ -1019,7 +1019,7 @@ export function SegmentSlider({
               )}
             </form.Field>
             <span
-              className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums"
+              className="sm:hidden mbs-1 text-xs text-muted-foreground tabular-nums"
               aria-hidden="true"
             >
               {formatTime(localStart)}
@@ -1099,7 +1099,7 @@ export function SegmentSlider({
               )}
             </form.Field>
             <span
-              className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums"
+              className="sm:hidden mbs-1 text-xs text-muted-foreground tabular-nums"
               aria-hidden="true"
             >
               {formatTime(localEnd)}
@@ -1117,7 +1117,7 @@ export function SegmentSlider({
       {/* Validation error */}
       {!validation.valid && (
         <p
-          className="text-sm text-destructive mt-3 flex items-center gap-2"
+          className="text-sm text-destructive mbs-3 flex items-center gap-2"
           role="alert"
         >
           <span className="size-1.5 rounded-full bg-destructive" />

@@ -45,9 +45,9 @@ const AlbumCard = function AlbumCardComponent({
         />
       </div>
 
-      <div className="px-3 py-2.5 md:px-4 md:py-3">
+      <div className="px-fluid-sm py-2.5 md:py-3">
         <p
-          className="text-sm md:text-base font-semibold truncate leading-snug text-foreground"
+          className="text-fluid-body font-semibold truncate leading-snug text-foreground"
           title={album.Name || undefined}
         >
           {albumName}
@@ -71,7 +71,7 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {albums.length === 0 ? (
         <EmptyState
           icon={<Disc3 />}

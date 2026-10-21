@@ -1,10 +1,6 @@
 /**
- * Media grid skeletons for async media content.
- * Responsive breakpoints align with VIEWPORT_BREAKPOINTS constants:
- * - sm: 640px (3 columns)
- * - md: 768px (4 columns)
- * - lg: 1024px (5 columns)
- * - xl: 1280px (6 columns)
+ * Media grid skeletons for async media content, laid out with the same
+ * grid-cols-media columns as the media grid they stand in for.
  */
 
 import { staggerDelay, STAGGER_FAST } from '@/lib/animation-utils'
@@ -15,7 +11,7 @@ function MediaCardSkeleton() {
   return (
     <div className="flex flex-col gap-3" aria-hidden="true">
       <Skeleton className="aspect-2/3 w-full rounded-2xl" />
-      <div className="space-y-2 px-1">
+      <div className="flex flex-col gap-2 px-1">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-3 w-1/2" />
       </div>
@@ -33,10 +29,7 @@ export function MediaGridSkeleton({
 }) {
   return (
     <output
-      className={cn(
-        'grid gap-4 sm:gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-        className,
-      )}
+      className={cn('grid grid-cols-media gap-fluid-md', className)}
       aria-live="polite"
       aria-busy="true"
     >

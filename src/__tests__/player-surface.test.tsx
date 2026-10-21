@@ -260,7 +260,7 @@ describe('PlayerSurface', () => {
     const backdropClip = backdrop.parentElement
     if (!backdropClip) throw new Error('Expected backdrop clipping wrapper')
     expect(backdropClip.getAttribute('aria-hidden')).toBe('true')
-    expect(backdropClip.classList.contains('overflow-hidden')).toBe(true)
+    expect(backdropClip.classList.contains('overflow-clip')).toBe(true)
     expect(backdropClip.classList.contains('rounded-2xl')).toBe(true)
     // The clipping wrapper must only ever contain the backdrop, never the
     // video (see the JASSUB black-frame guard below).
@@ -302,6 +302,7 @@ describe('PlayerSurface', () => {
       name: 'player.videoPlayer',
     })
     expect(videoButton.classList.contains('rounded-2xl')).toBe(false)
+    expect(videoButton.classList.contains('overflow-clip')).toBe(false)
     expect(videoButton.classList.contains('overflow-hidden')).toBe(false)
 
     expect(container.querySelector('img')).toBe(null)

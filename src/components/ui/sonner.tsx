@@ -2,7 +2,7 @@ import { Toaster as Sonner } from 'sonner'
 import {
   CircleCheckIcon,
   InfoIcon,
-  Loader2Icon,
+  LoaderIcon,
   OctagonXIcon,
   TriangleAlertIcon,
 } from 'lucide-react'
@@ -44,11 +44,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         info: <InfoIcon className="size-4" />,
         warning: <TriangleAlertIcon className="size-4" />,
         error: <OctagonXIcon className="size-4" />,
-        loading: (
-          <div className="animate-spin" aria-hidden>
-            <Loader2Icon className="size-4" />
-          </div>
-        ),
+        loading: <LoaderIcon className="size-4" aria-hidden="true" />,
       }}
       style={
         // SAFETY: CSSProperties declares no index signature for custom

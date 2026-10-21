@@ -116,54 +116,6 @@ export const CACHE_CONFIG = {
 } as const
 
 /**
- * Responsive grid column breakpoints.
- * Maps viewport width breakpoints to column counts.
- *
- * These values align with Tailwind CSS responsive classes:
- * - grid-cols-2 (default/mobile)
- * - sm:grid-cols-3
- * - md:grid-cols-4
- * - lg:grid-cols-5
- * - xl:grid-cols-6
- */
-export const COLUMN_BREAKPOINTS = {
-  /** Default columns for mobile (< 640px) */
-  default: 2,
-  /** Small screens (>= 640px) */
-  sm: 3,
-  /** Medium screens (>= 768px) */
-  md: 4,
-  /** Large screens (>= 1024px) */
-  lg: 5,
-  /** Extra large screens (>= 1280px) */
-  xl: 6,
-} as const
-
-/**
- * Viewport width thresholds in pixels.
- * Used for responsive layout calculations.
- *
- * These values align with Tailwind CSS default breakpoints:
- * - sm: 640px
- * - md: 768px
- * - lg: 1024px
- * - xl: 1280px
- *
- * IMPORTANT: Always use these constants instead of hardcoded values
- * to ensure consistency across the application.
- */
-export const VIEWPORT_BREAKPOINTS = {
-  /** Small screens - tablets and larger phones */
-  sm: 640,
-  /** Medium screens - small laptops and tablets in landscape */
-  md: 768,
-  /** Large screens - laptops and desktops */
-  lg: 1024,
-  /** Extra large screens - large desktops */
-  xl: 1280,
-} as const
-
-/**
  * Segment color configuration - single source of truth.
  * Maps segment types to their CSS variable and Tailwind background and
  * readable-text class names.

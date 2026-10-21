@@ -153,7 +153,7 @@ function AudioTrackGroup({
       {hints.showTranscodeHint && (
         <p
           id={transcodeHintId}
-          className="px-3 pb-1 text-xs text-muted-foreground"
+          className="px-3 pbe-1 text-xs text-muted-foreground"
         >
           {hints.showFullTranscodeHint
             ? t(
@@ -167,7 +167,7 @@ function AudioTrackGroup({
         </p>
       )}
       {hints.showChromiumFlagTip && (
-        <p id={flagTipId} className="px-3 pb-1 text-xs text-muted-foreground">
+        <p id={flagTipId} className="px-3 pbe-1 text-xs text-muted-foreground">
           {t(
             'player.tracks.audioSwitchChromiumFlagTip',
             'Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags',

@@ -45,11 +45,11 @@ export default function SettingsDialog() {
 
   return (
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-md p-0 overflow-clip">
         <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />
 
-        <div className="max-h-(--spacing-popup-max-height) overflow-y-auto px-3 pb-3">
+        <div className="max-h-(--spacing-popup-max-height) overflow-y-auto px-3 pbe-3">
           {!pluginMode && <ServerConnectionSection />}
           <AppearanceSection />
           <LanguageSection />
@@ -60,7 +60,7 @@ export default function SettingsDialog() {
           <JellyfinPlaybackSyncSection />
         </div>
         {!pluginMode && (
-          <div className="px-5 py-3 border-t border-border/50 text-center">
+          <div className="px-5 py-3 border-bs border-border/50 text-center">
             <a
               href="https://github.com/intro-skipper/.github/blob/main/PRIVACY.md#website-privacy-policy"
               target="_blank"
@@ -78,7 +78,7 @@ export default function SettingsDialog() {
 
 function SettingsHeader({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-3 px-5 pt-5 pb-3 pr-14">
+    <div className="flex items-center gap-3 px-5 pbs-5 pbe-3 pe-14">
       <IconDisc tone="primary">
         <Settings2 />
       </IconDisc>

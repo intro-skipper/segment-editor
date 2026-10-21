@@ -12,7 +12,7 @@ import {
 } from 'react'
 import { getRouteApi, useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Film, Loader2, Mic2, Play, Search, Tv, X } from 'lucide-react'
+import { Film, Loader, Mic2, Play, Search, Tv, X } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -134,7 +134,7 @@ function SearchResultItem({
       type="button"
       onClick={selectResult}
       className={cn(
-        'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
+        'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-start',
         isSelected
           ? 'bg-primary/10 text-primary'
           : 'hover:bg-muted/80 text-foreground',
@@ -163,7 +163,7 @@ function SearchResultItem({
           {item.Name ?? 'Unknown'}
         </p>
         {item.ProductionYear != null && item.ProductionYear > 0 && (
-          <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+          <p className="text-xs text-muted-foreground mbs-0.5 tabular-nums">
             {item.ProductionYear}
           </p>
         )}
@@ -248,22 +248,14 @@ function CommandPaletteSearchField({
   activeDescendantId: string | undefined
 }) {
   const { t } = useTranslation()
+  const FieldIcon = isLoading ? Loader : Search
 
   return (
-    <div className="relative border-b border-border/50 p-4 overflow-hidden">
-      {isLoading ? (
-        <div
-          className="absolute left-7 top-1/2 -translate-y-1/2 animate-spin"
-          aria-hidden
-        >
-          <Loader2 className="size-5 text-muted-foreground" />
-        </div>
-      ) : (
-        <Search
-          className="absolute left-7 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none"
-          aria-hidden
-        />
-      )}
+    <div className="relative border-be border-border/50 p-4 overflow-clip">
+      <FieldIcon
+        className="absolute inset-s-7 inset-bs-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none"
+        aria-hidden
+      />
       <input
         ref={inputRef}
         value={search}
@@ -273,8 +265,8 @@ function CommandPaletteSearchField({
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          'w-full min-w-0 max-w-full box-border bg-transparent pl-10 h-11 sm:h-10 text-base outline-none placeholder:text-muted-foreground',
-          search ? 'pr-28 sm:pr-34' : 'pr-20 sm:pr-24',
+          'w-full min-w-0 max-w-full box-border bg-transparent ps-10 h-11 sm:h-10 text-base outline-hidden placeholder:text-muted-foreground',
+          search ? 'pe-28 sm:pe-34' : 'pe-20 sm:pe-24',
         )}
         aria-haspopup="listbox"
         aria-label={t('search.placeholder', 'Search media…')}
@@ -287,8 +279,8 @@ function CommandPaletteSearchField({
         variant={includeEpisodes ? 'secondary' : 'outline'}
         size="xs"
         className={cn(
-          'absolute top-1/2 -translate-y-1/2 h-8 sm:h-7',
-          search ? 'right-13 sm:right-14' : 'right-4 sm:right-5',
+          'absolute inset-bs-1/2 -translate-y-1/2 h-8 sm:h-7',
+          search ? 'inset-e-13 sm:inset-e-14' : 'inset-e-4 sm:inset-e-5',
         )}
         onClick={onToggleEpisodes}
         aria-pressed={includeEpisodes}
@@ -303,7 +295,7 @@ function CommandPaletteSearchField({
         <Button
           variant="ghost"
           size="icon-sm"
-          className="absolute right-4 sm:right-5 top-1/2 -translate-y-1/2"
+          className="absolute inset-e-4 sm:inset-e-5 inset-bs-1/2 -translate-y-1/2"
           onClick={onClearSearch}
           aria-label={t('search.clear', 'Clear search')}
         >
@@ -340,12 +332,12 @@ function CommandPaletteResults({
   const { totalListHeight, visibleStartIndex, visibleItems } = visibleWindow
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-2 pbe-2">
       {resultItems.length > 0 && (
         <div className="px-3 py-2">
           <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
             {t('search.results', 'Results')}
-            <span className="ml-1.5 opacity-60">({resultItems.length})</span>
+            <span className="ms-1.5 opacity-60">({resultItems.length})</span>
           </span>
         </div>
       )}
@@ -375,9 +367,8 @@ function CommandPaletteResults({
                     shouldVirtualize
                       ? {
                           position: 'absolute',
-                          top: index * ITEM_HEIGHT,
-                          left: 0,
-                          right: 0,
+                          insetBlockStart: index * ITEM_HEIGHT,
+                          insetInline: 0,
                         }
                       : undefined
                   }
@@ -591,7 +582,7 @@ export default function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-lg p-0 overflow-hidden"
+        className="sm:max-w-lg p-0 overflow-clip"
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >

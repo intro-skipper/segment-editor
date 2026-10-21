@@ -63,7 +63,7 @@ export function PlayerSettingsMenu({
       <span className="text-muted-foreground">{t(labelKey)}</span>
       <span>
         {displayKeys.map((dk) => (
-          <kbd key={dk} className="ml-1">
+          <kbd key={dk} className="ms-1">
             {dk}
           </kbd>
         ))}
@@ -90,9 +90,9 @@ export function PlayerSettingsMenu({
         container={portalContainer}
       >
         <div className="p-3">
-          <div className="mb-4 pb-4 border-b border-border">
+          <div className="mbe-4 pbe-4 border-be border-border">
             <p
-              className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+              className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
               id={`${idPrefix}-skip-duration`}
             >
               {t('player.skipDuration', 'Skip Duration')}
@@ -126,9 +126,9 @@ export function PlayerSettingsMenu({
           </div>
 
           {onSpeedChange && playbackSpeedIndex !== undefined && (
-            <div className="mb-4 pb-4 border-b border-border">
+            <div className="mbe-4 pbe-4 border-be border-border">
               <p
-                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+                className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
                 id={`${idPrefix}-playback-speed`}
               >
                 {t('player.playbackSpeed', 'Playback Speed')}
@@ -161,14 +161,14 @@ export function PlayerSettingsMenu({
           )}
 
           {hasActiveSubtitle && onSubtitleOffsetChange && (
-            <div className="mb-4 pb-4 border-b border-border">
+            <div className="mbe-4 pbe-4 border-be border-border">
               <p
-                className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider"
+                className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
                 id={`${idPrefix}-subtitle-offset`}
               >
                 {t('player.subtitleOffset', 'Subtitle Offset')}
               </p>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -188,7 +188,7 @@ export function PlayerSettingsMenu({
                     )}
                     className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
                   />
-                  <span className="text-sm tabular-nums min-w-12 text-right">
+                  <span className="text-sm tabular-nums min-w-12 text-end">
                     {subtitleOffset > 0 ? '+' : ''}
                     {subtitleOffset.toFixed(1)}s
                   </span>
@@ -210,10 +210,10 @@ export function PlayerSettingsMenu({
           )}
 
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+            <p className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider">
               {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
             </p>
-            <div className="space-y-1.5 text-sm">{shortcutItems}</div>
+            <div className="flex flex-col gap-1.5 text-sm">{shortcutItems}</div>
           </div>
         </div>
       </DropdownMenuContent>

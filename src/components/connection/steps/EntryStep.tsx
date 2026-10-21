@@ -6,7 +6,7 @@
  * @module components/connection/steps/EntryStep
  */
 
-import { Loader2, Search, Server } from 'lucide-react'
+import { Loader, Search, Server } from 'lucide-react'
 
 import { WizardError } from '../WizardError'
 import type { RefObject } from 'react'
@@ -56,12 +56,12 @@ export function EntryStep({
         const displayError = fieldError ?? error
 
         return (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <div className="text-center">
-              <IconDisc tone="primary" className="mx-auto mb-4">
+              <IconDisc tone="primary" className="mx-auto mbe-4">
                 <Server />
               </IconDisc>
-              <h2 className="text-lg font-semibold mb-1">
+              <h2 className="text-lg font-semibold mbe-1">
                 Connect to Jellyfin
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -69,7 +69,7 @@ export function EntryStep({
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="server-address">Server Address</Label>
               <Input
                 ref={inputRef}
@@ -117,9 +117,7 @@ export function EntryStep({
             >
               {isLoading ? (
                 <>
-                  <div className="animate-spin" aria-hidden>
-                    <Loader2 className="size-4" />
-                  </div>
+                  <Loader className="size-4" aria-hidden />
                   Discovering…
                 </>
               ) : (

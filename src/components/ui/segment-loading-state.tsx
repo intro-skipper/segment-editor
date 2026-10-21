@@ -13,7 +13,7 @@ export function SegmentLoadingState({
 }: SegmentLoadingStateProps) {
   return (
     <output
-      className={cn('space-y-3', className)}
+      className={cn('flex flex-col gap-3', className)}
       aria-live="polite"
       aria-busy="true"
     >
@@ -27,14 +27,14 @@ export function SegmentLoadingState({
           )}
           style={{ animationDelay: staggerDelay(i, STAGGER_SLOW) }}
         >
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mbe-3">
             <Skeleton className="h-6 w-20 rounded-full" />
             <div className="flex gap-2">
               <Skeleton className="size-8 rounded-lg" />
               <Skeleton className="size-8 rounded-lg" />
             </div>
           </div>
-          <Skeleton className="h-10 w-full rounded-lg mb-3" />
+          <Skeleton className="h-10 w-full rounded-lg mbe-3" />
           <div className="flex items-center gap-4">
             <Skeleton className="h-8 w-24 rounded-md" />
             <Skeleton className="h-4 w-8" />

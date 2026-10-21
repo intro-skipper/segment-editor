@@ -103,11 +103,11 @@ function ConnectedState({
   onDisconnect,
 }: ConnectedStateProps) {
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="p-3 rounded-xl bg-muted/60">
         <p className="text-sm font-medium truncate">{serverAddress}</p>
         {username && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mbs-1 truncate">
             Logged in as {username}
           </p>
         )}
@@ -134,7 +134,7 @@ function DisconnectedState({ onConnect }: DisconnectedStateProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
         {t('login.not_connected', 'Not connected to any server')}
       </p>

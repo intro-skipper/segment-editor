@@ -37,11 +37,11 @@ export function LibraryPicker({
   return (
     <div className="flex items-center justify-center py-8">
       <div className="w-full max-w-6xl">
-        <div className="text-center mb-8">
-          <IconDisc tone="primary" size="lg" className="mx-auto mb-4">
+        <div className="text-center mbe-8">
+          <IconDisc tone="primary" size="lg" className="mx-auto mbe-4">
             <Library />
           </IconDisc>
-          <h2 className="text-2xl font-semibold mb-2">
+          <h2 className="text-2xl font-semibold mbe-2">
             {t('items.selectLibrary', {
               defaultValue: 'Select a Library',
             })}
@@ -53,7 +53,7 @@ export function LibraryPicker({
           </p>
         </div>
         <fieldset
-          className="flex flex-wrap justify-center gap-4 sm:gap-6 border-0 p-0 m-0"
+          className="flex flex-wrap justify-center gap-fluid-md border-0 p-0 m-0"
           aria-label={t('items.selectLibrary', {
             defaultValue: 'Select a Library',
           })}

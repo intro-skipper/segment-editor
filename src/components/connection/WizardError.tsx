@@ -7,7 +7,7 @@
  * @module components/connection/WizardError
  */
 
-import { AlertCircle, Loader2, RefreshCw, WifiOff } from 'lucide-react'
+import { AlertCircle, Loader, RefreshCw, WifiOff } from 'lucide-react'
 import { getErrorSuggestion, isNetworkRelatedError } from '@/lib/error-utils'
 import { Button } from '@/components/ui/button'
 import { IconDisc } from '@/components/ui/icon-disc'
@@ -48,12 +48,14 @@ export function WizardError({
       aria-live="assertive"
       className="flex flex-col items-center text-center p-4 rounded-xl bg-destructive/10 border border-destructive/20"
     >
-      <IconDisc tone="destructive" className="mb-3">
+      <IconDisc tone="destructive" className="mbe-3">
         <Icon />
       </IconDisc>
 
-      <p className="font-medium text-destructive mb-1">{message}</p>
-      <p className="text-sm text-muted-foreground mb-4">{suggestion}</p>
+      <p className="font-medium text-destructive mbe-1 break-words">
+        {message}
+      </p>
+      <p className="text-sm text-muted-foreground mbe-4">{suggestion}</p>
 
       {onRetry && (
         <Button
@@ -64,9 +66,7 @@ export function WizardError({
         >
           {isRetrying ? (
             <>
-              <div className="animate-spin" aria-hidden>
-                <Loader2 className="size-4" />
-              </div>
+              <Loader className="size-4" aria-hidden />
               Retrying…
             </>
           ) : (

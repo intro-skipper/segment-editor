@@ -44,7 +44,7 @@ const EpisodeItemSkeleton = function EpisodeItemSkeletonComponent({
       aria-hidden="true"
     >
       <Skeleton className="size-8 rounded-lg flex-shrink-0" />
-      <div className="flex-1 space-y-1.5">
+      <div className="flex-1 flex flex-col gap-1.5">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-3 w-12" />
       </div>
@@ -83,7 +83,7 @@ const EpisodeItem = function EpisodeItemComponent({
       data-interactive-transition="true"
       onClick={selectEpisode}
       className={cn(
-        'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left',
+        'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-start',
         isActive
           ? 'bg-primary/10 text-primary'
           : 'hover:bg-muted/80 text-foreground',
@@ -119,7 +119,7 @@ const EpisodeItem = function EpisodeItemComponent({
           {episodeName}
         </p>
         {runtime && (
-          <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+          <p className="text-xs text-muted-foreground mbs-0.5 tabular-nums">
             {runtime} min
           </p>
         )}
@@ -189,9 +189,9 @@ const SeasonSelector = function SeasonSelectorComponent({
 
   return (
     <>
-      <div className="pt-2">
+      <div className="pbs-2">
         <div
-          className="flex gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar"
+          className="flex gap-1.5 px-2 pbe-2 overflow-x-auto no-scrollbar"
           role="tablist"
           aria-label="Select season"
         >
@@ -246,7 +246,11 @@ const EpisodeListContent = function EpisodeListContentComponent({
 
   if (isLoading) {
     return (
-      <output className="space-y-0.5" aria-live="polite" aria-busy="true">
+      <output
+        className="flex flex-col gap-0.5"
+        aria-live="polite"
+        aria-busy="true"
+      >
         <span className="sr-only">Loading episodes</span>
         {['skeleton-1', 'skeleton-2', 'skeleton-3', 'skeleton-4'].map(
           (skeletonId, index) => (
@@ -295,9 +299,8 @@ const EpisodeListContent = function EpisodeListContentComponent({
                 key={episode.Id ?? `episode-${episodeIndex}`}
                 style={{
                   position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
+                  insetBlockStart: 0,
+                  insetInline: 0,
                   transform: `translateY(${episodeIndex * EPISODE_ROW_ESTIMATE_PX}px)`,
                 }}
               >
@@ -316,7 +319,7 @@ const EpisodeListContent = function EpisodeListContentComponent({
   }
 
   return (
-    <div className="space-y-0.5" aria-label="Episodes">
+    <div className="flex flex-col gap-0.5" aria-label="Episodes">
       {episodes.map((episode, index) => (
         <EpisodeItem
           key={episode.Id}
@@ -373,7 +376,7 @@ export default function EpisodeSwitcher({
         className={className}
         aria-label={t('player.selectEpisode', 'Select episode')}
       >
-        <span className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
+        <span className="text-fluid-title font-semibold tracking-tight truncate">
           {displayTitle}
         </span>
       </TitleMenuTrigger>
@@ -381,7 +384,7 @@ export default function EpisodeSwitcher({
       <DropdownMenuContent
         align="start"
         sideOffset={8}
-        className="w-72 p-0 overflow-hidden"
+        className="w-72 p-0 overflow-clip"
       >
         <SeasonSelector
           seasons={seasons}
@@ -400,7 +403,7 @@ export default function EpisodeSwitcher({
 
         <div
           ref={setEpisodeListElement}
-          className="overflow-y-auto max-h-(--spacing-popup-max-height) px-1.5 pb-1.5"
+          className="overflow-y-auto max-h-(--spacing-popup-max-height) px-1.5 pbe-1.5"
           role="tabpanel"
         >
           <EpisodeListContent

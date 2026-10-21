@@ -471,6 +471,34 @@ describe('FilterView', () => {
     })
   })
 
+  it('moves grid focus by the column count CSS lays out', () => {
+    useSessionStore.setState({ viewMode: 'card' })
+    routeSearchState.current = { collection: 'movies' }
+    setItemsQuery({
+      data: {
+        items: ['a', 'b', 'c', 'd', 'e'].map((id) =>
+          mediaItem(id, `Movie ${id}`),
+        ),
+        totalCount: 5,
+      },
+    })
+
+    render(<FilterView />)
+
+    const grid = screen.getByRole('grid', { name: 'Media items' })
+    grid.style.gridTemplateColumns = '160px 160px 160px'
+
+    fireEvent.focus(grid)
+    fireEvent.keyDown(grid, { key: 'ArrowDown' })
+    expect(document.activeElement?.textContent).toBe('Movie d')
+
+    fireEvent.keyDown(grid, { key: 'End' })
+    expect(document.activeElement?.textContent).toBe('Movie e')
+
+    fireEvent.keyDown(grid, { key: 'ArrowUp' })
+    expect(document.activeElement?.textContent).toBe('Movie b')
+  })
+
   it('retries item errors through the items query', () => {
     routeSearchState.current = { collection: 'movies' }
     setItemsQuery({

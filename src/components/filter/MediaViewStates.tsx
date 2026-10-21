@@ -6,7 +6,7 @@
 import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
-  Loader2,
+  Loader,
   RefreshCw,
   Search,
   Settings2,
@@ -52,11 +52,7 @@ export function ConnectionStatusNotice({
         />
       ) : (
         <EmptyState
-          icon={
-            <div className="animate-spin">
-              <Loader2 />
-            </div>
-          }
+          icon={<Loader />}
           title={t('connection.connecting', {
             defaultValue: 'Connecting…',
           })}
@@ -148,7 +144,7 @@ export function ResultsSummary({
   const end = Math.min(currentPage * pageSize, totalItems)
 
   return (
-    <div className="flex justify-between items-center mb-6">
+    <div className="flex justify-between items-center mbe-6">
       <p
         className="text-sm text-muted-foreground"
         role="status"

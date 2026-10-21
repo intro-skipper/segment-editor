@@ -71,7 +71,7 @@ function CollectionSelector({
       <TitleMenuTrigger
         aria-label={t('items.filter.selectCollection', 'Select collection')}
       >
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
+        <h1 className="text-fluid-display font-semibold tracking-tight truncate">
           {currentName ?? t('items.filter.collection', 'All Libraries')}
         </h1>
       </TitleMenuTrigger>
@@ -158,7 +158,7 @@ function DetailHeaderContent({
           <h1 className="sr-only">{pageTitle}</h1>
           <Suspense
             fallback={
-              <span className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
+              <span className="text-fluid-title font-semibold tracking-tight truncate">
                 {pageTitle}
               </span>
             }
@@ -170,7 +170,7 @@ function DetailHeaderContent({
           </Suspense>
         </>
       ) : (
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight truncate">
+        <h1 className="text-fluid-title font-semibold tracking-tight truncate">
           {pageTitle}
         </h1>
       )}
@@ -321,13 +321,13 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40">
+      <header className="sticky inset-bs-0 z-40">
         <DynamicThemeScope
           seedColor={seedColor}
-          className="border-b border-border/40"
+          className="border-be border-border/40"
         >
           <nav
-            className="px-4 py-4 sm:px-6"
+            className="px-fluid-md py-4"
             aria-label={t('accessibility.navigation', 'Main navigation')}
           >
             <div className="flex items-center justify-between gap-4">
