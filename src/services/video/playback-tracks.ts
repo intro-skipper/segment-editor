@@ -1,4 +1,3 @@
-import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type {
   HlsReloadRequest,
@@ -10,7 +9,6 @@ import type {
 import {
   applyInitialAudioTrack,
   switchAudioTrack,
-  switchSubtitleTrack,
 } from '@/services/video/track-switching'
 import type {
   AudioTrackInfo,
@@ -27,10 +25,10 @@ import {
   isAudioTrackDecodable,
   isAudioTrackDirectPlayable,
 } from '@/services/video/compatibility'
-import {
-  preloadJassubRenderer,
-  requiresJassubRenderer,
-} from '@/services/video/subtitle'
+import type {
+  SubtitleLoad,
+  SubtitlePresenter,
+} from '@/services/video/subtitle-presenter'
 import { showError } from '@/lib/notifications'
 import { languagesMatch } from '@/lib/language-utils'
 import { useAppStore } from '@/stores/app-store'
@@ -59,10 +57,8 @@ export interface PlaybackTrackMedia extends TrackMedia {
 }
 
 /** The engine's load the selection belongs to. */
-interface TrackLoad {
-  readonly item: BaseItemDto
+interface TrackLoad extends SubtitleLoad {
   readonly itemId: string
-  readonly mediaSourceId: string
   readonly controller: AbortController
 }
 
@@ -121,9 +117,9 @@ function audioSwitchTranscodeScope(
 /**
  * Audio and subtitle selection for the engine's loads. It owns the active
  * audio stream (decided once per load from the preferences, then changed only
- * by a successful switch), runs one switch at a time, shows the selected text
- * subtitle after every source change and persists a preference only once its
- * switch succeeded.
+ * by a successful switch), runs one switch at a time, has `subtitles` show
+ * the selected subtitle after every source change and persists a preference
+ * only once its switch succeeded.
  */
 export class PlaybackTracks {
   private state: PlaybackTrackState = EMPTY_STATE
@@ -142,6 +138,7 @@ export class PlaybackTracks {
     private readonly hls: { readonly current: HlsTrackController | null },
     private readonly reloadHls: (reload: HlsReloadRequest) => Promise<void>,
     private readonly t: (key: string) => string,
+    private readonly subtitles: SubtitlePresenter,
   ) {}
 
   subscribe = (listener: () => void): (() => void) => {
@@ -164,6 +161,7 @@ export class PlaybackTracks {
     const preferences = useAppStore.getState().trackPreferences
     this.current = load
     this.decodable = null
+    this.subtitles.setLoad(load)
     this.set({
       audioTracks,
       subtitleTracks,
@@ -201,7 +199,7 @@ export class PlaybackTracks {
     // The caption <track>s were rebuilt from the same item object.
     const media = this.media.current
     if (media) {
-      void switchSubtitleTrack(
+      void this.subtitles.show(
         this.state.activeSubtitleIndex,
         this.options(media, load, load.controller.signal),
       )
@@ -217,6 +215,7 @@ export class PlaybackTracks {
   unload(): void {
     this.current = null
     this.decodable = null
+    this.subtitles.setLoad(null)
     this.set(EMPTY_STATE)
   }
 
@@ -236,7 +235,7 @@ export class PlaybackTracks {
     const media = this.media.current
     if (!load || !media) return
 
-    void switchSubtitleTrack(
+    void this.subtitles.show(
       this.state.activeSubtitleIndex,
       this.options(media, load, load.controller.signal),
     )
@@ -292,13 +291,9 @@ export class PlaybackTracks {
     }
     if (index === this.state.activeSubtitleIndex) return false
 
-    if (track && requiresJassubRenderer(track)) {
-      void preloadJassubRenderer().catch(() => {})
-    }
-
     const outcome = await this.run(
       load,
-      (signal) => switchSubtitleTrack(index, this.options(media, load, signal)),
+      (signal) => this.subtitles.show(index, this.options(media, load, signal)),
       () => {
         this.set({ activeSubtitleIndex: index })
         const preferences = useAppStore.getState()

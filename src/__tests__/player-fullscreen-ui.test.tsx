@@ -17,28 +17,17 @@ const {
 
 interface RenderFullscreenUiOptions {
   onTogglePlay?: () => void
-  onResizeSubtitleRenderer?: () => void
 }
 
 let fullscreenElement: Element | null = null
 let originalFullscreenElementDescriptor: PropertyDescriptor | undefined
-let rafCallbacks: Array<{ id: number; callback: FrameRequestCallback }> = []
-let nextRafId = 1
-let cancelAnimationFrameMock: (handle: number) => void
 
 function renderFullscreenUi(options: RenderFullscreenUiOptions = {}) {
   const onTogglePlay = options.onTogglePlay ?? vi.fn()
-  const onResizeSubtitleRenderer = options.onResizeSubtitleRenderer ?? vi.fn()
 
   return {
-    ...renderHook(() =>
-      useFullscreenPlayerUi({
-        onTogglePlay,
-        onResizeSubtitleRenderer,
-      }),
-    ),
+    ...renderHook(() => useFullscreenPlayerUi({ onTogglePlay })),
     onTogglePlay,
-    onResizeSubtitleRenderer,
   }
 }
 
@@ -46,15 +35,6 @@ function dispatchFullscreenChange(element: Element | null) {
   fullscreenElement = element
   act(() => {
     document.dispatchEvent(new Event('fullscreenchange'))
-  })
-}
-
-function flushNextAnimationFrame() {
-  const frame = rafCallbacks.shift()
-  if (!frame) throw new Error('Expected queued animation frame')
-
-  act(() => {
-    frame.callback(performance.now())
   })
 }
 
@@ -100,21 +80,6 @@ describe('useFullscreenPlayerUi', () => {
       configurable: true,
       get: () => fullscreenElement,
     })
-
-    rafCallbacks = []
-    nextRafId = 1
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        const id = nextRafId++
-        rafCallbacks.push({ id, callback })
-        return id
-      }),
-    )
-    cancelAnimationFrameMock = vi.fn((handle: number) => {
-      rafCallbacks = rafCallbacks.filter((frame) => frame.id !== handle)
-    })
-    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameMock)
   })
 
   afterEach(() => {
@@ -169,48 +134,6 @@ describe('useFullscreenPlayerUi', () => {
     expect(result.current.isFullscreen).toBe(false)
     expect(result.current.showFullscreenControls).toBe(true)
     expect(result.current.videoFitMode).toBe('contain')
-  })
-
-  it('schedules subtitle renderer resize after fit mode styles have painted', () => {
-    const onResizeSubtitleRenderer = vi.fn()
-    const { result } = renderHook(() =>
-      useFullscreenPlayerUi({
-        onTogglePlay: vi.fn(),
-        onResizeSubtitleRenderer,
-      }),
-    )
-
-    act(() => {
-      result.current.toggleVideoFitMode()
-    })
-
-    expect(result.current.videoFitMode).toBe('cover')
-    expect(onResizeSubtitleRenderer).not.toHaveBeenCalled()
-
-    flushNextAnimationFrame()
-    expect(onResizeSubtitleRenderer).not.toHaveBeenCalled()
-
-    flushNextAnimationFrame()
-    expect(onResizeSubtitleRenderer).toHaveBeenCalledTimes(1)
-  })
-
-  it('cancels the nested subtitle resize animation frame on unmount', () => {
-    const onResizeSubtitleRenderer = vi.fn()
-    const { result, unmount } = renderFullscreenUi({
-      onResizeSubtitleRenderer,
-    })
-
-    act(() => {
-      result.current.toggleVideoFitMode()
-    })
-
-    flushNextAnimationFrame()
-    expect(onResizeSubtitleRenderer).not.toHaveBeenCalled()
-
-    unmount()
-
-    expect(cancelAnimationFrameMock).toHaveBeenCalled()
-    expect(rafCallbacks).toHaveLength(0)
   })
 
   it('turns a non-fullscreen single click into a delayed play toggle', () => {
@@ -360,18 +283,13 @@ describe('useFullscreenPlayerUi', () => {
     expect(result.current.showFullscreenControls).toBe(false)
   })
 
-  it('cleans up pending timers and animation frames on unmount', () => {
-    const { result, unmount } = renderFullscreenUi()
+  it('cleans up pending timers on unmount', () => {
+    const { unmount } = renderFullscreenUi()
 
     dispatchFullscreenChange(document.createElement('section'))
-    act(() => {
-      result.current.toggleVideoFitMode()
-    })
 
     unmount()
 
     expect(vi.getTimerCount()).toBe(0)
-    expect(cancelAnimationFrameMock).toHaveBeenCalled()
-    expect(rafCallbacks).toHaveLength(0)
   })
 })

@@ -7,7 +7,8 @@
 import type JASSUB from 'jassub'
 import type { SubtitleTrackInfo } from '../tracks'
 import type { BaseItemDto } from '@/types/jellyfin'
-import { buildApiUrl, getCredentials } from '@/services/jellyfin'
+import { getCredentials } from '@/services/jellyfin'
+import { getSubtitleUrl } from '@/services/video/api'
 import { JELLYFIN_CONFIG, SUBTITLE_CONFIG } from '@/lib/constants'
 
 const { TICKS_PER_SECOND } = JELLYFIN_CONFIG
@@ -51,6 +52,8 @@ export interface CreateRendererOptions {
   video: HTMLVideoElement
   track: SubtitleTrackInfo
   item: BaseItemDto
+  /** The media source `item` plays, whose subtitle stream and attachments load. */
+  mediaSourceId: string
   transcodingOffsetTicks?: number
   userOffset?: number
   signal?: AbortSignal
@@ -60,35 +63,16 @@ export interface CreateRendererOptions {
 // Helpers
 // ============================================================================
 
-/** Builds subtitle URL for a track. */
-function getSubtitleUrl(track: SubtitleTrackInfo, itemId: string): string {
-  const { serverAddress, accessToken } = getCredentials()
-
-  if (track.deliveryUrl) {
-    const endpoint = track.deliveryUrl.startsWith('/')
-      ? track.deliveryUrl.slice(1)
-      : track.deliveryUrl
-    return buildApiUrl({ serverAddress, accessToken, endpoint })
-  }
-
-  const mediaSourceId = itemId.replace(/-/g, '')
-  const ext = track.format.toLowerCase() === 'ssa' ? 'ssa' : 'ass'
-
-  return buildApiUrl({
-    serverAddress,
-    accessToken,
-    endpoint: `Videos/${itemId}/${mediaSourceId}/Subtitles/${track.index}/Stream.${ext}`,
-  })
-}
-
 /** Extracts embedded font URLs from media source. */
-function getEmbeddedFonts(item: BaseItemDto): Array<string> {
+function getEmbeddedFonts(
+  item: BaseItemDto,
+  mediaSourceId: string,
+): Array<string> {
   const { serverAddress } = getCredentials()
   const mediaSource = item.MediaSources?.[0]
   if (!mediaSource?.MediaAttachments?.length) return []
 
   const itemId = item.Id ?? ''
-  const mediaSourceId = mediaSource.Id ?? itemId.replace(/-/g, '')
   const cleanServer = serverAddress.replace(/\/+$/, '')
 
   return mediaSource.MediaAttachments.reduce<Array<string>>((urls, att) => {
@@ -126,14 +110,20 @@ export async function createJassubRenderer(
     video,
     track,
     item,
+    mediaSourceId,
     transcodingOffsetTicks = 0,
     userOffset = 0,
     signal,
   } = options
 
   const itemId = item.Id ?? ''
-  const subUrl = getSubtitleUrl(track, itemId)
-  const fonts = getEmbeddedFonts(item)
+  const subUrl = getSubtitleUrl(
+    itemId,
+    mediaSourceId,
+    track.index,
+    track.format.toLowerCase() === 'ssa' ? 'ssa' : 'ass',
+  )
+  const fonts = getEmbeddedFonts(item, mediaSourceId)
   const timeOffset = calcTimeOffset(transcodingOffsetTicks, userOffset)
 
   // Reuse the preloaded dynamic import when available. First ASS subtitle

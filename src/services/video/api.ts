@@ -142,6 +142,25 @@ export function getVideoStreamUrl(
   return buildUrl(`Videos/${itemId}/master.m3u8`, query)
 }
 
+/**
+ * The URL of subtitle stream `streamIndex` of a media source, converted to
+ * `format` ('vtt', 'ass' or 'ssa'); '' while signed out.
+ */
+export function getSubtitleUrl(
+  itemId: string,
+  mediaSourceId: string,
+  streamIndex: number,
+  format: string,
+): string {
+  const { serverAddress, accessToken } = getCredentials()
+  if (!serverAddress || !accessToken) return ''
+
+  return buildUrl(
+    `Videos/${itemId}/${mediaSourceId}/Subtitles/${streamIndex}/0/Stream.${format}`,
+    new URLSearchParams({ DeviceId: getDeviceId() }),
+  )
+}
+
 function getImageUrl(options: ImageUrlOptions): string {
   const {
     itemId,

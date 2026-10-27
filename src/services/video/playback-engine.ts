@@ -12,7 +12,6 @@ import { createPlaySessionId } from '@/services/video/session'
 import type {
   JellyfinSessionDescriptor,
   JellyfinStatusBackend,
-  ReportedMedia,
 } from '@/services/video/status-reporter'
 import {
   PlaybackStatusReporter,
@@ -30,9 +29,8 @@ import type {
   HlsTrackController,
 } from '@/services/video/track-switching'
 import { PlaybackTracks } from '@/services/video/playback-tracks'
-import type { PlaybackTrackMedia } from '@/services/video/playback-tracks'
 import { Playhead } from '@/services/video/playhead'
-import type { PlayheadMedia } from '@/services/video/playhead'
+import { SubtitlePresenter } from '@/services/video/subtitle-presenter'
 import { secondsToTicks } from '@/lib/time-utils'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import { PLAYER_CONFIG } from '@/lib/constants'
@@ -62,28 +60,6 @@ export const jellyfinPlaybackBackend: PlaybackBackend = {
       playSessionId,
     ),
   createPlaySessionId,
-}
-
-/** The parts of the video element playback drives; `HTMLVideoElement` satisfies it. */
-export interface PlaybackMedia
-  extends ReportedMedia, PlayheadMedia, PlaybackTrackMedia {
-  currentTime: number
-  volume: number
-  muted: boolean
-  playbackRate: number
-  defaultPlaybackRate: number
-  src: string
-  readonly error: { readonly code: number } | null
-  play: () => Promise<void>
-  pause: () => void
-  load: () => void
-  removeAttribute: (name: string) => void
-  canPlayType: (type: string) => string
-  addEventListener: (
-    type: string,
-    listener: () => void,
-    options?: { once?: boolean; signal?: AbortSignal },
-  ) => void
 }
 
 /** Where playback stands. Errors exist only while recovering or failed. */
@@ -172,19 +148,20 @@ function isSameError(left: VideoPlayerError, right: VideoPlayerError) {
 /**
  * Plays one item on one video element: resolves direct play or HLS, falls
  * back from direct to HLS on errors, recovers HLS in place, carries the
- * position across source reloads, selects audio and subtitle tracks, owns
- * volume, mute and speed (persisting volume and mute) and reports the
- * session to Jellyfin.
+ * position across source reloads, selects audio and subtitle tracks,
+ * presents subtitles, owns volume, mute and speed (persisting volume and
+ * mute) and reports the session to Jellyfin.
  * load() says what to play; it plays while the element is connected and
  * resumes where it was when the element connects again.
  */
 export class PlaybackEngine<
-  M extends PlaybackMedia,
+  M extends HTMLVideoElement,
   H extends HlsPlayer<M> & HlsTrackController,
 > {
   readonly hlsRef: { current: H | null } = { current: null }
   readonly playhead: Playhead
   readonly tracks: PlaybackTracks
+  readonly subtitles: SubtitlePresenter
 
   private snapshot: PlaybackSnapshot = initialSnapshot()
   private readonly listeners = new Set<() => void>()
@@ -212,11 +189,13 @@ export class PlaybackEngine<
   ) {
     this.reporter = new PlaybackStatusReporter(backend, this.getMedia, null)
     this.playhead = new Playhead(media)
+    this.subtitles = new SubtitlePresenter(media, (key) => this.host.t(key))
     this.tracks = new PlaybackTracks(
       media,
       this.hlsRef,
       (reload) => this.reloadHlsWithUrl(reload),
       (key) => this.host.t(key),
+      this.subtitles,
     )
   }
 
@@ -275,15 +254,16 @@ export class PlaybackEngine<
   /**
    * Plays `item`, or stops playing when null; while disconnected it only
    * records it. The same (item, media source) only swaps in the newer item
-   * object; a new media source of the same item carries the position and
-   * speed over, and another item starts from the beginning at the default
-   * speed.
+   * object; a new media source of the same item carries the position,
+   * speed and subtitle offset over, and another item starts from the
+   * beginning at the default speed and no offset.
    */
   load(item: BaseItemDto | null): void {
     if (item?.Id !== this.wanted?.Id) {
       this.carry = null
       this.playhead.reset()
       this.setSpeedIndex(DEFAULT_PLAYBACK_SPEED_INDEX)
+      this.subtitles.setOffset(0)
     }
     this.wanted = item
     if (this.connected) this.play(item)
@@ -462,8 +442,8 @@ export class PlaybackEngine<
 
   /**
    * Unloads after React let go of the element, so the position comes from
-   * the playhead and the play state from the snapshot. The speed lasts only
-   * as long as the element.
+   * the playhead and the play state from the snapshot. JASSUB, the speed and
+   * the subtitle offset last only as long as the element.
    */
   private detach() {
     this.connected = false
@@ -474,7 +454,9 @@ export class PlaybackEngine<
       }
     }
     this.unload()
+    this.subtitles.stop()
     this.setSpeedIndex(DEFAULT_PLAYBACK_SPEED_INDEX)
+    this.subtitles.setOffset(0)
   }
 
   private begin(item: BaseItemDto, itemId: string, mediaSourceId: string) {

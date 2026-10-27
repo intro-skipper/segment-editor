@@ -10,9 +10,7 @@ import type { PlaybackStrategy } from '@/services/video/api'
 import { getContainerDefaultAudioTrack } from '@/services/video/tracks'
 import { getVideoStreamUrl } from '@/services/video/api'
 import { createPlaySessionId } from '@/services/video/session'
-import { buildApiUrl, getCredentials, getDeviceId } from '@/services/jellyfin'
 import { isAudioTrackDecodable } from '@/services/video/compatibility'
-import { requiresJassubRenderer } from '@/services/video/subtitle'
 
 /**
  * The hls.js surface this module drives. Declaring it structurally keeps the
@@ -107,34 +105,6 @@ export type TrackSwitchResult =
       /** Error information for the failed switch */
       error: TrackSwitchError
     }
-
-/**
- * Generates the subtitle delivery URL a caption <track> loads.
- *
- * @param itemId - The media item ID
- * @param trackIndex - The subtitle track index
- * @param format - The desired subtitle format (default: 'vtt')
- * @returns The subtitle delivery URL
- */
-export function getSubtitleDeliveryUrl(
-  itemId: string,
-  trackIndex: number,
-  format: string = 'vtt',
-): string {
-  const creds = getCredentials()
-  if (!creds.serverAddress || !creds.accessToken) return ''
-
-  const query = new URLSearchParams({
-    DeviceId: getDeviceId(),
-  })
-
-  return buildApiUrl({
-    serverAddress: creds.serverAddress,
-    accessToken: creds.accessToken,
-    endpoint: `Videos/${itemId}/${itemId}/Subtitles/${trackIndex}/0/Stream.${format}`,
-    query,
-  })
-}
 
 /**
  * Generates an HLS URL with a specific audio stream index.
@@ -657,8 +627,8 @@ export async function switchAudioTrack(
 }
 
 /**
- * Shows one text subtitle through the element's text tracks in either
- * strategy, or none: for null, and for ASS/SSA, which JASSUB renders.
+ * Shows one subtitle through its text track in either strategy, or none
+ * for null.
  *
  * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to show, or null for off
  * @param options - Track switch options (includes subtitleTracks for index mapping)
@@ -681,11 +651,6 @@ export async function switchSubtitleTrack(
       `Subtitle track with index ${trackIndex} not found`,
       trackIndex,
     )
-  }
-
-  if (requiresJassubRenderer(track)) {
-    disableTextTracks(textTracks)
-    return { success: true }
   }
 
   if (track.relativeIndex >= textTracks.length) {

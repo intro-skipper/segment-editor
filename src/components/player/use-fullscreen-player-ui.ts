@@ -71,7 +71,6 @@ function fullscreenUiReducer(
 
 interface FullscreenPlayerUiOptions {
   onTogglePlay: () => void
-  onResizeSubtitleRenderer: () => void
 }
 
 interface FullscreenPlayerUi extends FullscreenPlayerUiState {
@@ -83,7 +82,6 @@ interface FullscreenPlayerUi extends FullscreenPlayerUiState {
 
 export function useFullscreenPlayerUi({
   onTogglePlay,
-  onResizeSubtitleRenderer,
 }: FullscreenPlayerUiOptions): FullscreenPlayerUi {
   const [fullscreenUiState, dispatchFullscreenUi] = useReducer(
     fullscreenUiReducer,
@@ -98,7 +96,6 @@ export function useFullscreenPlayerUi({
   const lastInteractionTimeRef = useRef(0)
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMouseMoveRef = useRef(0)
-  const resizeRafRef = useRef<number | null>(null)
 
   const clearHideControlsTimer = () => {
     if (hideControlsTimeoutRef.current) {
@@ -111,13 +108,6 @@ export function useFullscreenPlayerUi({
     if (singleTapTimerRef.current) {
       clearTimeout(singleTapTimerRef.current)
       singleTapTimerRef.current = null
-    }
-  }
-
-  const clearResizeFrame = () => {
-    if (resizeRafRef.current !== null) {
-      cancelAnimationFrame(resizeRafRef.current)
-      resizeRafRef.current = null
     }
   }
 
@@ -149,17 +139,6 @@ export function useFullscreenPlayerUi({
 
   const toggleVideoFitMode = () => {
     dispatchFullscreenUi({ type: 'TOGGLE_FIT_MODE' })
-    clearResizeFrame()
-
-    // Schedule resize after browser paints new styles.
-    // Double rAF pattern: outer frame waits for style recalc,
-    // inner frame ensures layout is complete before measuring.
-    resizeRafRef.current = requestAnimationFrame(() => {
-      resizeRafRef.current = requestAnimationFrame(() => {
-        resizeRafRef.current = null
-        onResizeSubtitleRenderer()
-      })
-    })
   }
 
   const resetHideControlsTimer = () => {
@@ -246,7 +225,6 @@ export function useFullscreenPlayerUi({
     return () => {
       clearHideControlsTimer()
       clearSingleTapTimer()
-      clearResizeFrame()
     }
   }, [])
 

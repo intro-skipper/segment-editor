@@ -1,38 +1,18 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerSurface } from './PlayerSurface'
 import { PlayerControls } from './PlayerControls'
 import type { PlayerControlsProps } from './PlayerControls'
-import {
-  usePlayback,
-  usePlaybackEngine,
-  usePlaybackTracks,
-  usePlayheadTimeline,
-} from './playback-context'
+import { usePlaybackEngine, usePlayheadTimeline } from './playback-context'
 import { initialPlayerState, playerReducer } from './player-reducer'
 import { buildNativeCaptionTracks } from './caption-tracks'
 import { useFullscreenPlayerUi } from './use-fullscreen-player-ui'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
 import { getBestImageUrl } from '@/services/video/api'
-import type { PlaybackTrackState } from '@/services/video/playback-tracks'
-import { extractTracks } from '@/services/video/tracks'
-import type { SubtitleTrackInfo } from '@/services/video/tracks'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
-import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
-
-function findActiveSubtitleTrack({
-  activeSubtitleIndex,
-  subtitleTracks,
-}: PlaybackTrackState): SubtitleTrackInfo | null {
-  if (activeSubtitleIndex === null) return null
-  return (
-    subtitleTracks.find((track) => track.index === activeSubtitleIndex) ?? null
-  )
-}
 
 interface TimelineScrubberProps {
   item: BaseItemDto
@@ -68,7 +48,7 @@ interface PlayerProps {
 
 /**
  * The editor's player: connects the provider's engine to its `<video>` while
- * mounted, and adds layout, fullscreen, shortcuts and subtitles.
+ * mounted, and adds layout, fullscreen, shortcuts and caption tracks.
  */
 export function Player({
   item,
@@ -78,11 +58,8 @@ export function Player({
   onCreateSegment,
   onUpdateSegmentTimestamp,
 }: PlayerProps) {
-  const { t } = useTranslation()
   const engine = usePlaybackEngine()
-  const strategy = usePlayback((s) => s.strategy)
-  const activeSubtitleTrack = usePlaybackTracks(findActiveSubtitleTrack)
-  const [{ skipTimeIndex, subtitleOffset }, dispatch] = useReducer(
+  const [{ skipTimeIndex }, dispatch] = useReducer(
     playerReducer,
     initialPlayerState,
   )
@@ -104,26 +81,7 @@ export function Player({
 
   // From the item, not the engine: the <track>s must exist before the engine
   // loads it and shows the selected one.
-  const nativeCaptionTracks = buildNativeCaptionTracks(
-    item.Id,
-    extractTracks(item).subtitleTracks,
-  )
-
-  const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
-    useJassubRenderer({
-      videoRef,
-      strategy,
-      activeTrack: activeSubtitleTrack,
-      item,
-      transcodingOffsetTicks: 0, // TODO: Get from playback options when HLS transcoding offset is available
-      userOffset: subtitleOffset,
-      t,
-    })
-
-  const handleSubtitleOffsetChange = (offset: number) => {
-    dispatch({ type: 'SUBTITLE_OFFSET_CHANGE', offset })
-    setJassubUserOffset(offset)
-  }
+  const nativeCaptionTracks = buildNativeCaptionTracks(item)
 
   const toggleFullscreen = () => {
     const container = containerRef.current
@@ -167,10 +125,7 @@ export function Player({
     handleVideoInteraction,
     handleFullscreenMouseMove,
     handleContainerMouseLeave,
-  } = useFullscreenPlayerUi({
-    onTogglePlay: engine.togglePlay,
-    onResizeSubtitleRenderer: resizeJassub,
-  })
+  } = useFullscreenPlayerUi({ onTogglePlay: engine.togglePlay })
 
   usePlayerKeyboard({
     skipTimeIndex,
@@ -210,8 +165,6 @@ export function Player({
             skipTimeIndex,
             onSkipTimeChange: (index) =>
               dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index }),
-            subtitleOffset,
-            onSubtitleOffsetChange: handleSubtitleOffsetChange,
           }}
         />
       }

@@ -1,5 +1,6 @@
-import { getSubtitleDeliveryUrl } from '@/services/video/track-switching'
-import type { SubtitleTrackInfo } from '@/services/video/tracks'
+import type { BaseItemDto } from '@/types/jellyfin'
+import { getPlaybackMediaSourceId, getSubtitleUrl } from '@/services/video/api'
+import { extractTracks } from '@/services/video/tracks'
 
 export interface NativeCaptionTrack {
   index: number
@@ -8,16 +9,16 @@ export interface NativeCaptionTrack {
   src: string
 }
 
-/** One VTT <track> per subtitle stream, in stream order, for direct play and HLS alike. */
+/** One VTT <track> per subtitle stream of the item's media source, in stream order, for direct play and HLS alike. */
 export function buildNativeCaptionTracks(
-  itemId: string | undefined,
-  subtitleTracks: ReadonlyArray<SubtitleTrackInfo>,
+  item: BaseItemDto,
 ): Array<NativeCaptionTrack> {
-  if (!itemId || subtitleTracks.length === 0) return []
+  const mediaSourceId = getPlaybackMediaSourceId(item)
+  if (!item.Id || !mediaSourceId) return []
 
   const tracks: Array<NativeCaptionTrack> = []
-  for (const track of subtitleTracks) {
-    const src = getSubtitleDeliveryUrl(itemId, track.index, 'vtt')
+  for (const track of extractTracks(item).subtitleTracks) {
+    const src = getSubtitleUrl(item.Id, mediaSourceId, track.index, 'vtt')
     if (src === '') continue
 
     tracks.push({

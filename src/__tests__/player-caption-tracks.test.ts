@@ -1,85 +1,60 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+// @vitest-environment jsdom
 
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import type { BaseItemDto } from '@/types/jellyfin'
 import { buildNativeCaptionTracks } from '@/components/player/caption-tracks'
-import type { SubtitleTrackInfo } from '@/services/video/tracks'
+import { useApiStore } from '@/stores/api-store'
 
-const getSubtitleDeliveryUrlMock = vi.hoisted(() =>
-  vi.fn((itemId: string, trackIndex: number, format: string) =>
-    trackIndex === 3 ? '' : `/subtitle/${itemId}/${trackIndex}.${format}`,
-  ),
-)
-
-vi.mock('@/services/video/track-switching', () => ({
-  getSubtitleDeliveryUrl: getSubtitleDeliveryUrlMock,
-}))
-
-function subtitleTrack(
-  index: number,
-  overrides: Partial<SubtitleTrackInfo> = {},
-): SubtitleTrackInfo {
-  return {
-    index,
-    relativeIndex: index,
-    language: 'eng',
-    displayTitle: `Subtitle ${index}`,
-    format: 'SRT',
-    isExternal: true,
-    isDefault: index === 0,
-    ...overrides,
-  }
+/** An item playing its second version, with two subtitle streams. */
+const ITEM: BaseItemDto = {
+  Id: 'item-1',
+  MediaSources: [
+    {
+      Id: 'extended',
+      MediaStreams: [
+        { Type: 'Video', Index: 0 },
+        { Type: 'Subtitle', Index: 2, Codec: 'srt', Language: 'eng' },
+        { Type: 'Subtitle', Index: 3, Codec: 'ass', DisplayTitle: 'Signs' },
+      ],
+    },
+  ],
 }
 
 describe('buildNativeCaptionTracks', () => {
   beforeEach(() => {
-    getSubtitleDeliveryUrlMock.mockClear()
+    useApiStore.setState({
+      serverAddress: 'https://jellyfin.example',
+      apiKey: 'api-key',
+    })
   })
 
-  it('does not derive native captions without an item id', () => {
-    const tracks = [subtitleTrack(1)]
+  it("loads each subtitle stream as VTT from the item's media source", () => {
+    const captions = buildNativeCaptionTracks(ITEM)
 
-    expect(buildNativeCaptionTracks(undefined, tracks)).toEqual([])
-    expect(getSubtitleDeliveryUrlMock).not.toHaveBeenCalled()
-  })
-
-  it('maps subtitles to VTT caption tracks and skips unavailable urls', () => {
-    const captions = buildNativeCaptionTracks('item-1', [
-      subtitleTrack(1),
-      subtitleTrack(2, { language: null }),
-      subtitleTrack(3),
-    ])
-
-    expect(captions).toEqual([
-      {
-        index: 1,
-        language: 'eng',
-        label: 'Subtitle 1',
-        src: '/subtitle/item-1/1.vtt',
-      },
+    expect(
+      captions.map(({ index, language, src }) => ({
+        index,
+        language,
+        path: new URL(src).pathname,
+      })),
+    ).toEqual([
       {
         index: 2,
+        language: 'eng',
+        path: '/Videos/item-1/extended/Subtitles/2/0/Stream.vtt',
+      },
+      {
+        index: 3,
         language: undefined,
-        label: 'Subtitle 2',
-        src: '/subtitle/item-1/2.vtt',
+        path: '/Videos/item-1/extended/Subtitles/3/0/Stream.vtt',
       },
     ])
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenCalledTimes(3)
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
-      1,
-      'item-1',
-      1,
-      'vtt',
-    )
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
-      2,
-      'item-1',
-      2,
-      'vtt',
-    )
-    expect(getSubtitleDeliveryUrlMock).toHaveBeenNthCalledWith(
-      3,
-      'item-1',
-      3,
-      'vtt',
-    )
+  })
+
+  it('builds none while signed out', () => {
+    useApiStore.setState({ apiKey: undefined })
+
+    expect(buildNativeCaptionTracks(ITEM)).toEqual([])
   })
 })
