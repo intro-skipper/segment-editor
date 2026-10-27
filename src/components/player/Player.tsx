@@ -1,4 +1,4 @@
-import { useLayoutEffect, useReducer, useRef } from 'react'
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PlayerScrubber } from './PlayerScrubber'
@@ -6,7 +6,6 @@ import { PlayerSurface } from './PlayerSurface'
 import { PlayerControls } from './PlayerControls'
 import type { PlayerControlsProps } from './PlayerControls'
 import {
-  PlaybackProvider,
   usePlayback,
   usePlaybackEngine,
   usePlaybackTracks,
@@ -17,17 +16,13 @@ import { buildNativeCaptionTracks } from './caption-tracks'
 import { useFullscreenPlayerUi } from './use-fullscreen-player-ui'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
-import type { PlaybackStrategy } from '@/services/video/api'
 import { getBestImageUrl } from '@/services/video/api'
 import type { PlaybackTrackState } from '@/services/video/playback-tracks'
 import { extractTracks } from '@/services/video/tracks'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
-import { useAppStore } from '@/stores/app-store'
-import { useVideoPlayer } from '@/hooks/use-video-player'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
-import { showNotification } from '@/lib/notifications'
 
 function findActiveSubtitleTrack({
   activeSubtitleIndex,
@@ -64,82 +59,25 @@ function TimelineScrubber({ item, segments }: TimelineScrubberProps) {
 
 interface PlayerProps {
   item: BaseItemDto
+  videoRef: React.RefObject<HTMLVideoElement | null>
   mediaSourceControls?: PlayerControlsProps['mediaSourceControls']
   segments?: Array<MediaSegmentDto>
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
-  handleRef?: React.RefObject<PlayerHandle | null>
 }
 
-/** Imperative access for the editor: read the playhead and seek it. */
-export interface PlayerHandle {
-  getCurrentTime: () => number
-  seek: (time: number) => void
-}
-
-/** Plays `item` for the editor. The playhead goes to `handleRef` while mounted. */
-export function Player({ item, segments, handleRef, ...shell }: PlayerProps) {
-  const { t } = useTranslation()
-  const jellyfinPlaybackSyncEnabled = useAppStore(
-    (s) => s.jellyfinPlaybackSyncEnabled,
-  )
-  const previousStrategyRef = useRef<PlaybackStrategy | null>(null)
-
-  const handleStrategyChange = (strategy: PlaybackStrategy) => {
-    if (previousStrategyRef.current === 'direct' && strategy === 'hls') {
-      showNotification({
-        type: 'info',
-        message: t('player.notification.switchedToTranscode'),
-        duration: 3000,
-      })
-    }
-    previousStrategyRef.current = strategy
-  }
-
-  const { engine, videoRef } = useVideoPlayer({
-    item,
-    jellyfinPlaybackSyncEnabled,
-    onStrategyChange: handleStrategyChange,
-    t,
-  })
-
-  useLayoutEffect(() => {
-    engine.playhead.setSegments(segments)
-  }, [engine, segments])
-
-  useLayoutEffect(() => {
-    if (!handleRef) return
-    handleRef.current = engine.playhead
-    return () => {
-      handleRef.current = null
-    }
-  }, [handleRef, engine])
-
-  return (
-    <PlaybackProvider engine={engine}>
-      <PlayerShell
-        item={item}
-        segments={segments}
-        videoRef={videoRef}
-        {...shell}
-      />
-    </PlaybackProvider>
-  )
-}
-
-interface PlayerShellProps extends Omit<PlayerProps, 'handleRef'> {
-  videoRef: React.RefObject<HTMLVideoElement | null>
-}
-
-/** Layout, fullscreen, shortcuts and subtitles around the provider's engine. */
-function PlayerShell({
+/**
+ * The editor's player: connects the provider's engine to its `<video>` while
+ * mounted, and adds layout, fullscreen, shortcuts and subtitles.
+ */
+export function Player({
   item,
   segments,
   videoRef,
   mediaSourceControls,
   onCreateSegment,
   onUpdateSegmentTimestamp,
-}: PlayerShellProps) {
+}: PlayerProps) {
   const { t } = useTranslation()
   const engine = usePlaybackEngine()
   const strategy = usePlayback((s) => s.strategy)
@@ -148,7 +86,19 @@ function PlayerShell({
     playerReducer,
     initialPlayerState,
   )
+  // Player stays mounted across items; another item starts with the defaults.
+  const [renderedItemId, setRenderedItemId] = useState(item.Id)
+  if (renderedItemId !== item.Id) {
+    setRenderedItemId(item.Id)
+    dispatch({ type: 'RESET' })
+  }
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => engine.connect(), [engine])
+
+  useLayoutEffect(() => {
+    engine.playhead.setSegments(segments)
+  }, [engine, segments])
 
   const posterUrl = useBlobUrl(getBestImageUrl(item, 900, 506) ?? null)
 
