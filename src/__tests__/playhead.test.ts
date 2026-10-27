@@ -242,6 +242,15 @@ describe('Playhead segment skip', () => {
     expect(playhead.getSkipOffer()).toBeNull()
   })
 
+  it('offers the next segment when playback runs straight into it', () => {
+    const recap = { ...intro, id: 'recap', startSeconds: 20, endSeconds: 30 }
+    const { video, playhead } = createPlayhead([intro, recap])
+    playTo(video, 12)
+    playTo(video, 22)
+
+    expect(playhead.getSkipOffer()).toBe(recap)
+  })
+
   it('shows the offered segment as the latest segments describe it', () => {
     const { video, playhead } = createPlayhead([intro])
     playTo(video, 12)

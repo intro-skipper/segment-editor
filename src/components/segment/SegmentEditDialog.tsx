@@ -73,17 +73,11 @@ export function SegmentEditDialog(props: SegmentEditDialogProps) {
     wasOpenRef.current = props.open
   }, [props.open])
 
-  const segmentKey = props.segment.id
-    ? props.segment.id
-    : [
-        props.segment.itemId,
-        props.segment.type,
-        props.segment.startSeconds,
-        props.segment.endSeconds,
-      ].join(':')
-
   return (
-    <SegmentEditDialogContent key={`${segmentKey}:${openSession}`} {...props} />
+    <SegmentEditDialogContent
+      key={`${props.segment.id}:${openSession}`}
+      {...props}
+    />
   )
 }
 

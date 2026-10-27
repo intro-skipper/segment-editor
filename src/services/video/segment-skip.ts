@@ -29,9 +29,7 @@ export function buildSegmentTimeIndex(
     if (endSeconds > startSeconds) {
       const range = { segment, startSeconds, endSeconds }
       ranges.push(range)
-      if (segment.id !== undefined) {
-        rangeById.set(segment.id, range)
-      }
+      rangeById.set(segment.id, range)
     }
   }
 
@@ -65,13 +63,6 @@ export function findActiveSegmentRange(
   }
 
   return null
-}
-
-export function getSegmentTimeRangeId(range: SegmentTimeRange): string {
-  return (
-    range.segment.id ??
-    `${range.startSeconds}:${range.endSeconds}:${range.segment.type ?? ''}`
-  )
 }
 
 export function getSegmentSkipTargetEndSeconds(

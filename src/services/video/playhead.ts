@@ -3,7 +3,6 @@ import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
-  getSegmentTimeRangeId,
 } from '@/services/video/segment-skip'
 import { useAppStore } from '@/stores/app-store'
 import {
@@ -82,7 +81,6 @@ export class Playhead {
   getSkipOffer = (): Segment | null => {
     const offer = this.offer
     if (!offer || !this.playbackReady) return null
-    if (offer.id === undefined) return offer
     return this.segments.rangeById.get(offer.id)?.segment ?? null
   }
 
@@ -130,10 +128,7 @@ export class Playhead {
 
   /** Seeks past `segment` and withdraws its offer. */
   skipSegment = (segment: Segment): void => {
-    const range =
-      segment.id !== undefined
-        ? this.segments.rangeById.get(segment.id)
-        : undefined
+    const range = this.segments.rangeById.get(segment.id)
     const targetEndSeconds = getSegmentSkipTargetEndSeconds(segment, range)
     if (targetEndSeconds === null) return
     this.seek(targetEndSeconds)
@@ -231,7 +226,7 @@ export class Playhead {
     }
 
     const range = findActiveSegmentRange(ranges, time)
-    const id = range ? getSegmentTimeRangeId(range) : null
+    const id = range?.segment.id ?? null
     if (id !== this.activeSegmentId) {
       this.activeSegmentId = id
       if (!range) this.autoSkippedSegmentId = null

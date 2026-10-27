@@ -13,7 +13,6 @@ import {
 } from './PlayerEditorDialogs'
 import type { BaseItemDto, MediaSegmentType } from '@/types/jellyfin'
 import type { Segment, SegmentUpdate, TimestampUpdate } from '@/types/segment'
-import type { SegmentTarget } from '@/services/segments/edit-session'
 import { useSegmentEditSession } from '@/services/segments/edit-session'
 import { useAppStore } from '@/stores/app-store'
 import { ticksToSeconds } from '@/lib/time-utils'
@@ -128,13 +127,9 @@ function buildImportInfoSuffix({
 }
 
 interface PendingDelete {
-  target: SegmentTarget
+  id: string
   type?: MediaSegmentType
 }
-
-/** Targets a segment by Id, falling back to its index for one without. */
-const targetOf = (segment: Segment, index: number): SegmentTarget =>
-  segment.id ? { id: segment.id } : { index }
 
 export function PlayerEditor({
   item,
@@ -248,7 +243,7 @@ function useRenderPlayerEditor({
 
   const handleUpdateSegmentTimestamp = (data: TimestampUpdate) => {
     update(
-      data.index === undefined ? 'active' : { index: data.index },
+      'active',
       data.start
         ? { startSeconds: data.currentTime }
         : { endSeconds: data.currentTime },
@@ -270,11 +265,11 @@ function useRenderPlayerEditor({
     // new identity on every edit, cache-missing every SegmentListRow below.
     const segment = elementAt(editingSegmentsRef.current, index)
     if (segment === undefined) return
-    setPendingDelete({ target: targetOf(segment, index), type: segment.type })
+    setPendingDelete({ id: segment.id, type: segment.type })
   }
 
   const handleConfirmDeleteSegment = () => {
-    if (pendingDelete !== null) remove(pendingDelete.target)
+    if (pendingDelete !== null) remove({ id: pendingDelete.id })
     setPendingDelete(null)
   }
 
@@ -298,15 +293,18 @@ function useRenderPlayerEditor({
   }
 
   const handleSaveSegmentFromDialog = (segment: Segment) => {
-    update(targetOf(segment, editingSegmentIndex ?? -1), {
-      type: segment.type,
-      startSeconds: segment.startSeconds,
-      endSeconds: segment.endSeconds,
-    })
+    update(
+      { id: segment.id },
+      {
+        type: segment.type,
+        startSeconds: segment.startSeconds,
+        endSeconds: segment.endSeconds,
+      },
+    )
   }
 
   const handleDeleteSegmentFromDialog = (segment: Segment) => {
-    remove(targetOf(segment, editingSegmentIndex ?? -1))
+    remove({ id: segment.id })
   }
 
   const handlePasteFromClipboard = () => {
@@ -535,7 +533,7 @@ function useRenderPlayerEditor({
 
       {editingSegmentIndex !== null && editingSegments[editingSegmentIndex] && (
         <SegmentEditDialog
-          key={editingSegments[editingSegmentIndex].id ?? editingSegmentIndex}
+          key={editingSegments[editingSegmentIndex].id}
           open={editDialogOpen}
           segment={editingSegments[editingSegmentIndex]}
           runtimeSeconds={runtimeSeconds}

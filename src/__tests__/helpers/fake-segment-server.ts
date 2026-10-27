@@ -22,9 +22,12 @@ export const segment = (
   type: Segment['type'],
   startSeconds: number,
   endSeconds: number,
-): Segment & { id: string } => ({ id, type, startSeconds, endSeconds })
+): Segment => ({ id, type, startSeconds, endSeconds })
 
-const toTicks = (s: Segment, itemId: string): MediaSegmentDto => ({
+/** A segment as the server may hold it: the SDK lets its Id be missing. */
+type StoredSegment = Omit<Segment, 'id'> & Partial<Pick<Segment, 'id'>>
+
+const toTicks = (s: StoredSegment, itemId: string): MediaSegmentDto => ({
   Id: s.id,
   ItemId: itemId,
   Type: s.type,
@@ -32,7 +35,7 @@ const toTicks = (s: Segment, itemId: string): MediaSegmentDto => ({
   EndTicks: s.endSeconds * TICKS_PER_SECOND,
 })
 
-const toSeconds = (s: MediaSegmentDto): Segment => ({
+const toSeconds = (s: MediaSegmentDto): StoredSegment => ({
   id: s.Id,
   itemId: s.ItemId,
   type: s.Type,
@@ -56,7 +59,7 @@ export function fakeSegmentServer({
 }: {
   itemId: string
   bulk: boolean
-  segments?: Array<Segment>
+  segments?: Array<StoredSegment>
 }) {
   let stored = segments.map((s) => toTicks(s, itemId))
   let version = 1

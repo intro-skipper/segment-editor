@@ -161,7 +161,7 @@ const compareStrings = (a: string, b: string): number =>
 const compareCanonical = (a: Segment, b: Segment): number =>
   a.startSeconds - b.startSeconds ||
   a.endSeconds - b.endSeconds ||
-  compareStrings(a.id ?? '', b.id ?? '') ||
+  compareStrings(a.id, b.id) ||
   compareStrings(a.type ?? '', b.type ?? '')
 
 /** Same segments in any order: list order is presentation, not an edit. */

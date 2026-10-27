@@ -45,8 +45,9 @@ const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
 
 type Server = Pick<JellyfinFetchOptions, 'baseUrl' | 'accessToken'>
 
+// The SDK types Id as optional; a segment read without one gets a client Id.
 const toSegment = (dto: MediaSegmentDto): Segment => ({
-  id: dto.Id,
+  id: typeof dto.Id === 'string' && dto.Id !== '' ? dto.Id : generateUUID(),
   itemId: dto.ItemId,
   type: dto.Type,
   startSeconds: ticksToSeconds(dto.StartTicks),
@@ -54,7 +55,7 @@ const toSegment = (dto: MediaSegmentDto): Segment => ({
 })
 
 const toServerSegment = (segment: Segment): MediaSegmentDto => ({
-  Id: segment.id || generateUUID(),
+  Id: segment.id,
   ItemId: segment.itemId,
   Type: segment.type,
   StartTicks: secondsToTicks(segment.startSeconds),
@@ -277,7 +278,7 @@ async function createSegment(
 async function deleteSegment(server: Server, segment: Segment): Promise<void> {
   const id = segment.id
   if (!isValidItemId(id)) {
-    throw AppError.validation('Invalid or missing segment ID')
+    throw AppError.validation('Invalid segment ID')
   }
   const query = new URLSearchParams()
   if (isValidItemId(segment.itemId)) query.set('itemId', segment.itemId)

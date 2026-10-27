@@ -49,6 +49,24 @@ describe('segment store', () => {
     ])
   })
 
+  it('gives a segment read without an Id a client Id and sends it back on the bulk PUT', async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [{ type: 'Intro', startSeconds: 10, endSeconds: 20 }],
+    })
+    const snapshot = await readSegments(ITEM_ID)
+    const id = snapshot.segments[0]?.id
+
+    await replaceSegments(ITEM_ID, snapshot, snapshot.segments)
+
+    expect(id).toMatch(
+      /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/,
+    )
+    const put = server.requests.find((r) => r.method === 'PUT')
+    expect(put?.body).toMatchObject([{ Id: id }])
+  })
+
   it('replaces the whole set in one PUT guarded by the read ETag, in ticks', async () => {
     const server = fakeSegmentServer({
       itemId: ITEM_ID,
