@@ -8,6 +8,7 @@ import {
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
+import type { PlaybackStrategy } from '@/services/video/api'
 import type { JassubRendererResult } from '@/services/video/subtitle'
 import {
   createJassubRenderer,
@@ -19,6 +20,11 @@ import { showError } from '@/lib/notifications'
 
 interface UseJassubRendererOptions {
   videoRef: React.RefObject<HTMLVideoElement | null>
+  /**
+   * A new strategy on the same element (direct play falling back to HLS)
+   * retries a renderer that failed to start; a working one is kept.
+   */
+  strategy: PlaybackStrategy
   activeTrack: SubtitleTrackInfo | null
   item: BaseItemDto | null
   transcodingOffsetTicks: number
@@ -185,6 +191,7 @@ function scheduleRendererResize(
 
 export function useJassubRenderer({
   videoRef,
+  strategy,
   activeTrack,
   item,
   transcodingOffsetTicks,
@@ -264,9 +271,8 @@ export function useJassubRenderer({
       return
     }
 
-    // The video element identity check is critical: during strategy switches
-    // (direct <-> HLS) the videoRef may resolve to a different HTMLVideoElement,
-    // and JASSUB must be re-created against the new element.
+    // Re-create only for a new track, item or element, or after a failed
+    // start: a strategy change re-runs this, and the renderer is null then.
     if (
       activeTrack === prevActiveTrackRef.current &&
       itemId === prevItemIdRef.current &&
@@ -327,7 +333,7 @@ export function useJassubRenderer({
         initTokenRef.current = null
       }
     }
-  }, [activeTrack, itemId, videoRef])
+  }, [activeTrack, itemId, videoRef, strategy])
 
   const needsJassubNow =
     !!(activeTrack && requiresJassubRenderer(activeTrack)) && !!item?.Id

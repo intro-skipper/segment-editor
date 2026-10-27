@@ -5,6 +5,7 @@ import type { CreateRendererOptions } from '@/services/video/subtitle'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BaseItemDto } from '@/types/jellyfin'
+import type { PlaybackStrategy } from '@/services/video/api'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import { createVideo, subtitleTrack } from './helpers/media-fixtures'
@@ -72,19 +73,26 @@ function createMeasurableVideo() {
   })
 }
 
-function renderRenderer() {
-  const videoRef = { current: createMeasurableVideo() }
+interface RendererProps {
+  item: BaseItemDto
+  strategy: PlaybackStrategy
+}
+
+function renderRenderer(video = createMeasurableVideo()) {
+  const videoRef = { current: video }
+  const initialProps: RendererProps = { item: ITEM, strategy: 'direct' }
   return renderHook(
-    (props: { item: BaseItemDto }) =>
+    (props: RendererProps) =>
       useJassubRenderer({
         videoRef,
+        strategy: props.strategy,
         activeTrack: ASS_TRACK,
         item: props.item,
         transcodingOffsetTicks: 0,
         userOffset: 0,
         t: (key: string) => key,
       }),
-    { initialProps: { item: ITEM } },
+    { initialProps },
   )
 }
 
@@ -178,11 +186,44 @@ describe('JASSUB renderer resize scheduling', () => {
 })
 
 describe('JASSUB renderer setup reactivity', () => {
+  it('retries a renderer that failed to start once playback falls back to HLS', async () => {
+    const video = createVideo()
+    const { result, rerender } = renderRenderer(video)
+
+    act(() => {
+      video.dispatchEvent(new Event('error'))
+    })
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+    expect(result.current.isActive).toBe(false)
+
+    Object.defineProperty(video, 'readyState', { value: 1, configurable: true })
+    Object.defineProperty(video, 'videoWidth', {
+      value: 1280,
+      configurable: true,
+    })
+    rerender({ item: ITEM, strategy: 'hls' })
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(true)
+    })
+  })
+
+  it('keeps a working renderer when the strategy changes', async () => {
+    const { rerender } = await renderActiveRenderer()
+
+    rerender({ item: ITEM, strategy: 'hls' })
+
+    expect(createRendererSpy).toHaveBeenCalledTimes(1)
+    expect(destroySpy).not.toHaveBeenCalled()
+  })
+
   it('does not re-create the renderer when only the item object identity changes', async () => {
     const view = await renderActiveRenderer()
 
     await act(async () => {
-      view.rerender({ item: { ...ITEM } })
+      view.rerender({ item: { ...ITEM }, strategy: 'direct' })
     })
 
     expect(createRendererSpy).toHaveBeenCalledTimes(1)
@@ -199,7 +240,7 @@ describe('JASSUB renderer setup reactivity', () => {
     const renamed: BaseItemDto = { ...ITEM, Name: 'Renamed while loading' }
 
     await act(async () => {
-      view.rerender({ item: renamed })
+      view.rerender({ item: renamed, strategy: 'direct' })
     })
     await act(async () => {
       releasePreload()

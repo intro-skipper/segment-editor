@@ -420,6 +420,7 @@ function useRenderPlayer({
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
     useJassubRenderer({
       videoRef,
+      strategy,
       activeTrack: activeSubtitleTrack,
       item,
       transcodingOffsetTicks: 0, // TODO: Get from playback options when HLS transcoding offset is available
