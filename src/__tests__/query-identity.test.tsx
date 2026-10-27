@@ -12,6 +12,12 @@ import {
   QueryClientProvider,
   useSuspenseQuery,
 } from '@tanstack/react-query'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { Suspense, createElement } from 'react'
 import type { ReactNode } from 'react'
@@ -93,11 +99,11 @@ function holdRequests() {
 const stops: Array<() => void> = []
 
 /** A QueryClient that drops other identities' queries, as the app's does. */
-function appQueryClient() {
+function appQueryClient(onSwitch = () => {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  stops.push(dropPreviousIdentities(queryClient))
+  stops.push(dropPreviousIdentities(queryClient, onSwitch))
   return queryClient
 }
 
@@ -235,8 +241,9 @@ describe('query identity', () => {
   })
 
   it('keeps the cache when the token changes but the server and user do not', async () => {
-    const queryClient = appQueryClient()
     signIn(SERVER_A, 'alice')
+    const onSwitch = vi.fn()
+    const queryClient = appQueryClient(onSwitch)
     await queryClient.ensureQueryData(
       itemsQueryOptions.detail(currentQueryIdentity(), ITEM_ID),
     )
@@ -244,6 +251,39 @@ describe('query identity', () => {
     act(() => useApiStore.setState({ apiKey: 'renewed-token' }))
 
     expect(queryClient.getQueryCache().getAll()).toHaveLength(1)
+    expect(onSwitch).not.toHaveBeenCalled()
+  })
+
+  it('loads a pending route as the new user when the switch cancels it', async () => {
+    signIn(SERVER_A, 'alice')
+    const root = createRootRoute()
+    const detail = createRoute({
+      getParentRoute: () => root,
+      path: '/item/$id',
+      loader: ({ params }) =>
+        queryClient.ensureQueryData(
+          itemsQueryOptions.detail(currentQueryIdentity(), params.id),
+        ),
+    })
+    const router = createRouter({
+      routeTree: root.addChildren([detail]),
+      history: createMemoryHistory({ initialEntries: [`/item/${ITEM_ID}`] }),
+    })
+    const queryClient = appQueryClient(() => void router.invalidate())
+
+    const release = holdRequests()
+    const loading = router.load()
+    await waitFor(() => expect(getItemById).toHaveBeenCalled())
+    signIn(SERVER_B, 'bob')
+    release()
+    await loading
+
+    await waitFor(() =>
+      expect(router.state.matches.at(-1)).toMatchObject({
+        status: 'success',
+        loaderData: { Name: `${SERVER_B} as bob` },
+      }),
+    )
   })
 
   it('stays idle without valid auth and loads once signed in', async () => {

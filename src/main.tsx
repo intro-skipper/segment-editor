@@ -56,7 +56,6 @@ const queryClient = new QueryClient({
     },
   },
 })
-dropPreviousIdentities(queryClient)
 const routerContext = { queryClient }
 const pluginMode = isPluginMode()
 
@@ -140,6 +139,7 @@ const router = createRouter({
       }
     : undefined,
 })
+dropPreviousIdentities(queryClient, () => void router.invalidate())
 
 declare module '@tanstack/react-router' {
   interface Register {

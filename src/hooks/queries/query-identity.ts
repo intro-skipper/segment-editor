@@ -77,13 +77,23 @@ export const keepPreviousDataOf =
 
 /**
  * Drops every cached query of another identity once the server or user
- * changes. Call once with the app's QueryClient; returns the unsubscribe.
+ * changes, then calls `onSwitch` so route loaders cancelled by the drop run
+ * again. Call once with the app's QueryClient; returns the unsubscribe.
  */
-export function dropPreviousIdentities(queryClient: QueryClient): () => void {
-  return useApiStore.subscribe((state) => {
+export function dropPreviousIdentities(
+  queryClient: QueryClient,
+  onSwitch: () => void,
+): () => void {
+  return useApiStore.subscribe((state, prev) => {
     const identity = selectIdentity(state)
     queryClient.removeQueries({
       predicate: (query) => !belongsTo(query.queryKey, identity),
     })
+    if (
+      state.serverAddress !== prev.serverAddress ||
+      state.userId !== prev.userId
+    ) {
+      onSwitch()
+    }
   })
 }
