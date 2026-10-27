@@ -64,7 +64,12 @@ export const loadHlsJs = async () => (await import('hls.js')).default
  * Retry. Reports health through `report`.
  */
 export function attachHls<
-  M extends { canPlayType: (type: string) => string; src: string },
+  M extends {
+    canPlayType: (type: string) => string
+    src: string
+    removeAttribute: (name: string) => void
+    load: () => void
+  },
   H extends HlsPlayer<M>,
 >(
   HlsClass: HlsPlayerClass<H>,
@@ -76,12 +81,19 @@ export function attachHls<
   report({ kind: 'ready' })
 
   if (!HlsClass.isSupported()) {
-    // Native HLS (Safari): the element plays the stream itself, so there is
-    // no Hls instance or listener to destroy.
-    if (media.canPlayType('application/vnd.apple.mpegurl')) {
-      media.src = url
+    // Native HLS (Safari): the element plays the stream itself, so detaching
+    // empties it as direct play does; the element outlives the item.
+    if (!media.canPlayType('application/vnd.apple.mpegurl')) {
+      return { hls: null, detach: () => {} }
     }
-    return { hls: null, detach: () => {} }
+    media.src = url
+    return {
+      hls: null,
+      detach: () => {
+        media.removeAttribute('src')
+        media.load()
+      },
+    }
   }
 
   const hls = new HlsClass({ ...HLS_CONFIG, startPosition })

@@ -18,6 +18,7 @@ export type PlayerAction =
   | { type: 'SKIP_TIME_CHANGE'; skipTimeIndex: number }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
+  | { type: 'RESET' }
 
 export const initialPlayerState: PlayerState = {
   skipTimeIndex: DEFAULT_SKIP_TIME_INDEX,
@@ -49,5 +50,8 @@ export function playerReducer(
       return state.subtitleOffset === action.offset
         ? state
         : { ...state, subtitleOffset: action.offset }
+
+    case 'RESET':
+      return initialPlayerState
   }
 }

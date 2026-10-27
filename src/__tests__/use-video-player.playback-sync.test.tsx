@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 /**
- * The playback engine behind useVideoPlayer, against a fake Jellyfin backend
- * and a real <video>: which source plays, the direct-to-HLS fallback, the
- * position carried across reloads, and what Jellyfin hears about it.
+ * The playback engine behind usePlaybackSession, against a fake Jellyfin
+ * backend and a real <video>: which source plays, the direct-to-HLS fallback,
+ * the position carried across reloads and reconnects, and what Jellyfin hears
+ * about it.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 
 import type { PlaybackStrategy } from '@/services/video/api'
+import { PLAYER_CONFIG } from '@/lib/constants'
 import {
   FakeHls,
   configCall,
   createItem,
   createPlayback,
+  createVideo,
   deferred,
   failMedia,
   latestHls,
@@ -568,16 +571,15 @@ describe('PlaybackEngine HLS audio reload', () => {
   })
 
   it('switches direct play to a Transcode session at the direct position', async () => {
-    const onStrategyChange = vi.fn<(strategy: PlaybackStrategy) => void>()
+    const onSwitchedToTranscode = vi.fn()
     const { engine, video, backend } = createPlayback({
       strategy: 'direct',
       sync: true,
-      host: { onStrategyChange },
+      host: { onSwitchedToTranscode },
     })
     engine.load(createItem())
     await settle()
     const directSession = backend.start.mock.calls[0][0].playSessionId
-    onStrategyChange.mockClear()
 
     video.currentTime = 42
     await engine.reloadHlsWithUrl(AUDIO_RELOAD)
@@ -599,19 +601,19 @@ describe('PlaybackEngine HLS audio reload', () => {
       }),
     )
     expect(engine.getSnapshot().strategy).toBe('hls')
-    expect(onStrategyChange).toHaveBeenCalledWith('hls')
+    expect(onSwitchedToTranscode).toHaveBeenCalledTimes(1)
   })
 
-  it('pauses direct play before reloading, then resumes once the stream can play', async () => {
+  it('publishes the pause of the released direct source, then resumes once the stream can play', async () => {
     const { engine, video } = createPlayback({ strategy: 'direct' })
     engine.load(createItem())
     await settle()
 
     setPaused(video, false)
+    emit(video, 'play')
     await engine.reloadHlsWithUrl(AUDIO_RELOAD)
 
-    // load() alone pauses without the 'pause' event the controls follow.
-    expect(video.pause).toHaveBeenCalledTimes(1)
+    expect(engine.getSnapshot().paused).toBe(true)
     emit(video, 'canplay')
     expect(video.play).toHaveBeenCalledTimes(1)
   })
@@ -667,13 +669,14 @@ describe('PlaybackEngine HLS audio reload', () => {
 
 describe('PlaybackEngine sources', () => {
   it('falls back to forced HLS with a new play session on a direct media error', async () => {
-    const onStrategyChange = vi.fn<(strategy: PlaybackStrategy) => void>()
+    const onSwitchedToTranscode = vi.fn()
     const { engine, video, backend } = createPlayback({
       strategy: 'direct',
-      host: { onStrategyChange },
+      host: { onSwitchedToTranscode },
     })
     engine.load(createItem())
     await settle()
+    expect(onSwitchedToTranscode).not.toHaveBeenCalled()
     expect(video.getAttribute('src')).toBe(
       'https://jellyfin.example/Videos/item-1/stream',
     )
@@ -699,7 +702,7 @@ describe('PlaybackEngine sources', () => {
       ),
       status: { kind: 'ready' },
     })
-    expect(onStrategyChange.mock.calls).toEqual([['direct'], ['hls']])
+    expect(onSwitchedToTranscode).toHaveBeenCalledTimes(1)
     expect(engine.hlsRef.current).toBe(latestHls())
     expect(latestHls().media).toBe(video)
   })
@@ -864,6 +867,40 @@ describe('PlaybackEngine sources', () => {
     )
   })
 
+  it('keeps playing another media source switched to before the first frame', async () => {
+    const { engine, video } = createPlayback()
+    engine.load(createItem())
+    await settle()
+    setPaused(video, false)
+
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    await settle()
+    const play = vi.spyOn(video, 'play')
+    emit(video, 'canplay')
+
+    expect(play).toHaveBeenCalled()
+  })
+
+  it('does not take another media source that plays as HLS for a switch to transcode', async () => {
+    const onSwitchedToTranscode = vi.fn()
+    const { engine, backend } = createPlayback({
+      strategy: 'direct',
+      host: { onSwitchedToTranscode },
+    })
+    engine.load(createItem())
+    await settle()
+
+    backend.getPlaybackConfig.mockResolvedValueOnce({
+      strategy: 'hls',
+      url: 'https://jellyfin.example/Videos/item-1/master.m3u8',
+    })
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    await settle()
+
+    expect(engine.getSnapshot().strategy).toBe('hls')
+    expect(onSwitchedToTranscode).not.toHaveBeenCalled()
+  })
+
   it('starts a different item from the beginning', async () => {
     const { engine, video } = createPlayback()
     engine.load(createItem())
@@ -876,6 +913,41 @@ describe('PlaybackEngine sources', () => {
     emit(video, 'canplay')
 
     expect(video.currentTime).toBe(0)
+  })
+
+  it('stops a native HLS stream when the item changes, so the next item starts from the beginning', async () => {
+    class NativeHls extends FakeHls {
+      static override isSupported = () => false
+    }
+    const { engine, video, backend } = createPlayback({
+      sync: true,
+      loadHls: async () => NativeHls,
+    })
+    video.canPlayType = () => 'maybe'
+    engine.load(createItem())
+    await settle()
+    expect(video.src).toContain('/Videos/item-1/')
+
+    video.currentTime = 600
+    setPaused(video, false)
+    const config = deferred<{ strategy: PlaybackStrategy; url: string }>()
+    backend.getPlaybackConfig.mockReturnValueOnce(config.promise)
+    engine.load(createItem('item-2'))
+    await settle()
+
+    expect(video.hasAttribute('src')).toBe(false)
+    expect(video.paused).toBe(true)
+
+    config.resolve({ strategy: 'hls', url: 'https://jellyfin.example/2.m3u8' })
+    await settle()
+    expect(backend.start).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        itemId: 'item-2',
+        positionTicks: 0,
+        isPaused: true,
+      }),
+    )
+    expect(video.src).toBe('https://jellyfin.example/2.m3u8')
   })
 
   it('hides the previous item’s error while the next item resolves', async () => {
@@ -931,5 +1003,197 @@ describe('PlaybackEngine sources', () => {
 
     expect(backend.getPlaybackConfig).toHaveBeenCalledTimes(1)
     expect(FakeHls.instances).toHaveLength(1)
+  })
+})
+
+describe('PlaybackEngine connection', () => {
+  /** Plays the item at 42 s, then lets the element go as React unmounts it. */
+  async function playThenDisconnect(paused: boolean) {
+    const playback = createPlayback({ sync: true })
+    const { engine, video, media, disconnect } = playback
+    engine.load(createItem())
+    await settle()
+    video.currentTime = 42
+    setPaused(video, paused)
+    emit(video, 'timeupdate', paused ? 'pause' : 'play')
+    media.current = null
+    disconnect()
+    return playback
+  }
+
+  it.each([
+    ['paused', true],
+    ['playing', false],
+  ])(
+    'resumes %s at the same position when the element connects again',
+    async (_, paused) => {
+      const { engine, media, backend } = await playThenDisconnect(paused)
+      expect(backend.stop).toHaveBeenCalledTimes(1)
+
+      const video = createVideo()
+      media.current = video
+      onTestFinished(engine.connect())
+      await settle()
+      emit(video, 'canplay')
+
+      expect(video.currentTime).toBe(42)
+      expect(video.play).toHaveBeenCalledTimes(paused ? 0 : 1)
+      expect(backend.start).toHaveBeenCalledTimes(2)
+      expect(backend.start).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ...ITEM, positionTicks: 420_000_000 }),
+      )
+    },
+  )
+
+  it('only records an item loaded while disconnected, and plays it on connect', async () => {
+    const { engine, video, media, backend, disconnect } = createPlayback()
+    media.current = null
+    disconnect()
+
+    engine.load(createItem())
+    await settle()
+    expect(backend.getPlaybackConfig).not.toHaveBeenCalled()
+
+    media.current = video
+    onTestFinished(engine.connect())
+    await settle()
+    expect(backend.getPlaybackConfig).toHaveBeenCalledTimes(1)
+    expect(latestHls().media).toBe(video)
+  })
+
+  it('keeps the position when the item is refetched while disconnected', async () => {
+    const { engine, media } = await playThenDisconnect(true)
+    engine.load(createItem())
+
+    const video = createVideo()
+    media.current = video
+    onTestFinished(engine.connect())
+    await settle()
+    emit(video, 'canplay')
+
+    expect(video.currentTime).toBe(42)
+  })
+
+  it('keeps a version switch’s position when disconnected before it restores', async () => {
+    const { engine, video, media, disconnect } = createPlayback()
+    engine.load(createItem())
+    await settle()
+    video.currentTime = 42
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    await settle()
+    media.current = null
+    disconnect()
+
+    const shown = createVideo()
+    media.current = shown
+    onTestFinished(engine.connect())
+    await settle()
+    emit(shown, 'canplay')
+
+    expect(shown.currentTime).toBe(42)
+  })
+
+  it('starts another item loaded while disconnected from the beginning', async () => {
+    const { engine, media, backend } = await playThenDisconnect(false)
+    engine.load(createItem('item-2'))
+
+    const video = createVideo()
+    media.current = video
+    onTestFinished(engine.connect())
+    await settle()
+    emit(video, 'canplay')
+
+    expect(video.currentTime).toBe(0)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(backend.start).toHaveBeenLastCalledWith(
+      expect.objectContaining({ itemId: 'item-2', positionTicks: 0 }),
+    )
+    expect(engine.playhead.getTimeline().currentTime).toBe(0)
+  })
+
+  it('publishes the pause when another item replaces a playing one, and does not play it on reconnect', async () => {
+    const { engine, video, media, disconnect } = createPlayback()
+    engine.load(createItem())
+    await settle()
+    setPaused(video, false)
+    emit(video, 'play')
+
+    // Releasing the source pauses the element without a 'pause' event.
+    engine.load(createItem('item-2'))
+    await settle()
+    expect(engine.getSnapshot().paused).toBe(true)
+
+    media.current = null
+    disconnect()
+    const shown = createVideo()
+    media.current = shown
+    onTestFinished(engine.connect())
+    await settle()
+    emit(shown, 'canplay')
+
+    expect(shown.play).not.toHaveBeenCalled()
+  })
+
+  it('keeps a restored version switch position when disconnected before the next timeupdate', async () => {
+    const { engine, video, media, disconnect } = createPlayback()
+    engine.load(createItem())
+    await settle()
+    video.currentTime = 42
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    await settle()
+    // The playhead hears the released source start over, then it can play.
+    emit(video, 'timeupdate', 'canplay')
+    media.current = null
+    disconnect()
+
+    const shown = createVideo()
+    media.current = shown
+    onTestFinished(engine.connect())
+    await settle()
+    emit(shown, 'canplay')
+
+    expect(shown.currentTime).toBe(42)
+  })
+
+  it('keeps the speed for another media source, but not for another item or a reconnect', async () => {
+    const { engine, video, media, disconnect } = createPlayback()
+    engine.load(createItem())
+    await settle()
+
+    engine.setSpeedIndex(5)
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    expect(video.defaultPlaybackRate).toBe(1.5)
+    engine.load(createItem('item-2'))
+    expect(video.defaultPlaybackRate).toBe(1)
+
+    engine.setSpeedIndex(5)
+    media.current = null
+    disconnect()
+    const shown = createVideo()
+    media.current = shown
+    onTestFinished(engine.connect())
+
+    expect(shown.defaultPlaybackRate).toBe(1)
+    expect(engine.getSnapshot().speedIndex).toBe(
+      PLAYER_CONFIG.DEFAULT_PLAYBACK_SPEED_INDEX,
+    )
+  })
+
+  it('starts one playback when connected, cleaned up and connected again, as StrictMode mounts', async () => {
+    const { engine, video, media, backend, disconnect } = createPlayback({
+      sync: true,
+    })
+    engine.load(createItem())
+    media.current = null
+    disconnect()
+    media.current = video
+    onTestFinished(engine.connect())
+    engine.load(createItem())
+    await settle()
+
+    expect(FakeHls.instances).toHaveLength(1)
+    expect(latestHls().media).toBe(video)
+    expect(backend.start).toHaveBeenCalledTimes(1)
+    expect(backend.stop).not.toHaveBeenCalled()
   })
 })

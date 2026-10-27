@@ -174,14 +174,16 @@ export function setPaused(video: HTMLMediaElement, paused: boolean) {
 }
 
 /**
- * A jsdom <video> whose load() resets the position and pauses, as the media
- * load algorithm does; play() only records, pause() only pauses.
+ * A jsdom <video> whose load() resets the position, pauses and fires
+ * 'emptied', as the media load algorithm does; play() only records, pause()
+ * only pauses.
  */
 export function createVideo(): HTMLVideoElement {
   const video = document.createElement('video')
   video.load = vi.fn(() => {
     video.currentTime = 0
     setPaused(video, true)
+    video.dispatchEvent(new Event('emptied'))
   })
   video.play = vi.fn(async () => {})
   video.pause = vi.fn(() => {

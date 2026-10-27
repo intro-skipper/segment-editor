@@ -109,7 +109,8 @@ export interface PlaybackSnapshot {
 
 /** Callbacks the host keeps current; the engine reads them when it needs them. */
 export interface PlaybackHost {
-  onStrategyChange?: (strategy: PlaybackStrategy) => void
+  /** Direct play gave way to HLS within one load: the fallback or a transcoded audio track. */
+  onSwitchedToTranscode?: () => void
   t: (key: string) => string
 }
 
@@ -174,7 +175,8 @@ function isSameError(left: VideoPlayerError, right: VideoPlayerError) {
  * position across source reloads, selects audio and subtitle tracks, owns
  * volume, mute and speed (persisting volume and mute) and reports the
  * session to Jellyfin.
- * Call connect() once mounted, then load() for every item change.
+ * load() says what to play; it plays while the element is connected and
+ * resumes where it was when the element connects again.
  */
 export class PlaybackEngine<
   M extends PlaybackMedia,
@@ -187,6 +189,9 @@ export class PlaybackEngine<
   private snapshot: PlaybackSnapshot = initialSnapshot()
   private readonly listeners = new Set<() => void>()
   private host: PlaybackHost = { t: (key) => key }
+  /** The item load() last asked for; connect() starts it. */
+  private wanted: BaseItemDto | null = null
+  private connected = false
   private current: Load | null = null
   /** The applied source; direct play is an attachment without hls.js. */
   private source: HlsAttachment<H> | null = null
@@ -230,8 +235,9 @@ export class PlaybackEngine<
 
   /**
    * Applies volume, mute and speed to the element, follows its play state and
-   * volume, listens for pagehide and connects the playhead; the returned
-   * cleanup unloads playback.
+   * volume, listens for pagehide, connects the playhead and plays the wanted
+   * item; the returned cleanup unloads it, keeping its position for the next
+   * connect().
    */
   connect(): () => void {
     const controller = new AbortController()
@@ -250,50 +256,37 @@ export class PlaybackEngine<
       this.applySpeed()
       media.addEventListener('play', this.syncPaused, { signal })
       media.addEventListener('pause', this.syncPaused, { signal })
+      // Releasing or reloading a source pauses without firing 'pause'.
+      media.addEventListener('emptied', this.syncPaused, { signal })
       // Native controls (iOS fullscreen) change volume behind our back.
       media.addEventListener('volumechange', this.syncVolume, { signal })
+      this.syncPaused()
     }
     const disconnectPlayhead = this.playhead.connect()
+    this.connected = true
+    if (this.wanted) this.play(this.wanted)
     return () => {
       controller.abort()
-      this.load(null)
+      this.detach()
       disconnectPlayhead()
     }
   }
 
   /**
-   * Plays `item`, or stops playing when null. The same (item, media source)
-   * only swaps in the newer item object; a new media source of the same
-   * item carries the position over.
+   * Plays `item`, or stops playing when null; while disconnected it only
+   * records it. The same (item, media source) only swaps in the newer item
+   * object; a new media source of the same item carries the position and
+   * speed over, and another item starts from the beginning at the default
+   * speed.
    */
   load(item: BaseItemDto | null): void {
-    const itemId = item?.Id
-    const mediaSourceId = item ? getPlaybackMediaSourceId(item) : undefined
-    const current = this.current
-    const sameItem = current !== null && current.itemId === itemId
-    // Follows refetched item objects too, like the editor's own frame step.
-    this.playhead.frameStepSeconds = item ? resolveFrameStepSeconds(item) : 0
-    if (item && sameItem && current.mediaSourceId === mediaSourceId) {
-      current.item = item
-      this.tracks.refresh()
-      return
-    }
-
-    if (sameItem) {
-      const time = this.media.current?.currentTime ?? 0
-      if (!this.carry && time > 0) this.captureCarry()
-    } else {
+    if (item?.Id !== this.wanted?.Id) {
       this.carry = null
       this.playhead.reset()
+      this.setSpeedIndex(DEFAULT_PLAYBACK_SPEED_INDEX)
     }
-    this.unload()
-
-    if (!item || !itemId || !mediaSourceId) {
-      this.tracks.unload()
-      this.update({ itemId: null, status: { kind: 'ready' } })
-      return
-    }
-    this.begin(item, itemId, mediaSourceId)
+    this.wanted = item
+    if (this.connected) this.play(item)
   }
 
   /** Turns Jellyfin status reporting on or off for the current and later sessions. */
@@ -400,16 +393,18 @@ export class PlaybackEngine<
       if (superseded()) return
     }
 
-    // load() pauses without firing 'pause', which the controls listen for.
-    if (this.snapshot.strategy === 'direct') this.media.current?.pause()
     this.apply(load, 'hls', url, playSessionId)
   }
 
   private readonly getMedia = (): M | null => this.media.current
 
   private readonly syncPaused = () => {
-    const paused = this.media.current?.paused ?? true
-    if (paused !== this.snapshot.paused) this.update({ paused })
+    // A 'pause' queued by removing the element must not lose the play state
+    // detach() carries.
+    const media = this.media.current
+    if (media && media.paused !== this.snapshot.paused) {
+      this.update({ paused: media.paused })
+    }
   }
 
   /** Publishes and persists the element's volume and mute. */
@@ -435,6 +430,51 @@ export class PlaybackEngine<
     const rate = PLAYBACK_SPEEDS[this.snapshot.speedIndex]
     media.defaultPlaybackRate = rate
     media.playbackRate = rate
+  }
+
+  private play(item: BaseItemDto | null) {
+    const itemId = item?.Id
+    const mediaSourceId = item ? getPlaybackMediaSourceId(item) : undefined
+    const current = this.current
+    const sameItem = current !== null && current.itemId === itemId
+    // Follows refetched item objects too, like the editor's own frame step.
+    this.playhead.frameStepSeconds = item ? resolveFrameStepSeconds(item) : 0
+    if (item && sameItem && current.mediaSourceId === mediaSourceId) {
+      current.item = item
+      this.tracks.refresh()
+      return
+    }
+
+    const media = this.media.current
+    // A version switch keeps playing even before the first frame (time 0).
+    const progressed =
+      media !== null && (media.currentTime > 0 || !media.paused)
+    if (sameItem && !this.carry && progressed) this.captureCarry()
+    this.unload()
+
+    if (!item || !itemId || !mediaSourceId) {
+      this.tracks.unload()
+      this.update({ itemId: null, status: { kind: 'ready' } })
+      return
+    }
+    this.begin(item, itemId, mediaSourceId)
+  }
+
+  /**
+   * Unloads after React let go of the element, so the position comes from
+   * the playhead and the play state from the snapshot. The speed lasts only
+   * as long as the element.
+   */
+  private detach() {
+    this.connected = false
+    if (this.current?.started) {
+      this.carry ??= {
+        time: this.playhead.getTimeline().currentTime,
+        paused: this.snapshot.paused,
+      }
+    }
+    this.unload()
+    this.setSpeedIndex(DEFAULT_PLAYBACK_SPEED_INDEX)
   }
 
   private begin(item: BaseItemDto, itemId: string, mediaSourceId: string) {
@@ -489,7 +529,8 @@ export class PlaybackEngine<
     url: string,
     playSessionId: string,
   ) {
-    const strategyChanged = !load.started || strategy !== this.snapshot.strategy
+    const switchedToTranscode =
+      load.started && this.snapshot.strategy === 'direct' && strategy === 'hls'
     this.sourceRevision++
     this.releaseSource()
     load.started = true
@@ -501,7 +542,7 @@ export class PlaybackEngine<
       strategy,
     })
     this.update({ strategy, videoUrl: url, status: { kind: 'ready' } })
-    if (strategyChanged) this.host.onStrategyChange?.(strategy)
+    if (switchedToTranscode) this.host.onSwitchedToTranscode?.()
     this.tracks.sourceApplied(strategy)
     void this.reporter.start(
       this.carry ? secondsToTicks(this.carry.time) : undefined,
@@ -649,7 +690,8 @@ export class PlaybackEngine<
     this.carry = null
 
     if (carry.time > 0 && Number.isFinite(carry.time)) {
-      media.currentTime = carry.time
+      // Published at once, so a detach before the next timeupdate keeps it.
+      this.playhead.seek(carry.time)
     }
     if (!carry.paused) {
       media.play().catch(() => {

@@ -5,7 +5,7 @@ import { useBlocker } from '@tanstack/react-router'
 import { ClipboardPaste, Eye, Plus } from 'lucide-react'
 
 import { Player } from './Player'
-import type { PlayerHandle } from './Player'
+import { PlaybackProvider } from './playback-context'
 import { EditorActionBar } from './EditorActionBar'
 import {
   ImportSegmentsDialog,
@@ -20,13 +20,14 @@ import type { SegmentUpdate, TimestampUpdate } from '@/types/segment'
 import type { SegmentTarget } from '@/services/segments/edit-session'
 import { useSegmentEditSession } from '@/services/segments/edit-session'
 import { useAppStore } from '@/stores/app-store'
-import { snapToFrame, ticksToSeconds } from '@/lib/time-utils'
+import { ticksToSeconds } from '@/lib/time-utils'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
 } from '@/services/plugins/intro-skipper'
 import { showNotification } from '@/lib/notifications'
+import { usePlaybackSession } from '@/hooks/use-playback-session'
 import { cn, elementAt } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -173,8 +174,6 @@ function useRenderPlayerEditor({
     number | null
   >(null)
 
-  const playerRef = React.useRef<PlayerHandle | null>(null)
-
   const [pendingImport, setPendingImport] =
     React.useState<ParsedImportResult | null>(null)
   const [pendingDelete, setPendingDelete] =
@@ -199,6 +198,8 @@ function useRenderPlayerEditor({
     () => itemForMediaSource(item, effectiveMediaSourceId),
     [item, effectiveMediaSourceId],
   )
+
+  const { engine, videoRef } = usePlaybackSession({ item: playbackItem })
 
   const runtimeSeconds = ticksToSeconds(playbackItem.RunTimeTicks) || 0
   const frameStepSeconds = resolveFrameStepSeconds(playbackItem)
@@ -258,11 +259,7 @@ function useRenderPlayerEditor({
     )
   }
 
-  const getPlayerTime = () => {
-    const raw = playerRef.current?.getCurrentTime()
-    if (raw === undefined) return undefined
-    return snapToFrame(raw, frameStepSeconds)
-  }
+  const getPlayerTime = () => engine.playhead.getSnappedTime()
 
   const handleUpdateSegment = (data: SegmentUpdate) => {
     update({ id: data.id }, { StartTicks: data.start, EndTicks: data.end })
@@ -289,8 +286,9 @@ function useRenderPlayerEditor({
     setPendingDelete(null)
   }
 
+  // A no-op while the player is hidden.
   const handlePlayerTimestamp = (timestamp: number) => {
-    playerRef.current?.seek(timestamp)
+    engine.playhead.seek(timestamp)
   }
 
   const handleOpenEditDialog = (index: number) => {
@@ -430,7 +428,7 @@ function useRenderPlayerEditor({
   const handleCreateSegmentOfType = (type: MediaSegmentType) => {
     create({
       type,
-      start: getPlayerTime() ?? 0,
+      start: getPlayerTime(),
     })
   }
 
@@ -449,19 +447,20 @@ function useRenderPlayerEditor({
   return (
     <div className={cn('flex flex-col gap-6 max-w-6xl mx-auto', className)}>
       {showVideoPlayer ? (
-        <Player
-          key={effectiveMediaSourceId}
-          item={playbackItem}
-          mediaSourceControls={{
-            sources: selectableMediaSources,
-            value: effectiveMediaSourceId,
-            onSelect: setSelectedMediaSourceId,
-          }}
-          segments={editingSegments}
-          onCreateSegment={create}
-          onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
-          handleRef={playerRef}
-        />
+        <PlaybackProvider engine={engine}>
+          <Player
+            item={playbackItem}
+            videoRef={videoRef}
+            mediaSourceControls={{
+              sources: selectableMediaSources,
+              value: effectiveMediaSourceId,
+              onSelect: setSelectedMediaSourceId,
+            }}
+            segments={editingSegments}
+            onCreateSegment={create}
+            onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
+          />
+        </PlaybackProvider>
       ) : (
         <div className="flex justify-center gap-3">
           <Button
