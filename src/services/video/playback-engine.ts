@@ -231,6 +231,7 @@ export class PlaybackEngine<
     this.playhead.frameStepSeconds = item ? resolveFrameStepSeconds(item) : 0
     if (item && sameItem && current.mediaSourceId === mediaSourceId) {
       current.item = item
+      this.tracks.refresh()
       return
     }
 
@@ -513,6 +514,8 @@ export class PlaybackEngine<
       )
       if (this.current !== load || this.snapshot.strategy !== 'direct') return
       if (audioStreamIndex === this.tracks.activeAudioIndex) {
+        // A switch still in flight would commit over the new source.
+        this.tracks.cancelSwitch()
         this.apply(load, 'hls', config.url, playSessionId)
         return
       }

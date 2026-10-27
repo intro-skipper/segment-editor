@@ -134,6 +134,8 @@ export class PlaybackTracks {
   private strategy: PlaybackStrategy = 'hls'
   /** Aborted when playback leaves direct play: a stale initial application must not enable a track or restart the transcode. */
   private initialAudio = new AbortController()
+  /** Cancelled by the HLS fallback, so a switch still in flight cannot commit over the new source. */
+  private pendingSwitch = new AbortController()
 
   constructor(
     private readonly media: { readonly current: PlaybackTrackMedia | null },
@@ -178,6 +180,40 @@ export class PlaybackTracks {
     })
   }
 
+  /**
+   * Re-reads the tracks of a refetched item object for the same source. The
+   * audio stream keeps playing; the subtitle stays selected while it exists.
+   */
+  refresh(): void {
+    const load = this.current
+    if (!load) return
+    const { audioTracks, subtitleTracks } = extractTracks(load.item)
+    const { activeSubtitleIndex } = this.state
+    this.set({
+      audioTracks,
+      subtitleTracks,
+      activeSubtitleIndex: subtitleTracks.some(
+        (track) => track.index === activeSubtitleIndex,
+      )
+        ? activeSubtitleIndex
+        : null,
+    })
+    // The caption <track>s were rebuilt from the same item object.
+    const media = this.media.current
+    if (media) {
+      void switchSubtitleTrack(
+        this.state.activeSubtitleIndex,
+        this.options(media, load, load.controller.signal),
+      )
+    }
+  }
+
+  /** Cancels a switch still in flight; it then commits nothing. */
+  cancelSwitch(): void {
+    this.pendingSwitch.abort()
+    this.pendingSwitch = new AbortController()
+  }
+
   unload(): void {
     this.current = null
     this.decodable = null
@@ -202,7 +238,7 @@ export class PlaybackTracks {
 
     void switchSubtitleTrack(
       this.state.activeSubtitleIndex,
-      this.options(media, load),
+      this.options(media, load, load.controller.signal),
     )
     if (strategy !== 'direct') return
 
@@ -229,7 +265,7 @@ export class PlaybackTracks {
 
     const outcome = await this.run(
       load,
-      () => switchAudioTrack(index, this.options(media, load)),
+      (signal) => switchAudioTrack(index, this.options(media, load, signal)),
       () => {
         this.set({ activeAudioIndex: index })
         if (track.language) {
@@ -262,7 +298,7 @@ export class PlaybackTracks {
 
     const outcome = await this.run(
       load,
-      () => switchSubtitleTrack(index, this.options(media, load)),
+      (signal) => switchSubtitleTrack(index, this.options(media, load, signal)),
       () => {
         this.set({ activeSubtitleIndex: index })
         const preferences = useAppStore.getState()
@@ -302,14 +338,17 @@ export class PlaybackTracks {
       return
     }
 
-    const signal = AbortSignal.any([
-      load.controller.signal,
-      this.initialAudio.signal,
-    ])
     void this.run(
       load,
-      () =>
-        applyInitialAudioTrack(index, { ...this.options(media, load), signal }),
+      (signal) =>
+        applyInitialAudioTrack(
+          index,
+          this.options(
+            media,
+            load,
+            AbortSignal.any([signal, this.initialAudio.signal]),
+          ),
+        ),
       () => {},
     ).then((outcome) => {
       // The element still plays the container default: show that.
@@ -326,14 +365,17 @@ export class PlaybackTracks {
    */
   private async run(
     load: TrackLoad,
-    operation: () => Promise<TrackSwitchResult>,
+    operation: (signal: AbortSignal) => Promise<TrackSwitchResult>,
     commit: () => void,
   ): Promise<Outcome> {
     if (this.state.switching) return 'skipped'
     this.set({ switching: true })
-    const { signal } = load.controller
+    const signal = AbortSignal.any([
+      load.controller.signal,
+      this.pendingSwitch.signal,
+    ])
     try {
-      const result = await operation()
+      const result = await operation(signal)
       if (signal.aborted) return 'skipped'
       if (result.success) {
         commit()
@@ -375,7 +417,11 @@ export class PlaybackTracks {
     }
   }
 
-  private options(media: TrackMedia, load: TrackLoad): TrackSwitchOptions {
+  private options(
+    media: TrackMedia,
+    load: TrackLoad,
+    signal: AbortSignal,
+  ): TrackSwitchOptions {
     return {
       strategy: this.strategy,
       videoElement: media,
@@ -385,7 +431,7 @@ export class PlaybackTracks {
       audioTracks: this.state.audioTracks,
       subtitleTracks: this.state.subtitleTracks,
       onReloadHls: this.reloadHls,
-      signal: load.controller.signal,
+      signal,
     }
   }
 

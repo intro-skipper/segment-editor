@@ -511,6 +511,35 @@ describe('one track switch at a time', () => {
   })
 })
 
+describe('refetched item', () => {
+  it('re-reads the tracks without restarting playback or dropping the subtitle', async () => {
+    const store = useAppStore.getState()
+    store.setSubtitlesEnabled(true)
+    store.setPreferredSubtitleLanguage('spa')
+    const { engine, backend, tracks } = await start()
+    expect(tracks.getState().activeSubtitleIndex).toBe(SPANISH_SRT)
+
+    const item = createTracksItem()
+    const source = item.MediaSources?.[0]
+    engine.load({
+      ...item,
+      MediaSources: [
+        {
+          ...source,
+          MediaStreams: [
+            ...(source?.MediaStreams ?? []),
+            { Type: 'Subtitle', Index: 7, Codec: 'subrip', Language: 'ger' },
+          ],
+        },
+      ],
+    })
+
+    expect(tracks.getState().subtitleTracks.map((t) => t.index)).toContain(7)
+    expect(tracks.getState().activeSubtitleIndex).toBe(SPANISH_SRT)
+    expect(backend.getPlaybackConfig).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('direct play error fallback', () => {
   it('restarts as HLS on the audio stream playing now', async () => {
     const { engine, video, backend, tracks } = await start()
@@ -564,6 +593,24 @@ describe('direct play error fallback', () => {
     expect(switched).toContain(`AudioStreamIndex=${JAPANESE}`)
     expect(engine.getSnapshot().videoUrl).toBe(switched)
     expect(tracks.activeAudioIndex).toBe(JAPANESE)
+  })
+
+  it('cancels a switch still in flight once it falls back', async () => {
+    const { engine, video, tracks } = await start()
+    const probe = deferred<boolean>()
+    vi.mocked(isCodecSupported).mockReturnValue(probe.promise)
+
+    const pending = tracks.selectAudio(JAPANESE)
+    failMedia(video)
+    await settle()
+    probe.resolve(true)
+
+    expect(await pending).toBe(false)
+    expect(tracks.activeAudioIndex).toBe(ENGLISH)
+    expect(preferences().preferredAudioLanguage).toBeNull()
+    expect(engine.getSnapshot().videoUrl).toContain(
+      `AudioStreamIndex=${ENGLISH}`,
+    )
   })
 
   it('restarts as HLS on the initial audio stream before any switch', async () => {
