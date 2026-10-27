@@ -11,6 +11,7 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import type * as ItemsApi from '@/services/items/api'
 import { BaseItemKind } from '@/types/jellyfin'
 import { seriesQueryOptions } from '@/services/items/queries'
+import type { QueryIdentity } from '@/hooks/queries/query-identity'
 
 const jellyfin = vi.hoisted(() => ({
   layout: new Map<BaseItemDto, Array<BaseItemDto>>(),
@@ -49,11 +50,13 @@ const episode = (seasonId: string, index: number): BaseItemDto => ({
 function series(layout: Array<[BaseItemDto, Array<BaseItemDto>]>) {
   jellyfin.layout = new Map(layout)
   const queryClient = new QueryClient()
+  const identity: QueryIdentity = { serverAddress: 'http://jf', userId: null }
   return {
-    seasons: () => queryClient.fetchQuery(seriesQueryOptions.seasons('series')),
+    seasons: () =>
+      queryClient.fetchQuery(seriesQueryOptions.seasons(identity, 'series')),
     adjacent: (of: BaseItemDto) =>
       queryClient.fetchQuery(
-        seriesQueryOptions.adjacentEpisodes(of, queryClient),
+        seriesQueryOptions.adjacentEpisodes(identity, of, queryClient),
       ),
   }
 }

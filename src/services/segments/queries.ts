@@ -3,12 +3,12 @@
  * Provides cached access to segments for a specific media item.
  */
 
-import { useQuery } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
+import { useServerQuery } from '@/hooks/queries/query-identity'
+import type { QueryIdentity } from '@/hooks/queries/query-identity'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { SegmentSnapshot } from '@/services/segments/store'
 import { readSegments } from '@/services/segments/store'
-import { selectValidAuth, useApiStore } from '@/stores'
 import { segmentsKeys } from './query-keys'
 
 /**
@@ -27,9 +27,9 @@ interface UseSegmentsOptions {
 }
 
 export const segmentsQueryOptions = {
-  list: (itemId: string) =>
+  list: (identity: QueryIdentity, itemId: string) =>
     createStandardQueryOptions<SegmentSnapshot>({
-      queryKey: segmentsKeys.list(itemId),
+      queryKey: segmentsKeys.list(identity, itemId),
       queryFn: ({ signal }) => readSegments(itemId, { signal }),
       cacheDuration: 'SHORT',
       operation: 'Fetch segments',
@@ -45,11 +45,8 @@ export const segmentsQueryOptions = {
  * @returns TanStack Query result with the segment snapshot
  */
 export function useSegments(itemId: string, options?: UseSegmentsOptions) {
-  const validAuth = useApiStore(selectValidAuth)
-  const enabled = options?.enabled ?? true
-
-  return useQuery({
-    ...segmentsQueryOptions.list(itemId),
-    enabled: validAuth && enabled && !!itemId,
-  })
+  return useServerQuery(
+    (identity) => segmentsQueryOptions.list(identity, itemId),
+    (options?.enabled ?? true) && !!itemId,
+  )
 }

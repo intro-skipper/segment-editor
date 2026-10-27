@@ -16,6 +16,7 @@ import {
   getRetryDelay,
   shouldRetryQuery,
 } from './hooks/queries/query-error-handling'
+import { dropPreviousIdentities } from './hooks/queries/query-identity'
 
 import { routeTree } from './routeTree.gen'
 import {
@@ -138,6 +139,7 @@ const router = createRouter({
       }
     : undefined,
 })
+dropPreviousIdentities(queryClient, () => void router.invalidate())
 
 declare module '@tanstack/react-router' {
   interface Register {

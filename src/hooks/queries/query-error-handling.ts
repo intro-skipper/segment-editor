@@ -11,10 +11,6 @@ import { API_CONFIG } from '@/lib/constants'
 // Re-export for query-specific usage
 export { AppError as QueryError }
 
-export const createQueryKey = <T extends ReadonlyArray<unknown>>(
-  ...parts: T
-): QueryKey => parts
-
 export const shouldRetryQuery = (
   failureCount: number,
   cause: unknown,

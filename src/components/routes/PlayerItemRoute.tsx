@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
 import { itemsQueryOptions } from '@/services/items/queries'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import { getBestImageUrl } from '@/services/video/api'
 import { useArtworkColor } from '@/hooks/use-artwork-color'
 import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
@@ -40,9 +41,12 @@ export function PlayerSkeleton() {
 
 export function PlayerPage() {
   const { itemId } = routeApi.useParams()
+  const identity = useQueryIdentity()
   const { fetchSegments } = routeApi.useSearch()
 
-  const { data: item } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
+  const { data: item } = useSuspenseQuery(
+    itemsQueryOptions.detail(identity, itemId),
+  )
 
   const imageUrl = item ? getBestImageUrl(item, 300) : null
   const seedColor = useArtworkColor(imageUrl || null, {

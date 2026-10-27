@@ -12,6 +12,8 @@ import type { SegmentSnapshot } from './store'
 import { UNREAD_SNAPSHOT, replaceSegments } from './store'
 import { NO_SEGMENTS, segmentsQueryOptions, useSegments } from './queries'
 import { segmentsKeys } from './query-keys'
+import type { QueryIdentity } from '@/hooks/queries/query-identity'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import {
   generateUUID,
   getSegmentsSortedByStart,
@@ -57,6 +59,8 @@ interface Edit {
 }
 
 interface SaveInput {
+  /** Who saves: the read, the write and the refetch stay on this identity's key. */
+  identity: QueryIdentity
   itemId: string
   base: Draft['base']
   segments: Array<MediaSegmentDto>
@@ -192,6 +196,7 @@ export function useSegmentEditSession(
   { enabled, rules }: { enabled: boolean; rules: RangeRules },
 ) {
   const queryClient = useQueryClient()
+  const identity = useQueryIdentity()
   const query = useSegments(itemId, { enabled })
   const snapshot = query.data
   // Identity-stable per snapshot, so commands keep their identity between
@@ -204,12 +209,17 @@ export function useSegmentEditSession(
   if (draft.itemId !== itemId) setDraft(emptyDraft(itemId))
 
   const saveMutation = useMutation({
-    mutationFn: async ({ itemId: id, base, segments: next }: SaveInput) =>
+    mutationFn: async ({
+      identity: savedAs,
+      itemId: id,
+      base,
+      segments: next,
+    }: SaveInput) =>
       replaceSegments(
         id,
         base === 'reread'
           ? await queryClient.fetchQuery({
-              ...segmentsQueryOptions.list(id),
+              ...segmentsQueryOptions.list(savedAs, id),
               staleTime: 0,
             })
           : base,
@@ -218,8 +228,11 @@ export function useSegmentEditSession(
     // A replace is not safe to replay from the same snapshot; the store
     // already retries each request.
     retry: false,
-    onSuccess: (saved, { itemId: id }) => {
-      queryClient.setQueryData<SegmentSnapshot>(segmentsKeys.list(id), saved)
+    onSuccess: (saved, { identity: savedAs, itemId: id }) => {
+      queryClient.setQueryData<SegmentSnapshot>(
+        segmentsKeys.list(savedAs, id),
+        saved,
+      )
       showSuccess('All segments saved')
     },
     onError: (cause) => {
@@ -231,8 +244,10 @@ export function useSegmentEditSession(
         error.recoverable ? 'Please try again' : error.message,
       )
     },
-    onSettled: (_saved, _error, { itemId: id }) => {
-      void queryClient.invalidateQueries({ queryKey: segmentsKeys.list(id) })
+    onSettled: (_saved, _error, { identity: savedAs, itemId: id }) => {
+      void queryClient.invalidateQueries({
+        queryKey: segmentsKeys.list(savedAs, id),
+      })
     },
   })
   const isSaving = saveMutation.isPending
@@ -341,6 +356,7 @@ export function useSegmentEditSession(
     let saved: SegmentSnapshot
     try {
       saved = await saveMutation.mutateAsync({
+        identity,
         itemId,
         base: draft.base,
         segments: saving,

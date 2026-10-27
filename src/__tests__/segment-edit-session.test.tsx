@@ -12,8 +12,12 @@ import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import type * as Notifications from '@/lib/notifications'
 import type { RangeRules } from '@/lib/segment-range'
+import { currentQueryIdentity } from '@/hooks/queries/query-identity'
 import { useSegmentEditSession } from '@/services/segments/edit-session'
+import { segmentsKeys } from '@/services/segments/query-keys'
+import type { SegmentSnapshot } from '@/services/segments/store'
 import { fakeSegmentServer, segment } from './helpers/fake-segment-server'
+import { useApiStore } from '@/stores/api-store'
 
 const showErrorMock = vi.hoisted(() => vi.fn())
 
@@ -163,6 +167,50 @@ describe('segment edit session', () => {
     server.changeElsewhere([RECAP])
     await refetch(queryClient)
     expect(types(result.current.segments)).toEqual(['Recap'])
+  })
+
+  it("writes the saved set to the signed-in identity's key and refetches it", async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [INTRO],
+    })
+    const { result, queryClient } = await renderLoadedSession()
+    const key = segmentsKeys.list(currentQueryIdentity(), ITEM_ID)
+    const release = server.hold('GET')
+
+    act(() => result.current.create({ type: 'Outro', start: 1200, end: 1260 }))
+    await act(() => result.current.save())
+
+    const cached = queryClient.getQueryData<SegmentSnapshot>(key)
+    expect(types(cached?.segments ?? [])).toEqual(['Intro', 'Outro'])
+    expect(queryClient.getQueryState(key)?.fetchStatus).toBe('fetching')
+    release()
+  })
+
+  it('writes a save to the identity it started under, even after a switch', async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [INTRO],
+    })
+    const { result, queryClient } = await renderLoadedSession()
+    const savedAs = segmentsKeys.list(currentQueryIdentity(), ITEM_ID)
+    const release = server.hold('PUT')
+
+    act(() => result.current.create({ type: 'Outro', start: 1200, end: 1260 }))
+    let saving: Promise<void> = Promise.resolve()
+    act(() => {
+      saving = result.current.save()
+    })
+    act(() => {
+      useApiStore.setState({ userId: 'another-user' })
+    })
+    release()
+    await act(() => saving)
+
+    const cached = queryClient.getQueryData<SegmentSnapshot>(savedAs)
+    expect(types(cached?.segments ?? [])).toEqual(['Intro', 'Outro'])
   })
 
   it('keeps the draft when the server rejects the save, without replaying it', async () => {

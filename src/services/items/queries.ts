@@ -1,10 +1,11 @@
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
+import {
+  keepPreviousDataOf,
+  useServerQuery,
+} from '@/hooks/queries/query-identity'
+import type { QueryIdentity } from '@/hooks/queries/query-identity'
 import { resolveAdjacentEpisodes } from '@/lib/adjacent-episodes'
 import { inSeriesOrder } from '@/lib/series-utils'
 import type { PagedItemsResult } from '@/services/items/api'
@@ -22,7 +23,6 @@ import {
   getSeasons,
   getTracks,
 } from '@/services/items/api'
-import { selectValidAuth, useApiStore } from '@/stores'
 import {
   albumKeys,
   artistKeys,
@@ -55,19 +55,22 @@ export interface UseItemsOptions {
 type ItemsQueryOptionsInput = Omit<UseItemsOptions, 'enabled'>
 
 export const itemsQueryOptions = {
-  list: ({
-    parentId,
-    nameFilter,
-    includeMediaStreams = false,
-    excludeItemTypes,
-    limit,
-    startIndex,
-  }: ItemsQueryOptionsInput) => {
+  list: (
+    identity: QueryIdentity,
+    {
+      parentId,
+      nameFilter,
+      includeMediaStreams = false,
+      excludeItemTypes,
+      limit,
+      startIndex,
+    }: ItemsQueryOptionsInput,
+  ) => {
     const trimmedFilter = nameFilter?.trim()
 
     return {
       ...createStandardQueryOptions<PagedItemsResult>({
-        queryKey: itemsKeys.list(parentId, {
+        queryKey: itemsKeys.list(identity, parentId, {
           includeMediaStreams,
           excludeItemTypes,
           limit,
@@ -89,12 +92,12 @@ export const itemsQueryOptions = {
         cacheDuration: 'MEDIUM',
         operation: 'Fetch items',
       }),
-      placeholderData: keepPreviousData,
+      placeholderData: keepPreviousDataOf(identity),
     }
   },
-  detail: (itemId: string) =>
+  detail: (identity: QueryIdentity, itemId: string) =>
     createStandardQueryOptions({
-      queryKey: itemsKeys.detail(itemId),
+      queryKey: itemsKeys.detail(identity, itemId),
       queryFn: (context) => getItemById(itemId, context),
       cacheDuration: 'LONG',
       operation: 'Fetch item',
@@ -103,25 +106,30 @@ export const itemsQueryOptions = {
 
 export const seriesQueryOptions = {
   /** The series' seasons in Series Order. */
-  seasons: (seriesId: string) =>
+  seasons: (identity: QueryIdentity, seriesId: string) =>
     createStandardQueryOptions({
-      queryKey: seriesKeys.seasons(seriesId),
+      queryKey: seriesKeys.seasons(identity, seriesId),
       queryFn: async (context) =>
         inSeriesOrder(await getSeasons(seriesId, context)),
       cacheDuration: 'LONG',
       operation: 'Fetch seasons',
     }),
-  episodes: (seriesId: string, seasonId: string) =>
+  episodes: (identity: QueryIdentity, seriesId: string, seasonId: string) =>
     createStandardQueryOptions({
-      queryKey: seriesKeys.episodes(seriesId, seasonId),
+      queryKey: seriesKeys.episodes(identity, seriesId, seasonId),
       queryFn: (context) => getEpisodes(seriesId, seasonId, undefined, context),
       cacheDuration: 'LONG',
       operation: 'Fetch episodes',
     }),
   /** Adjacent Episodes of `episode`, resolved through the cached seasons and episodes queries above. */
-  adjacentEpisodes: (episode: BaseItemDto, queryClient: QueryClient) =>
+  adjacentEpisodes: (
+    identity: QueryIdentity,
+    episode: BaseItemDto,
+    queryClient: QueryClient,
+  ) =>
     createStandardQueryOptions({
       queryKey: seriesKeys.adjacentEpisodes(
+        identity,
         episode.SeriesId ?? '',
         episode.Id ?? '',
       ),
@@ -129,10 +137,12 @@ export const seriesQueryOptions = {
         resolveAdjacentEpisodes(
           {
             fetchSeasons: (seriesId) =>
-              queryClient.fetchQuery(seriesQueryOptions.seasons(seriesId)),
+              queryClient.fetchQuery(
+                seriesQueryOptions.seasons(identity, seriesId),
+              ),
             fetchEpisodes: (seriesId, seasonId) =>
               queryClient.fetchQuery(
-                seriesQueryOptions.episodes(seriesId, seasonId),
+                seriesQueryOptions.episodes(identity, seriesId, seasonId),
               ),
           },
           episode,
@@ -143,9 +153,9 @@ export const seriesQueryOptions = {
 } as const
 
 export const albumQueryOptions = {
-  tracks: (albumId: string) =>
+  tracks: (identity: QueryIdentity, albumId: string) =>
     createStandardQueryOptions({
-      queryKey: albumKeys.tracks(albumId),
+      queryKey: albumKeys.tracks(identity, albumId),
       queryFn: (context) => getTracks(albumId, undefined, context),
       cacheDuration: 'LONG',
       operation: 'Fetch tracks',
@@ -153,9 +163,9 @@ export const albumQueryOptions = {
 } as const
 
 export const artistQueryOptions = {
-  albums: (artistId: string) =>
+  albums: (identity: QueryIdentity, artistId: string) =>
     createStandardQueryOptions({
-      queryKey: artistKeys.albums(artistId),
+      queryKey: artistKeys.albums(identity, artistId),
       queryFn: (context) => getAlbums(artistId, context),
       cacheDuration: 'LONG',
       operation: 'Fetch albums',
@@ -163,20 +173,14 @@ export const artistQueryOptions = {
 } as const
 
 const collectionsQueryOptions = {
-  list: () =>
+  list: (identity: QueryIdentity) =>
     createStandardQueryOptions<Array<VirtualFolderInfo>>({
-      queryKey: collectionsKeys.list(),
+      queryKey: collectionsKeys.list(identity),
       queryFn: ({ signal }) => getCollections({ signal }),
       cacheDuration: 'LONG',
       operation: 'Fetch collections',
     }),
 } as const
-
-const isEntityQueryEnabled = (
-  id: string,
-  validAuth: boolean,
-  options?: UseEntityOptions,
-) => validAuth && !!id && (options?.enabled ?? true)
 
 export function useItems({
   parentId,
@@ -187,69 +191,53 @@ export function useItems({
   startIndex,
   enabled = true,
 }: UseItemsOptions) {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...itemsQueryOptions.list({
-      parentId,
-      nameFilter,
-      includeMediaStreams,
-      excludeItemTypes,
-      limit,
-      startIndex,
-    }),
-    enabled: validAuth && enabled && !!parentId,
-  })
+  return useServerQuery(
+    (identity) =>
+      itemsQueryOptions.list(identity, {
+        parentId,
+        nameFilter,
+        includeMediaStreams,
+        excludeItemTypes,
+        limit,
+        startIndex,
+      }),
+    enabled && !!parentId,
+  )
 }
 
-export const useItem = (itemId: string, opts?: UseEntityOptions) => {
-  const validAuth = useApiStore(selectValidAuth)
+export const useItem = (itemId: string, opts?: UseEntityOptions) =>
+  useServerQuery(
+    (identity) => itemsQueryOptions.detail(identity, itemId),
+    !!itemId && (opts?.enabled ?? true),
+  )
 
-  return useQuery({
-    ...itemsQueryOptions.detail(itemId),
-    enabled: isEntityQueryEnabled(itemId, validAuth, opts),
-  })
-}
-
-export const useSeasons = (seriesId: string, opts?: UseEntityOptions) => {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...seriesQueryOptions.seasons(seriesId),
-    enabled: isEntityQueryEnabled(seriesId, validAuth, opts),
-  })
-}
+export const useSeasons = (seriesId: string, opts?: UseEntityOptions) =>
+  useServerQuery(
+    (identity) => seriesQueryOptions.seasons(identity, seriesId),
+    !!seriesId && (opts?.enabled ?? true),
+  )
 
 /** Previous and next episode in Series Order for the arrows and hotkeys in the header. */
 export const useAdjacentEpisodes = (episode: BaseItemDto) => {
-  const validAuth = useApiStore(selectValidAuth)
   const queryClient = useQueryClient()
 
-  return useQuery({
-    ...seriesQueryOptions.adjacentEpisodes(episode, queryClient),
-    enabled:
-      validAuth && !!episode.SeriesId && !!episode.SeasonId && !!episode.Id,
-  })
+  return useServerQuery(
+    (identity) =>
+      seriesQueryOptions.adjacentEpisodes(identity, episode, queryClient),
+    !!episode.SeriesId && !!episode.SeasonId && !!episode.Id,
+  )
 }
 
 export const useEpisodes = (
   seriesId: string,
   seasonId: string,
   opts?: UseEntityOptions,
-) => {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...seriesQueryOptions.episodes(seriesId, seasonId),
-    enabled: validAuth && !!seriesId && !!seasonId && (opts?.enabled ?? true),
-  })
-}
+) =>
+  useServerQuery(
+    (identity) => seriesQueryOptions.episodes(identity, seriesId, seasonId),
+    !!seriesId && !!seasonId && (opts?.enabled ?? true),
+  )
 
 export function useCollections() {
-  const validAuth = useApiStore(selectValidAuth)
-
-  return useQuery({
-    ...collectionsQueryOptions.list(),
-    enabled: validAuth,
-  })
+  return useServerQuery((identity) => collectionsQueryOptions.list(identity))
 }

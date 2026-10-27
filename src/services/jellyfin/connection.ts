@@ -59,9 +59,8 @@ export function storeAuthResult(
     store.setServerVersion(result.serverVersion)
   }
 
-  if (result.userId && result.username) {
-    store.setUserInfo(result.userId, result.username)
-  }
+  // An api key login has no user, so a previous login's user must not linger.
+  store.setUserInfo(result.userId, result.username)
 
   store.setConnectionStatus(true, true)
 }

@@ -132,6 +132,9 @@ describe('Property: Authentication Persistence Round-Trip', () => {
           // Verify auth method is stored
           expect(state.authMethod).toBe(authMethod)
 
+          // A result without a user clears the previous login's user
+          expect(state.userId).toBe(authResult.userId)
+
           // Verify connection status is set
           expect(state.validConnection).toBe(true)
           expect(state.validAuth).toBe(true)

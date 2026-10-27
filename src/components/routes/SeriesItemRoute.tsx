@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import { getBestImageUrl } from '@/services/video/api'
 import { useArtworkColor } from '@/hooks/use-artwork-color'
 import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
@@ -44,11 +45,16 @@ export function SeriesSkeleton() {
 
 export function SeriesPage() {
   const { itemId } = routeApi.useParams()
+  const identity = useQueryIdentity()
   const { seasonId } = routeApi.useSearch()
   const navigate = useNavigate({ from: '/series/$itemId' })
 
-  const { data: series } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
-  const { data: seasons } = useSuspenseQuery(seriesQueryOptions.seasons(itemId))
+  const { data: series } = useSuspenseQuery(
+    itemsQueryOptions.detail(identity, itemId),
+  )
+  const { data: seasons } = useSuspenseQuery(
+    seriesQueryOptions.seasons(identity, itemId),
+  )
 
   const imageUrl = series ? getBestImageUrl(series, 300) : null
   const seedColor = useArtworkColor(imageUrl || null, {

@@ -2,6 +2,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
+import { currentQueryIdentity } from '@/hooks/queries/query-identity'
 import { itemsQueryOptions } from '@/services/items/queries'
 import { segmentsQueryOptions } from '@/services/segments/queries'
 import { PlayerPage, PlayerSkeleton } from '@/components/routes/PlayerItemRoute'
@@ -41,16 +42,17 @@ export const Route = createFileRoute('/player/$itemId')({
     const { queryClient } = context
 
     assertJellyfinCredentials()
+    const identity = currentQueryIdentity()
 
     const segmentsPromise = deps.fetchSegments
-      ? queryClient.ensureQueryData(segmentsQueryOptions.list(itemId))
+      ? queryClient.ensureQueryData(segmentsQueryOptions.list(identity, itemId))
       : undefined
     void segmentsPromise?.catch(() => undefined)
     const playerEditorModulePromise = import('@/components/player/PlayerEditor')
     void playerEditorModulePromise.catch(() => undefined)
 
     const item = await queryClient.ensureQueryData(
-      itemsQueryOptions.detail(itemId),
+      itemsQueryOptions.detail(identity, itemId),
     )
     assertItemFound(item, abortController.signal)
 

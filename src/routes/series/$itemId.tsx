@@ -2,6 +2,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
+import { currentQueryIdentity } from '@/hooks/queries/query-identity'
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { resolveSelectedSeasonId } from '@/lib/series-utils'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
@@ -38,10 +39,11 @@ export const Route = createFileRoute('/series/$itemId')({
     const { queryClient } = context
 
     assertJellyfinCredentials()
+    const identity = currentQueryIdentity()
 
     const [series, seasons] = await Promise.all([
-      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
-      queryClient.ensureQueryData(seriesQueryOptions.seasons(itemId)),
+      queryClient.ensureQueryData(itemsQueryOptions.detail(identity, itemId)),
+      queryClient.ensureQueryData(seriesQueryOptions.seasons(identity, itemId)),
       import('@/components/views/SeriesView'),
     ])
     assertItemFound(series, abortController.signal)
@@ -51,7 +53,7 @@ export const Route = createFileRoute('/series/$itemId')({
     const seasonId = resolveSelectedSeasonId(seasons, deps.seasonId)
     if (series.Id && seasonId) {
       void queryClient.prefetchQuery(
-        seriesQueryOptions.episodes(series.Id, seasonId),
+        seriesQueryOptions.episodes(identity, series.Id, seasonId),
       )
     }
   },
