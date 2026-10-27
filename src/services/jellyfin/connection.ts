@@ -98,8 +98,6 @@ export async function testConnectionWithCredentials(
       credentials,
     )
 
-    if (version === null) return DEFAULT_RESULT
-
     return { valid: true, authenticated: true, serverVersion: version }
   } catch (error) {
     if (isAbortError(error) || isAborted(options?.signal)) {

@@ -96,7 +96,8 @@ const getStatus = (thrown: ThrownError): number | undefined =>
 
 const isAborted = (cause: unknown, thrown: ThrownError): boolean =>
   (cause instanceof DOMException && cause.name === 'AbortError') ||
-  thrown.code === 'ERR_CANCELED'
+  thrown.code === 'ERR_CANCELED' ||
+  thrown.code === ErrorCodes.CANCELLED
 
 const isTimeout = (thrown: ThrownError): boolean =>
   thrown.code === 'ECONNABORTED'

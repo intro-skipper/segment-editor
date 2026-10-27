@@ -23,7 +23,7 @@ import type {
   TypedApis,
 } from './types'
 import { generateUUID } from '@/lib/segment-utils'
-import { AppError, isAbortError } from '@/lib/unified-error'
+import { AppError, ErrorCodes } from '@/lib/unified-error'
 import { API_CONFIG } from '@/lib/constants'
 
 const CLIENT_INFO = { name: 'Segment Editor', version: '1.0.0' } as const
@@ -220,26 +220,31 @@ export function getRequestConfig(
 }
 
 /**
- * Executes an API operation with automatic credential resolution and error handling.
- * Returns null on abort or missing credentials, throws AppError on other failures.
+ * Runs `fn` against the Jellyfin APIs for `credentials` or the resolved ones.
+ * Rejects with an AppError: CANCELLED when aborted, API_UNAVAILABLE without a usable server.
  */
 export async function withApi<T>(
   fn: (apis: TypedApis) => Promise<T>,
   options?: ApiOptions,
   credentials?: Credentials,
-): Promise<T | null> {
-  if (isAborted(options?.signal)) return null
+): Promise<T> {
+  if (isAborted(options?.signal)) {
+    throw new AppError(
+      'Request cancelled',
+      ErrorCodes.CANCELLED,
+      false,
+      undefined,
+      options?.signal?.reason,
+    )
+  }
 
   const creds = credentials ?? credentialResolver?.() ?? null
-  if (!creds) return null
-
-  const apis = getTypedApis(creds)
-  if (!apis) return null
+  const apis = creds && getTypedApis(creds)
+  if (!apis) throw AppError.unavailable()
 
   try {
     return await fn(apis)
   } catch (error) {
-    if (isAbortError(error)) return null
     throw AppError.from(error)
   }
 }

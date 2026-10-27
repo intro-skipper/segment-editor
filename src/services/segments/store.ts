@@ -80,22 +80,15 @@ const writeRetry = {
   maxDelay: API_CONFIG.MAX_RETRY_DELAY_MS,
 }
 
-async function withServer<T>(
+const withServer = <T>(
   fn: (server: Server) => Promise<T>,
   options?: ApiOptions,
-): Promise<T> {
-  const result = await withApi(
+): Promise<T> =>
+  withApi(
     (apis) =>
       fn({ baseUrl: apis.api.basePath, accessToken: apis.api.accessToken }),
     options,
   )
-  if (result !== null) return result
-  // withApi answers null for a cancelled call or missing credentials.
-  if (options?.signal?.aborted) {
-    throw new AppError('Request cancelled', ErrorCodes.CANCELLED)
-  }
-  throw AppError.unavailable()
-}
 
 /**
  * Reads from the editor endpoint, the authoritative baseline the atomic
