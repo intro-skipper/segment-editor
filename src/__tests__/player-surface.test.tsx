@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PlayerSurface } from '@/components/player/PlayerSurface'
 import { PlaybackProvider } from '@/components/player/playback-context'
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -36,11 +36,11 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-const skipSegment: MediaSegmentDto = {
-  Id: 'segment-1',
-  Type: 'Intro',
-  StartTicks: 10,
-  EndTicks: 20,
+const skipSegment: Segment = {
+  id: 'segment-1',
+  type: 'Intro',
+  startSeconds: 10,
+  endSeconds: 20,
 }
 
 type SurfaceProps = ComponentProps<typeof PlayerSurface>

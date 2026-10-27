@@ -44,8 +44,8 @@ describe('segment store', () => {
       `MediaSegmentsApi/${ITEM_ID}`,
     ])
     expect(segments).toMatchObject([
-      { Type: 'Intro', StartTicks: 418.6, EndTicks: 515.08 },
-      { Type: 'Outro', StartTicks: 3478.92, EndTicks: 3545.76 },
+      { type: 'Intro', startSeconds: 418.6, endSeconds: 515.08 },
+      { type: 'Outro', startSeconds: 3478.92, endSeconds: 3545.76 },
     ])
   })
 
@@ -58,7 +58,7 @@ describe('segment store', () => {
     const snapshot = await readSegments(ITEM_ID)
 
     await replaceSegments(ITEM_ID, snapshot, [
-      { ...INTRO, StartTicks: 400 },
+      { ...INTRO, startSeconds: 400 },
       OUTRO,
     ])
 
@@ -86,10 +86,27 @@ describe('segment store', () => {
       `MediaSegments/${ITEM_ID}`,
     ])
     expect(server.writes()).toEqual([
-      `DELETE MediaSegmentsApi/${INTRO.Id}`,
+      `DELETE MediaSegmentsApi/${INTRO.id}`,
       `POST MediaSegmentsApi/${ITEM_ID}`,
     ])
-    expect(server.stored()).toMatchObject([{ Type: 'Outro' }])
+    expect(server.stored()).toMatchObject([{ type: 'Outro' }])
+  })
+
+  it('creates each segment as a Jellyfin DTO with its Id and item, in ticks', async () => {
+    const server = fakeSegmentServer({ itemId: ITEM_ID, bulk: false })
+    const snapshot = await readSegments(ITEM_ID)
+
+    const { segments } = await replaceSegments(ITEM_ID, snapshot, [OUTRO])
+
+    const post = server.requests.find((r) => r.method === 'POST')
+    expect(post?.body).toEqual({
+      Id: OUTRO.id,
+      ItemId: ITEM_ID,
+      Type: 'Outro',
+      StartTicks: 34_789_200_000,
+      EndTicks: 35_457_600_000,
+    })
+    expect(segments).toEqual([{ ...OUTRO, itemId: ITEM_ID }])
   })
 
   it('stops a delete-then-create before creating when a delete fails', async () => {
@@ -106,7 +123,7 @@ describe('segment store', () => {
     ).rejects.toMatchObject({
       code: ErrorCodes.FORBIDDEN,
     })
-    expect(server.writes()).toEqual([`DELETE MediaSegmentsApi/${INTRO.Id}`])
+    expect(server.writes()).toEqual([`DELETE MediaSegmentsApi/${INTRO.id}`])
   })
 
   it('rejects a failed read instead of reporting no segments', async () => {

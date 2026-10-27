@@ -10,6 +10,7 @@
  */
 
 import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { ApiOptions } from '@/services/jellyfin'
 import type { JellyfinFetchOptions } from '@/services/jellyfin/http'
 import { withApi } from '@/services/jellyfin'
@@ -28,9 +29,9 @@ import { AppError, ErrorCodes, logValidationWarning } from '@/lib/unified-error'
 /** The write path a snapshot was read for; callers pass it back untouched. */
 type SegmentVersion = { kind: 'bulk'; etag: string } | { kind: 'legacy' }
 
-/** An item's segments (times in seconds) and the version to replace them from. */
+/** An item's segments and the version to replace them from. */
 export interface SegmentSnapshot {
-  segments: Array<MediaSegmentDto>
+  segments: Array<Segment>
   version: SegmentVersion
 }
 
@@ -44,17 +45,20 @@ const DEFAULT_SEGMENT_PROVIDER_ID = 'IntroSkipper'
 
 type Server = Pick<JellyfinFetchOptions, 'baseUrl' | 'accessToken'>
 
-const toUiSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
-  ...s,
-  StartTicks: ticksToSeconds(s.StartTicks),
-  EndTicks: ticksToSeconds(s.EndTicks),
+const toSegment = (dto: MediaSegmentDto): Segment => ({
+  id: dto.Id,
+  itemId: dto.ItemId,
+  type: dto.Type,
+  startSeconds: ticksToSeconds(dto.StartTicks),
+  endSeconds: ticksToSeconds(dto.EndTicks),
 })
 
-const toServerSegment = (s: MediaSegmentDto): MediaSegmentDto => ({
-  ...s,
-  Id: s.Id || generateUUID(),
-  StartTicks: secondsToTicks(s.StartTicks ?? 0),
-  EndTicks: secondsToTicks(s.EndTicks ?? 0),
+const toServerSegment = (segment: Segment): MediaSegmentDto => ({
+  Id: segment.id || generateUUID(),
+  ItemId: segment.itemId,
+  Type: segment.type,
+  StartTicks: secondsToTicks(segment.startSeconds),
+  EndTicks: secondsToTicks(segment.endSeconds),
 })
 
 const toSnapshot = (
@@ -63,7 +67,7 @@ const toSnapshot = (
 ): SegmentSnapshot => {
   const validation = MediaSegmentArraySchema.safeParse(segments)
   if (!validation.success) logValidationWarning('Segment API', validation.error)
-  return { segments: segments.map(toUiSegment), version }
+  return { segments: segments.map(toSegment), version }
 }
 
 /** Intro-Skipper's editor endpoint: unfiltered reads and all writes. */
@@ -144,13 +148,13 @@ export function readSegments(
 export function replaceSegments(
   itemId: string,
   from: SegmentSnapshot,
-  segments: Array<MediaSegmentDto>,
+  segments: Array<Segment>,
 ): Promise<SegmentSnapshot> {
   if (!isValidItemId(itemId)) {
     return Promise.reject(AppError.validation('Invalid item ID'))
   }
   const { version } = from
-  const owned = segments.map((segment) => ({ ...segment, ItemId: itemId }))
+  const owned = segments.map((segment) => ({ ...segment, itemId }))
   return withServer((server) =>
     version.kind === 'bulk'
       ? putSegments(server, itemId, version.etag, owned)
@@ -162,7 +166,7 @@ async function putSegments(
   server: Server,
   itemId: string,
   etag: string,
-  segments: Array<MediaSegmentDto>,
+  segments: Array<Segment>,
 ): Promise<SegmentSnapshot> {
   const body = segments.map(toServerSegment)
   let status = 0
@@ -206,7 +210,7 @@ async function putSegments(
     else logValidationWarning('Segment API', validation.error)
   }
   return {
-    segments: saved.map(toUiSegment),
+    segments: saved.map(toSegment),
     version: { kind: 'bulk', etag: nextEtag ?? etag },
   }
 }
@@ -214,8 +218,8 @@ async function putSegments(
 async function recreateSegments(
   server: Server,
   itemId: string,
-  existing: Array<MediaSegmentDto>,
-  segments: Array<MediaSegmentDto>,
+  existing: Array<Segment>,
+  segments: Array<Segment>,
 ): Promise<SegmentSnapshot> {
   const total = existing.length + segments.length
   let written = 0
@@ -252,8 +256,8 @@ async function recreateSegments(
 async function createSegment(
   server: Server,
   itemId: string,
-  segment: MediaSegmentDto,
-): Promise<MediaSegmentDto> {
+  segment: Segment,
+): Promise<Segment> {
   const serverSegment = toServerSegment(segment)
   await withRetry(
     () =>
@@ -267,20 +271,17 @@ async function createSegment(
       }),
     writeRetry,
   )
-  return toUiSegment(serverSegment)
+  return toSegment(serverSegment)
 }
 
-async function deleteSegment(
-  server: Server,
-  segment: MediaSegmentDto,
-): Promise<void> {
-  const id = segment.Id
+async function deleteSegment(server: Server, segment: Segment): Promise<void> {
+  const id = segment.id
   if (!isValidItemId(id)) {
     throw AppError.validation('Invalid or missing segment ID')
   }
   const query = new URLSearchParams()
-  if (isValidItemId(segment.ItemId)) query.set('itemId', segment.ItemId)
-  if (segment.Type != null) query.set('type', String(segment.Type))
+  if (isValidItemId(segment.itemId)) query.set('itemId', segment.itemId)
+  if (segment.type != null) query.set('type', segment.type)
 
   await withRetry(
     () =>

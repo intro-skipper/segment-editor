@@ -1,4 +1,4 @@
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
@@ -58,7 +58,7 @@ export class Playhead {
   private activeSegmentId: string | null = null
   private autoSkippedSegmentId: string | null = null
   /** The segment entered in button mode, as it was then. */
-  private offer: MediaSegmentDto | null = null
+  private offer: Segment | null = null
   private playbackReady = false
 
   constructor(
@@ -79,11 +79,11 @@ export class Playhead {
    * The segment the skip button offers: button mode only, never while
    * playback loads or fails, and as the latest segments describe it.
    */
-  getSkipOffer = (): MediaSegmentDto | null => {
+  getSkipOffer = (): Segment | null => {
     const offer = this.offer
     if (!offer || !this.playbackReady) return null
-    if (offer.Id === undefined) return offer
-    return this.segments.rangeById.get(offer.Id)?.segment ?? null
+    if (offer.id === undefined) return offer
+    return this.segments.rangeById.get(offer.id)?.segment ?? null
   }
 
   /** The live element position. */
@@ -129,10 +129,10 @@ export class Playhead {
   }
 
   /** Seeks past `segment` and withdraws its offer. */
-  skipSegment = (segment: MediaSegmentDto): void => {
+  skipSegment = (segment: Segment): void => {
     const range =
-      segment.Id !== undefined
-        ? this.segments.rangeById.get(segment.Id)
+      segment.id !== undefined
+        ? this.segments.rangeById.get(segment.id)
         : undefined
     const targetEndSeconds = getSegmentSkipTargetEndSeconds(segment, range)
     if (targetEndSeconds === null) return
@@ -142,7 +142,7 @@ export class Playhead {
     this.setOffer(null)
   }
 
-  setSegments(segments: ReadonlyArray<MediaSegmentDto> | undefined): void {
+  setSegments(segments: ReadonlyArray<Segment> | undefined): void {
     this.segments = buildSegmentTimeIndex(segments)
     if (this.offer) this.notify()
   }
@@ -250,7 +250,7 @@ export class Playhead {
     this.setOffer(null)
   }
 
-  private setOffer(segment: MediaSegmentDto | null) {
+  private setOffer(segment: Segment | null) {
     if (segment === this.offer) return
     this.offer = segment
     this.notify()

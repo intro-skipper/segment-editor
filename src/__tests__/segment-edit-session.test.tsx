@@ -65,8 +65,8 @@ async function refetch(queryClient: QueryClient) {
   await act(() => queryClient.refetchQueries())
 }
 
-const types = (segments: Array<{ Type?: unknown }>) =>
-  segments.map((s) => s.Type)
+const types = (segments: Array<{ type?: unknown }>) =>
+  segments.map((s) => s.type)
 
 const count = (server: ReturnType<typeof fakeSegmentServer>, method: string) =>
   server.requests.filter((r) => r.method === method).length
@@ -89,10 +89,10 @@ describe('segment edit session', () => {
     fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [INTRO] })
     const { result } = await renderLoadedSession()
 
-    act(() => result.current.update({ id: INTRO.Id }, { EndTicks: 95 }))
+    act(() => result.current.update({ id: INTRO.id }, { endSeconds: 95 }))
     expect(result.current.isDirty).toBe(true)
 
-    act(() => result.current.update({ id: INTRO.Id }, { EndTicks: 90 }))
+    act(() => result.current.update({ id: INTRO.id }, { endSeconds: 90 }))
     expect(result.current.isDirty).toBe(false)
   })
 
@@ -112,8 +112,8 @@ describe('segment edit session', () => {
     fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [long, short] })
     const { result } = await renderLoadedSession()
 
-    act(() => result.current.update({ id: short.Id }, { EndTicks: 60 }))
-    act(() => result.current.update({ id: short.Id }, { EndTicks: 50 }))
+    act(() => result.current.update({ id: short.id }, { endSeconds: 60 }))
+    act(() => result.current.update({ id: short.id }, { endSeconds: 50 }))
 
     expect(types(result.current.segments)).toEqual(['Recap', 'Intro'])
     expect(result.current.isDirty).toBe(false)
@@ -125,8 +125,8 @@ describe('segment edit session', () => {
 
     act(() =>
       result.current.update(
-        { id: RECAP.Id },
-        { StartTicks: 100, EndTicks: 120 },
+        { id: RECAP.id },
+        { startSeconds: 100, endSeconds: 120 },
       ),
     )
 
@@ -143,9 +143,12 @@ describe('segment edit session', () => {
     const { result } = await renderLoadedSession()
 
     act(() =>
-      result.current.update({ id: OUTRO.Id }, { StartTicks: 10, EndTicks: 20 }),
+      result.current.update(
+        { id: OUTRO.id },
+        { startSeconds: 10, endSeconds: 20 },
+      ),
     )
-    act(() => result.current.remove({ id: INTRO.Id }))
+    act(() => result.current.remove({ id: INTRO.id }))
 
     expect(types(result.current.segments)).toEqual(['Recap', 'Outro'])
   })
@@ -222,7 +225,7 @@ describe('segment edit session', () => {
     const { result } = await renderLoadedSession()
     server.fail('PUT', 400)
 
-    act(() => result.current.remove({ id: INTRO.Id }))
+    act(() => result.current.remove({ id: INTRO.id }))
     await act(() => result.current.save())
 
     expect(result.current.segments).toEqual([])
@@ -299,8 +302,8 @@ describe('segment edit session', () => {
 
     await act(() => result.current.save())
     expect(server.stored()).toMatchObject([
-      { Type: 'Intro', StartTicks: 60, EndTicks: 90 },
-      { Type: 'Outro', StartTicks: 1200, EndTicks: 1260 },
+      { type: 'Intro', startSeconds: 60, endSeconds: 90 },
+      { type: 'Outro', startSeconds: 1200, endSeconds: 1260 },
     ])
   })
 
@@ -359,7 +362,7 @@ describe('segment edit session', () => {
     const { result } = await renderLoadedSession()
     const release = server.hold('PUT')
 
-    act(() => result.current.remove({ id: INTRO.Id }))
+    act(() => result.current.remove({ id: INTRO.id }))
     let saved: Promise<void> = Promise.resolve()
     act(() => {
       saved = result.current.save()
@@ -449,10 +452,10 @@ describe('segment edit session', () => {
     fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [INTRO] })
     const { result } = await renderLoadedSession()
 
-    act(() => result.current.update({ id: INTRO.Id }, { EndTicks: 30 }))
+    act(() => result.current.update({ id: INTRO.id }, { endSeconds: 30 }))
 
     expect(result.current.segments).toMatchObject([
-      { StartTicks: 60, EndTicks: 60.1 },
+      { startSeconds: 60, endSeconds: 60.1 },
     ])
   })
 
@@ -469,10 +472,12 @@ describe('segment edit session', () => {
       frameStepSeconds: 0.5,
     })
 
-    act(() => result.current.update({ id: unsnapped.Id }, { StartTicks: 61.1 }))
+    act(() =>
+      result.current.update({ id: unsnapped.id }, { startSeconds: 61.1 }),
+    )
 
     expect(result.current.segments).toMatchObject([
-      { StartTicks: 61, EndTicks: 90.3 },
+      { startSeconds: 61, endSeconds: 90.3 },
     ])
   })
 
@@ -483,7 +488,7 @@ describe('segment edit session', () => {
     act(() => result.current.create({ type: 'Outro', start: 99.98 }))
 
     expect(result.current.segments).toMatchObject([
-      { StartTicks: 99.9, EndTicks: 100 },
+      { startSeconds: 99.9, endSeconds: 100 },
     ])
   })
 
@@ -499,7 +504,7 @@ describe('segment edit session', () => {
     )
 
     expect(result.current.segments).toMatchObject([
-      { StartTicks: 10, EndTicks: 10.1 },
+      { startSeconds: 10, endSeconds: 10.1 },
     ])
   })
 
@@ -518,13 +523,13 @@ describe('segment edit session', () => {
 
     act(() =>
       result.current.update(
-        { id: precise.Id },
-        { Type: 'Recap', StartTicks: 60.235, EndTicks: 90.123 },
+        { id: precise.id },
+        { type: 'Recap', startSeconds: 60.235, endSeconds: 90.123 },
       ),
     )
 
     expect(result.current.segments).toMatchObject([
-      { Type: 'Recap', StartTicks: 60.2345678, EndTicks: 90.1234567 },
+      { type: 'Recap', startSeconds: 60.2345678, endSeconds: 90.1234567 },
     ])
   })
 
@@ -532,10 +537,10 @@ describe('segment edit session', () => {
     fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [OUTRO] })
     const { result } = await renderLoadedSession({ runtimeSeconds: 1150 })
 
-    act(() => result.current.update({ id: OUTRO.Id }, { EndTicks: 1149 }))
+    act(() => result.current.update({ id: OUTRO.id }, { endSeconds: 1149 }))
 
     expect(result.current.segments).toMatchObject([
-      { StartTicks: 1149.9, EndTicks: 1150 },
+      { startSeconds: 1149.9, endSeconds: 1150 },
     ])
   })
 
@@ -552,11 +557,11 @@ describe('segment edit session', () => {
         'merge',
       ),
     )
-    act(() => result.current.update({ id: INTRO.Id }, { StartTicks: 89.99 }))
+    act(() => result.current.update({ id: INTRO.id }, { startSeconds: 89.99 }))
 
     expect(result.current.segments).toMatchObject([
-      { Type: 'Recap', StartTicks: 10, EndTicks: 10.12 },
-      { Type: 'Intro', StartTicks: 89.88, EndTicks: 90 },
+      { type: 'Recap', startSeconds: 10, endSeconds: 10.12 },
+      { type: 'Intro', startSeconds: 89.88, endSeconds: 90 },
     ])
   })
 

@@ -11,12 +11,8 @@ import {
   ImportSegmentsDialog,
   UnsavedChangesDialog,
 } from './PlayerEditorDialogs'
-import type {
-  BaseItemDto,
-  MediaSegmentDto,
-  MediaSegmentType,
-} from '@/types/jellyfin'
-import type { SegmentUpdate, TimestampUpdate } from '@/types/segment'
+import type { BaseItemDto, MediaSegmentType } from '@/types/jellyfin'
+import type { Segment, SegmentUpdate, TimestampUpdate } from '@/types/segment'
 import type { SegmentTarget } from '@/services/segments/edit-session'
 import { useSegmentEditSession } from '@/services/segments/edit-session'
 import { useAppStore } from '@/stores/app-store'
@@ -107,7 +103,7 @@ interface PlayerEditorProps {
 }
 
 interface ParsedImportResult {
-  segments: Array<MediaSegmentDto>
+  segments: Array<Segment>
   skipped: number
   unknownTypes: Array<string>
 }
@@ -133,12 +129,12 @@ function buildImportInfoSuffix({
 
 interface PendingDelete {
   target: SegmentTarget
-  type?: MediaSegmentDto['Type']
+  type?: MediaSegmentType
 }
 
 /** Targets a segment by Id, falling back to its index for one without. */
-const targetOf = (segment: MediaSegmentDto, index: number): SegmentTarget =>
-  segment.Id ? { id: segment.Id } : { index }
+const targetOf = (segment: Segment, index: number): SegmentTarget =>
+  segment.id ? { id: segment.id } : { index }
 
 export function PlayerEditor({
   item,
@@ -254,19 +250,19 @@ function useRenderPlayerEditor({
     update(
       data.index === undefined ? 'active' : { index: data.index },
       data.start
-        ? { StartTicks: data.currentTime }
-        : { EndTicks: data.currentTime },
+        ? { startSeconds: data.currentTime }
+        : { endSeconds: data.currentTime },
     )
   }
 
   const getPlayerTime = () => engine.playhead.getSnappedTime()
 
   const handleUpdateSegment = (data: SegmentUpdate) => {
-    update({ id: data.id }, { StartTicks: data.start, EndTicks: data.end })
+    update({ id: data.id }, { startSeconds: data.start, endSeconds: data.end })
   }
 
   const handleChangeSegmentType = (index: number, type: MediaSegmentType) => {
-    update({ index }, { Type: type })
+    update({ index }, { type })
   }
 
   const handleRequestDeleteSegment = (index: number) => {
@@ -274,7 +270,7 @@ function useRenderPlayerEditor({
     // new identity on every edit, cache-missing every SegmentListRow below.
     const segment = elementAt(editingSegmentsRef.current, index)
     if (segment === undefined) return
-    setPendingDelete({ target: targetOf(segment, index), type: segment.Type })
+    setPendingDelete({ target: targetOf(segment, index), type: segment.type })
   }
 
   const handleConfirmDeleteSegment = () => {
@@ -301,15 +297,15 @@ function useRenderPlayerEditor({
     setEditingSegmentIndex(null)
   }
 
-  const handleSaveSegmentFromDialog = (segment: MediaSegmentDto) => {
+  const handleSaveSegmentFromDialog = (segment: Segment) => {
     update(targetOf(segment, editingSegmentIndex ?? -1), {
-      Type: segment.Type,
-      StartTicks: segment.StartTicks,
-      EndTicks: segment.EndTicks,
+      type: segment.type,
+      startSeconds: segment.startSeconds,
+      endSeconds: segment.endSeconds,
     })
   }
 
-  const handleDeleteSegmentFromDialog = (segment: MediaSegmentDto) => {
+  const handleDeleteSegmentFromDialog = (segment: Segment) => {
     remove(targetOf(segment, editingSegmentIndex ?? -1))
   }
 
@@ -517,7 +513,7 @@ function useRenderPlayerEditor({
           <div className="flex flex-col gap-3 pbe-2">
             {editingSegments.map((segment, index) => (
               <SegmentListRow
-                key={segment.Id}
+                key={segment.id}
                 segment={segment}
                 index={index}
                 isActive={index === activeIndex}
@@ -539,7 +535,7 @@ function useRenderPlayerEditor({
 
       {editingSegmentIndex !== null && editingSegments[editingSegmentIndex] && (
         <SegmentEditDialog
-          key={editingSegments[editingSegmentIndex].Id ?? editingSegmentIndex}
+          key={editingSegments[editingSegmentIndex].id ?? editingSegmentIndex}
           open={editDialogOpen}
           segment={editingSegments[editingSegmentIndex]}
           runtimeSeconds={runtimeSeconds}

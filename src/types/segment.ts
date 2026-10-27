@@ -1,6 +1,18 @@
 import type { MediaSegmentType } from './jellyfin'
 
 /**
+ * A media segment as the app holds it, with times in seconds. Only the segment
+ * store sees Jellyfin's MediaSegmentDto, whose times are ticks.
+ */
+export interface Segment {
+  id?: string
+  itemId?: string
+  type?: MediaSegmentType
+  startSeconds: number
+  endSeconds: number
+}
+
+/**
  * Data required to create a new segment from the player.
  */
 export interface CreateSegmentData {

@@ -6,7 +6,7 @@
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import { useServerQuery } from '@/hooks/queries/query-identity'
 import type { QueryIdentity } from '@/hooks/queries/query-identity'
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { SegmentSnapshot } from '@/services/segments/store'
 import { readSegments } from '@/services/segments/store'
 import { segmentsKeys } from './query-keys'
@@ -16,7 +16,7 @@ import { segmentsKeys } from './query-keys'
  * disabled or loading). An inline `= []` default at the call site allocates a
  * new array identity every render, defeating memoization keyed on the data.
  */
-export const NO_SEGMENTS: Array<MediaSegmentDto> = []
+export const NO_SEGMENTS: Array<Segment> = []
 
 /**
  * Options for the useSegments hook.
@@ -38,7 +38,6 @@ export const segmentsQueryOptions = {
 
 /**
  * Hook to fetch the segment snapshot for a media item.
- * Segments are returned with times converted to seconds for UI display.
  *
  * @param itemId - The media item ID to fetch segments for
  * @param options - Additional query options

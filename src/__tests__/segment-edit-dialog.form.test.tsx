@@ -16,7 +16,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { SegmentEditDialog } from '@/components/segment/SegmentEditDialog'
 
 const clipboardWriteTextMock = vi.fn<(text: string) => Promise<void>>()
@@ -43,7 +43,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/services/plugins/intro-skipper', () => ({
-  segmentsToIntroSkipperClipboardText: (segments: Array<MediaSegmentDto>) => ({
+  segmentsToIntroSkipperClipboardText: (segments: Array<Segment>) => ({
     text: JSON.stringify(segments),
   }),
 }))
@@ -52,14 +52,12 @@ vi.mock('@/lib/notifications', () => ({
   showNotification: vi.fn(),
 }))
 
-function createSegment(
-  overrides: Partial<MediaSegmentDto> = {},
-): MediaSegmentDto {
+function createSegment(overrides: Partial<Segment> = {}): Segment {
   return {
-    EndTicks: 25,
-    Id: 'segment-1',
-    StartTicks: 10,
-    Type: 'Intro',
+    endSeconds: 25,
+    id: 'segment-1',
+    startSeconds: 10,
+    type: 'Intro',
     ...overrides,
   }
 }
@@ -75,7 +73,7 @@ function getInput(label: string): HTMLInputElement {
 function SegmentEditDialogHarness() {
   const [open, setOpen] = React.useState(true)
   const [segment, setSegment] = React.useState(() =>
-    createSegment({ EndTicks: 25, StartTicks: 10 }),
+    createSegment({ endSeconds: 25, startSeconds: 10 }),
   )
   const onSave = vi.fn()
   const onDelete = vi.fn()
@@ -89,7 +87,11 @@ function SegmentEditDialogHarness() {
         type="button"
         onClick={() =>
           setSegment(
-            createSegment({ EndTicks: 40, Id: 'segment-2', StartTicks: 20 }),
+            createSegment({
+              endSeconds: 40,
+              id: 'segment-2',
+              startSeconds: 20,
+            }),
           )
         }
       >
@@ -175,9 +177,9 @@ describe('SegmentEditDialog TanStack Form migration', () => {
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          EndTicks: 123.75,
-          StartTicks: 62.5,
-          Type: 'Intro',
+          endSeconds: 123.75,
+          startSeconds: 62.5,
+          type: 'Intro',
         }),
       )
     })
@@ -228,18 +230,18 @@ describe('SegmentEditDialog TanStack Form migration', () => {
     })
 
     // The waitFor above already proved the clipboard was written once.
-    const copiedSegments: Array<MediaSegmentDto> = JSON.parse(
+    const copiedSegments: Array<Segment> = JSON.parse(
       clipboardWriteTextMock.mock.calls[0][0],
     )
-    expect(copiedSegments[0]?.StartTicks).toBe(segment.StartTicks)
+    expect(copiedSegments[0]?.startSeconds).toBe(segment.startSeconds)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
 
     expect(onDelete).toHaveBeenCalledWith(
       expect.objectContaining({
-        Id: segment.Id,
-        StartTicks: segment.StartTicks,
+        id: segment.id,
+        startSeconds: segment.startSeconds,
       }),
     )
   })

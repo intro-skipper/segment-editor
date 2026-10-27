@@ -1,7 +1,7 @@
 import { createContext, use, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { HlsPlayer } from '@/services/video/hls-controller'
 import type {
   PlaybackEngine,
@@ -62,7 +62,7 @@ export function usePlayheadTimeline<T>(
 }
 
 /** The segment the skip button offers, or null. */
-export function useSkipOffer(): MediaSegmentDto | null {
+export function useSkipOffer(): Segment | null {
   const { playhead } = usePlaybackEngine()
   return useSyncExternalStore(playhead.subscribe, playhead.getSkipOffer)
 }

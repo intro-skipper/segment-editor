@@ -17,8 +17,8 @@ import {
 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
 
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import type { SegmentUpdate } from '@/types/segment'
+import type { MediaSegmentType } from '@/types/jellyfin'
+import type { Segment, SegmentUpdate } from '@/types/segment'
 import { formatTime } from '@/lib/time-utils'
 import type { RangeRules } from '@/lib/segment-range'
 import { maxEndSeconds, placeRange, rangeError } from '@/lib/segment-range'
@@ -57,19 +57,17 @@ interface SegmentRange {
   end: number
 }
 
-interface SegmentSyncSnapshot {
-  id: MediaSegmentDto['Id']
-  startTicks: MediaSegmentDto['StartTicks']
-  endTicks: MediaSegmentDto['EndTicks']
-  type: MediaSegmentDto['Type']
-}
+type SegmentSyncSnapshot = Pick<
+  Segment,
+  'id' | 'startSeconds' | 'endSeconds' | 'type'
+>
 
-function getSegmentSyncSnapshot(segment: MediaSegmentDto): SegmentSyncSnapshot {
+function getSegmentSyncSnapshot(segment: Segment): SegmentSyncSnapshot {
   return {
-    id: segment.Id,
-    startTicks: segment.StartTicks,
-    endTicks: segment.EndTicks,
-    type: segment.Type,
+    id: segment.id,
+    startSeconds: segment.startSeconds,
+    endSeconds: segment.endSeconds,
+    type: segment.type,
   }
 }
 
@@ -79,14 +77,14 @@ function areSegmentSyncSnapshotsEqual(
 ): boolean {
   return (
     a.id === b.id &&
-    a.startTicks === b.startTicks &&
-    a.endTicks === b.endTicks &&
+    a.startSeconds === b.startSeconds &&
+    a.endSeconds === b.endSeconds &&
     a.type === b.type
   )
 }
 
 function syncSegmentProps(
-  segment: MediaSegmentDto,
+  segment: Segment,
   lastSyncedPropsRef: React.RefObject<SegmentSyncSnapshot | null>,
   stableRangeRef: React.RefObject<SegmentRange>,
   setStableRange: React.Dispatch<React.SetStateAction<SegmentRange>>,
@@ -104,8 +102,8 @@ function syncSegmentProps(
   lastSyncedPropsRef.current = nextSnapshot
 
   const nextRange = {
-    start: segment.StartTicks ?? 0,
-    end: segment.EndTicks ?? 0,
+    start: segment.startSeconds,
+    end: segment.endSeconds,
   }
   stableRangeRef.current = nextRange
   setStableRange((current) =>
@@ -248,7 +246,7 @@ function SegmentSliderHeader({
 
 interface SegmentSliderProps {
   /** The segment to display and edit */
-  segment: MediaSegmentDto
+  segment: Segment
   /** Index of this segment in the list */
   index: number
   /** Whether this segment is currently active */
@@ -304,8 +302,8 @@ export function SegmentSlider({
   const formValues = useStore(form.store, (state) => state.values)
   const activeInputRef = React.useRef<'start' | 'end' | null>(null)
   const [stableRange, setStableRange] = React.useState<SegmentRange>({
-    start: segment.StartTicks ?? 0,
-    end: segment.EndTicks ?? 0,
+    start: segment.startSeconds,
+    end: segment.endSeconds,
   })
   const stableRangeRef = React.useRef<SegmentRange>(stableRange)
   // Left null for the sync layout effect below to seed on mount. Writing the
@@ -457,11 +455,10 @@ export function SegmentSlider({
     ).end
 
   const commitSegmentUpdate = (start: number, end: number): boolean => {
-    if (!segment.Id) return false
-
-    const currentStart = segment.StartTicks ?? 0
-    const currentEnd = segment.EndTicks ?? 0
-    if (start === currentStart && end === currentEnd) return false
+    if (!segment.id) return false
+    if (start === segment.startSeconds && end === segment.endSeconds) {
+      return false
+    }
 
     // The session keeps edits inside the media; here a stale end past the
     // runtime must not block moving the start, so only order is checked.
@@ -469,7 +466,7 @@ export function SegmentSlider({
       return false
     }
 
-    onUpdate({ id: segment.Id, start, end })
+    onUpdate({ id: segment.id, start, end })
     return true
   }
 
@@ -809,15 +806,15 @@ export function SegmentSlider({
         ref={sliderRef}
         className="relative h-11 min-w-0 border-0 bg-muted/50 rounded-lg cursor-pointer mbe-4 touch-none overflow-visible"
         style={{ paddingInline: `${HANDLE_WIDTH / 2}px` }}
-        aria-label={t('segment.sliderGroup', { type: segment.Type })}
-        aria-describedby={`segment-${segment.Id}-description`}
+        aria-label={t('segment.sliderGroup', { type: segment.type })}
+        aria-describedby={`segment-${segment.id}-description`}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <span id={`segment-${segment.Id}-description`} className="sr-only">
+        <span id={`segment-${segment.id}-description`} className="sr-only">
           {t('segment.sliderDescription', {
-            type: segment.Type,
+            type: segment.type,
             start: formatTime(localStart),
             end: formatTime(localEnd),
             duration: formatTime(duration),
@@ -840,7 +837,7 @@ export function SegmentSlider({
             <input
               type="range"
               className="segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
-              aria-label={t('segment.startHandle', { type: segment.Type })}
+              aria-label={t('segment.startHandle', { type: segment.type })}
               aria-valuetext={formatTime(localStart)}
               min={0}
               max={localEnd - MIN_SEGMENT_GAP}
@@ -866,7 +863,7 @@ export function SegmentSlider({
             <input
               type="range"
               className="segment-handle absolute inset-0 cursor-ew-resize appearance-none border-0 bg-transparent p-0"
-              aria-label={t('segment.endHandle', { type: segment.Type })}
+              aria-label={t('segment.endHandle', { type: segment.type })}
               aria-valuetext={formatTime(localEnd)}
               min={localStart + MIN_SEGMENT_GAP}
               max={runtimeSeconds}
@@ -926,7 +923,7 @@ export function SegmentSlider({
             <SkipBack className="size-4" aria-hidden="true" />
           </Button>
           <label
-            htmlFor={`segment-${segment.Id}-start`}
+            htmlFor={`segment-${segment.id}-start`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0 sm:self-center leading-8"
           >
             {t('segment.start')}:
@@ -935,7 +932,7 @@ export function SegmentSlider({
             <form.Field name="startText">
               {(field) => (
                 <Input
-                  id={`segment-${segment.Id}-start`}
+                  id={`segment-${segment.id}-start`}
                   type="number"
                   step={inputStep}
                   min="0"
@@ -951,7 +948,7 @@ export function SegmentSlider({
                     handleInputBlur('start')
                   }}
                   className="w-full h-8 font-mono"
-                  aria-describedby={`segment-${segment.Id}-start-formatted`}
+                  aria-describedby={`segment-${segment.id}-start-formatted`}
                 />
               )}
             </form.Field>
@@ -963,7 +960,7 @@ export function SegmentSlider({
             </span>
           </div>
           <span
-            id={`segment-${segment.Id}-start-formatted`}
+            id={`segment-${segment.id}-start-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"
           >
             {formatTime(localStart)}
@@ -1006,7 +1003,7 @@ export function SegmentSlider({
             <SkipForward className="size-4" aria-hidden="true" />
           </Button>
           <label
-            htmlFor={`segment-${segment.Id}-end`}
+            htmlFor={`segment-${segment.id}-end`}
             className="text-sm text-muted-foreground whitespace-nowrap shrink-0 sm:self-center leading-8"
           >
             {t('segment.end')}:
@@ -1015,7 +1012,7 @@ export function SegmentSlider({
             <form.Field name="endText">
               {(field) => (
                 <Input
-                  id={`segment-${segment.Id}-end`}
+                  id={`segment-${segment.id}-end`}
                   type="number"
                   step={inputStep}
                   min={localStart + MIN_SEGMENT_GAP}
@@ -1031,7 +1028,7 @@ export function SegmentSlider({
                     handleInputBlur('end')
                   }}
                   className="w-full h-8 font-mono"
-                  aria-describedby={`segment-${segment.Id}-end-formatted`}
+                  aria-describedby={`segment-${segment.id}-end-formatted`}
                 />
               )}
             </form.Field>
@@ -1043,7 +1040,7 @@ export function SegmentSlider({
             </span>
           </div>
           <span
-            id={`segment-${segment.Id}-end-formatted`}
+            id={`segment-${segment.id}-end-formatted`}
             className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums"
           >
             {formatTime(localEnd)}

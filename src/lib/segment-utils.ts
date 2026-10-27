@@ -4,18 +4,14 @@ import {
   SEGMENT_TYPES,
 } from './constants'
 import { lookup } from './utils'
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { MediaSegmentType } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 
 export { SEGMENT_TYPES }
-export const sortSegmentsByStart = (
-  a: MediaSegmentDto,
-  b: MediaSegmentDto,
-): number => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)
+export const sortSegmentsByStart = (a: Segment, b: Segment): number =>
+  a.startSeconds - b.startSeconds
 
-const sortedSegmentsCache = new WeakMap<
-  Array<MediaSegmentDto>,
-  Array<MediaSegmentDto>
->()
+const sortedSegmentsCache = new WeakMap<Array<Segment>, Array<Segment>>()
 
 /**
  * Identity-stable sorted view: the same input array always returns the same
@@ -26,8 +22,8 @@ const sortedSegmentsCache = new WeakMap<
  * (TanStack structural sharing keeps the input array's identity per fetch).
  */
 export const getSegmentsSortedByStart = (
-  segments: Array<MediaSegmentDto>,
-): Array<MediaSegmentDto> => {
+  segments: Array<Segment>,
+): Array<Segment> => {
   const cached = sortedSegmentsCache.get(segments)
   if (cached) return cached
   const sorted = segments.toSorted(sortSegmentsByStart)
@@ -68,8 +64,8 @@ export const getSegmentChipClass = (
  * Shared by the player scrubber and the read-only episode-list timeline.
  */
 export interface SegmentRegion {
-  id: MediaSegmentDto['Id']
-  type: MediaSegmentDto['Type']
+  id: Segment['id']
+  type: Segment['type']
   /** Left edge as percent of track width [0, 100] */
   start: number
   /** Width as percent of track width [0, 100] */
@@ -93,11 +89,11 @@ export interface SegmentRegionOptions {
 }
 
 /**
- * Maps segments (times in seconds) onto percent-based track regions.
+ * Maps segments onto percent-based track regions.
  * Segments outside [0, duration] are clamped; degenerate spans are dropped.
  */
 export const getSegmentRegions = (
-  segments: Array<MediaSegmentDto> | undefined,
+  segments: Array<Segment> | undefined,
   duration: number,
   options?: SegmentRegionOptions,
 ): Array<SegmentRegion> => {
@@ -106,10 +102,9 @@ export const getSegmentRegions = (
   const minVisibleWidth = options?.minVisibleWidthPercent
   const regions: Array<SegmentRegion> = []
   for (const segment of segments) {
-    const startSeconds = segment.StartTicks ?? 0
+    const { startSeconds, endSeconds } = segment
     const startPercent = (startSeconds / duration) * 100
     if (startPercent >= 100) continue
-    const endSeconds = segment.EndTicks ?? 0
     const endPercent = (endSeconds / duration) * 100
     const clampedStart = Math.max(0, startPercent)
     const clampedEnd = Math.min(100, endPercent)
@@ -127,11 +122,11 @@ export const getSegmentRegions = (
     }
 
     regions.push({
-      id: segment.Id,
-      type: segment.Type,
+      id: segment.id,
+      type: segment.type,
       start: left,
       width,
-      color: getSegmentColorConfig(segment.Type).css,
+      color: getSegmentColorConfig(segment.type).css,
       startSeconds: Math.max(0, Math.min(startSeconds, duration)),
       endSeconds: Math.max(0, Math.min(endSeconds, duration)),
     })

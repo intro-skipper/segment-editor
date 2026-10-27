@@ -1,14 +1,15 @@
 /**
  * Feature: codebase-audit-refactor, Property: Segment Timestamp Validation
- * For any segment where StartTicks >= EndTicks, the segment form validation
+ * For any segment where startSeconds >= endSeconds, the segment form validation
  * SHALL return { valid: false } with an appropriate error message.
- * For any segment where StartTicks < EndTicks and both are non-negative,
+ * For any segment where startSeconds < endSeconds and both are non-negative,
  * validation SHALL return { valid: true }.
  */
 
 import { describe, it } from 'vitest'
 import * as fc from 'fast-check'
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { MediaSegmentType } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import {
   getSegmentFormDefaults,
   validateSegmentFormValues,
@@ -27,38 +28,28 @@ const SEGMENT_TYPES: Array<MediaSegmentType> = [
 // Arbitrary for segment types
 const segmentTypeArb = fc.constantFrom(...SEGMENT_TYPES)
 
-const validateSegmentValues = (
-  segment: Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>,
-  maxDuration?: number | null,
-) =>
-  validateSegmentFormValues(
-    getSegmentFormDefaults({
-      Type: segment.Type ?? 'Unknown',
-      StartTicks: segment.StartTicks ?? 0,
-      EndTicks: segment.EndTicks ?? 0,
-    }),
-    maxDuration,
-  )
+const validateSegmentValues = (segment: Segment, maxDuration?: number | null) =>
+  validateSegmentFormValues(getSegmentFormDefaults(segment), maxDuration)
 
 describe('Segment Timestamp Validation', () => {
   /**
-   * Property: Valid segments (StartTicks < EndTicks, both non-negative) pass validation
-   * For any segment where StartTicks < EndTicks and both are non-negative,
+   * Property: Valid segments (startSeconds < endSeconds, both non-negative) pass validation
+   * For any segment where startSeconds < endSeconds and both are non-negative,
    * the segment schema SHALL return { valid: true }.
    */
-  it('returns valid=true when StartTicks < EndTicks and both non-negative', () => {
+  it('returns valid=true when startSeconds < endSeconds and both non-negative', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 1_000_000 }),
         fc.integer({ min: 1, max: 1_000_000 }),
         segmentTypeArb,
         (start, gap, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: start,
-            EndTicks: start + gap, // Ensures EndTicks > StartTicks
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: start,
+            endSeconds: start + gap, // Ensures endSeconds > startSeconds
           }
 
           const result = validateSegmentValues(segment)
@@ -70,23 +61,23 @@ describe('Segment Timestamp Validation', () => {
   })
 
   /**
-   * Property: Invalid segments (StartTicks > EndTicks) fail validation
-   * For any segment where StartTicks > EndTicks, the segment schema SHALL
+   * Property: Invalid segments (startSeconds > endSeconds) fail validation
+   * For any segment where startSeconds > endSeconds, the segment schema SHALL
    * return { valid: false } with error message about start/end relationship.
    */
-  it('returns valid=false when StartTicks > EndTicks', () => {
+  it('returns valid=false when startSeconds > endSeconds', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 1, max: 1_000_000 }),
         fc.integer({ min: 1, max: 1_000_000 }),
         segmentTypeArb,
         (end, gap, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: end + gap, // Ensures StartTicks > EndTicks
-            EndTicks: end,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: end + gap, // Ensures startSeconds > endSeconds
+            endSeconds: end,
           }
 
           const result = validateSegmentValues(segment)
@@ -101,22 +92,22 @@ describe('Segment Timestamp Validation', () => {
   })
 
   /**
-   * Property: Invalid segments (StartTicks === EndTicks) fail validation
-   * For any segment where StartTicks === EndTicks, the segment schema SHALL
+   * Property: Invalid segments (startSeconds === endSeconds) fail validation
+   * For any segment where startSeconds === endSeconds, the segment schema SHALL
    * return { valid: false } with error message about start/end relationship.
    */
-  it('returns valid=false when StartTicks === EndTicks', () => {
+  it('returns valid=false when startSeconds === endSeconds', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 1_000_000 }),
         segmentTypeArb,
         (time, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: time,
-            EndTicks: time, // Same as StartTicks
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: time,
+            endSeconds: time, // Same as startSeconds
           }
 
           const result = validateSegmentValues(segment)
@@ -131,23 +122,23 @@ describe('Segment Timestamp Validation', () => {
   })
 
   /**
-   * Property: Negative StartTicks fails validation
-   * For any segment with negative StartTicks, the segment schema SHALL
+   * Property: Negative startSeconds fails validation
+   * For any segment with negative startSeconds, the segment schema SHALL
    * return { valid: false } with appropriate error message.
    */
-  it('returns valid=false when StartTicks is negative', () => {
+  it('returns valid=false when startSeconds is negative', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: -1_000_000, max: -1 }),
         fc.integer({ min: 1, max: 1_000_000 }),
         segmentTypeArb,
         (start, end, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: start,
-            EndTicks: end,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: start,
+            endSeconds: end,
           }
 
           const result = validateSegmentValues(segment)
@@ -162,23 +153,23 @@ describe('Segment Timestamp Validation', () => {
   })
 
   /**
-   * Property: Negative EndTicks fails validation
-   * For any segment with negative EndTicks (and non-negative StartTicks),
+   * Property: Negative endSeconds fails validation
+   * For any segment with negative endSeconds (and non-negative startSeconds),
    * the segment schema SHALL return { valid: false } with appropriate error message.
    */
-  it('returns valid=false when EndTicks is negative', () => {
+  it('returns valid=false when endSeconds is negative', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 100 }),
         fc.integer({ min: -1_000_000, max: -1 }),
         segmentTypeArb,
         (start, end, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: start,
-            EndTicks: end,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: start,
+            endSeconds: end,
           }
 
           const result = validateSegmentValues(segment)
@@ -195,7 +186,7 @@ describe('Segment Timestamp Validation', () => {
   /**
    * Property: Validation is consistent across all segment types
    * For any segment type, the validation logic SHALL behave consistently
-   * based only on StartTicks and EndTicks values.
+   * based only on startSeconds and endSeconds values.
    */
   it('validates consistently across all segment types', () => {
     fc.assert(
@@ -205,12 +196,12 @@ describe('Segment Timestamp Validation', () => {
         (start, end) => {
           // Test all segment types with the same start/end values
           const results = SEGMENT_TYPES.map((type) => {
-            const segment: MediaSegmentDto = {
-              Id: 'test-id',
-              ItemId: 'test-item',
-              Type: type,
-              StartTicks: start,
-              EndTicks: end,
+            const segment: Segment = {
+              id: 'test-id',
+              itemId: 'test-item',
+              type,
+              startSeconds: start,
+              endSeconds: end,
             }
             return validateSegmentValues(segment)
           })
@@ -225,21 +216,21 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Minimal valid gap is accepted
-   * For any segment with StartTicks just 1 less than EndTicks,
+   * For any segment with startSeconds just 1 less than endSeconds,
    * the segment schema SHALL return { valid: true }.
    */
-  it('accepts minimal valid gap (EndTicks = StartTicks + 1)', () => {
+  it('accepts minimal valid gap (endSeconds = startSeconds + 1)', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 1_000_000 }),
         segmentTypeArb,
         (start, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: start,
-            EndTicks: start + 1, // Minimal valid gap
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: start,
+            endSeconds: start + 1, // Minimal valid gap
           }
 
           const result = validateSegmentValues(segment)
@@ -252,20 +243,20 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Zero values are valid when properly ordered
-   * For segment with StartTicks=0 and EndTicks>0, validation SHALL pass.
+   * For segment with startSeconds=0 and endSeconds>0, validation SHALL pass.
    */
-  it('accepts zero StartTicks with positive EndTicks', () => {
+  it('accepts zero startSeconds with positive endSeconds', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 1, max: 1_000_000 }),
         segmentTypeArb,
         (end, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: 0,
-            EndTicks: end,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: 0,
+            endSeconds: end,
           }
 
           const result = validateSegmentValues(segment)
@@ -278,7 +269,7 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: End beyond the media duration is rejected
-   * For any segment whose EndTicks exceeds maxDuration, validation SHALL fail
+   * For any segment whose endSeconds exceeds maxDuration, validation SHALL fail
    * with the duration error.
    */
   it('rejects segments whose end exceeds max duration', () => {
@@ -288,12 +279,12 @@ describe('Segment Timestamp Validation', () => {
         fc.integer({ min: 1, max: 1_000_000 }),
         segmentTypeArb,
         (maxDuration, overshoot, type) => {
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: 0,
-            EndTicks: maxDuration + overshoot,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: 0,
+            endSeconds: maxDuration + overshoot,
           }
 
           const result = validateSegmentValues(segment, maxDuration)
@@ -309,7 +300,7 @@ describe('Segment Timestamp Validation', () => {
 
   /**
    * Property: Ordered segments inside the media duration pass
-   * For any segment with 0 <= StartTicks < EndTicks <= maxDuration,
+   * For any segment with 0 <= startSeconds < endSeconds <= maxDuration,
    * validation SHALL return { valid: true }.
    */
   it('accepts ordered segments within max duration', () => {
@@ -323,12 +314,12 @@ describe('Segment Timestamp Validation', () => {
           const start = Math.floor(startRatio * (maxDuration - 1))
           const end =
             start + 1 + Math.floor(endRatio * (maxDuration - start - 1))
-          const segment: MediaSegmentDto = {
-            Id: 'test-id',
-            ItemId: 'test-item',
-            Type: type,
-            StartTicks: start,
-            EndTicks: end,
+          const segment: Segment = {
+            id: 'test-id',
+            itemId: 'test-item',
+            type,
+            startSeconds: start,
+            endSeconds: end,
           }
 
           const result = validateSegmentValues(segment, maxDuration)
