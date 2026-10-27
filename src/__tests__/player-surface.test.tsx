@@ -6,12 +6,19 @@ import { createRef } from 'react'
 import { asElement } from './helpers/dom'
 import { isTranslationOptions, resolveTranslation } from './helpers/i18n-mock'
 import type { TranslationArg } from './helpers/i18n-mock'
+import {
+  FakeHls,
+  createItem,
+  createPlayback,
+  latestHls,
+  settle,
+} from './helpers/playback-fakes'
 import type { ComponentProps } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PlayerSurface } from '@/components/player/PlayerSurface'
-import type { PlayerControlsProps } from '@/components/player/PlayerControls'
+import { PlaybackProvider } from '@/components/player/playback-context'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 
 vi.mock('react-i18next', () => ({
@@ -29,37 +36,6 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('@/components/player/PlayerControls', () => ({
-  PlayerControls: () => <div data-testid="player-controls" />,
-}))
-
-const playerControlsProps: PlayerControlsProps = {
-  playback: {
-    state: 'paused',
-    onToggle: vi.fn(),
-  },
-  volumeControls: {
-    state: 'audible',
-    level: 0.8,
-    onToggleMute: vi.fn(),
-    onChange: vi.fn(),
-  },
-  segmentCreation: {
-    onCreate: vi.fn(),
-  },
-  skipControls: {
-    timeIndex: 0,
-    onTimeChange: vi.fn(),
-  },
-  display: {
-    mode: 'inline',
-  },
-  settings: {
-    subtitleOffset: 0,
-    subtitleState: 'inactive',
-  },
-}
-
 const skipSegment: MediaSegmentDto = {
   Id: 'segment-1',
   Type: 'Intro',
@@ -70,20 +46,14 @@ const skipSegment: MediaSegmentDto = {
 type SurfaceProps = ComponentProps<typeof PlayerSurface>
 
 interface SurfacePropOverrides {
-  containerRef?: SurfaceProps['containerRef']
-  videoRef?: SurfaceProps['videoRef']
   fullscreen?: Partial<SurfaceProps['fullscreen']>
   video?: Partial<SurfaceProps['video']>
-  playback?: Partial<SurfaceProps['playback']>
-  segmentSkip?: Partial<NonNullable<SurfaceProps['segmentSkip']>> | null
-  controlsProps?: SurfaceProps['controlsProps']
-  timelineScrubber?: SurfaceProps['timelineScrubber']
 }
 
 function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
   return {
-    containerRef: overrides.containerRef ?? createRef<HTMLDivElement>(),
-    videoRef: overrides.videoRef ?? createRef<HTMLVideoElement>(),
+    containerRef: createRef<HTMLDivElement>(),
+    videoRef: createRef<HTMLVideoElement>(),
     fullscreen: {
       isFullscreen: false,
       showControls: true,
@@ -110,47 +80,68 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
         },
       ],
       onInteraction: vi.fn(),
-      onKeyDown: vi.fn(),
-      onPlay: vi.fn(),
-      onPause: vi.fn(),
       ...overrides.video,
     },
-    playback: {
-      error: null,
-      isRecovering: false,
-      isVideoLoading: false,
-      onRetry: vi.fn(),
-      ...overrides.playback,
-    },
-    segmentSkip:
-      overrides.segmentSkip === null
-        ? null
-        : {
-            segment: skipSegment,
-            onSkipSegment: vi.fn(),
-            ...overrides.segmentSkip,
-          },
-    controlsProps: overrides.controlsProps ?? playerControlsProps,
-    timelineScrubber: overrides.timelineScrubber ?? (
-      <div data-testid="timeline-scrubber" />
-    ),
+    controls: <div data-testid="player-controls" />,
+    timelineScrubber: <div data-testid="timeline-scrubber" />,
   }
 }
+
+type Playback = ReturnType<typeof createPlayback>
+
+/** Renders the surface over `playback`'s engine, by default one still resolving its config. */
+function renderSurface(
+  overrides: SurfacePropOverrides = {},
+  playback: Playback = createPlayback(),
+) {
+  const props = createProps(overrides)
+  const utils = render(
+    <PlaybackProvider engine={playback.engine}>
+      <PlayerSurface {...props} />
+    </PlaybackProvider>,
+  )
+  const rerender = (next: SurfacePropOverrides) => {
+    utils.rerender(
+      <PlaybackProvider engine={playback.engine}>
+        <PlayerSurface {...createProps(next)} />
+      </PlaybackProvider>,
+    )
+  }
+  return { ...utils, props, rerender }
+}
+
+/** An engine playing an HLS stream, whose failure reads "Playback failed". */
+async function playingHls(): Promise<Playback> {
+  const playback = createPlayback({
+    host: {
+      t: (key) => (key === 'player.error.unknown' ? 'Playback failed' : key),
+    },
+  })
+  playback.engine.load(createItem())
+  await settle()
+  return playback
+}
+
+/** hls.js reports an error it cannot recover from, so playback waits for Retry. */
+function failHls() {
+  act(() => {
+    latestHls().emit(FakeHls.Events.ERROR, { fatal: true, type: 'otherError' })
+  })
+}
+
+beforeEach(() => {
+  FakeHls.instances.length = 0
+})
 
 afterEach(() => {
   cleanup()
 })
 
 describe('PlayerSurface', () => {
-  it('renders captions, inline controls, and the segment skip action', () => {
-    const onSkipSegment = vi.fn()
-    const { container } = render(
-      <PlayerSurface
-        {...createProps({
-          segmentSkip: { onSkipSegment },
-        })}
-      />,
-    )
+  it('renders captions, inline controls, and the segment skip action', async () => {
+    const playback = await playingHls()
+    playback.engine.playhead.setSegments([skipSegment])
+    const { container } = renderSurface({}, playback)
 
     const tracks = Array.from(container.querySelectorAll('track'))
     expect(tracks.map((track) => track.getAttribute('src'))).toEqual([
@@ -160,24 +151,25 @@ describe('PlayerSurface', () => {
     expect(screen.getByTestId('timeline-scrubber')).toBeTruthy()
     expect(screen.getByTestId('player-controls')).toBeTruthy()
 
+    playback.video.currentTime = 12
+    act(() => {
+      playback.video.dispatchEvent(new Event('timeupdate'))
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Skip type:Intro' }))
 
-    expect(onSkipSegment).toHaveBeenCalledWith(skipSegment)
+    expect(playback.video.currentTime).toBe(20)
+    expect(screen.queryByRole('button', { name: 'Skip type:Intro' })).toBe(null)
   })
 
   it('renders fullscreen controls, hides inline scrubber, and exposes hidden-control state', () => {
     const onToggleVideoFitMode = vi.fn()
-    const { container } = render(
-      <PlayerSurface
-        {...createProps({
-          fullscreen: {
-            isFullscreen: true,
-            showControls: false,
-            onToggleVideoFitMode,
-          },
-        })}
-      />,
-    )
+    const { container } = renderSurface({
+      fullscreen: {
+        isFullscreen: true,
+        showControls: false,
+        onToggleVideoFitMode,
+      },
+    })
 
     expect(screen.getByTestId('timeline-scrubber')).toBeTruthy()
 
@@ -197,41 +189,33 @@ describe('PlayerSurface', () => {
     expect(onToggleVideoFitMode).toHaveBeenCalledTimes(1)
   })
 
-  it('wires section, video interaction, keyboard, and media events', () => {
-    const props = createProps()
-    const { container } = render(<PlayerSurface {...props} />)
+  it('wires section and video interaction, and plays on Enter', () => {
+    const playback = createPlayback()
+    const { container, props } = renderSurface({}, playback)
 
     const section = container.querySelector('section')
     const videoButton = screen.getByRole('button', {
       name: 'player.videoPlayer',
     })
-    const video = container.querySelector('video')
-    if (!section || !video) throw new Error('Expected rendered player surface')
+    if (!section) throw new Error('Expected rendered player surface')
 
     fireEvent.mouseMove(section)
     fireEvent.mouseLeave(section)
     fireEvent.click(videoButton)
     fireEvent.touchEnd(videoButton)
+    fireEvent.keyDown(videoButton, { key: 'a' })
     fireEvent.keyDown(videoButton, { key: 'Enter' })
-    fireEvent(video, new Event('play'))
-    fireEvent(video, new Event('pause'))
 
     expect(props.fullscreen.onMouseMove).toHaveBeenCalledTimes(1)
     expect(props.fullscreen.onMouseLeave).toHaveBeenCalledTimes(1)
     expect(props.video.onInteraction).toHaveBeenCalledTimes(2)
-    expect(props.video.onKeyDown).toHaveBeenCalledTimes(1)
-    expect(props.video.onPlay).toHaveBeenCalledTimes(1)
-    expect(props.video.onPause).toHaveBeenCalledTimes(1)
+    expect(playback.video.play).toHaveBeenCalledTimes(1)
   })
 
   it('rounds the windowed surface and layers the blurred poster backdrop', () => {
-    const { container } = render(
-      <PlayerSurface
-        {...createProps({
-          video: { posterUrl: '/poster.jpg' },
-        })}
-      />,
-    )
+    const { container } = renderSurface({
+      video: { posterUrl: '/poster.jpg' },
+    })
 
     const videoButton = screen.getByRole('button', {
       name: 'player.videoPlayer',
@@ -263,13 +247,9 @@ describe('PlayerSurface', () => {
     // border-radius + overflow clip (hidden or clip, any axis) has to mask
     // the composited JASSUB subtitle canvas layered above the video.
     const overflowClipClass = /\boverflow-(?:x-|y-)?(?:hidden|clip)\b/
-    const { container } = render(
-      <PlayerSurface
-        {...createProps({
-          video: { posterUrl: '/poster.jpg' },
-        })}
-      />,
-    )
+    const { container } = renderSurface({
+      video: { posterUrl: '/poster.jpg' },
+    })
 
     const video = container.querySelector('video')
     if (!video) throw new Error('Expected video element')
@@ -280,14 +260,10 @@ describe('PlayerSurface', () => {
   })
 
   it('drops the rounded frame and poster backdrop in fullscreen', () => {
-    const { container } = render(
-      <PlayerSurface
-        {...createProps({
-          video: { posterUrl: '/poster.jpg' },
-          fullscreen: { isFullscreen: true },
-        })}
-      />,
-    )
+    const { container } = renderSurface({
+      video: { posterUrl: '/poster.jpg' },
+      fullscreen: { isFullscreen: true },
+    })
 
     const videoButton = screen.getByRole('button', {
       name: 'player.videoPlayer',
@@ -299,29 +275,15 @@ describe('PlayerSurface', () => {
     expect(container.querySelector('img')).toBe(null)
   })
 
-  it('rounds the error overlay only in windowed mode', () => {
-    const error = {
-      type: 'media_error',
-      message: 'Playback failed',
-      recoverable: false,
-    } as const
-
-    const { rerender } = render(
-      <PlayerSurface {...createProps({ playback: { error } })} />,
-    )
+  it('rounds the error overlay only in windowed mode', async () => {
+    const { rerender } = renderSurface({}, await playingHls())
+    failHls()
 
     const windowedOverlay = screen.getByText('Playback failed').parentElement
     if (!windowedOverlay) throw new Error('Expected error overlay')
     expect(windowedOverlay.classList.contains('rounded-2xl')).toBe(true)
 
-    rerender(
-      <PlayerSurface
-        {...createProps({
-          playback: { error },
-          fullscreen: { isFullscreen: true },
-        })}
-      />,
-    )
+    rerender({ fullscreen: { isFullscreen: true } })
 
     const fullscreenOverlay = screen.getByText('Playback failed').parentElement
     if (!fullscreenOverlay) throw new Error('Expected error overlay')
@@ -329,55 +291,59 @@ describe('PlayerSurface', () => {
   })
 
   it('rounds the loading overlay only in windowed mode', () => {
-    const { container, rerender } = render(
-      <PlayerSurface
-        {...createProps({ playback: { isVideoLoading: true } })}
-      />,
-    )
+    const { container, rerender } = renderSurface()
 
     const windowedOverlay = container.querySelector('output')
     if (!windowedOverlay) throw new Error('Expected loading overlay')
     expect(windowedOverlay.classList.contains('rounded-2xl')).toBe(true)
+    expect(screen.queryByRole('alert')).toBe(null)
 
-    rerender(
-      <PlayerSurface
-        {...createProps({
-          playback: { isVideoLoading: true },
-          fullscreen: { isFullscreen: true },
-        })}
-      />,
-    )
+    rerender({ fullscreen: { isFullscreen: true } })
 
     const fullscreenOverlay = container.querySelector('output')
     if (!fullscreenOverlay) throw new Error('Expected loading overlay')
     expect(fullscreenOverlay.classList.contains('rounded-2xl')).toBe(false)
   })
 
-  it('renders recoverable direct-play errors without the skip action', () => {
-    const onRetry = vi.fn()
-    render(
-      <PlayerSurface
-        {...createProps({
-          playback: {
-            onRetry,
-            error: {
-              type: 'media_error',
-              message: 'Playback failed',
-              recoverable: true,
-            },
-          },
-          segmentSkip: null,
-        })}
-      />,
+  it('shows a recovering error as the loading overlay, not as an error', async () => {
+    const { container } = renderSurface({}, await playingHls())
+    expect(container.querySelector('output')).toBe(null)
+
+    act(() => {
+      latestHls().emit(FakeHls.Events.ERROR, {
+        fatal: true,
+        type: FakeHls.ErrorTypes.MEDIA_ERROR,
+      })
+    })
+
+    expect(container.querySelector('output')?.textContent).toBe(
+      'Recovering playback',
     )
+    expect(screen.queryByRole('alert')).toBe(null)
+  })
+
+  it('renders a recoverable error without the skip action, and Retry restarts playback', async () => {
+    const playback = await playingHls()
+    playback.engine.playhead.setSegments([skipSegment])
+    renderSurface({}, playback)
+    playback.video.currentTime = 12
+    act(() => {
+      playback.video.dispatchEvent(new Event('timeupdate'))
+    })
+    expect(screen.getByRole('button', { name: 'Skip type:Intro' })).toBeTruthy()
+
+    failHls()
 
     expect(screen.getByText('Playback failed')).toBeTruthy()
     // The overlay must not repeat the failure message as a separate hint line.
-    expect(screen.queryByText('player.error.directPlayFailed')).toBe(null)
+    expect(screen.queryByText('player.error.unknown')).toBe(null)
     expect(screen.queryByRole('button', { name: 'Skip type:Intro' })).toBe(null)
 
     fireEvent.click(screen.getByRole('button', { name: 'player.retry' }))
+    await act(settle)
 
-    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('alert')).toBe(null)
+    expect(FakeHls.instances).toHaveLength(2)
+    expect(latestHls().config.startPosition).toBe(12)
   })
 })

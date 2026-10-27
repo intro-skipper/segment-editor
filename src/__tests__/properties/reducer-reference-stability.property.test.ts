@@ -17,94 +17,15 @@ import {
 } from '@/components/player/player-reducer'
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const { SKIP_TIMES, PLAYBACK_SPEEDS } = PLAYER_CONFIG
+const { SKIP_TIMES } = PLAYER_CONFIG
 
 /** Arbitrary for generating valid PlayerState */
 const playerStateArb: fc.Arbitrary<PlayerState> = fc.record({
-  isPlaying: fc.boolean(),
-  volume: fc.float({ min: 0, max: 1, noNaN: true }),
-  isMuted: fc.boolean(),
   skipTimeIndex: fc.integer({ min: 0, max: SKIP_TIMES.length - 1 }),
   subtitleOffset: fc.float({ min: -30, max: 30, noNaN: true }),
-  playbackSpeedIndex: fc.integer({ min: 0, max: PLAYBACK_SPEEDS.length - 1 }),
 })
 
 describe('Reducer Reference Stability', () => {
-  /**
-   * Property: PLAY_STATE returns same reference when isPlaying unchanged
-   */
-  it('returns same reference for PLAY_STATE with unchanged isPlaying', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'PLAY_STATE',
-          isPlaying: state.isPlaying,
-        }
-        const result = playerReducer(state, action)
-        return result === state
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: PLAY_STATE returns new reference when isPlaying changes
-   */
-  it('returns new reference for PLAY_STATE with changed isPlaying', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'PLAY_STATE',
-          isPlaying: !state.isPlaying,
-        }
-        const result = playerReducer(state, action)
-        return result !== state && result.isPlaying === !state.isPlaying
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: VOLUME_CHANGE returns same reference when volume and muted unchanged
-   */
-  it('returns same reference for VOLUME_CHANGE with unchanged values', () => {
-    fc.assert(
-      fc.property(playerStateArb, (state) => {
-        const action: PlayerAction = {
-          type: 'VOLUME_CHANGE',
-          volume: state.volume,
-          isMuted: state.isMuted,
-        }
-        const result = playerReducer(state, action)
-        return result === state
-      }),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: VOLUME_CHANGE returns new reference when volume changes
-   */
-  it('returns new reference for VOLUME_CHANGE with changed volume', () => {
-    fc.assert(
-      fc.property(
-        playerStateArb,
-        fc.float({ min: 0, max: 1, noNaN: true }),
-        (state, newVolume) => {
-          fc.pre(newVolume !== state.volume)
-          const action: PlayerAction = {
-            type: 'VOLUME_CHANGE',
-            volume: newVolume,
-            isMuted: state.isMuted,
-          }
-          const result = playerReducer(state, action)
-          return result !== state && result.volume === newVolume
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
   /**
    * Property: SKIP_TIME_CHANGE returns same reference when skipTimeIndex unchanged
    */
@@ -197,12 +118,8 @@ describe('Reducer Reference Stability', () => {
           }
           const result = playerReducer(state, action)
           return (
-            result.isPlaying === state.isPlaying &&
-            result.volume === state.volume &&
-            result.isMuted === state.isMuted &&
             result.skipTimeIndex === state.skipTimeIndex &&
-            result.subtitleOffset === newOffset &&
-            result.playbackSpeedIndex === state.playbackSpeedIndex
+            result.subtitleOffset === newOffset
           )
         },
       ),

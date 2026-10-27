@@ -1,48 +1,47 @@
-/**
- * usePlayerKeyboard - Custom hook for player keyboard shortcuts.
- * Uses @tanstack/react-hotkeys for type-safe, cross-platform hotkey management.
- */
-
 import { useHotkey } from '@tanstack/react-hotkeys'
+import type { TimestampUpdate } from '@/types/segment'
 import { PLAYER_HOTKEYS } from '@/lib/player-shortcuts'
+import { usePlaybackEngine } from '@/components/player/playback-context'
 
-interface KeyboardHandlers {
-  togglePlay: () => void
-  cycleSkipTimeUp: () => void
-  cycleSkipTimeDown: () => void
-  skipBackward: () => void
-  skipForward: () => void
-  stepFrameBackward: () => void
-  stepFrameForward: () => void
-  pushStartTimestamp: () => void
-  pushEndTimestamp: () => void
-  toggleMute: () => void
-  toggleFullscreen: () => void
-  toggleSubtitles: () => void
-  increaseSpeed: () => void
-  decreaseSpeed: () => void
+interface PlayerKeyboardOptions {
+  /** The skip size A and D move by. */
+  skipTimeIndex: number
+  onCycleSkipTime: (direction: 1 | -1) => void
+  onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
+  onToggleFullscreen: () => void
 }
 
 /**
- * Key mappings:
- * Space=Play, W/S=Skip time, A/D=Skip, ,/.=Frame step, E/F=Timestamps,
- * M=Mute, F11=Fullscreen, C=Subtitles, Alt+.=Faster, Alt+,=Slower
+ * Binds the player shortcuts to the provider's engine: Space=Play, W/S=Skip
+ * size, A/D=Skip, ,/.=Frame step, E/F=Timestamps, M=Mute, F11=Fullscreen,
+ * C=Subtitles, Alt+./Alt+,=Speed.
  */
-export function usePlayerKeyboard(handlers: KeyboardHandlers): void {
-  // Single-key shortcuts: ignoreInputs defaults to true (smart default),
-  // preventDefault defaults to true, automatic cleanup on unmount.
-  useHotkey(PLAYER_HOTKEYS.togglePlay, handlers.togglePlay)
-  useHotkey(PLAYER_HOTKEYS.cycleSkipTimeUp, handlers.cycleSkipTimeUp)
-  useHotkey(PLAYER_HOTKEYS.cycleSkipTimeDown, handlers.cycleSkipTimeDown)
-  useHotkey(PLAYER_HOTKEYS.skipBackward, handlers.skipBackward)
-  useHotkey(PLAYER_HOTKEYS.skipForward, handlers.skipForward)
-  useHotkey(PLAYER_HOTKEYS.stepFrameBackward, handlers.stepFrameBackward)
-  useHotkey(PLAYER_HOTKEYS.stepFrameForward, handlers.stepFrameForward)
-  useHotkey(PLAYER_HOTKEYS.pushStartTimestamp, handlers.pushStartTimestamp)
-  useHotkey(PLAYER_HOTKEYS.pushEndTimestamp, handlers.pushEndTimestamp)
-  useHotkey(PLAYER_HOTKEYS.toggleMute, handlers.toggleMute)
-  useHotkey(PLAYER_HOTKEYS.toggleFullscreen, handlers.toggleFullscreen)
-  useHotkey(PLAYER_HOTKEYS.toggleSubtitles, handlers.toggleSubtitles)
-  useHotkey(PLAYER_HOTKEYS.increaseSpeed, handlers.increaseSpeed)
-  useHotkey(PLAYER_HOTKEYS.decreaseSpeed, handlers.decreaseSpeed)
+export function usePlayerKeyboard({
+  skipTimeIndex,
+  onCycleSkipTime,
+  onUpdateSegmentTimestamp,
+  onToggleFullscreen,
+}: PlayerKeyboardOptions): void {
+  const engine = usePlaybackEngine()
+  const { playhead } = engine
+
+  const pushTimestamp = (start: boolean) => {
+    onUpdateSegmentTimestamp({ currentTime: playhead.getSnappedTime(), start })
+  }
+
+  // Single keys ignore inputs and prevent the default by default.
+  useHotkey(PLAYER_HOTKEYS.togglePlay, engine.togglePlay)
+  useHotkey(PLAYER_HOTKEYS.cycleSkipTimeUp, () => onCycleSkipTime(1))
+  useHotkey(PLAYER_HOTKEYS.cycleSkipTimeDown, () => onCycleSkipTime(-1))
+  useHotkey(PLAYER_HOTKEYS.skipBackward, () => playhead.skip(-1, skipTimeIndex))
+  useHotkey(PLAYER_HOTKEYS.skipForward, () => playhead.skip(1, skipTimeIndex))
+  useHotkey(PLAYER_HOTKEYS.stepFrameBackward, () => playhead.stepFrame(-1))
+  useHotkey(PLAYER_HOTKEYS.stepFrameForward, () => playhead.stepFrame(1))
+  useHotkey(PLAYER_HOTKEYS.pushStartTimestamp, () => pushTimestamp(true))
+  useHotkey(PLAYER_HOTKEYS.pushEndTimestamp, () => pushTimestamp(false))
+  useHotkey(PLAYER_HOTKEYS.toggleMute, engine.toggleMute)
+  useHotkey(PLAYER_HOTKEYS.toggleFullscreen, onToggleFullscreen)
+  useHotkey(PLAYER_HOTKEYS.toggleSubtitles, engine.tracks.toggleSubtitles)
+  useHotkey(PLAYER_HOTKEYS.increaseSpeed, () => engine.cycleSpeed(1))
+  useHotkey(PLAYER_HOTKEYS.decreaseSpeed, () => engine.cycleSpeed(-1))
 }

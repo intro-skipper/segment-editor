@@ -169,7 +169,7 @@ interface PlaybackOptions {
 }
 
 /** Sets the element's play state, which jsdom keeps read-only. */
-export function setPaused(video: HTMLVideoElement, paused: boolean) {
+export function setPaused(video: HTMLMediaElement, paused: boolean) {
   Object.defineProperty(video, 'paused', { configurable: true, value: paused })
 }
 

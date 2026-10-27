@@ -1,72 +1,35 @@
 /**
- * Player reducer - State management for video player component.
- * Extracted for testability and separation of concerns.
+ * Player reducer - the player's UI state. Playback state (play state,
+ * volume, speed) lives in the playback engine.
  */
 
 import { PLAYER_CONFIG } from '@/lib/constants'
 
-const {
-  SKIP_TIMES,
-  DEFAULT_SKIP_TIME_INDEX,
-  PLAYBACK_SPEEDS,
-  DEFAULT_PLAYBACK_SPEED_INDEX,
-} = PLAYER_CONFIG
+const { SKIP_TIMES, DEFAULT_SKIP_TIME_INDEX } = PLAYER_CONFIG
 
-/**
- * Player state managed by reducer.
- * Holds user-facing playback controls state; timeline data (current time,
- * duration, buffered) lives in Player's dedicated timeline store, and HLS
- * management in the playback engine.
- */
 export interface PlayerState {
-  isPlaying: boolean
-  volume: number
-  isMuted: boolean
+  /** The skip size the skip shortcuts move by, an index into SKIP_TIMES. */
   skipTimeIndex: number
   /** User-configured subtitle offset in seconds (positive = delay, negative = advance) */
   subtitleOffset: number
-  /** Current index into PLAYBACK_SPEEDS array */
-  playbackSpeedIndex: number
 }
 
-/** Consolidated action types for better efficiency */
 export type PlayerAction =
-  | { type: 'PLAY_STATE'; isPlaying: boolean }
-  | { type: 'VOLUME_CHANGE'; volume: number; isMuted: boolean }
   | { type: 'SKIP_TIME_CHANGE'; skipTimeIndex: number }
   | { type: 'CYCLE_SKIP'; direction: 1 | -1 }
   | { type: 'SUBTITLE_OFFSET_CHANGE'; offset: number }
-  | { type: 'CYCLE_SPEED'; direction: 1 | -1 }
-  | { type: 'SET_SPEED'; speedIndex: number }
 
 export const initialPlayerState: PlayerState = {
-  isPlaying: false,
-  volume: 1,
-  isMuted: false,
   skipTimeIndex: DEFAULT_SKIP_TIME_INDEX,
   subtitleOffset: 0,
-  playbackSpeedIndex: DEFAULT_PLAYBACK_SPEED_INDEX,
 }
 
-/**
- * Simplified player reducer with consolidated action types.
- * Returns the same reference when state is unchanged to prevent unnecessary re-renders.
- */
+/** Returns the same reference when state is unchanged to prevent unnecessary re-renders. */
 export function playerReducer(
   state: PlayerState,
   action: PlayerAction,
 ): PlayerState {
   switch (action.type) {
-    case 'PLAY_STATE':
-      return state.isPlaying === action.isPlaying
-        ? state
-        : { ...state, isPlaying: action.isPlaying }
-
-    case 'VOLUME_CHANGE':
-      return state.volume === action.volume && state.isMuted === action.isMuted
-        ? state
-        : { ...state, volume: action.volume, isMuted: action.isMuted }
-
     case 'SKIP_TIME_CHANGE':
       return state.skipTimeIndex === action.skipTimeIndex
         ? state
@@ -86,28 +49,5 @@ export function playerReducer(
       return state.subtitleOffset === action.offset
         ? state
         : { ...state, subtitleOffset: action.offset }
-
-    case 'CYCLE_SPEED': {
-      const newSpeedIndex = Math.max(
-        0,
-        Math.min(
-          PLAYBACK_SPEEDS.length - 1,
-          state.playbackSpeedIndex + action.direction,
-        ),
-      )
-      return newSpeedIndex === state.playbackSpeedIndex
-        ? state
-        : { ...state, playbackSpeedIndex: newSpeedIndex }
-    }
-
-    case 'SET_SPEED': {
-      const clampedSpeed = Math.max(
-        0,
-        Math.min(PLAYBACK_SPEEDS.length - 1, action.speedIndex),
-      )
-      return state.playbackSpeedIndex === clampedSpeed
-        ? state
-        : { ...state, playbackSpeedIndex: clampedSpeed }
-    }
   }
 }
