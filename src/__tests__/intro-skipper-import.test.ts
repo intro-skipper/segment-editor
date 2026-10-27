@@ -60,6 +60,24 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments[2]?.EndTicks).toBeCloseTo(10_000, 5)
   })
 
+  it('skips events that end past the media or before they start', () => {
+    const text = JSON.stringify({
+      events: [
+        { startTimeMs: 7000, endTimeMs: 12000, eventType: 'SKIP_RECAP' },
+        { startTimeMs: 9000, endTimeMs: 11000_000, eventType: 'SKIP_INTRO' },
+        { startTimeMs: 50000, endTimeMs: 40000, eventType: 'SKIP_INTRO' },
+      ],
+    })
+
+    const result = introSkipperClipboardTextToSegments(text, {
+      itemId: 'item-1',
+      maxDurationSeconds: 10_000,
+    })
+
+    expect(result.segments.map((s) => s.Type)).toEqual(['Recap'])
+    expect(result.skipped).toBe(2)
+  })
+
   it('imports when JSON is a raw events array (no wrapper)', () => {
     const text = JSON.stringify([
       {

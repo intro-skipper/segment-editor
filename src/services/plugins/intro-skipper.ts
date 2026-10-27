@@ -14,10 +14,7 @@ import { z } from 'zod'
 import { lookup } from '@/lib/utils'
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
-import {
-  getSegmentFormDefaults,
-  validateSegmentFormValues,
-} from '@/lib/forms/segment-form'
+import { rangeError } from '@/lib/segment-range'
 import { generateUUID, sortSegmentsByStart } from '@/lib/segment-utils'
 
 type IntroSkipperEventType = 'SKIP_INTRO' | 'SKIP_RECAP' | 'END_CREDITS'
@@ -373,14 +370,12 @@ function isValidImportedSegment(
   segment: MediaSegmentDto,
   maxDurationSeconds?: number,
 ): boolean {
-  return validateSegmentFormValues(
-    getSegmentFormDefaults({
-      Type: segment.Type,
-      StartTicks: segment.StartTicks,
-      EndTicks: segment.EndTicks,
-    }),
-    maxDurationSeconds,
-  ).valid
+  return (
+    rangeError(
+      { start: segment.StartTicks ?? 0, end: segment.EndTicks ?? 0 },
+      { runtimeSeconds: maxDurationSeconds ?? 0 },
+    ) === null
+  )
 }
 
 /**

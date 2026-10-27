@@ -18,6 +18,8 @@ import {
   sortSegmentsByStart,
 } from '@/lib/segment-utils'
 import { elementAt } from '@/lib/utils'
+import type { RangeRules, SegmentRange } from '@/lib/segment-range'
+import { placeRange } from '@/lib/segment-range'
 import { showError, showSuccess } from '@/lib/notifications'
 import { AppError, ErrorCodes } from '@/lib/unified-error'
 import { handleQueryError } from '@/hooks/queries/query-error-handling'
@@ -29,7 +31,10 @@ import { handleQueryError } from '@/hooks/queries/query-error-handling'
  */
 export type SegmentTarget = { id: string } | { index: number } | 'active'
 
-/** Fields an edit changes. The edited segment re-sorts and becomes active. */
+/**
+ * Fields an edit changes. Moved boundaries are placed under the range rules,
+ * and the edited segment re-sorts and becomes active.
+ */
 export type SegmentPatch = Partial<
   Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>
 >
@@ -111,6 +116,46 @@ function resolveIndex(
   return index >= 0 && index < segments.length ? index : -1
 }
 
+const rangeOf = (segment: MediaSegmentDto): SegmentRange => ({
+  start: segment.StartTicks ?? 0,
+  end: segment.EndTicks ?? 0,
+})
+
+/**
+ * Time inputs show three decimals, so a boundary that comes back within this
+ * of its old value was retyped or rounded, not moved.
+ */
+const INPUT_PRECISION_SECONDS = 0.0005
+
+/**
+ * `next` with the boundaries that moved away from `from` placed under the
+ * rules. A boundary the edit left alone keeps its exact old value, so saving
+ * the edit dialog unchanged or changing only the type keeps what the server
+ * holds.
+ */
+function placeMoved(
+  from: SegmentRange,
+  next: SegmentRange,
+  rules: RangeRules,
+): SegmentRange {
+  const startMoved = Math.abs(next.start - from.start) > INPUT_PRECISION_SECONDS
+  const endMoved = Math.abs(next.end - from.end) > INPUT_PRECISION_SECONDS
+  if (!startMoved && !endMoved) return from
+  return placeRange(
+    {
+      start: startMoved ? next.start : from.start,
+      end: endMoved ? next.end : from.end,
+    },
+    rules,
+    startMoved && endMoved ? 'both' : startMoved ? 'start' : 'end',
+  )
+}
+
+const withRange = (
+  segment: MediaSegmentDto,
+  { start, end }: SegmentRange,
+): MediaSegmentDto => ({ ...segment, StartTicks: start, EndTicks: end })
+
 const compareStrings = (a: string, b: string): number =>
   a < b ? -1 : a > b ? 1 : 0
 
@@ -139,12 +184,12 @@ function isSameSegmentSet(
 }
 
 /**
- * Edits one item's segments. `enabled: false` edits without reading the
- * server's set, and saving then only adds segments.
+ * Edits one item's segments under `rules`. `enabled: false` edits without
+ * reading the server's set, and saving then only adds segments.
  */
 export function useSegmentEditSession(
   itemId: string,
-  { enabled }: { enabled: boolean },
+  { enabled, rules }: { enabled: boolean; rules: RangeRules },
 ) {
   const queryClient = useQueryClient()
   const query = useSegments(itemId, { enabled })
@@ -215,13 +260,10 @@ export function useSegmentEditSession(
   }
 
   const create = ({ type, start, end }: CreateSegmentData): void => {
-    const segment: MediaSegmentDto = {
-      Id: generateUUID(),
-      ItemId: itemId,
-      Type: type,
-      StartTicks: start,
-      EndTicks: end ?? start + 1,
-    }
+    const segment = withRange(
+      { Id: generateUUID(), ItemId: itemId, Type: type },
+      placeRange({ start, end: end ?? start + 1 }, rules),
+    )
     edit(({ segments: current }) => insertSorted(current, segment))
   }
 
@@ -230,7 +272,11 @@ export function useSegmentEditSession(
       const index = resolveIndex(current, activeIndex, target)
       const segment = elementAt(current, index)
       if (segment === undefined) return null
-      const updated = { ...segment, ...patch }
+      const patched = { ...segment, ...patch }
+      const updated = withRange(
+        patched,
+        placeMoved(rangeOf(segment), rangeOf(patched), rules),
+      )
       if (isSameSegmentSet([segment], [updated])) return null
       return insertSorted(current.toSpliced(index, 1), updated)
     })
@@ -256,11 +302,14 @@ export function useSegmentEditSession(
     imported: Array<MediaSegmentDto>,
     mode: 'replace' | 'merge',
   ): void => {
+    const placed = imported.map((segment) =>
+      withRange(segment, placeRange(rangeOf(segment), rules)),
+    )
     edit(({ segments: current, activeIndex }) =>
       mode === 'replace'
-        ? { segments: imported.toSorted(sortSegmentsByStart), activeIndex: 0 }
+        ? { segments: placed.toSorted(sortSegmentsByStart), activeIndex: 0 }
         : {
-            segments: [...current, ...imported].sort(sortSegmentsByStart),
+            segments: [...current, ...placed].sort(sortSegmentsByStart),
             activeIndex,
           },
     )

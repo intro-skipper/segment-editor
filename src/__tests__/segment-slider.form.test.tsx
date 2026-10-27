@@ -102,6 +102,35 @@ function renderSlider(
   return { ...result, onUpdate }
 }
 
+const getEndHandle = () =>
+  screen.getAllByRole('slider', { name: /end handle/i })[0]
+
+const getEndInput = () =>
+  asElement(document.getElementById('segment-segment-1-end'), HTMLInputElement)
+
+/** The slider track laid out 100px wide, so clientX reads as seconds at a runtime of 100. */
+function trackOf100px() {
+  const track = asElement(
+    screen.getByRole('group', { name: /segment slider group/i }),
+    HTMLFieldSetElement,
+  )
+  Object.defineProperty(track, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      bottom: 20,
+      height: 20,
+      left: 0,
+      right: 100,
+      toJSON: () => ({}),
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+    }),
+  })
+  return track
+}
+
 describe('SegmentSlider type menu', () => {
   afterEach(() => {
     cleanup()
@@ -226,6 +255,63 @@ describe('SegmentSlider TanStack Form migration', () => {
       id: 'segment-1',
       start: 10,
     })
+  })
+
+  it('follows the pointer unsnapped and snaps to a frame on release', async () => {
+    const { onUpdate } = renderSlider(createSegment(), {
+      frameStepSeconds: 0.5,
+    })
+    const sliderTrack = trackOf100px()
+
+    fireEvent.pointerDown(getEndHandle(), { clientX: 20, pointerId: 1 })
+    fireEvent.pointerMove(sliderTrack, { clientX: 35.3, pointerId: 1 })
+    await waitFor(() => {
+      expect(getEndInput().value).toBe('35.3')
+    })
+
+    fireEvent.pointerUp(sliderTrack, { clientX: 35.3, pointerId: 1 })
+    await waitFor(() => {
+      expect(onUpdate).toHaveBeenCalledWith({
+        end: 35.5,
+        id: 'segment-1',
+        start: 10,
+      })
+    })
+  })
+
+  it('commits a start drag when the stored end runs past the runtime', async () => {
+    const { onUpdate } = renderSlider(
+      createSegment({ StartTicks: 90, EndTicks: 100.4 }),
+    )
+    const sliderTrack = trackOf100px()
+    const startHandle = screen.getByRole('slider', { name: /start handle/i })
+
+    fireEvent.pointerDown(startHandle, { clientX: 90, pointerId: 1 })
+    fireEvent.pointerMove(sliderTrack, { clientX: 80, pointerId: 1 })
+    fireEvent.pointerUp(sliderTrack, { clientX: 80, pointerId: 1 })
+
+    await waitFor(() => {
+      expect(onUpdate).toHaveBeenCalledWith({
+        end: 100.4,
+        id: 'segment-1',
+        start: 80,
+      })
+    })
+  })
+
+  it('leaves the end alone while the runtime is unknown', async () => {
+    const { onUpdate } = renderSlider(createSegment(), { runtimeSeconds: 0 })
+    const sliderTrack = trackOf100px()
+
+    fireEvent.keyDown(getEndHandle(), { key: 'End' })
+    fireEvent.blur(getEndHandle())
+    fireEvent.pointerDown(getEndHandle(), { clientX: 20, pointerId: 1 })
+    fireEvent.pointerMove(sliderTrack, { clientX: 35, pointerId: 1 })
+    fireEvent.pointerUp(sliderTrack, { clientX: 35, pointerId: 1 })
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(getEndInput().value).toBe('20')
+    expect(onUpdate).not.toHaveBeenCalled()
   })
 
   it('exposes frame step precision on range handles', () => {

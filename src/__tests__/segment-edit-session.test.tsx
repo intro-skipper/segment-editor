@@ -11,6 +11,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import type * as Notifications from '@/lib/notifications'
+import type { RangeRules } from '@/lib/segment-range'
 import { useSegmentEditSession } from '@/services/segments/edit-session'
 import { fakeSegmentServer, segment } from './helpers/fake-segment-server'
 
@@ -32,7 +33,10 @@ const OUTRO = segment(
   1260,
 )
 
-function renderSession(itemId = ITEM_ID) {
+/** A 20-minute episode without frame snapping, unless a test says otherwise. */
+const RULES: RangeRules = { runtimeSeconds: 1300 }
+
+function renderSession(itemId = ITEM_ID, rules = RULES) {
   // Mutation retry matches the app's QueryClient (main.tsx).
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: 1 } },
@@ -40,14 +44,14 @@ function renderSession(itemId = ITEM_ID) {
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children)
   const view = renderHook(
-    ({ id }) => useSegmentEditSession(id, { enabled: true }),
+    ({ id }) => useSegmentEditSession(id, { enabled: true, rules }),
     { wrapper, initialProps: { id: itemId } },
   )
   return { ...view, queryClient }
 }
 
-async function renderLoadedSession() {
-  const view = renderSession()
+async function renderLoadedSession(rules = RULES) {
+  const view = renderSession(ITEM_ID, rules)
   await waitFor(() => expect(view.result.current.isLoading).toBe(false))
   return view
 }
@@ -391,6 +395,100 @@ describe('segment edit session', () => {
 
     expect(server.writes()).toEqual([`POST MediaSegmentsApi/${ITEM_ID}`])
     expect(types(server.stored())).toEqual(['Intro', 'Outro'])
+  })
+
+  it('keeps the minimum length when the end moves before the start', async () => {
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [INTRO] })
+    const { result } = await renderLoadedSession()
+
+    act(() => result.current.update({ id: INTRO.Id }, { EndTicks: 30 }))
+
+    expect(result.current.segments).toMatchObject([
+      { StartTicks: 60, EndTicks: 60.1 },
+    ])
+  })
+
+  it('snaps a moved boundary to frames and leaves the other one as it was', async () => {
+    const unsnapped = segment(
+      '88f9667b-0b42-4900-87d8-94b181223490',
+      'Intro',
+      60.2,
+      90.3,
+    )
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [unsnapped] })
+    const { result } = await renderLoadedSession({
+      runtimeSeconds: 1300,
+      frameStepSeconds: 0.5,
+    })
+
+    act(() => result.current.update({ id: unsnapped.Id }, { StartTicks: 61.1 }))
+
+    expect(result.current.segments).toMatchObject([
+      { StartTicks: 61, EndTicks: 90.3 },
+    ])
+  })
+
+  it('creates a segment inside the media even at its very end', async () => {
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true })
+    const { result } = await renderLoadedSession({ runtimeSeconds: 100 })
+
+    act(() => result.current.create({ type: 'Outro', start: 99.98 }))
+
+    expect(result.current.segments).toMatchObject([
+      { StartTicks: 99.9, EndTicks: 100 },
+    ])
+  })
+
+  it('stretches an imported segment to the minimum length', async () => {
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true })
+    const { result } = await renderLoadedSession()
+
+    act(() =>
+      result.current.importSegments(
+        [segment('98f9667b-0b42-4900-87d8-94b181223490', 'Recap', 10, 10.05)],
+        'replace',
+      ),
+    )
+
+    expect(result.current.segments).toMatchObject([
+      { StartTicks: 10, EndTicks: 10.1 },
+    ])
+  })
+
+  it('keeps the server boundaries when the edit dialog saves them rounded', async () => {
+    const precise = segment(
+      'a8f9667b-0b42-4900-87d8-94b181223490',
+      'Intro',
+      60.2345678,
+      90.1234567,
+    )
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [precise] })
+    const { result } = await renderLoadedSession({
+      runtimeSeconds: 1300,
+      frameStepSeconds: 0.5,
+    })
+
+    act(() =>
+      result.current.update(
+        { id: precise.Id },
+        { Type: 'Recap', StartTicks: 60.235, EndTicks: 90.123 },
+      ),
+    )
+
+    expect(result.current.segments).toMatchObject([
+      { Type: 'Recap', StartTicks: 60.2345678, EndTicks: 90.1234567 },
+    ])
+  })
+
+  it('pulls a start past the media back before the end when only the end moves', async () => {
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [OUTRO] })
+    const { result } = await renderLoadedSession({ runtimeSeconds: 1150 })
+
+    act(() => result.current.update({ id: OUTRO.Id }, { EndTicks: 1149 }))
+
+    expect(result.current.segments).toMatchObject([
+      { StartTicks: 1149.9, EndTicks: 1150 },
+    ])
   })
 
   it('drops the draft when the item changes', async () => {
