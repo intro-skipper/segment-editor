@@ -5,7 +5,7 @@ import type { MediaSegmentType } from './jellyfin'
  * store sees Jellyfin's MediaSegmentDto, whose times are ticks.
  */
 export interface Segment {
-  id?: string
+  id: string
   itemId?: string
   type?: MediaSegmentType
   startSeconds: number
@@ -37,16 +37,13 @@ export interface SegmentUpdate {
 }
 
 /**
-/**
- * Data for updating a segment's timestamp from the player.
+ * Data for updating the active segment's timestamp from the player.
  */
 export interface TimestampUpdate {
   /** Current playback time in seconds */
   currentTime: number
   /** Whether to update the start (true) or end (false) timestamp */
   start: boolean
-  /** Optional index of the segment to update (defaults to active segment) */
-  index?: number
 }
 
 /**

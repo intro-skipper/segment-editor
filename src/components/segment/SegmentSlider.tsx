@@ -447,7 +447,6 @@ export function SegmentSlider({
     ).end
 
   const commitSegmentUpdate = (start: number, end: number): boolean => {
-    if (!segment.id) return false
     if (start === segment.startSeconds && end === segment.endSeconds) {
       return false
     }

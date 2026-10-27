@@ -4,12 +4,12 @@ import {
   buildSegmentTimeIndex,
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
-  getSegmentTimeRangeId,
 } from '@/services/video/segment-skip'
 import type { Segment } from '@/types/segment'
 
 function segment(
-  overrides: Partial<Segment> & Pick<Segment, 'startSeconds' | 'endSeconds'>,
+  overrides: Partial<Segment> &
+    Pick<Segment, 'id' | 'startSeconds' | 'endSeconds'>,
 ): Segment {
   return {
     itemId: 'item-1',
@@ -66,15 +66,6 @@ describe('player segment skip helpers', () => {
     expect(findActiveSegmentRange(ranges, 70)?.segment.id).toBe('outer')
   })
 
-  it('resolves stable range ids and skip targets without an id', () => {
-    const range = buildSegmentTimeIndex([
-      segment({ type: 'Outro', startSeconds: 70, endSeconds: 90 }),
-    ]).ranges[0]
-
-    expect(getSegmentTimeRangeId(range)).toBe('70:90:Outro')
-    expect(getSegmentSkipTargetEndSeconds(range.segment, undefined)).toBe(90)
-  })
-
   it('prefers the normalized indexed range end when skipping an identified segment', () => {
     const segmentWithStaleEnd = segment({
       id: 'intro',
@@ -88,6 +79,9 @@ describe('player segment skip helpers', () => {
     expect(
       getSegmentSkipTargetEndSeconds(segmentWithStaleEnd, normalizedRange),
     ).toBe(40)
+    expect(getSegmentSkipTargetEndSeconds(segmentWithStaleEnd, undefined)).toBe(
+      31,
+    )
     expect(
       getSegmentSkipTargetEndSeconds(
         segment({
