@@ -2,15 +2,19 @@
  * @vitest-environment jsdom
  */
 
+import { createRef } from 'react'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ComponentProps, SyntheticEvent } from 'react'
+import type { ComponentProps } from 'react'
 
 import { Player } from '@/components/player/Player'
+import type { PlayerHandle } from '@/components/player/Player'
+import { Playhead } from '@/services/video/playhead'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/services/video/playback-error'
 import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
+import type { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 type PlayerProps = ComponentProps<typeof Player>
@@ -21,6 +25,8 @@ interface PlayerMockState {
   videoPlayerError: VideoPlayerError | null
   videoElement: HTMLVideoElement | null
   videoRef: { current: HTMLVideoElement | null } | null
+  playhead: Playhead | null
+  keyboardHandlers: Parameters<typeof usePlayerKeyboard>[0] | null
   audioSwitchTranscodeScope: AudioSwitchTranscodeScope
 }
 
@@ -30,6 +36,8 @@ const mocks = vi.hoisted(() => {
     videoPlayerError: null,
     videoElement: null,
     videoRef: null,
+    playhead: null,
+    keyboardHandlers: null,
     audioSwitchTranscodeScope: 'all',
   }
 
@@ -122,6 +130,7 @@ vi.mock('@/hooks/use-video-player', () => ({
   useVideoPlayer: () => ({
     videoRef: mocks.videoRef,
     hlsRef: { current: null },
+    playhead: mocks.playhead,
     strategy: 'direct',
     isLoading: mocks.videoPlayerIsLoading,
     error: mocks.videoPlayerError,
@@ -153,7 +162,9 @@ vi.mock('@/hooks/use-jassub-renderer', () => ({
 }))
 
 vi.mock('@/hooks/use-player-keyboard', () => ({
-  usePlayerKeyboard: () => undefined,
+  usePlayerKeyboard: (handlers: PlayerMockState['keyboardHandlers']) => {
+    mocks.keyboardHandlers = handlers
+  },
 }))
 
 vi.mock('@/services/video/track-switching', async (importOriginal) => {
@@ -193,6 +204,7 @@ vi.mock('@/stores/app-store', () => {
     selector: (state: ReturnType<typeof getState>) => TSelected,
   ) => selector(getState())
   useAppStore.getState = getState
+  useAppStore.subscribe = () => () => {}
   return { useAppStore }
 })
 
@@ -241,7 +253,6 @@ function playerElement(overrides: Partial<PlayerProps> = {}) {
   return (
     <Player
       item={createItem()}
-      frameStepSeconds={1 / 24}
       onCreateSegment={vi.fn()}
       onUpdateSegmentTimestamp={vi.fn()}
       {...overrides}
@@ -259,6 +270,8 @@ describe('Player controls wiring', () => {
     mocks.playerSurfaceProps = []
     mocks.videoElement = document.createElement('video')
     mocks.videoRef = { current: mocks.videoElement }
+    mocks.playhead = new Playhead(mocks.videoRef)
+    mocks.keyboardHandlers = null
     mocks.videoPlayerError = null
     mocks.videoPlayerIsRecovering = false
     mocks.trackManagerIsLoading = true
@@ -352,22 +365,28 @@ describe('Player controls wiring', () => {
     expect(mocks.setSubtitlesEnabled).toHaveBeenCalledWith(false)
   })
 
+  it('hands the playhead to the editor while mounted', () => {
+    const handleRef = createRef<PlayerHandle>()
+    const utils = renderPlayer({ handleRef })
+    expect(handleRef.current).toBe(mocks.playhead)
+
+    utils.unmount()
+    expect(handleRef.current).toBeNull()
+  })
+
   it('keeps segment skip overlay state and seeking wired through Player', () => {
     const intro = createSegment({ Id: 'intro', StartTicks: 10, EndTicks: 20 })
 
     mocks.videoPlayerIsLoading = false
+    mocks.playhead!.connect()
+    mocks.playhead!.setPlaybackReady(true)
     renderPlayer({ segments: [intro] })
 
     expect(mocks.videoElement).not.toBeNull()
     mocks.videoElement!.currentTime = 12
 
     act(() => {
-      const surfaceProps = latestSurfaceProps()
-      // SAFETY: handleTimeUpdate reads only `currentTarget`; the rest of the
-      // synthetic event is never touched on this path.
-      surfaceProps.video.onTimeUpdate({
-        currentTarget: mocks.videoElement,
-      } as SyntheticEvent<HTMLVideoElement>)
+      mocks.videoElement!.dispatchEvent(new Event('timeupdate'))
     })
 
     let surfaceProps = latestSurfaceProps()
@@ -380,5 +399,23 @@ describe('Player controls wiring', () => {
     surfaceProps = latestSurfaceProps()
     expect(mocks.videoElement!.currentTime).toBe(20)
     expect(surfaceProps.segmentSkip).toBeNull()
+  })
+
+  it('stamps timestamps and new segments with the live position, snapped to a frame', () => {
+    const onUpdateSegmentTimestamp = vi.fn()
+    const onCreateSegment = vi.fn()
+    mocks.playhead!.frameStepSeconds = 0.5
+    renderPlayer({ onUpdateSegmentTimestamp, onCreateSegment })
+    mocks.videoElement!.currentTime = 12.3
+
+    mocks.keyboardHandlers?.pushStartTimestamp()
+    mocks.keyboardHandlers?.pushEndTimestamp()
+    latestSurfaceProps().controlsProps.segmentCreation.onCreate('Intro')
+
+    expect(onUpdateSegmentTimestamp.mock.calls).toEqual([
+      [{ currentTime: 12.5, start: true }],
+      [{ currentTime: 12.5, start: false }],
+    ])
+    expect(onCreateSegment).toHaveBeenCalledWith({ type: 'Intro', start: 12.5 })
   })
 })

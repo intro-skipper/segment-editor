@@ -41,9 +41,6 @@ interface PlayerSurfaceVideoState {
   captionTracks: Array<NativeCaptionTrack>
   onInteraction: VideoInteractionHandler
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
-  onTimeUpdate: ReactEventHandler<HTMLVideoElement>
-  onDurationChange: ReactEventHandler<HTMLVideoElement>
-  onProgress: ReactEventHandler<HTMLVideoElement>
   onPlay: ReactEventHandler<HTMLVideoElement>
   onPause: ReactEventHandler<HTMLVideoElement>
 }
@@ -136,9 +133,6 @@ function PlayerVideoButton({
         preload="metadata"
         playsInline
         aria-label={t('player.videoPlayer')}
-        onTimeUpdate={video.onTimeUpdate}
-        onDurationChange={video.onDurationChange}
-        onProgress={video.onProgress}
         onPlay={video.onPlay}
         onPause={video.onPause}
       >

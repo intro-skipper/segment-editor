@@ -185,7 +185,6 @@ describe('Player audio preference persistence', () => {
     render(
       <Player
         item={createItem()}
-        frameStepSeconds={1 / 24}
         onCreateSegment={vi.fn()}
         onUpdateSegmentTimestamp={vi.fn()}
       />,
@@ -226,7 +225,6 @@ describe('Player audio preference persistence', () => {
     const { rerender } = render(
       <Player
         item={createItem()}
-        frameStepSeconds={1 / 24}
         onCreateSegment={vi.fn()}
         onUpdateSegmentTimestamp={vi.fn()}
       />,
@@ -259,7 +257,6 @@ describe('Player audio preference persistence', () => {
     rerender(
       <Player
         item={nextItem}
-        frameStepSeconds={1 / 24}
         onCreateSegment={vi.fn()}
         onUpdateSegmentTimestamp={vi.fn()}
       />,
@@ -285,7 +282,6 @@ describe('Player audio preference persistence', () => {
     render(
       <Player
         item={createItem()}
-        frameStepSeconds={1 / 24}
         onCreateSegment={vi.fn()}
         onUpdateSegmentTimestamp={vi.fn()}
       />,

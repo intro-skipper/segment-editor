@@ -15,6 +15,7 @@ import {
   jellyfinPlaybackBackend,
 } from '@/services/video/playback-engine'
 import { loadHlsJs } from '@/services/video/hls-controller'
+import type { Playhead } from '@/services/video/playhead'
 
 interface UseVideoPlayerOptions {
   item: BaseItemDto | null
@@ -38,6 +39,7 @@ interface UseVideoPlayerOptions {
 interface UseVideoPlayerReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>
   hlsRef: React.RefObject<Hls | null>
+  playhead: Playhead
   strategy: PlaybackStrategy
   isLoading: boolean
   error: VideoPlayerError | null
@@ -104,6 +106,7 @@ export function useVideoPlayer({
   return {
     videoRef,
     hlsRef: engine.hlsRef,
+    playhead: engine.playhead,
     strategy,
     isLoading,
     error:

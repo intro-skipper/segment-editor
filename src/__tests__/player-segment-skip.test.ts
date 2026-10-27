@@ -5,7 +5,7 @@ import {
   findActiveSegmentRange,
   getSegmentSkipTargetEndSeconds,
   getSegmentTimeRangeId,
-} from '@/components/player/segment-skip'
+} from '@/services/video/segment-skip'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 
 function segment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
