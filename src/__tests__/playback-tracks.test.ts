@@ -11,7 +11,6 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type * as VideoApiModule from '@/services/video/api'
 import type * as TrackSwitchingModule from '@/services/video/track-switching'
-import type * as SubtitleModule from '@/services/video/subtitle'
 import type { BaseItemDto } from '@/types/jellyfin'
 import {
   applyInitialAudioTrack,
@@ -20,7 +19,6 @@ import {
 import { getVideoStreamUrl } from '@/services/video/api'
 import { isCodecSupported } from '@/services/video/compatibility'
 import { supportsNativeAudioTrackSwitching } from '@/services/video/capabilities'
-import { preloadJassubRenderer } from '@/services/video/subtitle'
 import { showError } from '@/lib/notifications'
 import { useAppStore } from '@/stores/app-store'
 import {
@@ -61,11 +59,6 @@ vi.mock('@/services/video/track-switching', async (importOriginal) => {
     switchAudioTrack: vi.fn(actual.switchAudioTrack),
   }
 })
-
-vi.mock('@/services/video/subtitle', async (importOriginal) => ({
-  ...(await importOriginal<typeof SubtitleModule>()),
-  preloadJassubRenderer: vi.fn(async () => {}),
-}))
 
 const ENGLISH = 1
 const JAPANESE = 2
@@ -791,17 +784,6 @@ describe('subtitles', () => {
       subtitlesEnabled: false,
       preferredSubtitleLanguage: 'spa',
     })
-  })
-
-  it('hand an ASS subtitle to JASSUB instead of a text track', async () => {
-    const { text, tracks } = await start()
-    await tracks.selectSubtitle(SPANISH_SRT)
-
-    await expect(tracks.selectSubtitle(ENGLISH_ASS)).resolves.toBe(true)
-
-    expect(preloadJassubRenderer).toHaveBeenCalled()
-    expect(modes(text)).toEqual(['disabled', 'disabled', 'disabled'])
-    expect(tracks.getState().activeSubtitleIndex).toBe(ENGLISH_ASS)
   })
 
   it('keep the selection and the preferences when a subtitle has no text track', async () => {

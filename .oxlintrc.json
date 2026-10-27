@@ -21,9 +21,7 @@
     "**/coverage/**",
     "**/dist/**",
     "**/snap/**",
-    "**/vite.config.*.timestamp-*.*",
-    "eslint.config.js",
-    "prettier.config.js"
+    "**/vite.config.*.timestamp-*.*"
   ],
   "rules": {
     "shadcn/no-restyle": [

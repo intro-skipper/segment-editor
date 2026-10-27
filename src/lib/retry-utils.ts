@@ -85,23 +85,3 @@ export async function withRetry<T>(
 
   return attempt(maxRetries, 0)
 }
-
-/**
- * Executes an async function with retry logic, returning false on failure.
- * Useful for operations where failure should be handled gracefully.
- */
-export async function withRetryOrFalse<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {},
-): Promise<T | false> {
-  try {
-    return await withRetry(fn, options)
-  } catch (error) {
-    if (isAbortError(error)) return false
-    // Log error message only to avoid exposing sensitive request details
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error'
-    console.error('Operation failed after retries:', errorMessage)
-    return false
-  }
-}

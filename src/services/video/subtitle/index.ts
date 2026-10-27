@@ -3,8 +3,7 @@
  * @module services/video/subtitle
  */
 
-// Types
-export type { JassubRendererResult } from './renderer' // Format detection
-export { requiresJassubRenderer } from './utils' // Main renderer
+export type { JassubRendererResult } from './renderer'
+export { requiresJassubRenderer } from './utils'
 export { createJassubRenderer, preloadJassubRenderer } from './renderer'
 export type { CreateRendererOptions } from './renderer'

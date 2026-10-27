@@ -104,7 +104,7 @@ export default defineConfig({
             },
             {
               name: 'media-vendor',
-              test: /[\\/]node_modules[\\/](node-vibrant|culori|blurhash)[\\/]/,
+              test: /[\\/]node_modules[\\/]blurhash[\\/]/,
             },
             {
               name: 'hls-vendor',

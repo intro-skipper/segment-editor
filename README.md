@@ -80,7 +80,7 @@ restarting the stream as a transcode, because most browsers do not expose the HT
 
 ## Development
 
-Prereqs: Node.js (LTS) and `pnpm` (see `package.json` -> `packageManager`).
+Prereqs: Node.js (LTS) and `pnpm`.
 
 ```bash
 pnpm install
@@ -90,7 +90,8 @@ pnpm dev
 - Dev server: http://localhost:3000
 - Tests: `pnpm test`
 - Lint: `pnpm lint`
-- Format/fix: `pnpm check`
+- Format/fix: `pnpm format`
+- Format check: `pnpm check`
 - Mock dev server: `pnpm dev:mock` starts Vite with a mock Jellyfin server and auto-login when no non-mock login is cached. Set `VITE_MOCK_SERVER_AUTO_LOGIN=force` to overwrite cached credentials. Use `FFMPEG_PATH=/path/to/ffmpeg` when ffmpeg is not on `PATH`.
 
 ## Build

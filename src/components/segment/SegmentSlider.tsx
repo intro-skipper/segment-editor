@@ -1,8 +1,3 @@
-/**
- * SegmentSlider component.
- * Interactive timeline control for adjusting segment start/end times.
- */
-
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -273,10 +268,7 @@ interface SegmentSliderProps {
   onChangeType?: (index: number, type: MediaSegmentType) => void
 }
 
-/**
- * SegmentSlider component.
- * Displays a segment with dual-handle range slider and numeric inputs.
- */
+/** One segment row: a dual-handle range slider with numeric start/end inputs. */
 // eslint-disable-next-line react-doctor/no-giant-component -- cohesive range-editing controller; prior extraction caused broad prop bags and unnecessary complexity
 export function SegmentSlider({
   segment,
@@ -641,7 +633,6 @@ export function SegmentSlider({
     commitRangeAfterInteraction(nextStart, nextEnd)
   }
 
-  // Copy segment to system clipboard as JSON
   const handleCopy = async () => {
     const nextSegment = buildSegmentFromFormValues(
       segment,
@@ -668,7 +659,6 @@ export function SegmentSlider({
   const handleSeekStart = () => onPlayerTimestamp(localStart)
   const handleSeekEnd = () => onPlayerTimestamp(localEnd)
 
-  // Set timestamp from current player position
   const handleSetStartToZero = () => {
     const nextStart = placeStart(0)
     const nextRange = applyDraftBoundary('start', nextStart, true)

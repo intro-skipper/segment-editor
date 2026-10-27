@@ -5,6 +5,7 @@
  * - types.ts: Type definitions (no runtime code)
  * - security.ts: URL sanitization and validation
  * - core.ts: SDK client and API factory
+ * - http.ts: fetch for endpoints the SDK does not cover
  * - auth.ts: Authentication flows
  * - discovery.ts: Server discovery
  * - connection.ts: Connection testing and credential management

@@ -133,10 +133,10 @@ export function UnsavedChangesDialog({
         {isSaving ? t('editor.stay', 'Stay') : t('common.cancel', 'Cancel')}
       </AlertDialogCancel>
       {isSaving ? (
-        // Cancelling the batch save is not safe: it deletes the
-        // existing segments before recreating them, so an abort between
-        // the two phases would wipe the item's segments remotely.
-        // Leaving lets the in-flight save finish in the background.
+        // Cancelling the save is not safe: for older providers it deletes
+        // the existing segments before recreating them, so an abort between
+        // the two phases would wipe the item's segments remotely. Leaving
+        // lets the in-flight save finish in the background.
         <AlertDialogAction onClick={onLeave}>
           {t('editor.leave', 'Leave')}
         </AlertDialogAction>
