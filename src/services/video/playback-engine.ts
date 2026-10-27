@@ -35,6 +35,10 @@ import { Playhead } from '@/services/video/playhead'
 import type { PlayheadMedia } from '@/services/video/playhead'
 import { secondsToTicks } from '@/lib/time-utils'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
+import { PLAYER_CONFIG } from '@/lib/constants'
+import { useSessionStore } from '@/stores/session-store'
+
+const { PLAYBACK_SPEEDS, DEFAULT_PLAYBACK_SPEED_INDEX } = PLAYER_CONFIG
 
 /** The Jellyfin calls playback makes: config resolution, play session ids and status reporting. */
 export interface PlaybackBackend extends JellyfinStatusBackend {
@@ -64,6 +68,10 @@ export const jellyfinPlaybackBackend: PlaybackBackend = {
 export interface PlaybackMedia
   extends ReportedMedia, PlayheadMedia, PlaybackTrackMedia {
   currentTime: number
+  volume: number
+  muted: boolean
+  playbackRate: number
+  defaultPlaybackRate: number
   src: string
   readonly error: { readonly code: number } | null
   play: () => Promise<void>
@@ -92,6 +100,11 @@ export interface PlaybackSnapshot {
   strategy: PlaybackStrategy
   videoUrl: string
   status: PlaybackStatus
+  paused: boolean
+  volume: number
+  muted: boolean
+  /** Index into PLAYBACK_SPEEDS. */
+  speedIndex: number
 }
 
 /** Callbacks the host keeps current; the engine reads them when it needs them. */
@@ -127,6 +140,20 @@ function mediaErrorType(code: number): VideoPlayerErrorType {
   }
 }
 
+function initialSnapshot(): PlaybackSnapshot {
+  const { playerVolume, playerMuted } = useSessionStore.getState()
+  return {
+    itemId: null,
+    strategy: 'hls',
+    videoUrl: '',
+    status: { kind: 'resolving' },
+    paused: true,
+    volume: playerVolume,
+    muted: playerMuted,
+    speedIndex: DEFAULT_PLAYBACK_SPEED_INDEX,
+  }
+}
+
 function statusError(status: PlaybackStatus): VideoPlayerError | null {
   return status.kind === 'recovering' || status.kind === 'failed'
     ? status.error
@@ -144,8 +171,9 @@ function isSameError(left: VideoPlayerError, right: VideoPlayerError) {
 /**
  * Plays one item on one video element: resolves direct play or HLS, falls
  * back from direct to HLS on errors, recovers HLS in place, carries the
- * position across source reloads, selects audio and subtitle tracks and
- * reports the session to Jellyfin.
+ * position across source reloads, selects audio and subtitle tracks, owns
+ * volume, mute and speed (persisting volume and mute) and reports the
+ * session to Jellyfin.
  * Call connect() once mounted, then load() for every item change.
  */
 export class PlaybackEngine<
@@ -156,12 +184,7 @@ export class PlaybackEngine<
   readonly playhead: Playhead
   readonly tracks: PlaybackTracks
 
-  private snapshot: PlaybackSnapshot = {
-    itemId: null,
-    strategy: 'hls',
-    videoUrl: '',
-    status: { kind: 'resolving' },
-  }
+  private snapshot: PlaybackSnapshot = initialSnapshot()
   private readonly listeners = new Set<() => void>()
   private host: PlaybackHost = { t: (key) => key }
   private current: Load | null = null
@@ -205,15 +228,34 @@ export class PlaybackEngine<
     this.host = host
   }
 
-  /** Listens for pagehide and connects the playhead; the returned cleanup unloads playback. */
+  /**
+   * Applies volume, mute and speed to the element, follows its play state and
+   * volume, listens for pagehide and connects the playhead; the returned
+   * cleanup unloads playback.
+   */
   connect(): () => void {
-    const handlePageHide = () => {
-      this.reporter.stopAllKeepalive()
+    const controller = new AbortController()
+    const { signal } = controller
+    window.addEventListener(
+      'pagehide',
+      () => {
+        this.reporter.stopAllKeepalive()
+      },
+      { signal },
+    )
+    const media = this.media.current
+    if (media) {
+      media.volume = this.snapshot.volume
+      media.muted = this.snapshot.muted
+      this.applySpeed()
+      media.addEventListener('play', this.syncPaused, { signal })
+      media.addEventListener('pause', this.syncPaused, { signal })
+      // Native controls (iOS fullscreen) change volume behind our back.
+      media.addEventListener('volumechange', this.syncVolume, { signal })
     }
-    window.addEventListener('pagehide', handlePageHide)
     const disconnectPlayhead = this.playhead.connect()
     return () => {
-      window.removeEventListener('pagehide', handlePageHide)
+      controller.abort()
       this.load(null)
       disconnectPlayhead()
     }
@@ -266,6 +308,46 @@ export class PlaybackEngine<
     } else if (this.identity) {
       void this.reporter.start()
     }
+  }
+
+  togglePlay = (): void => {
+    const media = this.media.current
+    if (!media) return
+    if (media.paused) {
+      media.play().catch(() => {
+        // Rejected by autoplay policy or a source change; errors surface
+        // through the media error path.
+      })
+    } else {
+      media.pause()
+    }
+  }
+
+  /** Sets the volume; 0 mutes and anything louder unmutes. */
+  setVolume = (volume: number): void => {
+    const media = this.media.current
+    if (!media) return
+    media.volume = volume
+    media.muted = volume === 0
+    this.syncVolume()
+  }
+
+  toggleMute = (): void => {
+    const media = this.media.current
+    if (!media) return
+    media.muted = !media.muted
+    this.syncVolume()
+  }
+
+  /** Plays at PLAYBACK_SPEEDS[index], clamped to the list, from now on and after every source reload. */
+  setSpeedIndex = (index: number): void => {
+    const speedIndex = Math.max(0, Math.min(PLAYBACK_SPEEDS.length - 1, index))
+    if (speedIndex !== this.snapshot.speedIndex) this.update({ speedIndex })
+    this.applySpeed()
+  }
+
+  cycleSpeed = (direction: 1 | -1): void => {
+    this.setSpeedIndex(this.snapshot.speedIndex + direction)
   }
 
   /** Clears the error and tries again: the config if it never resolved, else the source. */
@@ -324,6 +406,36 @@ export class PlaybackEngine<
   }
 
   private readonly getMedia = (): M | null => this.media.current
+
+  private readonly syncPaused = () => {
+    const paused = this.media.current?.paused ?? true
+    if (paused !== this.snapshot.paused) this.update({ paused })
+  }
+
+  /** Publishes and persists the element's volume and mute. */
+  private readonly syncVolume = () => {
+    const media = this.media.current
+    if (!media) return
+    const { volume, muted } = media
+    if (volume === this.snapshot.volume && muted === this.snapshot.muted) return
+    this.update({ volume, muted })
+    const { setPlayerVolume, setPlayerMuted } = useSessionStore.getState()
+    setPlayerVolume(volume)
+    setPlayerMuted(muted)
+  }
+
+  /**
+   * Every source change runs the media load algorithm, which resets
+   * playbackRate to defaultPlaybackRate; setting both keeps the speed across
+   * the HLS fallback, audio reloads and Retry.
+   */
+  private applySpeed() {
+    const media = this.media.current
+    if (!media) return
+    const rate = PLAYBACK_SPEEDS[this.snapshot.speedIndex]
+    media.defaultPlaybackRate = rate
+    media.playbackRate = rate
+  }
 
   private begin(item: BaseItemDto, itemId: string, mediaSourceId: string) {
     const load: Load = {

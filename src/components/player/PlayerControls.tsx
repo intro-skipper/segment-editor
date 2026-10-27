@@ -1,8 +1,3 @@
-/**
- * PlayerControls - Extracted control buttons from Player component.
- * Reduces Player.tsx complexity by isolating UI controls.
- */
-
 import { useTranslation } from 'react-i18next'
 import {
   EyeOff,
@@ -18,11 +13,11 @@ import {
 import { TrackSelector } from './TrackSelector'
 import { MediaSourceSelector } from './MediaSourceSelector'
 import { PlayerSettingsMenu } from './PlayerSettingsMenu'
-import type { MediaSegmentType } from '@/types/jellyfin'
-import type { TrackState } from '@/services/video/tracks'
+import type { PlayerSettingsMenuProps } from './PlayerSettingsMenu'
+import { usePlayback, usePlaybackEngine } from './playback-context'
+import type { CreateSegmentData } from '@/types/segment'
 import type { SelectableMediaSource } from '@/lib/media-source-utils'
-import type { PlaybackStrategy } from '@/services/video/api'
-import type { AudioSwitchTranscodeScope } from '@/services/video/playback-tracks'
+import { useAppStore } from '@/stores/app-store'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,73 +27,36 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export interface PlayerControlsProps {
-  playback: {
-    state: 'playing' | 'paused'
-    onToggle: () => void
+  display: {
+    mode: 'fullscreen' | 'inline'
+    onToggleFullscreen: () => void
+    /** Container element for dropdown portals (needed for fullscreen) */
+    portalContainer: React.RefObject<HTMLElement | null>
   }
-  volumeControls: {
-    state: 'muted' | 'audible'
-    level: number
-    onToggleMute: () => void
-    onChange: (volume: number) => void
-  }
-  segmentCreation: {
-    onCreate: (type: MediaSegmentType) => void
-  }
+  /** Called with the frame-snapped live position as the start. */
+  onCreateSegment: (data: CreateSegmentData) => void
   /** Alternate Jellyfin media versions available for this item. */
   mediaSourceControls?: {
     sources: SelectableMediaSource[]
     value: string
     onSelect: (mediaSourceId: string) => void
   }
-  skipControls: {
-    timeIndex: number
-    onTimeChange: (index: number) => void
-  }
-  /** Track controls for audio/subtitle selection */
-  trackControls?: {
-    state: TrackState
-    availability: 'available' | 'disabled'
-    strategy?: PlaybackStrategy
-    /** Which audio switch targets restart the stream as a transcode */
-    audioSwitchTranscodeScope?: AudioSwitchTranscodeScope
-    onSelectAudio: (index: number) => void
-    onSelectSubtitle: (index: number | null) => void
-  }
-  display: {
-    mode: 'fullscreen' | 'inline'
-    onToggleFullscreen?: () => void
-    onMinimize?: () => void
-    /** Container element for dropdown portals (needed for fullscreen) */
-    portalContainer?: React.RefObject<HTMLElement | null>
-  }
-  settings: {
-    /** Current subtitle offset in seconds (positive = delay, negative = advance) */
-    subtitleOffset: number
-    /** Callback when subtitle offset changes */
-    onSubtitleOffsetChange?: (offset: number) => void
-    subtitleState: 'active' | 'inactive'
-    /** Current playback speed index into PLAYBACK_SPEEDS */
-    playbackSpeedIndex?: number
-    /** Callback when playback speed changes */
-    onSpeedChange?: (speedIndex: number) => void
-  }
+  settings: PlayerSettingsMenuProps
 }
 
 /** Mute toggle button that opens a vertical volume slider popover. */
 function VolumeControl({
-  volumeControls,
   portalContainer,
-}: Pick<PlayerControlsProps, 'volumeControls'> &
-  Pick<PlayerControlsProps['display'], 'portalContainer'>) {
+}: Pick<PlayerControlsProps['display'], 'portalContainer'>) {
   const { t } = useTranslation()
-  const isMuted = volumeControls.state === 'muted'
-  const { level: volume } = volumeControls
+  const engine = usePlaybackEngine()
+  const volume = usePlayback((s) => s.volume)
+  const isMuted = usePlayback((s) => s.muted)
   const isSilent = isMuted || volume === 0
   const sliderVolume = isMuted ? 0 : volume
 
   const handleVolumeSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    volumeControls.onChange(parseFloat(e.target.value))
+    engine.setVolume(parseFloat(e.target.value))
   }
 
   return (
@@ -138,11 +96,7 @@ function VolumeControl({
             aria-valuetext={`${Math.round(sliderVolume * 100)}%`}
             className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer slider-vertical"
           />
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={volumeControls.onToggleMute}
-          >
+          <Button variant="ghost" size="xs" onClick={engine.toggleMute}>
             {isMuted ? t('player.unmute') : t('player.mute')}
           </Button>
         </div>
@@ -151,20 +105,18 @@ function VolumeControl({
   )
 }
 
+/** The transport, track, segment and display controls below the video. */
 export function PlayerControls({
-  playback,
-  volumeControls,
-  segmentCreation,
-  mediaSourceControls,
-  skipControls,
-  trackControls,
   display,
+  onCreateSegment,
+  mediaSourceControls,
   settings,
 }: PlayerControlsProps) {
   const { t } = useTranslation()
-  const isPlaying = playback.state === 'playing'
+  const engine = usePlaybackEngine()
+  const isPlaying = usePlayback((s) => !s.paused)
+  const setShowVideoPlayer = useAppStore((s) => s.setShowVideoPlayer)
   const isFullscreen = display.mode === 'fullscreen'
-  const hasActiveSubtitle = settings.subtitleState === 'active'
   const { portalContainer } = display
 
   return (
@@ -178,7 +130,7 @@ export function PlayerControls({
         <Button
           variant="player"
           size="icon-xl"
-          onClick={playback.onToggle}
+          onClick={engine.togglePlay}
           aria-label={t('accessibility.playPause', 'Play or pause video')}
           aria-pressed={isPlaying}
         >
@@ -190,10 +142,7 @@ export function PlayerControls({
         </Button>
 
         {/* Volume */}
-        <VolumeControl
-          volumeControls={volumeControls}
-          portalContainer={portalContainer}
-        />
+        <VolumeControl portalContainer={portalContainer} />
 
         {/* Alternate video versions */}
         {mediaSourceControls && (
@@ -206,21 +155,13 @@ export function PlayerControls({
         )}
 
         {/* Track selector for audio and subtitles */}
-        {trackControls && (
-          <TrackSelector
-            trackState={trackControls.state}
-            onSelectAudio={trackControls.onSelectAudio}
-            onSelectSubtitle={trackControls.onSelectSubtitle}
-            strategy={trackControls.strategy}
-            audioSwitchTranscodeScope={trackControls.audioSwitchTranscodeScope}
-            disabled={trackControls.availability === 'disabled'}
-            portalContainer={portalContainer}
-          />
-        )}
+        <TrackSelector portalContainer={portalContainer} />
 
         {/* Create segment */}
         <SegmentTypeMenu
-          onSelect={segmentCreation.onCreate}
+          onSelect={(type) =>
+            onCreateSegment({ type, start: engine.playhead.getSnappedTime() })
+          }
           align="start"
           container={portalContainer}
           render={
@@ -238,11 +179,11 @@ export function PlayerControls({
       <div className="flex-1" />
 
       {/* Minimize button */}
-      {display.onMinimize && !isFullscreen && (
+      {!isFullscreen && (
         <Button
           variant="player"
           size="icon-xl"
-          onClick={display.onMinimize}
+          onClick={() => setShowVideoPlayer(false)}
           aria-label={t('player.minimize', 'Minimize player')}
         >
           <EyeOff strokeWidth={2.5} aria-hidden="true" />
@@ -250,36 +191,25 @@ export function PlayerControls({
       )}
 
       {/* Fullscreen button */}
-      {display.onToggleFullscreen && (
-        <Button
-          variant="player"
-          size="icon-xl"
-          onClick={display.onToggleFullscreen}
-          aria-label={
-            isFullscreen
-              ? t('player.exitFullscreen', 'Exit fullscreen')
-              : t('player.fullscreen', 'Fullscreen')
-          }
-        >
-          {isFullscreen ? (
-            <Minimize strokeWidth={2.5} aria-hidden="true" />
-          ) : (
-            <Maximize strokeWidth={2.5} aria-hidden="true" />
-          )}
-        </Button>
-      )}
+      <Button
+        variant="player"
+        size="icon-xl"
+        onClick={display.onToggleFullscreen}
+        aria-label={
+          isFullscreen
+            ? t('player.exitFullscreen', 'Exit fullscreen')
+            : t('player.fullscreen', 'Fullscreen')
+        }
+      >
+        {isFullscreen ? (
+          <Minimize strokeWidth={2.5} aria-hidden="true" />
+        ) : (
+          <Maximize strokeWidth={2.5} aria-hidden="true" />
+        )}
+      </Button>
 
       {/* Settings menu */}
-      <PlayerSettingsMenu
-        skipTimeIndex={skipControls.timeIndex}
-        onSkipTimeChange={skipControls.onTimeChange}
-        subtitleOffset={settings.subtitleOffset}
-        onSubtitleOffsetChange={settings.onSubtitleOffsetChange}
-        hasActiveSubtitle={hasActiveSubtitle}
-        playbackSpeedIndex={settings.playbackSpeedIndex}
-        onSpeedChange={settings.onSpeedChange}
-        portalContainer={portalContainer}
-      />
+      <PlayerSettingsMenu {...settings} portalContainer={portalContainer} />
     </div>
   )
 }

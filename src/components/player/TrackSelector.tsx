@@ -2,6 +2,11 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
+import {
+  usePlayback,
+  usePlaybackEngine,
+  usePlaybackTracks,
+} from './playback-context'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
 import type { AudioSwitchTranscodeScope } from '@/services/video/playback-tracks'
@@ -17,17 +22,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-
-interface TrackSelectorProps {
-  trackState: TrackState
-  onSelectAudio: (index: number) => void
-  onSelectSubtitle: (index: number | null) => void
-  strategy?: PlaybackStrategy
-  /** Which audio switch targets restart the stream as a transcode */
-  audioSwitchTranscodeScope?: AudioSwitchTranscodeScope
-  disabled?: boolean
-  portalContainer?: React.RefObject<HTMLElement | null>
-}
 
 interface AudioSwitchHints {
   /** Some or all audio switches restart the stream as a transcode */
@@ -124,12 +118,12 @@ function AudioTrackGroup({
   hints,
   transcodeHintId,
   flagTipId,
-}: Pick<TrackState, 'audioTracks' | 'activeAudioIndex'> &
-  Pick<TrackSelectorProps, 'onSelectAudio'> & {
-    hints: AudioSwitchHints
-    transcodeHintId: string
-    flagTipId: string
-  }) {
+}: Pick<TrackState, 'audioTracks' | 'activeAudioIndex'> & {
+  onSelectAudio: (index: number) => void
+  hints: AudioSwitchHints
+  transcodeHintId: string
+  flagTipId: string
+}) {
   const { t } = useTranslation()
 
   return (
@@ -182,8 +176,9 @@ function SubtitleTrackGroup({
   subtitleTracks,
   activeSubtitleIndex,
   onSelectSubtitle,
-}: Pick<TrackState, 'subtitleTracks' | 'activeSubtitleIndex'> &
-  Pick<TrackSelectorProps, 'onSelectSubtitle'>) {
+}: Pick<TrackState, 'subtitleTracks' | 'activeSubtitleIndex'> & {
+  onSelectSubtitle: (index: number | null) => void
+}) {
   const { t } = useTranslation()
 
   return (
@@ -211,19 +206,23 @@ function SubtitleTrackGroup({
   )
 }
 
-export const TrackSelector = function TrackSelectorComponent({
-  trackState,
-  onSelectAudio,
-  onSelectSubtitle,
-  strategy,
-  audioSwitchTranscodeScope = 'none',
-  disabled = false,
+/** The audio and subtitle menu, with the playback strategy and the transcode hints. */
+export function TrackSelector({
   portalContainer,
-}: TrackSelectorProps) {
+}: {
+  portalContainer: React.RefObject<HTMLElement | null>
+}) {
   const { t } = useTranslation()
-
-  const { audioTracks, subtitleTracks, activeAudioIndex, activeSubtitleIndex } =
-    trackState
+  const { tracks } = usePlaybackEngine()
+  const strategy = usePlayback((s) => s.strategy)
+  const {
+    audioTracks,
+    subtitleTracks,
+    activeAudioIndex,
+    activeSubtitleIndex,
+    audioSwitchTranscodeScope,
+    switching,
+  } = usePlaybackTracks((s) => s)
 
   const hasAudioTracks = audioTracks.length > 0
   const hasSubtitleTracks = subtitleTracks.length > 0
@@ -251,7 +250,7 @@ export const TrackSelector = function TrackSelectorComponent({
               'player.tracks.selector',
               'Audio and subtitle tracks',
             )}
-            disabled={disabled || !hasTracks}
+            disabled={switching || !hasTracks}
           />
         }
       >
@@ -264,18 +263,14 @@ export const TrackSelector = function TrackSelectorComponent({
         container={portalContainer}
         aria-describedby={menuDescriptionIds}
       >
-        {strategy && (
-          <>
-            <StrategyBadge strategy={strategy} />
-            {hasTracks && <DropdownMenuSeparator />}
-          </>
-        )}
+        <StrategyBadge strategy={strategy} />
+        {hasTracks && <DropdownMenuSeparator />}
 
         {hasAudioTracks && (
           <AudioTrackGroup
             audioTracks={audioTracks}
             activeAudioIndex={activeAudioIndex}
-            onSelectAudio={onSelectAudio}
+            onSelectAudio={(index) => void tracks.selectAudio(index)}
             hints={hints}
             transcodeHintId={transcodeHintId}
             flagTipId={flagTipId}
@@ -288,7 +283,7 @@ export const TrackSelector = function TrackSelectorComponent({
           <SubtitleTrackGroup
             subtitleTracks={subtitleTracks}
             activeSubtitleIndex={activeSubtitleIndex}
-            onSelectSubtitle={onSelectSubtitle}
+            onSelectSubtitle={(index) => void tracks.selectSubtitle(index)}
           />
         )}
 

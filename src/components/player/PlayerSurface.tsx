@@ -1,7 +1,6 @@
 import type {
   KeyboardEvent,
   MouseEvent,
-  ReactEventHandler,
   ReactNode,
   RefObject,
   TouchEvent,
@@ -16,10 +15,13 @@ import {
   SkipForward,
 } from 'lucide-react'
 
-import { PlayerControls } from './PlayerControls'
 import type { VideoFitMode } from './use-fullscreen-player-ui'
-import type { PlayerControlsProps } from './PlayerControls'
 import type { NativeCaptionTrack } from './caption-tracks'
+import {
+  usePlayback,
+  usePlaybackEngine,
+  useSkipOffer,
+} from './playback-context'
 import type { MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/services/video/playback-error'
 import { cn } from '@/lib/utils'
@@ -40,21 +42,6 @@ interface PlayerSurfaceVideoState {
   posterUrl: string | null
   captionTracks: Array<NativeCaptionTrack>
   onInteraction: VideoInteractionHandler
-  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
-  onPlay: ReactEventHandler<HTMLVideoElement>
-  onPause: ReactEventHandler<HTMLVideoElement>
-}
-
-interface PlayerSurfacePlaybackState {
-  error: VideoPlayerError | null
-  isRecovering: boolean
-  isVideoLoading: boolean
-  onRetry: () => void
-}
-
-interface PlayerSurfaceSegmentSkipAction {
-  segment: MediaSegmentDto
-  onSkipSegment: (segment: MediaSegmentDto) => void
 }
 
 interface PlayerSurfaceProps {
@@ -62,9 +49,7 @@ interface PlayerSurfaceProps {
   videoRef: RefObject<HTMLVideoElement | null>
   fullscreen: PlayerSurfaceFullscreenState
   video: PlayerSurfaceVideoState
-  playback: PlayerSurfacePlaybackState
-  segmentSkip: PlayerSurfaceSegmentSkipAction | null
-  controlsProps: PlayerControlsProps
+  controls: ReactNode
   timelineScrubber: ReactNode
 }
 
@@ -80,7 +65,16 @@ function PlayerVideoButton({
   video,
 }: PlayerVideoButtonProps) {
   const { t } = useTranslation()
+  const { togglePlay } = usePlaybackEngine()
   const { isFullscreen, showControls, videoFitMode } = fullscreen
+
+  // Space is a global shortcut; Enter plays only from the focused video.
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      togglePlay()
+    }
+  }
 
   return (
     <button
@@ -94,7 +88,7 @@ function PlayerVideoButton({
       )}
       onClick={video.onInteraction}
       onTouchEnd={video.onInteraction}
-      onKeyDown={video.onKeyDown}
+      onKeyDown={handleKeyDown}
       aria-label={t('player.videoPlayer')}
     >
       {/* The rounded frame must NOT clip the video via an ancestor (overflow-clip/hidden):
@@ -133,8 +127,6 @@ function PlayerVideoButton({
         preload="metadata"
         playsInline
         aria-label={t('player.videoPlayer')}
-        onPlay={video.onPlay}
-        onPause={video.onPause}
       >
         {video.captionTracks.map((track) => (
           <track
@@ -258,13 +250,13 @@ function SegmentSkipOverlay({
 
 interface FullscreenControlsOverlayProps {
   fullscreen: PlayerSurfaceFullscreenState
-  controlsProps: PlayerControlsProps
+  controls: ReactNode
   timelineScrubber: ReactNode
 }
 
 function FullscreenControlsOverlay({
   fullscreen,
-  controlsProps,
+  controls,
   timelineScrubber,
 }: FullscreenControlsOverlayProps) {
   const { t } = useTranslation()
@@ -307,23 +299,26 @@ function FullscreenControlsOverlay({
 
         <div className="mbe-4 text-white">{timelineScrubber}</div>
 
-        <PlayerControls {...controlsProps} />
+        {controls}
       </div>
     </div>
   )
 }
 
+/** The video with its overlays (error, loading, segment skip), the timeline and the controls, windowed or fullscreen. */
 export function PlayerSurface({
   containerRef,
   videoRef,
   fullscreen,
   video,
-  playback,
-  segmentSkip,
-  controlsProps,
+  controls,
   timelineScrubber,
 }: PlayerSurfaceProps) {
   const { t } = useTranslation()
+  const engine = usePlaybackEngine()
+  const status = usePlayback((s) => s.status)
+  const skipOffer = useSkipOffer()
+  const isRecovering = status.kind === 'recovering'
 
   return (
     <div className="flex flex-col gap-4">
@@ -344,32 +339,32 @@ export function PlayerSurface({
           video={video}
         />
 
-        {playback.error && !playback.isRecovering ? (
+        {status.kind === 'failed' ? (
           <PlayerErrorOverlay
-            error={playback.error}
+            error={status.error}
             isFullscreen={fullscreen.isFullscreen}
-            onRetry={playback.onRetry}
+            onRetry={engine.retry}
           />
         ) : null}
 
-        {playback.isVideoLoading || playback.isRecovering ? (
+        {status.kind === 'resolving' || isRecovering ? (
           <PlayerLoadingOverlay
-            isRecovering={playback.isRecovering}
+            isRecovering={isRecovering}
             isFullscreen={fullscreen.isFullscreen}
           />
         ) : null}
 
-        {segmentSkip ? (
+        {skipOffer ? (
           <SegmentSkipOverlay
-            segment={segmentSkip.segment}
-            onSkipSegment={segmentSkip.onSkipSegment}
+            segment={skipOffer}
+            onSkipSegment={engine.playhead.skipSegment}
           />
         ) : null}
 
         {fullscreen.isFullscreen ? (
           <FullscreenControlsOverlay
             fullscreen={fullscreen}
-            controlsProps={controlsProps}
+            controls={controls}
             timelineScrubber={timelineScrubber}
           />
         ) : null}
@@ -379,7 +374,7 @@ export function PlayerSurface({
         <>
           {timelineScrubber}
 
-          <PlayerControls {...controlsProps} />
+          {controls}
         </>
       ) : null}
     </div>

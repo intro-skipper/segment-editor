@@ -2,6 +2,12 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MoreVertical } from 'lucide-react'
 
+import {
+  usePlayback,
+  usePlaybackEngine,
+  usePlaybackTracks,
+} from './playback-context'
+
 import { formatForDisplay } from '@tanstack/react-hotkeys'
 import type React from 'react'
 import { PLAYER_SHORTCUT_CHEATSHEET } from '@/lib/player-shortcuts'
@@ -24,38 +30,39 @@ const CHEATSHEET_DISPLAY = PLAYER_SHORTCUT_CHEATSHEET.map((entry) => ({
   displayKeys: entry.hotkeys.map((hotkey) => formatForDisplay(hotkey)),
 }))
 
-interface PlayerSettingsMenuProps {
+export interface PlayerSettingsMenuProps {
   skipTimeIndex: number
   onSkipTimeChange: (index: number) => void
   subtitleOffset: number
-  onSubtitleOffsetChange?: (offset: number) => void
-  hasActiveSubtitle: boolean
-  playbackSpeedIndex?: number
-  onSpeedChange?: (speedIndex: number) => void
-  portalContainer?: React.RefObject<HTMLElement | null>
+  onSubtitleOffsetChange: (offset: number) => void
 }
 
+/** Skip size, playback speed, subtitle offset and the shortcut cheatsheet. */
 export function PlayerSettingsMenu({
   skipTimeIndex,
   onSkipTimeChange,
   subtitleOffset,
   onSubtitleOffsetChange,
-  hasActiveSubtitle,
-  playbackSpeedIndex,
-  onSpeedChange,
   portalContainer,
-}: PlayerSettingsMenuProps) {
+}: PlayerSettingsMenuProps & {
+  portalContainer: React.RefObject<HTMLElement | null>
+}) {
   const { t } = useTranslation()
   const idPrefix = useId()
+  const engine = usePlaybackEngine()
+  const playbackSpeedIndex = usePlayback((s) => s.speedIndex)
+  const hasActiveSubtitle = usePlaybackTracks(
+    (s) => s.activeSubtitleIndex !== null,
+  )
 
   const handleSubtitleOffsetChange = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    onSubtitleOffsetChange?.(parseFloat(e.target.value))
+    onSubtitleOffsetChange(parseFloat(e.target.value))
   }
 
   const handleSubtitleOffsetReset = () => {
-    onSubtitleOffsetChange?.(0)
+    onSubtitleOffsetChange(0)
   }
 
   const shortcutItems = CHEATSHEET_DISPLAY.map(({ labelKey, displayKeys }) => (
@@ -125,42 +132,38 @@ export function PlayerSettingsMenu({
             </div>
           </div>
 
-          {onSpeedChange && playbackSpeedIndex !== undefined && (
-            <div className="mbe-4 pbe-4 border-be border-border">
-              <p
-                className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
-                id={`${idPrefix}-playback-speed`}
-              >
-                {t('player.playbackSpeed', 'Playback Speed')}
-              </p>
-              <div
-                className="flex flex-wrap gap-1.5"
-                role="radiogroup"
-                aria-labelledby={`${idPrefix}-playback-speed`}
-              >
-                {PLAYBACK_SPEEDS.map((speed, idx) => (
-                  <Button
-                    type="button"
-                    key={speed}
-                    size="sm"
-                    variant={
-                      idx === playbackSpeedIndex ? 'default' : 'secondary'
-                    }
-                    onClick={() => onSpeedChange(idx)}
-                    role="radio"
-                    aria-checked={idx === playbackSpeedIndex}
-                    aria-label={t('player.speedValue', '{{speed}}x speed', {
-                      speed,
-                    })}
-                  >
-                    {speed}x
-                  </Button>
-                ))}
-              </div>
+          <div className="mbe-4 pbe-4 border-be border-border">
+            <p
+              className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
+              id={`${idPrefix}-playback-speed`}
+            >
+              {t('player.playbackSpeed', 'Playback Speed')}
+            </p>
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="radiogroup"
+              aria-labelledby={`${idPrefix}-playback-speed`}
+            >
+              {PLAYBACK_SPEEDS.map((speed, idx) => (
+                <Button
+                  type="button"
+                  key={speed}
+                  size="sm"
+                  variant={idx === playbackSpeedIndex ? 'default' : 'secondary'}
+                  onClick={() => engine.setSpeedIndex(idx)}
+                  role="radio"
+                  aria-checked={idx === playbackSpeedIndex}
+                  aria-label={t('player.speedValue', '{{speed}}x speed', {
+                    speed,
+                  })}
+                >
+                  {speed}x
+                </Button>
+              ))}
             </div>
-          )}
+          </div>
 
-          {hasActiveSubtitle && onSubtitleOffsetChange && (
+          {hasActiveSubtitle && (
             <div className="mbe-4 pbe-4 border-be border-border">
               <p
                 className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
