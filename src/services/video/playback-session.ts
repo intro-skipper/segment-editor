@@ -2,7 +2,7 @@ import { buildApiUrl, getCredentials, withApi } from '@/services/jellyfin'
 
 export type PlaybackStatusPlayMethod = 'DirectPlay' | 'Transcode'
 
-interface PlaybackStatusOptions {
+export interface PlaybackStatusOptions {
   itemId: string
   mediaSourceId: string
   playSessionId: string
@@ -11,7 +11,7 @@ interface PlaybackStatusOptions {
   isPaused: boolean
 }
 
-interface StopPlaybackStatusOptions {
+export interface StopPlaybackStatusOptions {
   itemId: string
   mediaSourceId: string
   playSessionId: string
