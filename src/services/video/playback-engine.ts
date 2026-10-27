@@ -25,7 +25,12 @@ import type {
   HlsPlayerClass,
 } from '@/services/video/hls-controller'
 import { attachHls } from '@/services/video/hls-controller'
-import type { HlsReloadRequest } from '@/services/video/track-switching'
+import type {
+  HlsReloadRequest,
+  HlsTrackController,
+} from '@/services/video/track-switching'
+import { PlaybackTracks } from '@/services/video/playback-tracks'
+import type { PlaybackTrackMedia } from '@/services/video/playback-tracks'
 import { Playhead } from '@/services/video/playhead'
 import type { PlayheadMedia } from '@/services/video/playhead'
 import { secondsToTicks } from '@/lib/time-utils'
@@ -56,7 +61,8 @@ export const jellyfinPlaybackBackend: PlaybackBackend = {
 }
 
 /** The parts of the video element playback drives; `HTMLVideoElement` satisfies it. */
-export interface PlaybackMedia extends ReportedMedia, PlayheadMedia {
+export interface PlaybackMedia
+  extends ReportedMedia, PlayheadMedia, PlaybackTrackMedia {
   currentTime: number
   src: string
   readonly error: { readonly code: number } | null
@@ -90,10 +96,6 @@ export interface PlaybackSnapshot {
 
 /** Callbacks the host keeps current; the engine reads them when it needs them. */
 export interface PlaybackHost {
-  /** Read once per load: the audio stream the new session starts on. */
-  getInitialAudioStreamIndex?: () => number | undefined
-  /** Read on the forced-HLS fallback: the audio stream playing right now. */
-  getCurrentAudioStreamIndex?: () => number | undefined
   onStrategyChange?: (strategy: PlaybackStrategy) => void
   t: (key: string) => string
 }
@@ -104,7 +106,6 @@ interface Load {
   readonly itemId: string
   readonly mediaSourceId: string
   readonly controller: AbortController
-  readonly initialAudioStreamIndex: number | undefined
   networkRetries: number
   /** Set once a source is applied; until then retry() resolves the config again. */
   started: boolean
@@ -143,12 +144,17 @@ function isSameError(left: VideoPlayerError, right: VideoPlayerError) {
 /**
  * Plays one item on one video element: resolves direct play or HLS, falls
  * back from direct to HLS on errors, recovers HLS in place, carries the
- * position across source reloads and reports the session to Jellyfin.
+ * position across source reloads, selects audio and subtitle tracks and
+ * reports the session to Jellyfin.
  * Call connect() once mounted, then load() for every item change.
  */
-export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
+export class PlaybackEngine<
+  M extends PlaybackMedia,
+  H extends HlsPlayer<M> & HlsTrackController,
+> {
   readonly hlsRef: { current: H | null } = { current: null }
   readonly playhead: Playhead
+  readonly tracks: PlaybackTracks
 
   private snapshot: PlaybackSnapshot = {
     itemId: null,
@@ -176,6 +182,12 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
   ) {
     this.reporter = new PlaybackStatusReporter(backend, this.getMedia, null)
     this.playhead = new Playhead(media)
+    this.tracks = new PlaybackTracks(
+      media,
+      this.hlsRef,
+      (reload) => this.reloadHlsWithUrl(reload),
+      (key) => this.host.t(key),
+    )
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -232,6 +244,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     this.unload()
 
     if (!item || !itemId || !mediaSourceId) {
+      this.tracks.unload()
       this.update({ itemId: null, status: { kind: 'ready' } })
       return
     }
@@ -311,11 +324,11 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
       itemId,
       mediaSourceId,
       controller: new AbortController(),
-      initialAudioStreamIndex: this.host.getInitialAudioStreamIndex?.(),
       networkRetries: 0,
       started: false,
     }
     this.current = load
+    this.tracks.load(load)
     this.update({ itemId, status: { kind: 'resolving' } })
     void this.resolve(load)
   }
@@ -328,7 +341,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     try {
       config = await this.backend.getPlaybackConfig(
         load.item,
-        load.initialAudioStreamIndex,
+        this.tracks.activeAudioIndex,
         false,
         hlsPlaySessionId,
       )
@@ -369,6 +382,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     })
     this.update({ strategy, videoUrl: url, status: { kind: 'ready' } })
     if (strategyChanged) this.host.onStrategyChange?.(strategy)
+    this.tracks.sourceApplied(strategy)
     void this.reporter.start(
       this.carry ? secondsToTicks(this.carry.time) : undefined,
     )
@@ -481,24 +495,29 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
   }
 
   private async switchToHls(load: Load): Promise<void> {
-    // Keep the track the user hears: the session may have switched natively
-    // off the track it started on.
-    const audioStreamIndex =
-      this.host.getCurrentAudioStreamIndex?.() ?? load.initialAudioStreamIndex
     this.captureCarry()
     await this.reporter.stop()
 
     const playSessionId = this.backend.createPlaySessionId()
-    if (this.current !== load) return
-    const config = await this.backend.getPlaybackConfig(
-      load.item,
-      audioStreamIndex,
-      true,
-      playSessionId,
-    )
-    if (this.current !== load) return
-
-    this.apply(load, 'hls', config.url, playSessionId)
+    let audioStreamIndex = this.tracks.activeAudioIndex
+    // A track switch while the config resolves changes what should play: a
+    // native one asks for the config again, a transcoded one already left
+    // direct play with the track the user picked, so the fallback stands down.
+    for (;;) {
+      if (this.current !== load) return
+      const config = await this.backend.getPlaybackConfig(
+        load.item,
+        audioStreamIndex,
+        true,
+        playSessionId,
+      )
+      if (this.current !== load || this.snapshot.strategy !== 'direct') return
+      if (audioStreamIndex === this.tracks.activeAudioIndex) {
+        this.apply(load, 'hls', config.url, playSessionId)
+        return
+      }
+      audioStreamIndex = this.tracks.activeAudioIndex
+    }
   }
 
   private readonly restoreCarry = () => {

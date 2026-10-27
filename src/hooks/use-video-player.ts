@@ -5,10 +5,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import type Hls from 'hls.js'
 import type { BaseItemDto } from '@/types/jellyfin'
 import type { PlaybackStrategy } from '@/services/video/api'
-import type { HlsReloadRequest } from '@/services/video/track-switching'
 import type { VideoPlayerError } from '@/services/video/playback-error'
 import {
   PlaybackEngine,
@@ -16,21 +14,10 @@ import {
 } from '@/services/video/playback-engine'
 import { loadHlsJs } from '@/services/video/hls-controller'
 import type { Playhead } from '@/services/video/playhead'
+import type { PlaybackTrackState } from '@/services/video/playback-tracks'
 
 interface UseVideoPlayerOptions {
   item: BaseItemDto | null
-  /**
-   * Called once per playback initialization (item or media source change) to
-   * resolve the audio stream index the new session should start on, so a
-   * changed preference applies only to the next initialization.
-   */
-  getInitialAudioStreamIndex?: () => number | undefined
-  /**
-   * Returns the audio stream index the session is currently playing (the
-   * initial selection or a later native switch). The direct-play error
-   * fallback reads it when it happens.
-   */
-  getCurrentAudioStreamIndex?: () => number | undefined
   jellyfinPlaybackSyncEnabled?: boolean
   onStrategyChange?: (strategy: PlaybackStrategy) => void
   t: (key: string) => string
@@ -38,7 +25,6 @@ interface UseVideoPlayerOptions {
 
 interface UseVideoPlayerReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>
-  hlsRef: React.RefObject<Hls | null>
   playhead: Playhead
   strategy: PlaybackStrategy
   isLoading: boolean
@@ -46,14 +32,16 @@ interface UseVideoPlayerReturn {
   isRecovering: boolean
   retry: () => void
   videoUrl: string
-  reloadHlsWithUrl: (reload: HlsReloadRequest) => Promise<void>
+  tracks: PlaybackTrackState
+  /** Resolve true only for an applied switch; a failure has shown its toast. */
+  selectAudio: (index: number) => Promise<boolean>
+  selectSubtitle: (index: number | null) => Promise<boolean>
+  toggleSubtitles: () => void
 }
 
 /** Plays `item` on the `<video>` the returned videoRef is attached to; mount that element unconditionally. */
 export function useVideoPlayer({
   item,
-  getInitialAudioStreamIndex,
-  getCurrentAudioStreamIndex,
   jellyfinPlaybackSyncEnabled = false,
   onStrategyChange,
   t,
@@ -70,21 +58,14 @@ export function useVideoPlayer({
     videoUrl,
     status,
   } = useSyncExternalStore(engine.subscribe, engine.getSnapshot)
+  const tracks = useSyncExternalStore(
+    engine.tracks.subscribe,
+    engine.tracks.getState,
+  )
 
   useLayoutEffect(() => {
-    engine.setHost({
-      getInitialAudioStreamIndex,
-      getCurrentAudioStreamIndex,
-      onStrategyChange,
-      t,
-    })
-  }, [
-    engine,
-    getInitialAudioStreamIndex,
-    getCurrentAudioStreamIndex,
-    onStrategyChange,
-    t,
-  ])
+    engine.setHost({ onStrategyChange, t })
+  }, [engine, onStrategyChange, t])
 
   useEffect(() => engine.connect(), [engine])
 
@@ -105,7 +86,6 @@ export function useVideoPlayer({
 
   return {
     videoRef,
-    hlsRef: engine.hlsRef,
     playhead: engine.playhead,
     strategy,
     isLoading,
@@ -117,6 +97,9 @@ export function useVideoPlayer({
     isRecovering: hasLoadedSession && status.kind === 'recovering',
     retry: engine.retry,
     videoUrl: itemId ? videoUrl : '',
-    reloadHlsWithUrl: engine.reloadHlsWithUrl,
+    tracks,
+    selectAudio: engine.tracks.selectAudio,
+    selectSubtitle: engine.tracks.selectSubtitle,
+    toggleSubtitles: engine.tracks.toggleSubtitles,
   }
 }

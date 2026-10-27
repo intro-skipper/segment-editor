@@ -27,17 +27,13 @@ import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { useSessionStore } from '@/stores/session-store'
 import { useAppStore } from '@/stores/app-store'
 import { useVideoPlayer } from '@/hooks/use-video-player'
-import { useTrackManager } from '@/hooks/use-track-manager'
 import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
 import type { SubtitleTrackInfo, TrackState } from '@/services/video/tracks'
 import type { SelectableMediaSource } from '@/lib/media-source-utils'
-import {
-  extractTracks,
-  findPreferredAudioStreamIndex,
-} from '@/services/video/tracks'
+import { extractTracks } from '@/services/video/tracks'
 
 function findActiveSubtitleTrack({
   activeSubtitleIndex,
@@ -75,22 +71,6 @@ function TimelineScrubber({ playhead, item, segments }: TimelineScrubberProps) {
     />
   )
 }
-
-function findItemPreferredAudioStreamIndex(
-  item: BaseItemDto,
-  preferredLanguage: string | null,
-): number | undefined {
-  const { audioTracks } = extractTracks(item)
-  return findPreferredAudioStreamIndex(audioTracks, preferredLanguage)
-}
-
-// Read non-reactively: the preference is deliberately consumed only at item
-// boundaries (useVideoPlayer resolves getInitialAudioStreamIndex once per
-// playback initialization), and handleAudioTrackSelect persists the chosen
-// language after every successful switch — a store subscription would
-// re-render the whole player tree for a value the render ignores.
-const readPreferredAudioLanguage = () =>
-  useAppStore.getState().trackPreferences.preferredAudioLanguage
 
 interface PlayerProps {
   item: BaseItemDto
@@ -184,35 +164,20 @@ function useRenderPlayer({
     previousStrategyRef.current = strategy
   }
 
-  // The exact track this session is currently playing (initial selection or
-  // a later native switch). useVideoPlayer's direct-play error fallback reads
-  // it through this ref so the live value never becomes an initialization
-  // input, yet a forced-HLS fallback still restarts on the track the user is
-  // hearing instead of the container default.
-  const currentAudioStreamIndexRef = useRef<number | undefined>(undefined)
-
   const {
     videoRef,
-    hlsRef,
     playhead,
     strategy,
     isLoading: isVideoLoading,
     error: playerError,
     isRecovering,
     retry: handleRetry,
-    reloadHlsWithUrl,
+    tracks: trackState,
+    selectAudio,
+    selectSubtitle,
+    toggleSubtitles,
   } = useVideoPlayer({
     item,
-    // Resolved once per playback initialization: the preference decides only
-    // the *initial* strategy and audio stream of a session.
-    // handleAudioTrackSelect persists the chosen language after every
-    // successful switch; applying it mid-session would tear down and reload
-    // the source right after an in-place native switch (and, with
-    // duplicate-language tracks, re-select the first language match instead
-    // of the exact track the user just picked).
-    getInitialAudioStreamIndex: () =>
-      findItemPreferredAudioStreamIndex(item, readPreferredAudioLanguage()),
-    getCurrentAudioStreamIndex: () => currentAudioStreamIndexRef.current,
     jellyfinPlaybackSyncEnabled,
     onStrategyChange: handleStrategyChange,
     t,
@@ -227,43 +192,13 @@ function useRenderPlayer({
     playhead.getSkipOffer,
   )
 
-  const {
-    setPreferredAudioLanguage,
-    setPreferredSubtitleLanguage,
-    setSubtitlesEnabled,
-  } = useAppStore(
-    useShallow((appState) => ({
-      setPreferredAudioLanguage: appState.setPreferredAudioLanguage,
-      setPreferredSubtitleLanguage: appState.setPreferredSubtitleLanguage,
-      setSubtitlesEnabled: appState.setSubtitlesEnabled,
-    })),
-  )
-
-  const {
-    trackState,
-    selectAudioTrack,
-    selectSubtitleTrack,
-    isLoading: isTrackLoading,
-    audioSwitchTranscodeScope,
-  } = useTrackManager({
-    item,
-    strategy,
-    videoRef,
-    hlsRef,
-    t,
-    onReloadHls: reloadHlsWithUrl,
-  })
-
-  useLayoutEffect(() => {
-    currentAudioStreamIndexRef.current = trackState.activeAudioIndex
-  }, [trackState.activeAudioIndex])
-
   const activeSubtitleTrack = findActiveSubtitleTrack(trackState)
 
+  // From the item, not the engine: the <track>s must exist before the engine
+  // loads it and shows the selected one.
   const nativeCaptionTracks = buildNativeCaptionTracks(
-    strategy,
     item.Id,
-    trackState.subtitleTracks,
+    extractTracks(item).subtitleTracks,
   )
 
   const { setUserOffset: setJassubUserOffset, resize: resizeJassub } =
@@ -453,27 +388,6 @@ function useRenderPlayer({
     }
   }
 
-  const toggleSubtitles = async () => {
-    try {
-      if (trackState.activeSubtitleIndex !== null) {
-        if (await selectSubtitleTrack(null)) {
-          setSubtitlesEnabled(false)
-        }
-      } else if (trackState.subtitleTracks.length > 0) {
-        const firstTrack = trackState.subtitleTracks[0]
-        if (await selectSubtitleTrack(firstTrack.index)) {
-          setSubtitlesEnabled(true)
-          if (firstTrack.language) {
-            setPreferredSubtitleLanguage(firstTrack.language)
-          }
-        }
-      }
-    } catch {
-      // Track switch failures are already surfaced by useTrackManager;
-      // catch here to prevent an unhandled rejection from the hotkey path.
-    }
-  }
-
   const {
     isFullscreen,
     showFullscreenControls,
@@ -518,38 +432,6 @@ function useRenderPlayer({
     dispatch({ type: 'SKIP_TIME_CHANGE', skipTimeIndex: index })
   }
 
-  const handleAudioTrackSelect = async (index: number) => {
-    // selectAudioTrack reports failures itself; the catch only shields the
-    // persistence below from an unexpected rejection.
-    const switched = await selectAudioTrack(index).catch(() => false)
-    // Persist only what was actually applied: recording a language the switch
-    // could not deliver would desync the persisted preference (and every
-    // later item's auto-selection) from what is audible.
-    if (!switched) return
-    const selectedTrack = trackState.audioTracks.find(
-      (track) => track.index === index,
-    )
-    if (selectedTrack?.language) {
-      setPreferredAudioLanguage(selectedTrack.language)
-    }
-  }
-
-  const handleSubtitleTrackSelect = async (index: number | null) => {
-    const switched = await selectSubtitleTrack(index).catch(() => false)
-    if (!switched) return
-    if (index === null) {
-      setSubtitlesEnabled(false)
-    } else {
-      setSubtitlesEnabled(true)
-      const selectedTrack = trackState.subtitleTracks.find(
-        (track) => track.index === index,
-      )
-      if (selectedTrack?.language) {
-        setPreferredSubtitleLanguage(selectedTrack.language)
-      }
-    }
-  }
-
   const hasAnyTracks =
     trackState.audioTracks.length > 0 || trackState.subtitleTracks.length > 0
 
@@ -576,11 +458,12 @@ function useRenderPlayer({
     },
     trackControls: {
       state: trackState,
-      availability: !hasAnyTracks || isTrackLoading ? 'disabled' : 'available',
+      availability:
+        !hasAnyTracks || trackState.switching ? 'disabled' : 'available',
       strategy,
-      audioSwitchTranscodeScope,
-      onSelectAudio: handleAudioTrackSelect,
-      onSelectSubtitle: handleSubtitleTrackSelect,
+      audioSwitchTranscodeScope: trackState.audioSwitchTranscodeScope,
+      onSelectAudio: selectAudio,
+      onSelectSubtitle: selectSubtitle,
     },
     display: {
       mode: isFullscreen ? 'fullscreen' : 'inline',

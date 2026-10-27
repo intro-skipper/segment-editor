@@ -72,7 +72,7 @@ export function fakeBackend(strategy: PlaybackStrategy) {
   } satisfies PlaybackBackend
 }
 
-type FakeBackend = ReturnType<typeof fakeBackend>
+export type FakeBackend = ReturnType<typeof fakeBackend>
 
 /** The `n`th getPlaybackConfig call (0-based) by name. */
 export function configCall(backend: FakeBackend, n: number) {
@@ -105,6 +105,9 @@ export class FakeHls implements HlsPlayer<HTMLVideoElement> {
   static isSupported = () => true
 
   readonly listeners = new Map<string, Set<FakeHlsListener>>()
+  /** Jellyfin playlists carry one muxed audio rendition, so this stays empty. */
+  audioTracks: Array<{ lang?: string; name?: string }> = []
+  audioTrack = -1
   destroyed = false
   media: HTMLVideoElement | null = null
   loadedUrls: Array<string> = []

@@ -441,55 +441,7 @@ describe('switchAudioTrack async reload failures', () => {
   })
 })
 
-describe('switchSubtitleTrack direct play', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    getDeviceIdMock.mockReturnValue('device-1')
-    getCredentialsMock.mockReturnValue({
-      serverAddress: 'https://jellyfin.example',
-      accessToken: 'token',
-    })
-    buildApiUrlMock.mockImplementation(({ serverAddress, endpoint, query }) => {
-      const params = query ? `?${query.toString()}` : ''
-      return `${serverAddress}/${endpoint}${params}`
-    })
-  })
-
-  it('loads a managed external subtitle track when no TextTrack exists', async () => {
-    const video = document.createElement('video')
-    const textTracks: Array<{ mode: TextTrackMode }> = []
-    Object.defineProperty(video, 'textTracks', {
-      configurable: true,
-      value: textTracks,
-    })
-
-    const appendChild = video.appendChild.bind(video)
-    vi.spyOn(video, 'appendChild').mockImplementation((node) => {
-      const result = appendChild(node)
-      textTracks.push({ mode: 'disabled' })
-      window.setTimeout(() => {
-        node.dispatchEvent(new Event('load'))
-      }, 0)
-      return result
-    })
-
-    await expect(
-      switchSubtitleTrack(3, {
-        strategy: 'direct',
-        videoElement: video,
-        itemId: 'item-1',
-        subtitleTracks: [createSubtitleTrack(3, 0)],
-      }),
-    ).resolves.toEqual({ success: true })
-
-    const trackElement = video.querySelector('track')
-    expect(trackElement?.src).toContain(
-      '/Videos/item-1/item-1/Subtitles/3/0/Stream.vtt',
-    )
-    expect(trackElement?.getAttribute('data-segment-editor-track')).toBe('true')
-    expect(textTracks[0].mode).toBe('showing')
-  })
-
+describe('switchSubtitleTrack', () => {
   it('shows the selected native text track and disables the rest', async () => {
     const video = document.createElement('video')
     const textTracks: Array<{ mode: TextTrackMode }> = [
@@ -521,7 +473,7 @@ describe('switchSubtitleTrack direct play', () => {
     ])
   })
 
-  it('disables existing text tracks and HLS subtitles when subtitles are turned off', async () => {
+  it('disables existing text tracks when subtitles are turned off', async () => {
     const video = document.createElement('video')
     const textTracks: Array<{ mode: TextTrackMode }> = [
       { mode: 'showing' },
@@ -531,26 +483,18 @@ describe('switchSubtitleTrack direct play', () => {
       configurable: true,
       value: textTracks,
     })
-    const hlsInstance = {
-      audioTracks: [],
-      audioTrack: 0,
-      subtitleTracks: [],
-      subtitleTrack: 1,
-    }
 
     await expect(
       switchSubtitleTrack(null, {
         strategy: 'hls',
         videoElement: video,
-        hlsInstance,
       }),
-    ).resolves.toEqual({ success: true, jassubAction: 'dispose' })
+    ).resolves.toEqual({ success: true })
 
     expect(textTracks.map((track) => track.mode)).toEqual([
       'disabled',
       'disabled',
     ])
-    expect(hlsInstance.subtitleTrack).toBe(-1)
   })
 
   it('disables existing text tracks before initializing ASS subtitles', async () => {
@@ -563,12 +507,6 @@ describe('switchSubtitleTrack direct play', () => {
       configurable: true,
       value: textTracks,
     })
-    const hlsInstance = {
-      audioTracks: [],
-      audioTrack: 0,
-      subtitleTracks: [],
-      subtitleTrack: 1,
-    }
     const assTrack = {
       ...createSubtitleTrack(4, 0),
       format: 'ASS',
@@ -578,19 +516,13 @@ describe('switchSubtitleTrack direct play', () => {
       switchSubtitleTrack(4, {
         strategy: 'hls',
         videoElement: video,
-        hlsInstance,
         subtitleTracks: [assTrack],
       }),
-    ).resolves.toEqual({
-      success: true,
-      jassubAction: 'initialize',
-      track: assTrack,
-    })
+    ).resolves.toEqual({ success: true })
 
     expect(textTracks.map((track) => track.mode)).toEqual([
       'disabled',
       'disabled',
     ])
-    expect(hlsInstance.subtitleTrack).toBe(-1)
   })
 })
