@@ -14,7 +14,7 @@ export interface SegmentTimeIndex {
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   value !== null && value !== undefined && Number.isFinite(value)
 
-// NOTE: Segment query layer (`services/segments/api.ts`) maps server ticks to
+// NOTE: Segment query layer (`services/segments/store.ts`) maps server ticks to
 // UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).
 /** Returns UI-second start time stored in the DTO's StartTicks field. */
 const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
