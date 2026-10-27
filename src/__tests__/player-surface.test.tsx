@@ -111,9 +111,6 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
       ],
       onInteraction: vi.fn(),
       onKeyDown: vi.fn(),
-      onTimeUpdate: vi.fn(),
-      onDurationChange: vi.fn(),
-      onProgress: vi.fn(),
       onPlay: vi.fn(),
       onPause: vi.fn(),
       ...overrides.video,
@@ -216,9 +213,6 @@ describe('PlayerSurface', () => {
     fireEvent.click(videoButton)
     fireEvent.touchEnd(videoButton)
     fireEvent.keyDown(videoButton, { key: 'Enter' })
-    fireEvent(video, new Event('timeupdate'))
-    fireEvent(video, new Event('durationchange'))
-    fireEvent(video, new Event('progress'))
     fireEvent(video, new Event('play'))
     fireEvent(video, new Event('pause'))
 
@@ -226,9 +220,6 @@ describe('PlayerSurface', () => {
     expect(props.fullscreen.onMouseLeave).toHaveBeenCalledTimes(1)
     expect(props.video.onInteraction).toHaveBeenCalledTimes(2)
     expect(props.video.onKeyDown).toHaveBeenCalledTimes(1)
-    expect(props.video.onTimeUpdate).toHaveBeenCalledTimes(1)
-    expect(props.video.onDurationChange).toHaveBeenCalledTimes(1)
-    expect(props.video.onProgress).toHaveBeenCalledTimes(1)
     expect(props.video.onPlay).toHaveBeenCalledTimes(1)
     expect(props.video.onPause).toHaveBeenCalledTimes(1)
   })

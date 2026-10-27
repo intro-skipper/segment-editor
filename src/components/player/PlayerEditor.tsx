@@ -458,7 +458,6 @@ function useRenderPlayerEditor({
             onSelect: setSelectedMediaSourceId,
           }}
           segments={editingSegments}
-          frameStepSeconds={frameStepSeconds}
           onCreateSegment={create}
           onUpdateSegmentTimestamp={handleUpdateSegmentTimestamp}
           handleRef={playerRef}

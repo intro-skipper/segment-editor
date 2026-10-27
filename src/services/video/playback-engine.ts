@@ -26,7 +26,10 @@ import type {
 } from '@/services/video/hls-controller'
 import { attachHls } from '@/services/video/hls-controller'
 import type { HlsReloadRequest } from '@/services/video/track-switching'
+import { Playhead } from '@/services/video/playhead'
+import type { PlayheadMedia } from '@/services/video/playhead'
 import { secondsToTicks } from '@/lib/time-utils'
+import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
 
 /** The Jellyfin calls playback makes: config resolution, play session ids and status reporting. */
 export interface PlaybackBackend extends JellyfinStatusBackend {
@@ -53,7 +56,7 @@ export const jellyfinPlaybackBackend: PlaybackBackend = {
 }
 
 /** The parts of the video element playback drives; `HTMLVideoElement` satisfies it. */
-export interface PlaybackMedia extends ReportedMedia {
+export interface PlaybackMedia extends ReportedMedia, PlayheadMedia {
   currentTime: number
   src: string
   readonly error: { readonly code: number } | null
@@ -145,6 +148,7 @@ function isSameError(left: VideoPlayerError, right: VideoPlayerError) {
  */
 export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
   readonly hlsRef: { current: H | null } = { current: null }
+  readonly playhead: Playhead
 
   private snapshot: PlaybackSnapshot = {
     itemId: null,
@@ -171,6 +175,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     private readonly media: { readonly current: M | null },
   ) {
     this.reporter = new PlaybackStatusReporter(backend, this.getMedia, null)
+    this.playhead = new Playhead(media)
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -186,15 +191,17 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     this.host = host
   }
 
-  /** Listens for pagehide; the returned cleanup unloads playback. */
+  /** Listens for pagehide and connects the playhead; the returned cleanup unloads playback. */
   connect(): () => void {
     const handlePageHide = () => {
       this.reporter.stopAllKeepalive()
     }
     window.addEventListener('pagehide', handlePageHide)
+    const disconnectPlayhead = this.playhead.connect()
     return () => {
       window.removeEventListener('pagehide', handlePageHide)
       this.load(null)
+      disconnectPlayhead()
     }
   }
 
@@ -208,6 +215,8 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
     const mediaSourceId = item ? getPlaybackMediaSourceId(item) : undefined
     const current = this.current
     const sameItem = current !== null && current.itemId === itemId
+    // Follows refetched item objects too, like the editor's own frame step.
+    this.playhead.frameStepSeconds = item ? resolveFrameStepSeconds(item) : 0
     if (item && sameItem && current.mediaSourceId === mediaSourceId) {
       current.item = item
       return
@@ -218,6 +227,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
       if (!this.carry && time > 0) this.captureCarry()
     } else {
       this.carry = null
+      this.playhead.reset()
     }
     this.unload()
 
@@ -582,6 +592,7 @@ export class PlaybackEngine<M extends PlaybackMedia, H extends HlsPlayer<M>> {
 
   private update(changes: Partial<PlaybackSnapshot>) {
     this.snapshot = { ...this.snapshot, ...changes }
+    this.playhead.setPlaybackReady(this.snapshot.status.kind === 'ready')
     for (const listener of this.listeners) listener()
   }
 }

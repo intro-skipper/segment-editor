@@ -1,9 +1,7 @@
 import {
-  useEffect,
   useLayoutEffect,
   useReducer,
   useRef,
-  useState,
   useSyncExternalStore,
 } from 'react'
 import type { ReactEventHandler } from 'react'
@@ -14,13 +12,6 @@ import { PlayerScrubber } from './PlayerScrubber'
 import { PlayerSurface } from './PlayerSurface'
 import type { PlayerControlsProps } from './PlayerControls'
 import { initialPlayerState, playerReducer } from './player-reducer'
-import type { SegmentTimeIndex } from './segment-skip'
-import {
-  buildSegmentTimeIndex,
-  findActiveSegmentRange,
-  getSegmentSkipTargetEndSeconds,
-  getSegmentTimeRangeId,
-} from './segment-skip'
 import { buildNativeCaptionTracks } from './caption-tracks'
 import { useFullscreenPlayerUi } from './use-fullscreen-player-ui'
 import type {
@@ -31,6 +22,7 @@ import type {
 import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
 import type { PlaybackStrategy } from '@/services/video/api'
 import { getBestImageUrl } from '@/services/video/api'
+import type { Playhead } from '@/services/video/playhead'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { useSessionStore } from '@/stores/session-store'
 import { useAppStore } from '@/stores/app-store'
@@ -40,59 +32,12 @@ import { useJassubRenderer } from '@/hooks/use-jassub-renderer'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 import { showNotification } from '@/lib/notifications'
 import { PLAYER_CONFIG } from '@/lib/constants'
-import {
-  getFrameStepTargetTime,
-  getSkipStepSeconds,
-} from '@/lib/player-timing-utils'
-import { snapToFrame } from '@/lib/time-utils'
 import type { SubtitleTrackInfo, TrackState } from '@/services/video/tracks'
 import type { SelectableMediaSource } from '@/lib/media-source-utils'
 import {
   extractTracks,
   findPreferredAudioStreamIndex,
 } from '@/services/video/tracks'
-
-const PLAYBACK_UPDATE_INTERVAL_MS = 120
-
-function getPlaybackTimestampMs() {
-  return performance.now()
-}
-
-interface PlaybackTimelineState {
-  currentTime: number
-  duration: number
-  buffered: number
-}
-
-interface PlaybackTimelineStore {
-  getSnapshot: () => PlaybackTimelineState
-  subscribe: (listener: () => void) => () => void
-  setState: (partial: Partial<PlaybackTimelineState>) => void
-}
-
-interface ActiveSkipSegmentState {
-  segment: MediaSegmentDto
-  segmentSkipModeRevision: number
-}
-
-/**
- * The segment the skip overlay should show: the tracked one, dropped once the
- * skip mode revision moves on, and resolved against the current segment index
- * so edits (e.g. a Type change) are reflected immediately instead of showing
- * the cached segment.
- */
-function resolveActiveSkipSegment(
-  state: ActiveSkipSegmentState | null,
-  segmentSkipModeRevision: number,
-  rangeById: SegmentTimeIndex['rangeById'],
-): MediaSegmentDto | null {
-  const trackedSegment =
-    state?.segmentSkipModeRevision === segmentSkipModeRevision
-      ? state.segment
-      : null
-  if (trackedSegment?.Id === undefined) return trackedSegment
-  return rangeById.get(trackedSegment.Id)?.segment ?? null
-}
 
 function findActiveSubtitleTrack({
   activeSubtitleIndex,
@@ -104,62 +49,17 @@ function findActiveSubtitleTrack({
   )
 }
 
-function createPlaybackTimelineStore(): PlaybackTimelineStore {
-  let state: PlaybackTimelineState = {
-    currentTime: 0,
-    duration: 0,
-    buffered: 0,
-  }
-  const listeners = new Set<() => void>()
-
-  return {
-    getSnapshot: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    setState: (partial) => {
-      const nextState: PlaybackTimelineState = {
-        currentTime: partial.currentTime ?? state.currentTime,
-        duration: partial.duration ?? state.duration,
-        buffered: partial.buffered ?? state.buffered,
-      }
-
-      if (
-        nextState.currentTime === state.currentTime &&
-        nextState.duration === state.duration &&
-        nextState.buffered === state.buffered
-      ) {
-        return
-      }
-
-      state = nextState
-      listeners.forEach((listener) => {
-        listener()
-      })
-    },
-  }
-}
-
 interface TimelineScrubberProps {
-  timelineStore: PlaybackTimelineStore
+  playhead: Playhead
   item: BaseItemDto
   segments: Array<MediaSegmentDto> | undefined
-  onSeek: (time: number) => void
 }
 
-function TimelineScrubber({
-  timelineStore,
-  item,
-  segments,
-  onSeek,
-}: TimelineScrubberProps) {
+function TimelineScrubber({ playhead, item, segments }: TimelineScrubberProps) {
   const { currentTime, duration, buffered } = useSyncExternalStore(
-    timelineStore.subscribe,
-    timelineStore.getSnapshot,
-    timelineStore.getSnapshot,
+    playhead.subscribe,
+    playhead.getTimeline,
+    playhead.getTimeline,
   )
 
   return (
@@ -169,7 +69,7 @@ function TimelineScrubber({
       buffered={buffered}
       chapters={item.Chapters}
       segments={segments}
-      onSeek={onSeek}
+      onSeek={playhead.seek}
       itemId={item.Id}
       trickplay={item.Trickplay}
     />
@@ -200,7 +100,6 @@ interface PlayerProps {
     onSelect: (mediaSourceId: string) => void
   }
   segments?: Array<MediaSegmentDto>
-  frameStepSeconds: number
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
   handleRef?: React.RefObject<PlayerHandle | null>
@@ -216,7 +115,6 @@ export function Player({
   item,
   mediaSourceControls,
   segments,
-  frameStepSeconds,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   handleRef,
@@ -225,7 +123,6 @@ export function Player({
     item,
     mediaSourceControls,
     segments,
-    frameStepSeconds,
     onCreateSegment,
     onUpdateSegmentTimestamp,
     handleRef,
@@ -236,7 +133,6 @@ function useRenderPlayer({
   item,
   mediaSourceControls,
   segments,
-  frameStepSeconds: frameStep,
   onCreateSegment,
   onUpdateSegmentTimestamp,
   handleRef,
@@ -267,68 +163,12 @@ function useRenderPlayer({
     playbackSpeedIndex,
   } = state
 
-  const { segmentSkipMode, segmentSkipModeRevision } = useAppStore(
-    useShallow((s) => ({
-      segmentSkipMode: s.segmentSkipMode,
-      segmentSkipModeRevision: s.segmentSkipModeRevision,
-    })),
-  )
-  const segmentSkipModeRef = useRef(segmentSkipMode)
-  const currentTimeRef = useRef(0)
-  const durationRef = useRef(0)
-
   const jellyfinPlaybackSyncEnabled = useAppStore(
     (s) => s.jellyfinPlaybackSyncEnabled,
   )
 
-  const segmentTimeIndex = buildSegmentTimeIndex(segments)
-  const segmentTimeRangesRef = useRef(segmentTimeIndex.ranges)
-  useLayoutEffect(() => {
-    segmentTimeRangesRef.current = segmentTimeIndex.ranges
-  }, [segmentTimeIndex.ranges])
-  const segmentTimeRangeByIdRef = useRef(segmentTimeIndex.rangeById)
-  useLayoutEffect(() => {
-    segmentTimeRangeByIdRef.current = segmentTimeIndex.rangeById
-  }, [segmentTimeIndex.rangeById])
-
-  const [activeSkipSegmentState, setActiveSkipSegmentState] =
-    useState<ActiveSkipSegmentState | null>(null)
-  const prevActiveSegmentIdRef = useRef<string | null | undefined>(undefined)
-  const lastAutoSkippedSegmentIdRef = useRef<string | null>(null)
-
-  useLayoutEffect(() => {
-    segmentSkipModeRef.current = segmentSkipMode
-    prevActiveSegmentIdRef.current = null
-    lastAutoSkippedSegmentIdRef.current = null
-  }, [segmentSkipMode, segmentSkipModeRevision])
-
-  const activeSkipSegment = resolveActiveSkipSegment(
-    activeSkipSegmentState,
-    segmentSkipModeRevision,
-    segmentTimeIndex.rangeById,
-  )
-
-  const snappedCurrentTime = () =>
-    snapToFrame(currentTimeRef.current, frameStep)
-
   const previousStrategyRef = useRef<PlaybackStrategy | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [timelineStore] = useState(createPlaybackTimelineStore)
-
-  const playbackUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  )
-  const lastPlaybackUpdateAtRef = useRef(0)
-
-  useEffect(() => {
-    currentTimeRef.current = 0
-    durationRef.current = 0
-    timelineStore.setState({
-      currentTime: 0,
-      duration: 0,
-      buffered: 0,
-    })
-  }, [item.Id, timelineStore])
 
   const rawPosterUrl = getBestImageUrl(item, 900, 506) ?? null
   const posterUrl = useBlobUrl(rawPosterUrl)
@@ -354,6 +194,7 @@ function useRenderPlayer({
   const {
     videoRef,
     hlsRef,
+    playhead,
     strategy,
     isLoading: isVideoLoading,
     error: playerError,
@@ -376,7 +217,15 @@ function useRenderPlayer({
     onStrategyChange: handleStrategyChange,
     t,
   })
-  const hasPlayerError = playerError !== null
+
+  useLayoutEffect(() => {
+    playhead.setSegments(segments)
+  }, [playhead, segments])
+  const skipOffer = useSyncExternalStore(
+    playhead.subscribe,
+    playhead.getSkipOffer,
+    playhead.getSkipOffer,
+  )
 
   const {
     setPreferredAudioLanguage,
@@ -441,115 +290,6 @@ function useRenderPlayer({
     }
   }, [videoRef, persistedVolume, persistedMuted])
 
-  const clearPlaybackUpdateTimer = () => {
-    if (playbackUpdateTimeoutRef.current !== null) {
-      clearTimeout(playbackUpdateTimeoutRef.current)
-      playbackUpdateTimeoutRef.current = null
-    }
-  }
-
-  const publishTimelineTime = (nextTime: number) => {
-    timelineStore.setState({ currentTime: nextTime })
-  }
-
-  /**
-   * Updates the active skip segment state based on the current playback time.
-   * Handles both 'button' (show overlay) and 'skip' (seek past segment) modes.
-   * Uses refs to avoid stale closures and to batch state updates only on changes.
-   */
-  const checkSegmentSkip = (currentTime: number) => {
-    const segmentRanges = segmentTimeRangesRef.current
-    const mode = segmentSkipModeRef.current
-
-    if (mode === 'disabled' || segmentRanges.length === 0) {
-      if (prevActiveSegmentIdRef.current !== null) {
-        prevActiveSegmentIdRef.current = null
-        lastAutoSkippedSegmentIdRef.current = null
-        setActiveSkipSegmentState(null)
-      }
-      return
-    }
-
-    const activeRange = findActiveSegmentRange(segmentRanges, currentTime)
-    const active = activeRange?.segment ?? null
-    const activeId = activeRange ? getSegmentTimeRangeId(activeRange) : null
-    if (activeId !== prevActiveSegmentIdRef.current) {
-      prevActiveSegmentIdRef.current = activeId
-      if (!active) {
-        lastAutoSkippedSegmentIdRef.current = null
-      }
-      if (mode === 'button') {
-        setActiveSkipSegmentState(
-          active
-            ? {
-                segment: active,
-                segmentSkipModeRevision,
-              }
-            : null,
-        )
-      }
-    }
-
-    if (mode === 'skip' && activeRange && videoRef.current) {
-      if (lastAutoSkippedSegmentIdRef.current !== activeId) {
-        lastAutoSkippedSegmentIdRef.current = activeId
-        const endSecs = activeRange.endSeconds
-        handleSeek(endSecs)
-      }
-    }
-  }
-
-  const handleTimeUpdate: ReactEventHandler<HTMLVideoElement> = (event) => {
-    const video = event.currentTarget
-
-    const nextTime = video.currentTime
-    currentTimeRef.current = nextTime
-
-    checkSegmentSkip(nextTime)
-
-    const now = getPlaybackTimestampMs()
-    const elapsed = now - lastPlaybackUpdateAtRef.current
-    if (
-      elapsed >= PLAYBACK_UPDATE_INTERVAL_MS &&
-      playbackUpdateTimeoutRef.current === null
-    ) {
-      lastPlaybackUpdateAtRef.current = now
-      publishTimelineTime(nextTime)
-      return
-    }
-
-    if (playbackUpdateTimeoutRef.current !== null) {
-      return
-    }
-
-    const remainingDelay = Math.max(0, PLAYBACK_UPDATE_INTERVAL_MS - elapsed)
-    playbackUpdateTimeoutRef.current = setTimeout(() => {
-      playbackUpdateTimeoutRef.current = null
-
-      const latestTime = videoRef.current?.currentTime
-      if (latestTime === undefined) return
-
-      currentTimeRef.current = latestTime
-      lastPlaybackUpdateAtRef.current = getPlaybackTimestampMs()
-      publishTimelineTime(latestTime)
-    }, remainingDelay)
-  }
-
-  const handleDurationChange: ReactEventHandler<HTMLVideoElement> = (event) => {
-    const duration = event.currentTarget.duration
-    durationRef.current = duration
-    timelineStore.setState({ duration })
-  }
-
-  const handleProgress: ReactEventHandler<HTMLVideoElement> = (event) => {
-    const video = event.currentTarget
-    if (video.buffered.length) {
-      timelineStore.setState({
-        buffered: video.buffered.end(video.buffered.length - 1),
-      })
-    }
-  }
-
   const handlePlay: ReactEventHandler<HTMLVideoElement> = () => {
     dispatch({ type: 'PLAY_STATE', isPlaying: true })
   }
@@ -608,67 +348,28 @@ function useRenderPlayer({
     setPlayerMuted(newMuted)
   }
 
-  const handleSeek = (time: number) => {
-    const video = videoRef.current
-    if (!video) return
-
-    clearPlaybackUpdateTimer()
-    video.currentTime = time
-    currentTimeRef.current = time
-    lastPlaybackUpdateAtRef.current = getPlaybackTimestampMs()
-    publishTimelineTime(time)
-  }
-
-  // No deps: re-publish every commit so `seek` never closes over stale state.
   useLayoutEffect(() => {
     if (!handleRef) return
-    handleRef.current = {
-      getCurrentTime: () => currentTimeRef.current,
-      seek: handleSeek,
-    }
+    handleRef.current = playhead
     return () => {
       handleRef.current = null
     }
-  })
+  }, [handleRef, playhead])
 
   const skipForward = () => {
-    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
-    const newTime = Math.min(
-      snapToFrame(currentTimeRef.current + step, frameStep),
-      durationRef.current,
-    )
-    handleSeek(newTime)
+    playhead.skip(1, skipTimeIndex)
   }
 
   const skipBackward = () => {
-    const step = getSkipStepSeconds(skipTimeIndex, frameStep)
-    const newTime = Math.max(
-      snapToFrame(currentTimeRef.current - step, frameStep),
-      0,
-    )
-    handleSeek(newTime)
+    playhead.skip(-1, skipTimeIndex)
   }
 
   const stepFrameForward = () => {
-    handleSeek(
-      getFrameStepTargetTime(
-        currentTimeRef.current,
-        1,
-        frameStep,
-        durationRef.current,
-      ),
-    )
+    playhead.stepFrame(1)
   }
 
   const stepFrameBackward = () => {
-    handleSeek(
-      getFrameStepTargetTime(
-        currentTimeRef.current,
-        -1,
-        frameStep,
-        durationRef.current,
-      ),
-    )
+    playhead.stepFrame(-1)
   }
 
   const cycleSkipTimeUp = () => {
@@ -699,14 +400,14 @@ function useRenderPlayer({
 
   const pushStartTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: snappedCurrentTime(),
+      currentTime: playhead.getSnappedTime(),
       start: true,
     })
   }
 
   const pushEndTimestamp = () => {
     onUpdateSegmentTimestamp({
-      currentTime: snappedCurrentTime(),
+      currentTime: playhead.getSnappedTime(),
       start: false,
     })
   }
@@ -714,7 +415,7 @@ function useRenderPlayer({
   const handleCreateSegment = (type: MediaSegmentType) => {
     onCreateSegment({
       type,
-      start: snappedCurrentTime(),
+      start: playhead.getSnappedTime(),
     })
   }
 
@@ -803,12 +504,6 @@ function useRenderPlayer({
     decreaseSpeed,
   })
 
-  useEffect(() => {
-    return () => {
-      clearPlaybackUpdateTimer()
-    }
-  }, [])
-
   const handleVideoContainerKeyDown = (
     e: React.KeyboardEvent<HTMLButtonElement>,
   ) => {
@@ -817,19 +512,6 @@ function useRenderPlayer({
       e.preventDefault()
       togglePlay()
     }
-  }
-
-  const handleSkipSegment = (segment: MediaSegmentDto) => {
-    const range =
-      segment.Id !== undefined
-        ? segmentTimeRangeByIdRef.current.get(segment.Id)
-        : undefined
-    const targetEndSeconds = getSegmentSkipTargetEndSeconds(segment, range)
-    if (targetEndSeconds === null) return
-    handleSeek(targetEndSeconds)
-    setActiveSkipSegmentState(null)
-    prevActiveSegmentIdRef.current = null
-    lastAutoSkippedSegmentIdRef.current = null
   }
 
   const handleSkipTimeChange = (index: number) => {
@@ -932,9 +614,6 @@ function useRenderPlayer({
         captionTracks: nativeCaptionTracks,
         onInteraction: handleVideoInteraction,
         onKeyDown: handleVideoContainerKeyDown,
-        onTimeUpdate: handleTimeUpdate,
-        onDurationChange: handleDurationChange,
-        onProgress: handleProgress,
         onPlay: handlePlay,
         onPause: handlePause,
       }}
@@ -945,20 +624,13 @@ function useRenderPlayer({
         onRetry: handleRetry,
       }}
       segmentSkip={
-        segmentSkipMode === 'button' && !hasPlayerError && !isVideoLoading
-          ? activeSkipSegment
-            ? { segment: activeSkipSegment, onSkipSegment: handleSkipSegment }
-            : null
+        skipOffer
+          ? { segment: skipOffer, onSkipSegment: playhead.skipSegment }
           : null
       }
       controlsProps={playerControlsProps}
       timelineScrubber={
-        <TimelineScrubber
-          timelineStore={timelineStore}
-          item={item}
-          segments={segments}
-          onSeek={handleSeek}
-        />
+        <TimelineScrubber playhead={playhead} item={item} segments={segments} />
       }
     />
   )
