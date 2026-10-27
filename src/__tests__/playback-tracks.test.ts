@@ -195,6 +195,7 @@ interface StartOptions {
   item?: BaseItemDto
   /** Native audio track languages; null leaves the element without the API. */
   nativeAudio?: Array<string> | null
+  sync?: boolean
 }
 
 /** An engine playing `item` on a <video> with native audio and text track lists. */
@@ -202,8 +203,9 @@ async function start({
   strategy = 'direct',
   item = createTracksItem(),
   nativeAudio = ['eng', 'jpn', 'eng'],
+  sync = false,
 }: StartOptions = {}) {
-  const playback = createPlayback({ strategy })
+  const playback = createPlayback({ strategy, sync })
   const native = nativeAudio
     ? setNativeAudioTracks(playback.video, nativeAudio)
     : []
@@ -608,6 +610,28 @@ describe('direct play error fallback', () => {
     expect(await pending).toBe(false)
     expect(tracks.activeAudioIndex).toBe(ENGLISH)
     expect(preferences().preferredAudioLanguage).toBeNull()
+    expect(engine.getSnapshot().videoUrl).toContain(
+      `AudioStreamIndex=${ENGLISH}`,
+    )
+  })
+
+  it('drops a transcoded switch whose status stop the fallback overtook', async () => {
+    vi.mocked(supportsNativeAudioTrackSwitching).mockReturnValue(false)
+    const { engine, video, backend, tracks } = await start({
+      nativeAudio: null,
+      sync: true,
+    })
+    const stopping = deferred()
+    backend.stop.mockReturnValueOnce(stopping.promise)
+
+    const pending = tracks.selectAudio(JAPANESE)
+    await settle()
+    failMedia(video)
+    await settle()
+    stopping.resolve()
+
+    expect(await pending).toBe(false)
+    expect(tracks.activeAudioIndex).toBe(ENGLISH)
     expect(engine.getSnapshot().videoUrl).toContain(
       `AudioStreamIndex=${ENGLISH}`,
     )

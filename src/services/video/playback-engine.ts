@@ -169,6 +169,8 @@ export class PlaybackEngine<
   private source: HlsAttachment<H> | null = null
   /** Position and play state to restore once the next source can play. */
   private carry: { time: number; paused: boolean } | null = null
+  /** Counts applied sources, so a reload can tell another one landed first. */
+  private sourceRevision = 0
   private identity: SessionIdentity | null = null
   private syncEnabled = false
   private readonly reporter: PlaybackStatusReporter
@@ -300,16 +302,20 @@ export class PlaybackEngine<
   }: HlsReloadRequest): Promise<void> => {
     const load = this.current
     if (!load) return
+    // Another source applied while this waits (the HLS fallback) wins.
+    const source = this.sourceRevision
+    const superseded = () =>
+      this.current !== load || this.sourceRevision !== source
 
     this.captureCarry()
     await this.reporter.stop()
-    if (this.current !== load) return
+    if (superseded()) return
 
     const previous =
       this.identity?.strategy === 'hls' ? this.identity.playSessionId : null
     if (previous && previous !== playSessionId) {
       await this.reporter.stopPreviousEncoding(previous)
-      if (this.current !== load) return
+      if (superseded()) return
     }
 
     // load() pauses without firing 'pause', which the controls listen for.
@@ -372,6 +378,7 @@ export class PlaybackEngine<
     playSessionId: string,
   ) {
     const strategyChanged = !load.started || strategy !== this.snapshot.strategy
+    this.sourceRevision++
     this.releaseSource()
     load.started = true
 
