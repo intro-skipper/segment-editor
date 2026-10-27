@@ -93,7 +93,7 @@ const SORT_ASCENDING = [SortOrder.Ascending] as const
 export async function getCollections(
   options?: ApiOptions,
 ): Promise<Array<VirtualFolderInfo>> {
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.libraryStructureApi.getVirtualFolders(
       getRequestConfig(options),
     )
@@ -103,7 +103,6 @@ export async function getCollections(
     }
     return data.filter((folder) => folder.CollectionType !== 'homevideos')
   }, options)
-  return result ?? []
 }
 
 export async function getItems(
@@ -120,7 +119,7 @@ export async function getItems(
   requireParam(parentId, 'Parent ID')
   requireValidId(parentId, 'Parent ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.libraryApi.getItems(
       {
         parentId,
@@ -149,7 +148,6 @@ export async function getItems(
       totalCount: data.TotalRecordCount ?? items.length,
     }
   }, options)
-  return result ?? { items: [], totalCount: 0 }
 }
 
 export async function getItemById(
@@ -159,7 +157,7 @@ export async function getItemById(
   requireParam(itemId, 'Item ID')
   requireValidId(itemId, 'Item ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.libraryApi.getItems(
       {
         ids: [itemId],
@@ -171,7 +169,6 @@ export async function getItemById(
     validateItems(items, 'getItemById')
     return items[0] ?? null
   }, options)
-  return result ?? null
 }
 
 export async function getSeasons(
@@ -181,7 +178,7 @@ export async function getSeasons(
   requireParam(seriesId, 'Series ID')
   requireValidId(seriesId, 'Series ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.showApi.getSeasons(
       {
         seriesId,
@@ -192,7 +189,6 @@ export async function getSeasons(
     )
     return validateItems(data.Items ?? [], 'getSeasons')
   }, options)
-  return result ?? []
 }
 
 export async function getEpisodes(
@@ -206,7 +202,7 @@ export async function getEpisodes(
   requireValidId(seriesId, 'Series ID')
   requireValidId(seasonId, 'Season ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.showApi.getEpisodes(
       {
         seriesId,
@@ -219,7 +215,6 @@ export async function getEpisodes(
     )
     return validateItems(data.Items ?? [], 'getEpisodes')
   }, apiOptions)
-  return result ?? []
 }
 
 export async function getAlbums(
@@ -229,7 +224,7 @@ export async function getAlbums(
   requireParam(artistId, 'Artist ID')
   requireValidId(artistId, 'Artist ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.libraryApi.getItems(
       {
         artistIds: [artistId],
@@ -242,7 +237,6 @@ export async function getAlbums(
     )
     return validateItems(data.Items ?? [], 'getAlbums')
   }, options)
-  return result ?? []
 }
 
 export async function getTracks(
@@ -253,7 +247,7 @@ export async function getTracks(
   requireParam(albumId, 'Album ID')
   requireValidId(albumId, 'Album ID')
 
-  const result = await withApi(async (apis) => {
+  return withApi(async (apis) => {
     const { data } = await apis.libraryApi.getItems(
       {
         parentId: albumId,
@@ -267,5 +261,4 @@ export async function getTracks(
     )
     return validateItems(data.Items ?? [], 'getTracks')
   }, apiOptions)
-  return result ?? []
 }

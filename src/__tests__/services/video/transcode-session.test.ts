@@ -30,10 +30,9 @@ describe('transcode-session active encoding cleanup', () => {
     vi.mocked(withApi).mockImplementation(async (callback) => {
       // SAFETY: withApi hands its callback the full Jellyfin API set, but
       // this path reaches only the raw client fields stubbed below.
-      await callback({
+      return callback({
         api: { basePath: 'https://jellyfin.example', accessToken: 'token' },
       } as never)
-      return null
     })
   })
 
