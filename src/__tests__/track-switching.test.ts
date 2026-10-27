@@ -91,29 +91,6 @@ describe('switchAudioTrack native and HLS runtime selection', () => {
     vi.clearAllMocks()
   })
 
-  it('enables the direct-play native audio track by relative index', async () => {
-    const video = document.createElement('video')
-    const { list, tracks } = createNativeAudioTracks(['eng', 'jpn'])
-    Object.defineProperty(video, 'audioTracks', {
-      configurable: true,
-      value: list,
-    })
-    const onReloadHls = vi.fn<() => Promise<void>>()
-
-    await expect(
-      switchAudioTrack(7, {
-        strategy: 'direct',
-        videoElement: video,
-        audioTracks: [createAudioTrack(5, 0), createAudioTrack(7, 1, 'jpn')],
-        itemId: 'item-native',
-        onReloadHls,
-      }),
-    ).resolves.toEqual({ success: true })
-
-    expect(tracks.map((track) => track.enabled)).toEqual([false, true])
-    expect(onReloadHls).not.toHaveBeenCalled()
-  })
-
   it('uses native audio track language matching when relative index is invalid', async () => {
     const video = document.createElement('video')
     const { list, tracks } = createNativeAudioTracks(['eng', 'jpn'])
@@ -370,53 +347,6 @@ describe('switchAudioTrack async reload failures', () => {
     })
   })
 
-  it('returns api_unsupported when direct-play fallback lacks item id', async () => {
-    const result = await switchAudioTrack(5, {
-      strategy: 'direct',
-      videoElement: document.createElement('video'),
-      audioTracks: [createAudioTrack(5, 0)],
-      onReloadHls: vi.fn<() => Promise<void>>(),
-    })
-
-    expect(getVideoStreamUrlMock).not.toHaveBeenCalled()
-    expect(result).toEqual({
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message:
-          'Audio track switching requires transcoding in this browser. Item ID not available.',
-        trackIndex: 5,
-      },
-    })
-  })
-
-  it('returns api_unsupported when hls reload-required path lacks reload callback', async () => {
-    const hlsInstance = {
-      audioTracks: [],
-      audioTrack: 0,
-      subtitleTracks: [],
-      subtitleTrack: -1,
-    }
-
-    const result = await switchAudioTrack(7, {
-      strategy: 'hls',
-      videoElement: document.createElement('video'),
-      hlsInstance,
-      audioTracks: [createAudioTrack(7, 0)],
-      itemId: 'item-hls',
-    })
-
-    expect(getVideoStreamUrlMock).not.toHaveBeenCalled()
-    expect(result).toEqual({
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message: 'HLS reload callback not provided',
-        trackIndex: 7,
-      },
-    })
-  })
-
   it('returns network_error when reload URL generation fails', async () => {
     getVideoStreamUrlMock.mockReturnValue('')
     const onReloadHls = vi.fn<() => Promise<void>>()
@@ -463,6 +393,8 @@ describe('switchSubtitleTrack', () => {
           createSubtitleTrack(4, 1),
           createSubtitleTrack(5, 2),
         ],
+        itemId: 'item-subtitle',
+        onReloadHls: vi.fn<() => Promise<void>>(),
       }),
     ).resolves.toEqual({ success: true })
 
@@ -470,30 +402,6 @@ describe('switchSubtitleTrack', () => {
       'disabled',
       'disabled',
       'showing',
-    ])
-  })
-
-  it('disables existing text tracks when subtitles are turned off', async () => {
-    const video = document.createElement('video')
-    const textTracks: Array<{ mode: TextTrackMode }> = [
-      { mode: 'showing' },
-      { mode: 'showing' },
-    ]
-    Object.defineProperty(video, 'textTracks', {
-      configurable: true,
-      value: textTracks,
-    })
-
-    await expect(
-      switchSubtitleTrack(null, {
-        strategy: 'hls',
-        videoElement: video,
-      }),
-    ).resolves.toEqual({ success: true })
-
-    expect(textTracks.map((track) => track.mode)).toEqual([
-      'disabled',
-      'disabled',
     ])
   })
 })

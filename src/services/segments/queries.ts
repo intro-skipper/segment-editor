@@ -12,9 +12,9 @@ import { readSegments } from '@/services/segments/store'
 import { segmentsKeys } from './query-keys'
 
 /**
- * Stable default for an unresolved segments query (`data` while the query is
- * disabled or loading). An inline `= []` default at the call site allocates a
- * new array identity every render, defeating memoization keyed on the data.
+ * Stable stand-in for `data.segments` while the query is disabled or loading.
+ * An inline `= []` would allocate a new array every render, defeating
+ * memoization keyed on it.
  */
 export const NO_SEGMENTS: Array<Segment> = []
 

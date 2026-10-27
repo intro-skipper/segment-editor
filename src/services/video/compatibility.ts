@@ -23,7 +23,7 @@ import { lookup } from '@/lib/utils'
  * Video stream metadata used to build precise codec strings and decoding configs.
  * Every field is optional: Jellyfin does not always report full stream details.
  */
-export interface VideoStreamInfo {
+interface VideoStreamInfo {
   codec: string
   /** Codec profile as reported by Jellyfin (e.g. "High", "Main 10") */
   profile?: string
@@ -737,8 +737,8 @@ export async function checkCompatibility(
   const { container, videoCodec } = mediaSource
 
   // The browser starts playback on the container-default track, so that is
-  // the stream that decides direct play. Legacy callers without audioStreams
-  // metadata fall back to the flat audioCodec field.
+  // the stream that decides direct play; a source without audio streams falls
+  // back to the flat audioCodec field.
   const defaultAudioStream = getContainerDefaultAudioTrack(
     mediaSource.audioStreams ?? [],
   )

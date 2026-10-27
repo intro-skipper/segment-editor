@@ -65,11 +65,11 @@ export interface TrackSwitchOptions {
   /** Subtitle tracks for index mapping */
   subtitleTracks?: Array<SubtitleTrackInfo>
   /** Item ID for URL generation (needed for reload fallback) */
-  itemId?: string
+  itemId: string
   /** Media source ID for URL generation */
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
-  onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
+  onReloadHls: (reload: HlsReloadRequest) => Promise<void>
   /** AbortSignal that cancels stale async operations (native audio wait, transcode reload) */
   signal?: AbortSignal
   /**
@@ -107,15 +107,8 @@ export type TrackSwitchResult =
     }
 
 /**
- * Generates an HLS URL with a specific audio stream index.
- * Used when switching audio tracks in HLS mode requires a stream reload.
- *
- * Note: This function does NOT include StartTimeTicks because the HLS player hook
- * handles playback state preservation and restoration automatically.
- *
- * @param itemId - The media item ID
- * @param audioStreamIndex - The audio stream index to use
- * @returns The HLS URL with audio stream parameter
+ * An HLS request for audio stream `audioStreamIndex` under a new play session.
+ * No StartTimeTicks: the playback engine carries the position across the reload.
  */
 function getHlsUrlWithAudioTrack(
   itemId: string,
@@ -369,18 +362,12 @@ function disableTextTracks(
 }
 
 interface HlsReloadMessages {
-  missingItemId: string
-  missingReloadCallback: string
   urlGenerationFailed: string
   reloadFailed: string
 }
 
 /** Messages for the direct-play → HLS transcode fallback paths. */
 const DIRECT_PLAY_HLS_FALLBACK_MESSAGES: HlsReloadMessages = {
-  missingItemId:
-    'Audio track switching requires transcoding in this browser. Item ID not available.',
-  missingReloadCallback:
-    'Audio track switching requires transcoding in this browser. Please wait for the stream to reload.',
   urlGenerationFailed: 'Failed to generate HLS URL for audio track switching',
   reloadFailed: 'Failed to reload HLS stream for audio track switching',
 }
@@ -398,22 +385,6 @@ async function reloadHlsAudioTrack(
   }
 
   const { itemId, mediaSourceId, onReloadHls } = options
-
-  if (!itemId) {
-    return createTrackSwitchError(
-      'api_unsupported',
-      messages.missingItemId,
-      trackIndex,
-    )
-  }
-
-  if (!onReloadHls) {
-    return createTrackSwitchError(
-      'api_unsupported',
-      messages.missingReloadCallback,
-      trackIndex,
-    )
-  }
 
   const reload = getHlsUrlWithAudioTrack(itemId, trackIndex, mediaSourceId)
   if (!reload.url) {
@@ -614,8 +585,6 @@ export async function switchAudioTrack(
     // If HLS switching requires a reload, generate new URL and trigger reload
     if (result.success && result.reloadRequired) {
       return reloadHlsAudioTrack(trackIndex, options, {
-        missingItemId: 'Item ID required for HLS audio track switching',
-        missingReloadCallback: 'HLS reload callback not provided',
         urlGenerationFailed: 'Failed to generate HLS URL with audio track',
         reloadFailed: 'Failed to reload HLS stream with new audio track',
       })

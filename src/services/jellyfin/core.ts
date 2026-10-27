@@ -31,7 +31,7 @@ const DEVICE_ID_KEY = 'segment-editor-device-id'
 const PLUGIN_CONFIGURATION_PATH = '/configurationpage'
 
 /** Base route name used for the standalone app URL (e.g. `/SegmentEditor`). */
-export const APP_BASE_ROUTE = 'SegmentEditor' as const
+const APP_BASE_ROUTE = 'SegmentEditor' as const
 
 export const PLUGIN_ROUTER_BASE_PATH = PLUGIN_CONFIGURATION_PATH
 export const PLUGIN_ROUTER_ENTRY =
@@ -107,8 +107,6 @@ export const isPluginMode = (): boolean => getPluginApiClient() !== undefined
  * To add a new desktop client variant, append its UA substring to the
  * alternation (e.g. `JellyfinDesktop|JellyfinMediaPlayer|NewClient`).
  * The pattern is tested via {@link isJellyfinDesktopClient}.
- *
- * Exported for reuse and testing.
  */
 const DESKTOP_UA_PATTERNS = /JellyfinDesktop|JellyfinMediaPlayer/i
 

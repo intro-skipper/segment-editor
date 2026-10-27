@@ -51,7 +51,7 @@ export interface AudioTrackInfo {
  *
  * Index mapping:
  * - `index`: Original Jellyfin MediaStream index (includes all stream types: video, audio, subtitle)
- * - `relativeIndex`: 0-based position within subtitle tracks only (for HLS.js/HTML5 API)
+ * - `relativeIndex`: 0-based position within subtitle tracks only (for HTML5 textTracks)
  */
 export interface SubtitleTrackInfo {
   /**
@@ -62,7 +62,7 @@ export interface SubtitleTrackInfo {
   index: number
   /**
    * 0-based position within subtitle tracks only.
-   * Use this for HLS.js subtitleTrack setter and HTML5 textTracks array access.
+   * Use this for HTML5 textTracks access (the <track> captions in stream order).
    */
   relativeIndex: number
   /** ISO 639 language code (e.g., "eng", "deu") or null if unknown */
@@ -226,14 +226,7 @@ const EMPTY_TRACK_RESULT: TrackExtractionResult = {
   subtitleTracks: [],
 }
 
-/**
- * Cache keyed on the item object, so the same item always yields the same
- * result object. Callers key effects and memoization on the returned track
- * identities, and React Compiler 1.0.0 does not cache this call in compiled
- * hooks/components (verified in its emitted output) - re-extracting per
- * render re-created the JASSUB renderer in a loop. Do not remove without
- * re-verifying that compiled callers cache the call themselves.
- */
+/** Cache keyed on the item object, so one item object always yields the same track objects. */
 const trackExtractionCache = new WeakMap<
   Pick<BaseItemDto, 'MediaSources'>,
   TrackExtractionResult
@@ -387,8 +380,3 @@ function formatSubtitleTrackLabel(track: {
 
   return `${languageName} - ${track.format}`
 }
-
-// ============================================================================
-// Language Utilities
-// ============================================================================
-// getLanguageName is imported from @/lib/language-utils — single source of truth.

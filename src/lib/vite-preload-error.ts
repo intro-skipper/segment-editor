@@ -14,7 +14,7 @@ function getSessionStorage(): VitePreloadErrorStorage | undefined {
   }
 }
 
-export interface VitePreloadErrorHandlerOptions {
+interface VitePreloadErrorHandlerOptions {
   location?: Pick<Location, 'href' | 'reload'>
   storage?: VitePreloadErrorStorage
 }

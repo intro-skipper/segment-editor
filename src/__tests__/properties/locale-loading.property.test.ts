@@ -38,7 +38,7 @@ const sampleTranslationKeys = [
   'app.title',
   'app.theme.title',
   'app.locale.title',
-  'login.test_conn',
+  'login.http_warning.title',
   'segment.start',
   'segment.end',
   'yes',

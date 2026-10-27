@@ -5,29 +5,14 @@
     "seekToStart": "Seek to start time",
     "seekToEnd": "Seek to end time",
     "playPause": "Play or pause video",
-    "keyboardShortcuts": "View keyboard shortcuts",
-    "skipTimeSelector": "Select skip time interval",
-    "dragHandle": "Drag to reorder",
-    "closeDialog": "Close dialog",
     "skipToMain": "Skip to main content",
     "mainContent": "Main content",
     "navigation": "Main navigation",
     "loading": "Loading content",
-    "loadingComplete": "Content loaded",
-    "searchResults": "{{count}} results found",
-    "noResults": "No results found",
-    "currentPage": "Page {{page}} of {{total}}",
-    "expandMenu": "Expand menu",
-    "collapseMenu": "Collapse menu",
-    "required": "Required field",
-    "optional": "Optional field",
-    "error": "Error: {{message}}",
-    "success": "Success: {{message}}",
     "pagination": {
       "previous": "Go to previous page",
       "next": "Go to next page",
-      "page": "Go to page {{page}}",
-      "current": "Current page, page {{page}}"
+      "page": "Go to page {{page}}"
     },
     "mediaCard": {
       "viewSeries": "View series: {{name}}",
@@ -40,42 +25,14 @@
     "player": {
       "progressLabel": "Video progress",
       "videoProgress": "{{current}} of {{total}}",
-      "volumeLevel": "Volume: {{level}}%",
-      "muted": "Audio muted",
-      "unmuted": "Audio unmuted",
-      "playing": "Video playing",
-      "buffering": "Video buffering",
-      "controls": "Video player controls"
-    },
-    "segment": {
-      "selected": "Segment {{index}} selected",
-      "created": "New segment created",
-      "deleted": "Segment deleted",
-      "updated": "Segment updated"
-    },
-    "form": {
-      "invalidInput": "Invalid input",
-      "fieldRequired": "This field is required",
-      "characterCount": "{{current}} of {{max}} characters"
-    },
-    "settings": {
-      "description": "Configure application settings including server connection, theme, language, and display preferences"
+      "muted": "Audio muted"
     }
   },
   "login": {
-    "api_key": "Jellyfin API Key",
-    "server_address": "Jellyfin Server Address",
-    "test_conn": "Test Connection",
     "connect": "Connect to Server",
     "connect_success": "Successfully connected to server",
     "disconnected": "Disconnected from server",
     "not_connected": "Not connected to any server",
-    "validation": {
-      "api_key_invalid": "API Key Invalid",
-      "url_invalid": "URL invalid. Should start with http:// or https://"
-    },
-    "connect_fail": "Connection failed!",
-    "auth_fail": "Authentication failed!",
     "http_warning": {
       "title": "HTTP Connection Warning",
       "message": "Firefox has known issues with HTTP connections. For the best experience, please use Google Chrome or Microsoft Edge.",
@@ -103,15 +60,8 @@
       "card": "Card",
       "list": "List"
     },
-    "plugins": {
-      "title": "Installed Server Plugins"
-    },
     "name": "Segment Editor",
-    "title": "Segment Editor",
-    "showVideoPlayer": "Show Video Player",
-    "pagesize": {
-      "unlimited": "Unlimited"
-    }
+    "title": "Segment Editor"
   },
   "connection": {
     "notConnected": "Not Connected",
@@ -126,9 +76,7 @@
     }
   },
   "items": {
-    "select_collection": "Select a collection to browse",
     "filter": {
-      "name": "Search",
       "collection": "Collection",
       "selectCollection": "Select collection"
     },
@@ -151,9 +99,6 @@
     "saveSegment": "Save",
     "deleteSure": "Are you sure to delete segment '{{Type}}'?",
     "deleteSureTitle": "Delete Segment",
-    "deleteSureTitle_plural": "Delete {{count}} Segments",
-    "time": "Time",
-    "deleteSegments": "Are you sure to delete all segments for '{{item}}'?",
     "newSegment": "New Segment",
     "actions": "Segment actions",
     "paste": "Paste",
@@ -202,12 +147,6 @@
   },
   "close": "Close",
   "back": "Back",
-  "provider": {
-    "title": "Provider ID (Name)",
-    "skipper": "Intro Skipper",
-    "chapter": "Chapter Segments",
-    "segment": "MediaSegments API"
-  },
   "error": {
     "not_found": "Page Not Found",
     "not_found_description": "The page you're looking for doesn't exist or has been moved.",
@@ -219,7 +158,6 @@
   "common": {
     "cancel": "Cancel",
     "go_back": "Go Back",
-    "goBack": "Go back",
     "home": "Home",
     "reload": "Reload",
     "retry": "Retry"
@@ -241,10 +179,6 @@
     "nextEpisode": "Next episode",
     "controls": "Video player controls",
     "recovering": "Recovering playback",
-    "directPlay": "Direct play",
-    "hlsFallback": "Transcoded playback",
-    "direct": "Direct",
-    "hls": "HLS",
     "strategy": {
       "direct": "Direct Play - Original quality, no transcoding",
       "hls": "HLS Streaming - Transcoded for compatibility",
@@ -258,17 +192,13 @@
       "network": "Network error. Check your connection.",
       "media": "Media playback error. Attempting recovery...",
       "unknown": "Unable to play video.",
-      "directPlayFailed": "Direct playback failed. Switching to transcoded stream...",
-      "trackSwitch": "Failed to switch track",
-      "trackUnavailable": "Track is not available",
-      "subtitleLoadFailed": "Failed to load subtitles"
+      "directPlayFailed": "Direct playback failed. Switching to transcoded stream..."
     },
     "subtitle": {
       "error": {
         "jassubInit": "Failed to initialize subtitle renderer",
         "loadFailed": "Failed to load subtitle file",
         "wasmFailed": "Failed to load subtitle renderer module",
-        "webgpuRequired": "WebGPU required for ASS/SSA subtitles",
         "timeout": "Subtitle renderer initialization timed out"
       }
     },
@@ -276,20 +206,12 @@
       "audio": "Audio",
       "subtitle": "Subtitles",
       "off": "Off",
-      "unknown": "Unknown",
       "selector": "Audio and subtitle tracks",
       "noTracks": "No tracks available",
       "audioSwitchTranscodeHint": "Switching audio restarts the stream as a transcode",
       "audioSwitchPartialTranscodeHint": "Switching to some audio tracks restarts the stream as a transcode",
       "audioSwitchChromiumFlagTip": "Tip: Chromium browsers can switch audio in place when “Experimental Web Platform features” is enabled in chrome://flags",
-      "channels": {
-        "mono": "Mono",
-        "stereo": "Stereo",
-        "surround51": "5.1",
-        "surround71": "7.1"
-      },
       "error": {
-        "noVideo": "Video element not available",
         "trackNotFound": "Track not found",
         "switchFailed": "Failed to switch track"
       }
@@ -328,12 +250,10 @@
     "stepFrameBackForward": "Step frame back / forward"
   },
   "series": {
-    "unknownSeries": "Unknown Series",
     "noSeasons": "No seasons found for this series",
     "noEpisodes": "No episodes found",
     "loadingEpisodes": "Loading episodes for {{season}}...",
     "episodeLoadError": "Failed to load episodes",
-    "seasonNumber": "Season {{number}}",
     "episodes": "Episodes",
     "loadError": "Failed to load episodes",
     "episode": "Episode"

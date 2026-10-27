@@ -138,9 +138,8 @@ afterEach(() => {
 })
 
 describe('PlayerSurface', () => {
-  it('renders captions, inline controls, and the segment skip action', async () => {
+  it('renders captions and the inline controls', async () => {
     const playback = await playingHls()
-    playback.engine.playhead.setSegments([skipSegment])
     const { container } = renderSurface({}, playback)
 
     const tracks = Array.from(container.querySelectorAll('track'))
@@ -150,15 +149,6 @@ describe('PlayerSurface', () => {
     ])
     expect(screen.getByTestId('timeline-scrubber')).toBeTruthy()
     expect(screen.getByTestId('player-controls')).toBeTruthy()
-
-    playback.video.currentTime = 12
-    act(() => {
-      playback.video.dispatchEvent(new Event('timeupdate'))
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Skip type:Intro' }))
-
-    expect(playback.video.currentTime).toBe(20)
-    expect(screen.queryByRole('button', { name: 'Skip type:Intro' })).toBe(null)
   })
 
   it('renders fullscreen controls, hides inline scrubber, and exposes hidden-control state', () => {

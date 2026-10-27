@@ -5,10 +5,6 @@
     "seekToStart": "Aller au temps de début",
     "seekToEnd": "Aller au temps de fin",
     "playPause": "Lire ou mettre en pause la vidéo",
-    "keyboardShortcuts": "Voir les raccourcis clavier",
-    "skipTimeSelector": "Sélectionner l'intervalle de saut",
-    "dragHandle": "Glisser pour réorganiser",
-    "closeDialog": "Fermer le dialogue",
     "pagination": {
       "previous": "Aller à la page précédente",
       "next": "Aller à la page suivante",
@@ -24,15 +20,6 @@
     }
   },
   "login": {
-    "api_key": "Clé d'API Jellyfin",
-    "server_address": "Adresse du serveur Jellyfin",
-    "test_conn": "Test de connexion",
-    "validation": {
-      "api_key_invalid": "Clé d'API invalide",
-      "url_invalid": "URL invalide. Doit commencer par http:// ou https://"
-    },
-    "connect_fail": "Connexion échouée !",
-    "auth_fail": "Échec d'authentification !",
     "http_warning": {
       "title": "Avertissement de connexion HTTP",
       "message": "Firefox a des problèmes connus avec les connexions HTTP. Pour une meilleure expérience, veuillez utiliser Google Chrome ou Microsoft Edge.",
@@ -60,14 +47,7 @@
       "card": "Carte",
       "list": "Liste"
     },
-    "plugins": {
-      "title": "Plugins de serveur installés"
-    },
-    "title": "Éditeur de segment",
-    "showVideoPlayer": "Afficher le lecteur vidéo",
-    "pagesize": {
-      "unlimited": "Illimitée"
-    }
+    "title": "Éditeur de segment"
   },
   "connection": {
     "error": {
@@ -77,9 +57,7 @@
     }
   },
   "items": {
-    "select_collection": "Sélectionnez une collection à parcourir",
     "filter": {
-      "name": "Recherche",
       "collection": "Collection"
     },
     "seasonCount_one": "{{count}} saison",
@@ -96,9 +74,6 @@
     "saveSegment": "Sauvegarder",
     "deleteSure": "Êtes-vous sûr de supprimer le segment '{{Type}}' ?",
     "deleteSureTitle": "Supprimer un segment",
-    "deleteSureTitle_plural": "Supprimer {{count}} segments",
-    "time": "Temps",
-    "deleteSegments": "Êtes-vous sûr de supprimer tous les segments pour '{{item}}' ?",
     "newSegment": "Nouveau segment",
     "slider": {
       "title": "Éditeur de Slider"
@@ -145,12 +120,6 @@
   },
   "close": "Fermer",
   "back": "Retour",
-  "provider": {
-    "title": "Provider ID (Nom)",
-    "skipper": "Intro Skipper",
-    "chapter": "Chapter Segments",
-    "segment": "MediaSegments API"
-  },
   "error": {
     "not_found": "Page non trouvée",
     "not_found_description": "La page que vous recherchez n'existe pas ou a été déplacée."
@@ -158,7 +127,6 @@
   "common": {
     "cancel": "Annuler",
     "go_back": "Retour",
-    "goBack": "Retour",
     "home": "Accueil",
     "reload": "Recharger",
     "retry": "Réessayer"
@@ -178,10 +146,6 @@
     "retry": "Réessayer",
     "selectEpisode": "Sélectionner un épisode",
     "nextEpisode": "Épisode suivant",
-    "directPlay": "Lecture directe",
-    "hlsFallback": "Lecture transcodée",
-    "direct": "Direct",
-    "hls": "HLS",
     "strategy": {
       "direct": "Lecture directe - Qualité originale, sans transcodage",
       "hls": "Streaming HLS - Transcodé pour la compatibilité"
@@ -193,10 +157,7 @@
       "network": "Erreur réseau. Vérifiez votre connexion.",
       "media": "Erreur de lecture. Tentative de récupération...",
       "unknown": "Impossible de lire la vidéo.",
-      "directPlayFailed": "Échec de la lecture directe. Passage au flux transcodé...",
-      "trackSwitch": "Échec du changement de piste",
-      "trackUnavailable": "Piste non disponible",
-      "subtitleLoadFailed": "Échec du chargement des sous-titres"
+      "directPlayFailed": "Échec de la lecture directe. Passage au flux transcodé..."
     },
     "subtitle": {
       "error": {
@@ -209,20 +170,12 @@
       "audio": "Audio",
       "subtitle": "Sous-titres",
       "off": "Désactivé",
-      "unknown": "Inconnu",
       "selector": "Pistes audio et sous-titres",
       "noTracks": "Aucune piste disponible",
       "audioSwitchTranscodeHint": "Changer de piste audio redémarre le flux en transcodage",
       "audioSwitchPartialTranscodeHint": "Changer vers certaines pistes audio redémarre le flux en transcodage",
       "audioSwitchChromiumFlagTip": "Astuce : les navigateurs Chromium peuvent changer de piste audio sans redémarrage lorsque « Experimental Web Platform features » est activé dans chrome://flags",
-      "channels": {
-        "mono": "Mono",
-        "stereo": "Stéréo",
-        "surround51": "5.1",
-        "surround71": "7.1"
-      },
       "error": {
-        "noVideo": "Élément vidéo non disponible",
         "trackNotFound": "Piste non trouvée",
         "switchFailed": "Échec du changement de piste"
       }
@@ -261,12 +214,10 @@
     "stepFrameBackForward": "Image précédente / suivante"
   },
   "series": {
-    "unknownSeries": "Série inconnue",
     "noSeasons": "Aucune saison trouvée pour cette série",
     "noEpisodes": "Aucun épisode trouvé",
     "loadingEpisodes": "Chargement des épisodes pour {{season}}...",
     "episodeLoadError": "Échec du chargement des épisodes",
-    "seasonNumber": "Saison {{number}}",
     "episodes": "Épisodes"
   },
   "settings": {

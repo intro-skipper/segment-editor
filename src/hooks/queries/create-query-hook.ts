@@ -1,5 +1,6 @@
 /**
- * Factory utilities for creating standardized TanStack Query hooks.
+ * Query options with the app's cache times, retry policy and error logging,
+ * for useServerQuery and the route loaders' ensureQueryData.
  */
 
 import {

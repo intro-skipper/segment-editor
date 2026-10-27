@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { z } from 'zod'
 
 export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96, 120] as const
-export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 export const VIEW_MODE_OPTIONS = ['card', 'list'] as const
 export type ViewMode = (typeof VIEW_MODE_OPTIONS)[number]
 

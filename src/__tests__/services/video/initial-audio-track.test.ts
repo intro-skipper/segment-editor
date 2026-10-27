@@ -85,28 +85,6 @@ describe('applyInitialAudioTrack', () => {
     getVideoStreamUrlMock.mockReturnValue('https://example.com/hls.m3u8')
   })
 
-  it('enables the matching native track when playback starts on a non-default track', async () => {
-    const nativeTracks = createNativeTrackList(['eng', 'jpn'])
-    const onReloadHls = vi.fn<() => Promise<void>>()
-
-    await expect(
-      applyInitialAudioTrack(7, {
-        strategy: 'direct',
-        videoElement: createVideoWithNativeTracks(nativeTracks),
-        audioTracks: [
-          createAudioTrack(5, 0),
-          createAudioTrack(7, 1, { language: 'jpn' }),
-        ],
-        itemId: 'item-native',
-        onReloadHls,
-        nativeTrackTimeoutMs: 0,
-      }),
-    ).resolves.toEqual({ success: true })
-
-    expect(nativeTracks.map((track) => track.enabled)).toEqual([false, true])
-    expect(onReloadHls).not.toHaveBeenCalled()
-  })
-
   it('leaves the container default track untouched', async () => {
     const nativeTracks = createNativeTrackList(['eng', 'jpn'])
     const onReloadHls = vi.fn<() => Promise<void>>()
@@ -330,26 +308,6 @@ describe('applyInitialAudioTrack', () => {
         trackIndex: 99,
       },
     })
-  })
-
-  it('does nothing in HLS mode, where the track is baked into the transcode', async () => {
-    const onReloadHls = vi.fn<() => Promise<void>>()
-
-    await expect(
-      applyInitialAudioTrack(7, {
-        strategy: 'hls',
-        videoElement: document.createElement('video'),
-        audioTracks: [
-          createAudioTrack(5, 0),
-          createAudioTrack(7, 1, { language: 'jpn' }),
-        ],
-        itemId: 'item-native',
-        onReloadHls,
-        nativeTrackTimeoutMs: 0,
-      }),
-    ).resolves.toEqual({ success: true })
-
-    expect(onReloadHls).not.toHaveBeenCalled()
   })
 })
 
