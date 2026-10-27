@@ -22,7 +22,6 @@ const { SKIP_TIMES } = PLAYER_CONFIG
 /** Arbitrary for generating valid PlayerState */
 const playerStateArb: fc.Arbitrary<PlayerState> = fc.record({
   skipTimeIndex: fc.integer({ min: 0, max: SKIP_TIMES.length - 1 }),
-  subtitleOffset: fc.float({ min: -30, max: 30, noNaN: true }),
 })
 
 describe('Reducer Reference Stability', () => {
@@ -95,32 +94,6 @@ describe('Reducer Reference Stability', () => {
           const action: PlayerAction = { type: 'CYCLE_SKIP', direction: -1 }
           const result = playerReducer(state, action)
           return result !== state && result.skipTimeIndex === skipTimeIndex - 1
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
-
-  /**
-   * Property: State values are preserved for unchanged fields
-   * When an action changes one field, all other fields should remain unchanged.
-   */
-  it('preserves unchanged fields when updating state', () => {
-    fc.assert(
-      fc.property(
-        playerStateArb,
-        fc.float({ min: -30, max: 30, noNaN: true }),
-        (state, newOffset) => {
-          fc.pre(newOffset !== state.subtitleOffset)
-          const action: PlayerAction = {
-            type: 'SUBTITLE_OFFSET_CHANGE',
-            offset: newOffset,
-          }
-          const result = playerReducer(state, action)
-          return (
-            result.skipTimeIndex === state.skipTimeIndex &&
-            result.subtitleOffset === newOffset
-          )
         },
       ),
       { numRuns: 100 },

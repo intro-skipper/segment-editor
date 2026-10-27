@@ -100,7 +100,7 @@ vi.mock('@/services/video/subtitle', async (importOriginal) => ({
   preloadJassubRenderer: () => Promise.resolve(),
   createJassubRenderer: () =>
     Promise.resolve({
-      instance: { resize: () => {} },
+      instance: { resize: async () => {} },
       destroy: () => {},
       setTimeOffset,
       setTrack: () => Promise.resolve(),
@@ -591,6 +591,12 @@ describe('PlayerEditor playback', () => {
     fireEvent.change(screen.getByRole('slider', { name: 'Subtitle Offset' }), {
       target: { value: '2.5' },
     })
+    expect(
+      asElement(
+        screen.getByRole('slider', { name: 'Subtitle Offset' }),
+        HTMLInputElement,
+      ).value,
+    ).toBe('2.5')
 
     fireEvent.click(button('Next episode'))
     await act(settle)

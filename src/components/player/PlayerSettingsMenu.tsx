@@ -6,6 +6,7 @@ import {
   usePlayback,
   usePlaybackEngine,
   usePlaybackTracks,
+  useSubtitleOffset,
 } from './playback-context'
 
 import { formatForDisplay } from '@tanstack/react-hotkeys'
@@ -33,16 +34,12 @@ const CHEATSHEET_DISPLAY = PLAYER_SHORTCUT_CHEATSHEET.map((entry) => ({
 export interface PlayerSettingsMenuProps {
   skipTimeIndex: number
   onSkipTimeChange: (index: number) => void
-  subtitleOffset: number
-  onSubtitleOffsetChange: (offset: number) => void
 }
 
 /** Skip size, playback speed, subtitle offset and the shortcut cheatsheet. */
 export function PlayerSettingsMenu({
   skipTimeIndex,
   onSkipTimeChange,
-  subtitleOffset,
-  onSubtitleOffsetChange,
   portalContainer,
 }: PlayerSettingsMenuProps & {
   portalContainer: React.RefObject<HTMLElement | null>
@@ -54,15 +51,16 @@ export function PlayerSettingsMenu({
   const hasActiveSubtitle = usePlaybackTracks(
     (s) => s.activeSubtitleIndex !== null,
   )
+  const subtitleOffset = useSubtitleOffset()
 
   const handleSubtitleOffsetChange = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    onSubtitleOffsetChange(parseFloat(e.target.value))
+    engine.subtitles.setOffset(parseFloat(e.target.value))
   }
 
   const handleSubtitleOffsetReset = () => {
-    onSubtitleOffsetChange(0)
+    engine.subtitles.setOffset(0)
   }
 
   const shortcutItems = CHEATSHEET_DISPLAY.map(({ labelKey, displayKeys }) => (

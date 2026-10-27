@@ -20,7 +20,6 @@ interface WireMediaStream {
   Channels?: number | null
   IsDefault?: boolean | null
   IsExternal?: boolean | null
-  DeliveryUrl?: string | null
 }
 
 /** The slice of an item carrying those streams. */
@@ -55,7 +54,7 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
     })
   })
 
-  it('normalizes nullable stream fields and DeliveryUrl null', () => {
+  it('normalizes nullable stream fields', () => {
     const item: WireItem = {
       MediaSources: [
         {
@@ -77,7 +76,6 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
               Codec: null,
               IsExternal: null,
               IsDefault: null,
-              DeliveryUrl: null,
             },
           ],
         },
@@ -109,7 +107,6 @@ describe('extractTracks null-tolerant Jellyfin input', () => {
         format: 'Unknown',
         isExternal: false,
         isDefault: false,
-        deliveryUrl: undefined,
       },
     ])
   })

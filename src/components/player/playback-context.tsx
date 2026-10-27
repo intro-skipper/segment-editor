@@ -76,3 +76,9 @@ export function usePlaybackTracks<T>(
     selector(tracks.getState()),
   )
 }
+
+/** The user subtitle offset in seconds; set it through `engine.subtitles`. */
+export function useSubtitleOffset(): number {
+  const { subtitles } = usePlaybackEngine()
+  return useSyncExternalStore(subtitles.subscribe, subtitles.getOffset)
+}

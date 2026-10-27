@@ -75,8 +75,6 @@ export interface SubtitleTrackInfo {
   isExternal: boolean
   /** Whether this is the default subtitle track */
   isDefault: boolean
-  /** URL to fetch external subtitles from Jellyfin server */
-  deliveryUrl?: string
 }
 
 /**
@@ -330,7 +328,6 @@ function extractSubtitleTrack(
     format,
     isExternal: stream.IsExternal ?? false,
     isDefault: stream.IsDefault ?? false,
-    deliveryUrl: stream.DeliveryUrl ?? undefined,
   }
 }
 

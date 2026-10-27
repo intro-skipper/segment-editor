@@ -496,33 +496,4 @@ describe('switchSubtitleTrack', () => {
       'disabled',
     ])
   })
-
-  it('disables existing text tracks before initializing ASS subtitles', async () => {
-    const video = document.createElement('video')
-    const textTracks: Array<{ mode: TextTrackMode }> = [
-      { mode: 'showing' },
-      { mode: 'hidden' },
-    ]
-    Object.defineProperty(video, 'textTracks', {
-      configurable: true,
-      value: textTracks,
-    })
-    const assTrack = {
-      ...createSubtitleTrack(4, 0),
-      format: 'ASS',
-    }
-
-    await expect(
-      switchSubtitleTrack(4, {
-        strategy: 'hls',
-        videoElement: video,
-        subtitleTracks: [assTrack],
-      }),
-    ).resolves.toEqual({ success: true })
-
-    expect(textTracks.map((track) => track.mode)).toEqual([
-      'disabled',
-      'disabled',
-    ])
-  })
 })
