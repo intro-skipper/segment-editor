@@ -4,7 +4,7 @@ import { AudioLines, Captions, Check, Monitor, Zap } from 'lucide-react'
 
 import type { PlaybackStrategy } from '@/services/video/api'
 import type { TrackState } from '@/services/video/tracks'
-import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
+import type { AudioSwitchTranscodeScope } from '@/services/video/playback-tracks'
 import { canEnableNativeAudioSwitchingViaBrowserFlag } from '@/services/video/capabilities'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

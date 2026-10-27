@@ -13,7 +13,8 @@ import { Playhead } from '@/services/video/playhead'
 import type { PlayerSurface } from '@/components/player/PlayerSurface'
 import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
 import type { VideoPlayerError } from '@/services/video/playback-error'
-import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
+import type { AudioSwitchTranscodeScope } from '@/services/video/playback-tracks'
+import type { PlaybackStrategy } from '@/services/video/api'
 import type { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 
 type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
@@ -28,6 +29,7 @@ interface PlayerMockState {
   playhead: Playhead | null
   keyboardHandlers: Parameters<typeof usePlayerKeyboard>[0] | null
   audioSwitchTranscodeScope: AudioSwitchTranscodeScope
+  strategy: PlaybackStrategy
 }
 
 const mocks = vi.hoisted(() => {
@@ -39,24 +41,23 @@ const mocks = vi.hoisted(() => {
     playhead: null,
     keyboardHandlers: null,
     audioSwitchTranscodeScope: 'all',
+    strategy: 'direct',
   }
 
   return {
     ...state,
     videoPlayerIsRecovering: false,
     setShowVideoPlayer: vi.fn(),
-    setPreferredAudioLanguage: vi.fn(),
-    setPreferredSubtitleLanguage: vi.fn(),
-    setSubtitlesEnabled: vi.fn(),
     setPlayerVolume: vi.fn(),
     setPlayerMuted: vi.fn(),
-    selectAudioTrack: vi.fn(() => Promise.resolve(true)),
-    selectSubtitleTrack: vi.fn(() => Promise.resolve(true)),
+    selectAudio: vi.fn(() => Promise.resolve(true)),
+    selectSubtitle: vi.fn(() => Promise.resolve(true)),
+    toggleSubtitles: vi.fn(),
     resizeJassub: vi.fn(),
     setJassubUserOffset: vi.fn(),
     retry: vi.fn(),
     videoPlayerIsLoading: true,
-    trackManagerIsLoading: true,
+    tracksSwitching: true,
     segmentSkipMode: 'button',
     segmentSkipModeRevision: 0,
     fullscreenUi: {
@@ -129,29 +130,25 @@ vi.mock('@/hooks/useBlobUrl', () => ({
 vi.mock('@/hooks/use-video-player', () => ({
   useVideoPlayer: () => ({
     videoRef: mocks.videoRef,
-    hlsRef: { current: null },
     playhead: mocks.playhead,
-    strategy: 'direct',
+    strategy: mocks.strategy,
     isLoading: mocks.videoPlayerIsLoading,
     error: mocks.videoPlayerError,
     isRecovering: mocks.videoPlayerIsRecovering,
     retry: mocks.retry,
-    reloadHlsWithUrl: vi.fn(),
+    tracks: {
+      ...trackState,
+      audioSwitchTranscodeScope: mocks.audioSwitchTranscodeScope,
+      switching: mocks.tracksSwitching,
+    },
+    selectAudio: mocks.selectAudio,
+    selectSubtitle: mocks.selectSubtitle,
+    toggleSubtitles: mocks.toggleSubtitles,
   }),
 }))
 
 vi.mock('@/components/player/use-fullscreen-player-ui', () => ({
   useFullscreenPlayerUi: () => mocks.fullscreenUi,
-}))
-
-vi.mock('@/hooks/use-track-manager', () => ({
-  useTrackManager: () => ({
-    trackState,
-    selectAudioTrack: mocks.selectAudioTrack,
-    selectSubtitleTrack: mocks.selectSubtitleTrack,
-    isLoading: mocks.trackManagerIsLoading,
-    audioSwitchTranscodeScope: mocks.audioSwitchTranscodeScope,
-  }),
 }))
 
 vi.mock('@/hooks/use-jassub-renderer', () => ({
@@ -192,13 +189,7 @@ vi.mock('@/stores/app-store', () => {
     segmentSkipMode: mocks.segmentSkipMode,
     segmentSkipModeRevision: mocks.segmentSkipModeRevision,
     jellyfinPlaybackSyncEnabled: false,
-    trackPreferences: {
-      preferredAudioLanguage: 'eng',
-    },
     setShowVideoPlayer: mocks.setShowVideoPlayer,
-    setPreferredAudioLanguage: mocks.setPreferredAudioLanguage,
-    setPreferredSubtitleLanguage: mocks.setPreferredSubtitleLanguage,
-    setSubtitlesEnabled: mocks.setSubtitlesEnabled,
   })
   const useAppStore = <TSelected,>(
     selector: (state: ReturnType<typeof getState>) => TSelected,
@@ -234,6 +225,13 @@ function createItem(): BaseItemDto {
             Type: 'Audio',
             Index: 1,
             Language: 'eng',
+          },
+          {
+            Type: 'Subtitle',
+            Index: 2,
+            Language: 'spa',
+            Codec: 'subrip',
+            DisplayTitle: 'Spanish - SRT',
           },
         ],
       },
@@ -274,15 +272,25 @@ describe('Player controls wiring', () => {
     mocks.keyboardHandlers = null
     mocks.videoPlayerError = null
     mocks.videoPlayerIsRecovering = false
-    mocks.trackManagerIsLoading = true
+    mocks.tracksSwitching = true
     mocks.videoPlayerIsLoading = true
     mocks.audioSwitchTranscodeScope = 'all'
+    mocks.strategy = 'direct'
     mocks.segmentSkipMode = 'button'
     mocks.segmentSkipModeRevision = 0
   })
 
   afterEach(() => {
     cleanup()
+  })
+
+  it('renders caption tracks for HLS playback too, so a text subtitle survives the fallback', () => {
+    mocks.strategy = 'hls'
+    renderPlayer()
+
+    expect(latestSurfaceProps().video.captionTracks).toEqual([
+      expect.objectContaining({ index: 2, language: 'spa' }),
+    ])
   })
 
   it('passes Player state, handlers, and render groups through to PlayerSurface', () => {
@@ -314,7 +322,7 @@ describe('Player controls wiring', () => {
     expect(controlsProps.volumeControls.state).toBe('audible')
     expect(controlsProps.volumeControls.level).toBe(0.8)
     expect(controlsProps.display.mode).toBe('fullscreen')
-    expect(controlsProps.trackControls?.state).toBe(trackState)
+    expect(controlsProps.trackControls?.state).toMatchObject(trackState)
     expect(controlsProps.trackControls?.availability).toBe('disabled')
     expect(controlsProps.trackControls?.audioSwitchTranscodeScope).toBe('all')
     expect(controlsProps.settings.subtitleState).toBe('active')
@@ -340,8 +348,8 @@ describe('Player controls wiring', () => {
     expect(mocks.retry).toHaveBeenCalledTimes(1)
   })
 
-  it('enables track selection wiring after tracks load', async () => {
-    mocks.trackManagerIsLoading = false
+  it('enables track selection once no switch is running', async () => {
+    mocks.tracksSwitching = false
     mocks.audioSwitchTranscodeScope = 'none'
 
     renderPlayer()
@@ -355,14 +363,15 @@ describe('Player controls wiring', () => {
     await act(async () => {
       await controlsProps.trackControls?.onSelectAudio(1)
     })
-    expect(mocks.selectAudioTrack).toHaveBeenCalledWith(1)
-    expect(mocks.setPreferredAudioLanguage).toHaveBeenCalledWith('eng')
+    expect(mocks.selectAudio).toHaveBeenCalledWith(1)
 
     await act(async () => {
       await controlsProps.trackControls?.onSelectSubtitle(null)
     })
-    expect(mocks.selectSubtitleTrack).toHaveBeenCalledWith(null)
-    expect(mocks.setSubtitlesEnabled).toHaveBeenCalledWith(false)
+    expect(mocks.selectSubtitle).toHaveBeenCalledWith(null)
+
+    mocks.keyboardHandlers?.toggleSubtitles()
+    expect(mocks.toggleSubtitles).toHaveBeenCalledTimes(1)
   })
 
   it('hands the playhead to the editor while mounted', () => {

@@ -1,4 +1,3 @@
-import type { PlaybackStrategy } from '@/services/video/api'
 import { getSubtitleDeliveryUrl } from '@/services/video/track-switching'
 import type { SubtitleTrackInfo } from '@/services/video/tracks'
 
@@ -9,12 +8,12 @@ export interface NativeCaptionTrack {
   src: string
 }
 
+/** One VTT <track> per subtitle stream, in stream order, for direct play and HLS alike. */
 export function buildNativeCaptionTracks(
-  strategy: PlaybackStrategy,
   itemId: string | undefined,
   subtitleTracks: ReadonlyArray<SubtitleTrackInfo>,
 ): Array<NativeCaptionTrack> {
-  if (strategy !== 'direct' || !itemId || subtitleTracks.length === 0) return []
+  if (!itemId || subtitleTracks.length === 0) return []
 
   const tracks: Array<NativeCaptionTrack> = []
   for (const track of subtitleTracks) {

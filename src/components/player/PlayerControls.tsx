@@ -22,7 +22,7 @@ import type { MediaSegmentType } from '@/types/jellyfin'
 import type { TrackState } from '@/services/video/tracks'
 import type { SelectableMediaSource } from '@/lib/media-source-utils'
 import type { PlaybackStrategy } from '@/services/video/api'
-import type { AudioSwitchTranscodeScope } from '@/hooks/use-track-manager'
+import type { AudioSwitchTranscodeScope } from '@/services/video/playback-tracks'
 import { SegmentTypeMenu } from '@/components/segment/SegmentTypeMenu'
 import { Button } from '@/components/ui/button'
 import {

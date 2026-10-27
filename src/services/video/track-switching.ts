@@ -20,21 +20,18 @@ import { requiresJassubRenderer } from '@/services/video/subtitle'
  * tests supply those rather than a whole Hls instance.
  */
 export interface HlsTrackController {
-  audioTracks: Array<{ lang?: string; name?: string }>
+  readonly audioTracks: ReadonlyArray<{ lang?: string; name?: string }>
   audioTrack: number
-  subtitleTracks: Array<unknown>
-  subtitleTrack: number
 }
 
-const SUBTITLE_TRACK_MARKER_ATTR = 'data-segment-editor-track'
-
-function removeManagedSubtitleTracks(videoElement: HTMLVideoElement): void {
-  const managedTracks = videoElement.querySelectorAll(
-    `track[${SUBTITLE_TRACK_MARKER_ATTR}="true"]`,
-  )
-  managedTracks.forEach((track) => {
-    track.remove()
-  })
+/**
+ * The media element surface track switching drives; `HTMLVideoElement`
+ * satisfies it. `textTracks` lists the <track> captions in subtitle stream
+ * order, so a subtitle's `relativeIndex` addresses its text track.
+ */
+export interface TrackMedia {
+  readonly audioTracks?: AudioTrackList
+  readonly textTracks: ArrayLike<{ mode: TextTrackMode }>
 }
 
 /**
@@ -61,13 +58,13 @@ interface TrackSwitchError {
 export interface TrackSwitchOptions {
   /** Current playback strategy (direct or hls) */
   strategy: PlaybackStrategy
-  /** The video element for direct play operations */
-  videoElement: HTMLVideoElement
+  /** The media element whose audio and text tracks switch */
+  videoElement: TrackMedia
   /** HLS.js instance for HLS mode operations */
   hlsInstance?: HlsTrackController | null
   /** Audio tracks for index mapping (required for HLS mode) */
   audioTracks?: Array<AudioTrackInfo>
-  /** Subtitle tracks for index mapping (required for HLS mode) */
+  /** Subtitle tracks for index mapping */
   subtitleTracks?: Array<SubtitleTrackInfo>
   /** Item ID for URL generation (needed for reload fallback) */
   itemId?: string
@@ -75,7 +72,7 @@ export interface TrackSwitchOptions {
   mediaSourceId?: string
   /** Callback to reload HLS stream with new URL (for audio track switching in HLS mode) */
   onReloadHls?: (reload: HlsReloadRequest) => Promise<void>
-  /** AbortSignal that cancels stale async operations (subtitle load, initial audio apply) */
+  /** AbortSignal that cancels stale async operations (native audio wait, transcode reload) */
   signal?: AbortSignal
   /**
    * How long to wait for the native audio track list to populate after
@@ -95,11 +92,6 @@ export interface HlsReloadRequest {
 }
 
 /**
- * JASSUB action type for ASS/SSA subtitle handling.
- */
-type JassubAction = 'initialize' | 'dispose'
-
-/**
  * Result of a track switching operation. Discriminated on `success`, so a
  * failure always carries its error and the success-only fields cannot appear
  * on a failure.
@@ -109,10 +101,6 @@ export type TrackSwitchResult =
       success: true
       /** Whether a reload was required (direct play fallback) */
       reloadRequired?: boolean
-      /** JASSUB action for ASS/SSA tracks (initialize or dispose) */
-      jassubAction?: JassubAction
-      /** The subtitle track info when jassubAction is 'initialize' */
-      track?: SubtitleTrackInfo
     }
   | {
       success: false
@@ -121,7 +109,7 @@ export type TrackSwitchResult =
     }
 
 /**
- * Generates a subtitle delivery URL for fetching external subtitles.
+ * Generates the subtitle delivery URL a caption <track> loads.
  *
  * @param itemId - The media item ID
  * @param trackIndex - The subtitle track index
@@ -174,31 +162,6 @@ function getHlsUrlWithAudioTrack(
   }
 }
 
-/**
- * Maps a Jellyfin MediaStream index to the HLS.js/HTML5 relative index.
- * This is necessary because Jellyfin MediaStream indices include all stream types
- * (video, audio, subtitle), while HLS.js and HTML5 APIs use 0-based indices
- * within each track type.
- *
- * @param mediaStreamIndex - The Jellyfin MediaStream index to map
- * @param tracks - Array of tracks with index and relativeIndex properties
- * @returns The relative index for HLS.js/HTML5 API, or -1 if track not found
- *
- * @example
- * ```ts
- * // For tracks: [{ index: 1, relativeIndex: 0 }, { index: 2, relativeIndex: 1 }]
- * mapToRelativeIndex(2, tracks) // Returns 1
- * mapToRelativeIndex(5, tracks) // Returns -1 (not found)
- * ```
- */
-function mapToRelativeIndex(
-  mediaStreamIndex: number,
-  tracks: Array<{ index: number; relativeIndex: number }>,
-): number {
-  const track = tracks.find((t) => t.index === mediaStreamIndex)
-  return track?.relativeIndex ?? -1
-}
-
 function createTrackSwitchError(
   type: TrackSwitchErrorType,
   message: string,
@@ -224,7 +187,7 @@ function findTrackByMediaStreamIndex<T extends { index: number }>(
 function findHlsAudioTrackIndex(
   targetTrack: AudioTrackInfo | undefined,
   trackPosition: number,
-  hlsAudioTracks: Array<{ lang?: string; name?: string }>,
+  hlsAudioTracks: ReadonlyArray<{ lang?: string; name?: string }>,
 ): number {
   if (targetTrack?.language) {
     const targetLang = targetTrack.language.toLowerCase()
@@ -427,7 +390,9 @@ async function waitForNativeAudioTracks(
  * Turns every text track off. 'disabled', not 'hidden': the browser fetches
  * a hidden <track>, so hiding would download every subtitle stream.
  */
-function disableTextTracks(textTracks: ArrayLike<TextTrack>): void {
+function disableTextTracks(
+  textTracks: ArrayLike<{ mode: TextTrackMode }>,
+): void {
   Array.from(textTracks).forEach((track) => {
     track.mode = 'disabled'
   })
@@ -654,225 +619,6 @@ export async function applyInitialAudioTrack(
 }
 
 /**
- * Switches subtitle track in HLS mode using HLS.js API.
- * Maps the Jellyfin MediaStream index to the HLS.js relative index before switching.
- *
- * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to switch to, or null for off
- * @param hlsInstance - The HLS.js instance
- * @param subtitleTracks - Array of subtitle tracks for index mapping
- * @returns Result of the switch operation
- */
-function switchHlsSubtitleTrack(
-  trackIndex: number | null,
-  hlsInstance: HlsTrackController | null | undefined,
-  subtitleTracks?: Array<SubtitleTrackInfo>,
-): TrackSwitchResult {
-  if (!hlsInstance) {
-    return {
-      success: false,
-      error: {
-        type: 'api_unsupported',
-        message: 'HLS instance not available',
-        trackIndex: trackIndex ?? -1,
-      },
-    }
-  }
-
-  try {
-    // Handle "off" selection
-    if (trackIndex === null) {
-      hlsInstance.subtitleTrack = -1
-      return { success: true }
-    }
-
-    // Map MediaStream index to HLS.js relative index
-    let relativeIndex: number
-
-    if (subtitleTracks && subtitleTracks.length > 0) {
-      relativeIndex = mapToRelativeIndex(trackIndex, subtitleTracks)
-      if (relativeIndex === -1) {
-        return {
-          success: false,
-          error: {
-            type: 'track_unavailable',
-            message: `Subtitle track with MediaStream index ${trackIndex} not found in track list`,
-            trackIndex,
-          },
-        }
-      }
-    } else {
-      // Fallback: assume trackIndex is already a relative index (legacy behavior)
-      relativeIndex = trackIndex
-    }
-
-    // Check if relative index is valid against HLS.js subtitleTracks
-    const hlsSubtitleTracks = hlsInstance.subtitleTracks
-    if (relativeIndex < 0 || relativeIndex >= hlsSubtitleTracks.length) {
-      return {
-        success: false,
-        error: {
-          type: 'track_unavailable',
-          message: `Subtitle track relative index ${relativeIndex} is out of range (0-${hlsSubtitleTracks.length - 1})`,
-          trackIndex,
-        },
-      }
-    }
-
-    // Switch the subtitle track using the relative index
-    hlsInstance.subtitleTrack = relativeIndex
-
-    return { success: true }
-  } catch (err) {
-    return {
-      success: false,
-      error: {
-        type: 'unknown_error',
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Failed to switch subtitle track',
-        trackIndex: trackIndex ?? -1,
-      },
-    }
-  }
-}
-
-/**
- * Switches subtitle track in direct play mode using the TextTrack API.
- * Uses relativeIndex for TextTrack array access.
- *
- * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to switch to, or null for off
- * @param options - Track switch options
- * @returns Promise resolving to the result of the switch operation
- */
-async function switchDirectPlaySubtitleTrack(
-  trackIndex: number | null,
-  options: TrackSwitchOptions,
-): Promise<TrackSwitchResult> {
-  const { videoElement, itemId, subtitleTracks, signal } = options
-  const textTracks = videoElement.textTracks
-
-  // Handle "Off" selection - disable all tracks
-  if (trackIndex === null) {
-    disableTextTracks(textTracks)
-    removeManagedSubtitleTracks(videoElement)
-    return { success: true }
-  }
-
-  // Map MediaStream index to relative index for TextTrack array access
-  let relativeIndex: number
-  if (subtitleTracks && subtitleTracks.length > 0) {
-    relativeIndex = mapToRelativeIndex(trackIndex, subtitleTracks)
-  } else {
-    // Fallback: assume trackIndex is already a relative index (legacy behavior)
-    relativeIndex = trackIndex
-  }
-
-  // Check if track exists in TextTracks using relativeIndex
-  if (relativeIndex >= 0 && relativeIndex < textTracks.length) {
-    disableTextTracks(textTracks)
-    // Show the selected track using relativeIndex
-    textTracks[relativeIndex].mode = 'showing'
-    return { success: true }
-  }
-
-  // Track not in TextTracks - may need to fetch external subtitle
-  if (!itemId) {
-    return {
-      success: false,
-      error: {
-        type: 'track_unavailable',
-        message:
-          'Subtitle track not available and no item ID for external fetch',
-        trackIndex,
-      },
-    }
-  }
-
-  // Fetch external subtitle (use original MediaStream index for Jellyfin API)
-  try {
-    const subtitleUrl = getSubtitleDeliveryUrl(itemId, trackIndex, 'vtt')
-    if (!subtitleUrl) {
-      return {
-        success: false,
-        error: {
-          type: 'network_error',
-          message: 'Failed to generate subtitle URL',
-          trackIndex,
-        },
-      }
-    }
-
-    // Create a new track element
-    removeManagedSubtitleTracks(videoElement)
-
-    const trackElement = document.createElement('track')
-    trackElement.kind = 'subtitles'
-    trackElement.src = subtitleUrl
-    trackElement.default = true
-    trackElement.setAttribute(SUBTITLE_TRACK_MARKER_ATTR, 'true')
-
-    disableTextTracks(textTracks)
-
-    // Add and show the new track
-    videoElement.appendChild(trackElement)
-
-    // Wait for track to load
-    await new Promise<void>((resolve, reject) => {
-      const timeoutId = setTimeout(
-        () => reject(new Error('Subtitle load timeout')),
-        10000,
-      )
-
-      const handleAbort = () => {
-        cleanup()
-        reject(new Error('Subtitle load aborted'))
-      }
-
-      const cleanup = () => {
-        clearTimeout(timeoutId)
-        trackElement.removeEventListener('load', handleLoad)
-        trackElement.removeEventListener('error', handleError)
-        signal?.removeEventListener('abort', handleAbort)
-      }
-
-      const handleLoad = () => {
-        cleanup()
-        resolve()
-      }
-
-      const handleError = () => {
-        cleanup()
-        reject(new Error('Failed to load subtitle'))
-      }
-
-      trackElement.addEventListener('load', handleLoad)
-      trackElement.addEventListener('error', handleError)
-      // Cancel the timeout when the caller's AbortSignal fires (e.g. component unmount)
-      signal?.addEventListener('abort', handleAbort, { once: true })
-    })
-
-    // Find and show the newly added track
-    textTracks[textTracks.length - 1].mode = 'showing'
-
-    return { success: true }
-  } catch (err) {
-    removeManagedSubtitleTracks(videoElement)
-    return {
-      success: false,
-      error: {
-        type: 'network_error',
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Failed to load external subtitle',
-        trackIndex,
-      },
-    }
-  }
-}
-
-/**
  * Switches audio track using the appropriate method based on playback strategy.
  *
  * For HLS mode: If HLS.js doesn't support runtime switching (most Jellyfin transcodes),
@@ -911,10 +657,10 @@ export async function switchAudioTrack(
 }
 
 /**
- * Switches subtitle track using the appropriate method based on playback strategy.
- * For ASS/SSA tracks, returns jassubAction to signal JASSUB renderer should handle it.
+ * Shows one text subtitle through the element's text tracks in either
+ * strategy, or none: for null, and for ASS/SSA, which JASSUB renders.
  *
- * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to switch to, or null for off
+ * @param trackIndex - The Jellyfin MediaStream index of the subtitle track to show, or null for off
  * @param options - Track switch options (includes subtitleTracks for index mapping)
  * @returns Promise resolving to the result of the switch operation
  */
@@ -922,50 +668,35 @@ export async function switchSubtitleTrack(
   trackIndex: number | null,
   options: TrackSwitchOptions,
 ): Promise<TrackSwitchResult> {
-  // Handle "off" selection - signal JASSUB to dispose if active
+  const textTracks = options.videoElement.textTracks
   if (trackIndex === null) {
-    disableTextTracks(options.videoElement.textTracks)
-
-    // Also disable HLS subtitles if in HLS mode
-    if (options.strategy === 'hls' && options.hlsInstance) {
-      options.hlsInstance.subtitleTrack = -1
-    }
-
-    return { success: true, jassubAction: 'dispose' }
+    disableTextTracks(textTracks)
+    return { success: true }
   }
 
-  // Find the track to determine if it's ASS/SSA
   const track = options.subtitleTracks?.find((t) => t.index === trackIndex)
   if (!track) {
-    return {
-      success: false,
-      error: {
-        type: 'track_unavailable',
-        message: `Subtitle track with index ${trackIndex} not found`,
-        trackIndex,
-      },
-    }
-  }
-
-  // Check if ASS/SSA - delegate to JASSUB renderer
-  if (requiresJassubRenderer(track)) {
-    disableTextTracks(options.videoElement.textTracks)
-
-    // Also disable HLS subtitles if in HLS mode
-    if (options.strategy === 'hls' && options.hlsInstance) {
-      options.hlsInstance.subtitleTrack = -1
-    }
-
-    return { success: true, jassubAction: 'initialize', track }
-  }
-
-  // Non-ASS: use existing TextTrack/HLS subtitle handling
-  if (options.strategy === 'hls') {
-    return switchHlsSubtitleTrack(
+    return createTrackSwitchError(
+      'track_unavailable',
+      `Subtitle track with index ${trackIndex} not found`,
       trackIndex,
-      options.hlsInstance,
-      options.subtitleTracks,
     )
   }
-  return switchDirectPlaySubtitleTrack(trackIndex, options)
+
+  if (requiresJassubRenderer(track)) {
+    disableTextTracks(textTracks)
+    return { success: true }
+  }
+
+  if (track.relativeIndex >= textTracks.length) {
+    return createTrackSwitchError(
+      'track_unavailable',
+      `Subtitle track with index ${trackIndex} has no text track`,
+      trackIndex,
+    )
+  }
+
+  disableTextTracks(textTracks)
+  textTracks[track.relativeIndex].mode = 'showing'
+  return { success: true }
 }

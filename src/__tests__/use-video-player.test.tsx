@@ -11,6 +11,7 @@ import type { BaseItemDto } from '@/types/jellyfin'
 import type * as VideoApiModule from '@/services/video/api'
 import { getPlaybackConfig } from '@/services/video/api'
 import { startPlaybackStatus } from '@/services/video/playback-session'
+import { stopActiveEncoding } from '@/services/video/transcode-session'
 import { useVideoPlayer } from '@/hooks/use-video-player'
 import {
   FakeHls,
@@ -28,6 +29,10 @@ vi.mock('hls.js', async () => ({
 vi.mock('@/services/video/api', async (importOriginal) => ({
   ...(await importOriginal<typeof VideoApiModule>()),
   getPlaybackConfig: vi.fn(),
+  getVideoStreamUrl: vi.fn(
+    (options: { itemId: string }, audioStreamIndex?: number) =>
+      `https://jellyfin.example/Videos/${options.itemId}/master.m3u8?AudioStreamIndex=${audioStreamIndex}`,
+  ),
 }))
 
 vi.mock('@/services/video/playback-session', () => ({
@@ -141,5 +146,86 @@ describe('useVideoPlayer', () => {
     expect(startPlaybackStatus).toHaveBeenCalledWith(
       expect.objectContaining({ itemId: 'item-2' }),
     )
+  })
+})
+
+describe('useVideoPlayer track selection', () => {
+  const ENGLISH = 1
+  const JAPANESE = 2
+  const SPANISH_SRT = 3
+
+  const tracksItem: BaseItemDto = {
+    ...createItem(),
+    MediaSources: [
+      {
+        Id: 'item-1-media-source',
+        MediaStreams: [
+          {
+            Type: 'Audio',
+            Index: ENGLISH,
+            Codec: 'aac',
+            Language: 'eng',
+            IsDefault: true,
+          },
+          { Type: 'Audio', Index: JAPANESE, Codec: 'aac', Language: 'jpn' },
+          {
+            Type: 'Subtitle',
+            Index: SPANISH_SRT,
+            Codec: 'subrip',
+            Language: 'spa',
+          },
+        ],
+      },
+    ],
+  }
+
+  it('re-renders while an audio switch runs and with the track it switched to', async () => {
+    const { result } = renderPlayer(tracksItem)
+    await act(settle)
+    expect(result.current.tracks.activeAudioIndex).toBe(ENGLISH)
+
+    // The transcode restart waits for the previous encoding to stop.
+    const encoding = deferred()
+    vi.mocked(stopActiveEncoding).mockReturnValueOnce(encoding.promise)
+    let switched: Promise<boolean> = Promise.resolve(false)
+    act(() => {
+      switched = result.current.selectAudio(JAPANESE)
+    })
+    expect(result.current.tracks.switching).toBe(true)
+
+    await act(async () => {
+      encoding.resolve()
+      await settle()
+    })
+    await expect(switched).resolves.toBe(true)
+    expect(result.current.tracks).toMatchObject({
+      activeAudioIndex: JAPANESE,
+      switching: false,
+    })
+    expect(result.current.videoUrl).toContain(`AudioStreamIndex=${JAPANESE}`)
+  })
+
+  it('re-renders with the selected subtitle and after the toggle', async () => {
+    const { result } = renderPlayer(tracksItem)
+    const video = result.current.videoRef.current
+    if (!video) throw new Error('no video element')
+    Object.defineProperty(video, 'textTracks', {
+      configurable: true,
+      value: [{ mode: 'disabled' }],
+    })
+    await act(settle)
+
+    await act(async () => {
+      await expect(result.current.selectSubtitle(SPANISH_SRT)).resolves.toBe(
+        true,
+      )
+    })
+    expect(result.current.tracks.activeSubtitleIndex).toBe(SPANISH_SRT)
+
+    await act(async () => {
+      result.current.toggleSubtitles()
+      await settle()
+    })
+    expect(result.current.tracks.activeSubtitleIndex).toBeNull()
   })
 })

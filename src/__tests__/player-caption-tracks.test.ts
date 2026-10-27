@@ -34,16 +34,15 @@ describe('buildNativeCaptionTracks', () => {
     getSubtitleDeliveryUrlMock.mockClear()
   })
 
-  it('does not derive native captions for HLS playback or missing item ids', () => {
+  it('does not derive native captions without an item id', () => {
     const tracks = [subtitleTrack(1)]
 
-    expect(buildNativeCaptionTracks('hls', 'item-1', tracks)).toEqual([])
-    expect(buildNativeCaptionTracks('direct', undefined, tracks)).toEqual([])
+    expect(buildNativeCaptionTracks(undefined, tracks)).toEqual([])
     expect(getSubtitleDeliveryUrlMock).not.toHaveBeenCalled()
   })
 
-  it('maps direct-play subtitles to VTT caption tracks and skips unavailable urls', () => {
-    const captions = buildNativeCaptionTracks('direct', 'item-1', [
+  it('maps subtitles to VTT caption tracks and skips unavailable urls', () => {
+    const captions = buildNativeCaptionTracks('item-1', [
       subtitleTrack(1),
       subtitleTrack(2, { language: null }),
       subtitleTrack(3),

@@ -81,15 +81,15 @@ export interface SubtitleTrackInfo {
 
 /**
  * Current state of audio and subtitle tracks for a media item.
- * Used by the track manager hook to track available and active tracks.
+ * Used by the playback engine's track selection and the track menu.
  */
 export interface TrackState {
   /** All available audio tracks */
   audioTracks: Array<AudioTrackInfo>
   /** All available subtitle tracks */
   subtitleTracks: Array<SubtitleTrackInfo>
-  /** Index of the currently active audio track */
-  activeAudioIndex: number
+  /** Index of the currently active audio track, or undefined without audio tracks */
+  activeAudioIndex: number | undefined
   /** Index of the currently active subtitle track, or null if subtitles are off */
   activeSubtitleIndex: number | null
 }
@@ -184,10 +184,9 @@ export function getContainerDefaultAudioTrack<
  * {@link getContainerDefaultAudioTrack}, else undefined when the item has no
  * audio tracks.
  *
- * This is the single definition of "initial audio selection". The playback
- * strategy decision (`Player` → `getPlaybackConfig`) and the track manager's
- * active-track state must both derive from it so the strategy and the applied
- * track can never disagree.
+ * This is the single definition of "initial audio selection": the playback
+ * engine resolves it once per load and uses it both for `getPlaybackConfig`
+ * and as the active audio track.
  *
  * @returns The Jellyfin MediaStream index of the track, or undefined
  */
