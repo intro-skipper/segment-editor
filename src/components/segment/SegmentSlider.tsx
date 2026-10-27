@@ -19,13 +19,14 @@ import { useForm, useStore } from '@tanstack/react-form'
 
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import type { SegmentUpdate } from '@/types/segment'
-import { formatTime, snapToFrame } from '@/lib/time-utils'
+import { formatTime } from '@/lib/time-utils'
+import type { RangeRules } from '@/lib/segment-range'
+import { maxEndSeconds, placeRange, rangeError } from '@/lib/segment-range'
 import {
   buildSegmentFromFormValues,
   formatSegmentInputSeconds,
   getSegmentDraftState,
   getSegmentFormDefaults,
-  validateSegmentFormValues,
 } from '@/lib/forms/segment-form'
 import { getSegmentChipClass, getSegmentCssVar } from '@/lib/segment-utils'
 import { segmentsToIntroSkipperClipboardText } from '@/services/plugins/intro-skipper'
@@ -50,31 +51,6 @@ const { MIN_SEGMENT_GAP } = SEGMENT_CONFIG
 
 /** Handle width in pixels for positioning calculations */
 const HANDLE_WIDTH = 14
-
-function clampStartToBounds(start: number, end: number): number {
-  return Math.max(0, Math.min(start, end - MIN_SEGMENT_GAP))
-}
-
-function clampEndToBounds(end: number, start: number, runtime: number): number {
-  return Math.min(runtime, Math.max(end, start + MIN_SEGMENT_GAP))
-}
-
-function snapAndClampStart(
-  value: number,
-  end: number,
-  frameStep: number | undefined,
-): number {
-  return clampStartToBounds(snapToFrame(value, frameStep), end)
-}
-
-function snapAndClampEnd(
-  value: number,
-  start: number,
-  runtime: number,
-  frameStep: number | undefined,
-): number {
-  return clampEndToBounds(snapToFrame(value, frameStep), start, runtime)
-}
 
 interface SegmentRange {
   start: number
@@ -460,6 +436,26 @@ export function SegmentSlider({
 
   const inputStep = frameStep ?? MIN_SEGMENT_GAP
 
+  const rules: RangeRules = { runtimeSeconds, frameStepSeconds: frameStep }
+  const maxEnd = maxEndSeconds(rules)
+  const isRuntimeKnown = Number.isFinite(maxEnd)
+  // Drags follow the pointer unsnapped and snap when released.
+  const dragRules: RangeRules = { runtimeSeconds }
+  /** Where the start lands when moved to `value`, against the current end. */
+  const placeStart = (value: number, placeRules = rules) =>
+    placeRange(
+      { start: value, end: stableRangeRef.current.end },
+      placeRules,
+      'start',
+    ).start
+  /** Where the end lands when moved to `value`, against the current start. */
+  const placeEnd = (value: number, placeRules = rules) =>
+    placeRange(
+      { start: stableRangeRef.current.start, end: value },
+      placeRules,
+      'end',
+    ).end
+
   const commitSegmentUpdate = (start: number, end: number): boolean => {
     if (!segment.Id) return false
 
@@ -467,14 +463,11 @@ export function SegmentSlider({
     const currentEnd = segment.EndTicks ?? 0
     if (start === currentStart && end === currentEnd) return false
 
-    const nextValidation = validateSegmentFormValues(
-      getSegmentFormDefaults({
-        Type: segment.Type ?? 'Unknown',
-        StartTicks: start,
-        EndTicks: end,
-      }),
-    )
-    if (!nextValidation.valid) return false
+    // The session keeps edits inside the media; here a stale end past the
+    // runtime must not block moving the start, so only order is checked.
+    if (rangeError({ start, end }, { runtimeSeconds: 0 }) !== null) {
+      return false
+    }
 
     onUpdate({ id: segment.Id, start, end })
     return true
@@ -519,7 +512,8 @@ export function SegmentSlider({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     const dragging = isDraggingRef.current
-    if (!dragging || !sliderRef.current) return
+    // Without a runtime the track has no time scale to map the pointer onto.
+    if (!dragging || !sliderRef.current || !isRuntimeKnown) return
 
     const rect = sliderRef.current.getBoundingClientRect()
     const percent = Math.max(
@@ -538,17 +532,10 @@ export function SegmentSlider({
 
         const currentDragging = isDraggingRef.current
         if (currentDragging === 'start') {
-          const nextStart = clampStartToBounds(
-            pendingTime,
-            stableRangeRef.current.end,
-          )
+          const nextStart = placeStart(pendingTime, dragRules)
           applyDraftBoundary('start', nextStart, true)
         } else if (currentDragging === 'end') {
-          const nextEnd = clampEndToBounds(
-            pendingTime,
-            stableRangeRef.current.start,
-            runtimeSeconds,
-          )
+          const nextEnd = placeEnd(pendingTime, dragRules)
           applyDraftBoundary('end', nextEnd, true)
         }
       })
@@ -567,19 +554,10 @@ export function SegmentSlider({
     if (pendingTime !== null) {
       const currentDragging = isDraggingRef.current
       if (currentDragging === 'start') {
-        const newStart = snapAndClampStart(
-          pendingTime,
-          stableRangeRef.current.end,
-          frameStep,
-        )
+        const newStart = placeStart(pendingTime)
         applyDraftBoundary('start', newStart, true)
       } else {
-        const newEnd = snapAndClampEnd(
-          pendingTime,
-          stableRangeRef.current.start,
-          runtimeSeconds,
-          frameStep,
-        )
+        const newEnd = placeEnd(pendingTime)
         applyDraftBoundary('end', newEnd, true)
       }
       pendingPositionRef.current = null
@@ -654,17 +632,11 @@ export function SegmentSlider({
     let nextEnd = stableRangeRef.current.end
 
     if (type === 'start') {
-      const nextRange = applyDraftBoundary(
-        'start',
-        snapAndClampStart(nextStart, nextEnd, frameStep),
-      )
+      const nextRange = applyDraftBoundary('start', placeStart(nextStart))
       nextStart = nextRange.start
       nextEnd = nextRange.end
     } else {
-      const nextRange = applyDraftBoundary(
-        'end',
-        snapAndClampEnd(nextEnd, nextStart, runtimeSeconds, frameStep),
-      )
+      const nextRange = applyDraftBoundary('end', placeEnd(nextEnd))
       nextStart = nextRange.start
       nextEnd = nextRange.end
     }
@@ -701,11 +673,7 @@ export function SegmentSlider({
 
   // Set timestamp from current player position
   const handleSetStartToZero = () => {
-    const nextStart = snapAndClampStart(
-      0,
-      stableRangeRef.current.end,
-      frameStep,
-    )
+    const nextStart = placeStart(0)
     const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
     hasLocalRangeDirtyRef.current = false
@@ -713,12 +681,7 @@ export function SegmentSlider({
 
   const handleSetEndToDuration = () => {
     if (!Number.isFinite(runtimeSeconds) || runtimeSeconds <= 0) return
-    const nextEnd = snapAndClampEnd(
-      runtimeSeconds,
-      stableRangeRef.current.start,
-      runtimeSeconds,
-      frameStep,
-    )
+    const nextEnd = placeEnd(runtimeSeconds)
     const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
     hasLocalRangeDirtyRef.current = false
@@ -727,11 +690,7 @@ export function SegmentSlider({
   const handleSetStartFromPlayer = () => {
     const currentTime = getPlayerTime?.()
     if (currentTime === undefined) return
-    const nextStart = snapAndClampStart(
-      currentTime,
-      stableRangeRef.current.end,
-      frameStep,
-    )
+    const nextStart = placeStart(currentTime)
     const nextRange = applyDraftBoundary('start', nextStart, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
     hasLocalRangeDirtyRef.current = false
@@ -739,12 +698,7 @@ export function SegmentSlider({
   const handleSetEndFromPlayer = () => {
     const currentTime = getPlayerTime?.()
     if (currentTime === undefined) return
-    const nextEnd = snapAndClampEnd(
-      currentTime,
-      stableRangeRef.current.start,
-      runtimeSeconds,
-      frameStep,
-    )
+    const nextEnd = placeEnd(currentTime)
     const nextRange = applyDraftBoundary('end', nextEnd, true)
     commitSegmentUpdate(nextRange.start, nextRange.end)
     hasLocalRangeDirtyRef.current = false
@@ -754,11 +708,7 @@ export function SegmentSlider({
     if (type === 'start') {
       const nextRange = applyDraftBoundary(
         'start',
-        snapAndClampStart(
-          stableRangeRef.current.start,
-          stableRangeRef.current.end,
-          frameStep,
-        ),
+        placeStart(stableRangeRef.current.start),
       )
       commitRangeAfterInteraction(nextRange.start, nextRange.end)
       return
@@ -766,12 +716,7 @@ export function SegmentSlider({
 
     const nextRange = applyDraftBoundary(
       'end',
-      snapAndClampEnd(
-        stableRangeRef.current.end,
-        stableRangeRef.current.start,
-        runtimeSeconds,
-        frameStep,
-      ),
+      placeEnd(stableRangeRef.current.end),
     )
     commitRangeAfterInteraction(nextRange.start, nextRange.end)
   }
@@ -786,11 +731,7 @@ export function SegmentSlider({
     )
     if (result.handled) {
       e.preventDefault()
-      const nextStart = snapAndClampStart(
-        result.newValue,
-        stableRangeRef.current.end,
-        frameStep,
-      )
+      const nextStart = placeStart(result.newValue)
       applyDraftBoundary('start', nextStart, true)
     }
   }
@@ -801,17 +742,13 @@ export function SegmentSlider({
       e.shiftKey,
       stableRangeRef.current.start,
       stableRangeRef.current.end,
-      runtimeSeconds,
+      maxEnd,
       MIN_SEGMENT_GAP,
     )
-    if (result.handled) {
+    // End has nowhere to go while the runtime is unknown.
+    if (result.handled && Number.isFinite(result.newValue)) {
       e.preventDefault()
-      const nextEnd = snapAndClampEnd(
-        result.newValue,
-        stableRangeRef.current.start,
-        runtimeSeconds,
-        frameStep,
-      )
+      const nextEnd = placeEnd(result.newValue)
       applyDraftBoundary('end', nextEnd, true)
     }
   }

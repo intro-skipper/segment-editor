@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { ValidationResult } from '@/types/segment'
 import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
 import { SEGMENT_TYPES } from '@/lib/constants'
+import { maxEndSeconds, rangeError } from '@/lib/segment-range'
 
 const SEGMENT_TIME_TEXT_REGEX = /^-?[\d:.eE+\- ]+$/
 const MAX_DECIMALS = 3
@@ -41,13 +42,7 @@ export function formatSegmentInputSeconds(value: number): string {
   return value.toFixed(MAX_DECIMALS).replace(/\.?0+$/, '')
 }
 
-/**
- * Returns the valid time bounds for segment fields: min is always 0; max is
- * the media duration when it is a positive finite number, or Infinity otherwise.
- * Both the blur-time clamping and the form schema boundary checks derive their
- * range from this single function so the two never drift apart.
- */
-/** The valid range for a segment's time fields. */
+/** The valid range for a segment's time fields; max is Infinity when the media duration is unknown. */
 export interface SegmentTimeBounds {
   min: 0
   max: number
@@ -56,16 +51,7 @@ export interface SegmentTimeBounds {
 export function getSegmentTimeBounds(
   maxDuration?: number | null,
 ): SegmentTimeBounds {
-  return {
-    min: 0,
-    max:
-      maxDuration !== null &&
-      maxDuration !== undefined &&
-      Number.isFinite(maxDuration) &&
-      maxDuration > 0
-        ? maxDuration
-        : Infinity,
-  }
+  return { min: 0, max: maxEndSeconds({ runtimeSeconds: maxDuration ?? 0 }) }
 }
 
 /**
@@ -163,22 +149,6 @@ function getSegmentDraftRange(
   }
 }
 
-function getSegmentBoundaryError(
-  startSeconds: number,
-  endSeconds: number,
-  maxDuration?: number | null,
-): string | null {
-  // min is always 0 (see getSegmentTimeBounds); max is the media duration when known.
-  const { min, max } = getSegmentTimeBounds(maxDuration)
-  if (startSeconds < min) return 'Start time cannot be negative'
-  if (endSeconds < min) return 'End time cannot be negative'
-  if (startSeconds >= endSeconds) return 'Start time must be less than end time'
-  if (Number.isFinite(max) && endSeconds > max) {
-    return 'End time exceeds media duration'
-  }
-  return null
-}
-
 export function createSegmentFormSchema(maxDuration?: number | null) {
   return z
     .object({
@@ -208,10 +178,9 @@ export function createSegmentFormSchema(maxDuration?: number | null) {
 
       if (!start.ok || !end.ok) return
 
-      const boundaryError = getSegmentBoundaryError(
-        start.value,
-        end.value,
-        maxDuration,
+      const boundaryError = rangeError(
+        { start: start.value, end: end.value },
+        { runtimeSeconds: maxDuration ?? 0 },
       )
 
       if (!boundaryError) return

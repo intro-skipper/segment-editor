@@ -168,26 +168,6 @@ function useRenderPlayerEditor({
   const [selectedMediaSourceId, setSelectedMediaSourceId] =
     React.useState(defaultMediaSourceId)
 
-  // Destructured so handlers close over the commands, which keep their
-  // identity between edits, not over the session object, which does not.
-  const {
-    segments: editingSegments,
-    activeIndex,
-    isLoading,
-    isDirty,
-    isSaving,
-    create,
-    update,
-    remove,
-    importSegments,
-    select,
-    step,
-    save,
-    discard,
-  } = useSegmentEditSession(item.Id ?? '', {
-    enabled: fetchSegments && !!item.Id,
-  })
-
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [editingSegmentIndex, setEditingSegmentIndex] = React.useState<
     number | null
@@ -220,6 +200,30 @@ function useRenderPlayerEditor({
     [item, effectiveMediaSourceId],
   )
 
+  const runtimeSeconds = ticksToSeconds(playbackItem.RunTimeTicks) || 0
+  const frameStepSeconds = resolveFrameStepSeconds(playbackItem)
+
+  // Destructured so handlers close over the commands, which keep their
+  // identity between edits, not over the session object, which does not.
+  const {
+    segments: editingSegments,
+    activeIndex,
+    isLoading,
+    isDirty,
+    isSaving,
+    create,
+    update,
+    remove,
+    importSegments,
+    select,
+    step,
+    save,
+    discard,
+  } = useSegmentEditSession(item.Id ?? '', {
+    enabled: fetchSegments && !!item.Id,
+    rules: { runtimeSeconds, frameStepSeconds },
+  })
+
   const blocker = useBlocker({
     shouldBlockFn: () => isDirty,
     enableBeforeUnload: () => isDirty,
@@ -244,10 +248,6 @@ function useRenderPlayerEditor({
   React.useEffect(() => {
     editingSegmentsRef.current = editingSegments
   }, [editingSegments])
-
-  const runtimeSeconds = ticksToSeconds(playbackItem.RunTimeTicks) || 0
-
-  const frameStepSeconds = resolveFrameStepSeconds(playbackItem)
 
   const handleUpdateSegmentTimestamp = (data: TimestampUpdate) => {
     update(
