@@ -4,10 +4,17 @@
  * hls.js are faked: clicking its controls and pressing its shortcuts drives
  * the <video>, the engine's state and the persisted settings. In the real
  * PlayerEditor, playback outlives a version switch and the player being
- * hidden.
+ * hidden, and its shortcuts, segment rows and edit dialog edit the segments.
  */
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import type { ComponentProps } from 'react'
@@ -275,6 +282,22 @@ async function renderEditor({ strict = false } = {}) {
   await screen.findByRole('button', { name: 'Minimize player' })
   const video = await mountedVideo(utils.container)
   return { ...utils, video }
+}
+
+/**
+ * The real PlayerEditor with an Intro from 12.25 to 13.25 s, created from the
+ * editor's own new-segment button at the frame-snapped 12.3 s plus a second.
+ */
+async function renderEditorWithIntro() {
+  const editor = await renderEditor()
+  playAt(editor.video, 12.3)
+  // The editor's own, below the player's.
+  const newSegment = screen
+    .getAllByRole('button', { name: 'editor.newSegment' })
+    .at(-1)
+  fireEvent.click(asElement(newSegment, HTMLElement))
+  fireEvent.click(menuItem('Intro'))
+  return editor
 }
 
 /**
@@ -555,14 +578,7 @@ describe('PlayerEditor playback', () => {
   })
 
   it('gives segments the player position and seeks them only while the player is shown', async () => {
-    const { container, video } = await renderEditor()
-    playAt(video, 12.3)
-    // The editor's own, below the player's.
-    const newSegment = screen
-      .getAllByRole('button', { name: 'editor.newSegment' })
-      .at(-1)
-    fireEvent.click(asElement(newSegment, HTMLElement))
-    fireEvent.click(menuItem('Intro'))
+    const { container } = await renderEditorWithIntro()
     expect(button('Set start from player')).toBeTruthy()
 
     hidePlayer()
@@ -644,6 +660,68 @@ describe('PlayerEditor playback', () => {
     expect(FakeHls.instances).toHaveLength(1)
     expect(startPlaybackStatus).toHaveBeenCalledTimes(1)
     expect(stopPlaybackStatus).not.toHaveBeenCalled()
+  })
+})
+
+describe('PlayerEditor segment edits', () => {
+  /** The segment row's start and end inputs, as shown. */
+  function shownRange() {
+    return [
+      asElement(screen.getByLabelText('segment.start:'), HTMLInputElement)
+        .value,
+      asElement(screen.getByLabelText('segment.end:'), HTMLInputElement).value,
+    ]
+  }
+
+  it('sets the end on F and the start on E from the player position', async () => {
+    const { video } = await renderEditorWithIntro()
+
+    playAt(video, 40)
+    press('f')
+    playAt(video, 2)
+    press('e')
+
+    expect(shownRange()).toEqual(['2', '40'])
+  })
+
+  it('moves the end typed into the segment row', async () => {
+    const { video } = await renderEditorWithIntro()
+    const end = screen.getByLabelText('segment.end:')
+
+    fireEvent.focus(end)
+    fireEvent.change(end, { target: { value: '30' } })
+    fireEvent.blur(end)
+    // The row keeps its typed draft until the segment changes, so stamp the
+    // start to show the end the segment itself holds.
+    playAt(video, 5)
+    press('e')
+
+    await waitFor(() => {
+      expect(shownRange()).toEqual(['5', '30'])
+    })
+  })
+
+  it('applies the type, start and end saved from the edit dialog', async () => {
+    await renderEditorWithIntro()
+
+    fireEvent.click(button('segment.edit'))
+    fireEvent.click(screen.getByRole('combobox'))
+    // An item commits only to a click that started on it.
+    const outro = await screen.findByRole('option', { name: 'Outro' })
+    fireEvent.pointerDown(outro)
+    fireEvent.click(outro)
+    fireEvent.change(screen.getByLabelText('segment.start'), {
+      target: { value: '50' },
+    })
+    fireEvent.change(screen.getByLabelText('segment.end'), {
+      target: { value: '60' },
+    })
+    fireEvent.click(button('editor.saveSegment'))
+
+    await waitFor(() => {
+      expect(shownRange()).toEqual(['50', '60'])
+    })
+    expect(button('Segment type').textContent).toBe('Outro')
   })
 })
 
