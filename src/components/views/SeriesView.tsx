@@ -13,7 +13,7 @@ import { InteractiveCard } from '@/components/ui/interactive-card'
 import { LoadingState } from '@/components/ui/async-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { isSpecialSeason, resolveSelectedSeasonId } from '@/lib/series-utils'
+import { resolveSelectedSeasonId } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
 import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
@@ -35,23 +35,13 @@ const SeasonTabs = function SeasonTabsComponent({
   selectedSeasonId,
   onSeasonSelect,
 }: SeasonTabsProps) {
-  const orderedSeasons = (() => {
-    const normal: typeof seasons = []
-    const specials: typeof seasons = []
-    for (const s of seasons) {
-      if (isSpecialSeason(s)) specials.push(s)
-      else normal.push(s)
-    }
-    return [...normal, ...specials]
-  })()
-
   return (
     <div
       className="flex gap-2 md:gap-3 overflow-x-auto pbe-2 md:pbe-3 no-scrollbar relative z-10"
       role="tablist"
       aria-label="Seasons"
     >
-      {orderedSeasons.map((season, index) => {
+      {seasons.map((season, index) => {
         const isSelected = season.Id === selectedSeasonId
         const label = season.Name ?? `Season ${season.IndexNumber ?? index + 1}`
 
