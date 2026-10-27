@@ -41,6 +41,14 @@ export const jellyfinStatusBackend: JellyfinStatusBackend = {
     stopActiveEncodingKeepalive({ playSessionId }),
 }
 
+/** The video the reporter reads positions from and listens on. */
+export interface ReportedMedia {
+  readonly currentTime: number
+  readonly paused: boolean
+  addEventListener: (type: string, listener: () => void) => void
+  removeEventListener: (type: string, listener: () => void) => void
+}
+
 /** The play session Jellyfin should hear about, or null when nothing plays. */
 export interface JellyfinSessionDescriptor {
   itemId: string
@@ -114,7 +122,7 @@ function isSameSessionDescriptor(
  */
 export class PlaybackStatusReporter {
   private descriptor: JellyfinSessionDescriptor | null
-  private getActiveVideoElement: () => HTMLVideoElement | null
+  private getActiveVideoElement: () => ReportedMedia | null
   private status: PlaybackStatus = { state: 'idle' }
   private nextStartToken = 0
   /** The HLS play session whose transcode still needs stopping. */
@@ -122,7 +130,7 @@ export class PlaybackStatusReporter {
 
   constructor(
     private readonly backend: JellyfinStatusBackend,
-    getActiveVideoElement: () => HTMLVideoElement | null,
+    getActiveVideoElement: () => ReportedMedia | null,
     descriptor: JellyfinSessionDescriptor | null,
   ) {
     this.getActiveVideoElement = getActiveVideoElement
@@ -134,7 +142,7 @@ export class PlaybackStatusReporter {
   /** The session Jellyfin should hear about from now on, and where its video is. */
   update(
     descriptor: JellyfinSessionDescriptor | null,
-    getActiveVideoElement: () => HTMLVideoElement | null,
+    getActiveVideoElement: () => ReportedMedia | null,
   ): void {
     this.descriptor = descriptor
     this.getActiveVideoElement = getActiveVideoElement

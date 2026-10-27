@@ -16,7 +16,7 @@ const {
  * Player state managed by reducer.
  * Holds user-facing playback controls state; timeline data (current time,
  * duration, buffered) lives in Player's dedicated timeline store, and HLS
- * management in useHlsPlayer.
+ * management in the playback engine.
  */
 export interface PlayerState {
   isPlaying: boolean
