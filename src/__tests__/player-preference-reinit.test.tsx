@@ -22,13 +22,11 @@ type PlayerSurfaceProps = ComponentProps<typeof PlayerSurface>
 /** Mock state the tests read back after each render. */
 interface PlayerMockState {
   playerSurfaceProps: Array<PlayerSurfaceProps>
-  hlsVideoRef: { current: HTMLVideoElement | null }
 }
 
 const mocks = vi.hoisted(() => {
   const state: PlayerMockState = {
     playerSurfaceProps: [],
-    hlsVideoRef: { current: null },
   }
 
   return {
@@ -85,14 +83,6 @@ vi.mock('@/hooks/use-jassub-renderer', () => ({
 
 vi.mock('@/hooks/use-player-keyboard', () => ({
   usePlayerKeyboard: () => undefined,
-}))
-
-vi.mock('@/hooks/use-hls-player', () => ({
-  useHlsPlayer: () => ({
-    videoRef: mocks.hlsVideoRef,
-    hlsRef: { current: null },
-    retry: vi.fn(),
-  }),
 }))
 
 vi.mock('@/services/video/api', async (importOriginal) => ({
@@ -177,7 +167,6 @@ describe('Player audio preference persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.playerSurfaceProps = []
-    mocks.hlsVideoRef.current = document.createElement('video')
     vi.mocked(getPlaybackConfig).mockResolvedValue({
       strategy: 'direct',
       url: 'https://jellyfin.example/Videos/item-1/stream',
