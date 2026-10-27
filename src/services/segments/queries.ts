@@ -6,7 +6,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import type { MediaSegmentDto } from '@/types/jellyfin'
-import { getSegmentsById } from '@/services/segments/api'
+import type { SegmentSnapshot } from '@/services/segments/store'
+import { readSegments } from '@/services/segments/store'
 import { selectValidAuth, useApiStore } from '@/stores'
 import { segmentsKeys } from './query-keys'
 
@@ -27,21 +28,21 @@ interface UseSegmentsOptions {
 
 export const segmentsQueryOptions = {
   list: (itemId: string) =>
-    createStandardQueryOptions<Array<MediaSegmentDto>>({
+    createStandardQueryOptions<SegmentSnapshot>({
       queryKey: segmentsKeys.list(itemId),
-      queryFn: ({ signal }) => getSegmentsById(itemId, { signal }),
+      queryFn: ({ signal }) => readSegments(itemId, { signal }),
       cacheDuration: 'SHORT',
       operation: 'Fetch segments',
     }),
 } as const
 
 /**
- * Hook to fetch all segments for a media item.
+ * Hook to fetch the segment snapshot for a media item.
  * Segments are returned with times converted to seconds for UI display.
  *
  * @param itemId - The media item ID to fetch segments for
  * @param options - Additional query options
- * @returns TanStack Query result with segments data
+ * @returns TanStack Query result with the segment snapshot
  */
 export function useSegments(itemId: string, options?: UseSegmentsOptions) {
   const validAuth = useApiStore(selectValidAuth)

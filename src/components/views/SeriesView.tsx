@@ -93,11 +93,9 @@ function EpisodeSegmentTimeline({
   const { ref, inView } = useInView<HTMLDivElement>({
     rootMargin: SEGMENT_PREFETCH_ROOT_MARGIN,
   })
-  const {
-    data: segments,
-    isPending,
-    isError,
-  } = useSegments(episodeId, { enabled: inView })
+  const { data, isPending, isError } = useSegments(episodeId, {
+    enabled: inView,
+  })
 
   // Keep the observer target mounted for cached errors so entering the
   // viewport can re-enable the query and retry it.
@@ -107,7 +105,7 @@ function EpisodeSegmentTimeline({
     <div ref={ref} className="mbs-2 md:mbs-2.5">
       {!isError && (
         <SegmentTimeline
-          segments={segments ?? NO_SEGMENTS}
+          segments={data?.segments ?? NO_SEGMENTS}
           runtimeSeconds={runtimeSeconds}
           isLoading={isPending}
         />
