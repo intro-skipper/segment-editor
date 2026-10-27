@@ -8,15 +8,19 @@ import { usePlaybackEngine, usePlayheadTimeline } from './playback-context'
 import { initialPlayerState, playerReducer } from './player-reducer'
 import { buildNativeCaptionTracks } from './caption-tracks'
 import { useFullscreenPlayerUi } from './use-fullscreen-player-ui'
-import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
-import type { CreateSegmentData, TimestampUpdate } from '@/types/segment'
+import type { BaseItemDto } from '@/types/jellyfin'
+import type {
+  CreateSegmentData,
+  Segment,
+  TimestampUpdate,
+} from '@/types/segment'
 import { getBestImageUrl } from '@/services/video/api'
 import { useBlobUrl } from '@/hooks/useBlobUrl'
 import { usePlayerKeyboard } from '@/hooks/use-player-keyboard'
 
 interface TimelineScrubberProps {
   item: BaseItemDto
-  segments: Array<MediaSegmentDto> | undefined
+  segments: Array<Segment> | undefined
 }
 
 function TimelineScrubber({ item, segments }: TimelineScrubberProps) {
@@ -41,7 +45,7 @@ interface PlayerProps {
   item: BaseItemDto
   videoRef: React.RefObject<HTMLVideoElement | null>
   mediaSourceControls?: PlayerControlsProps['mediaSourceControls']
-  segments?: Array<MediaSegmentDto>
+  segments?: Array<Segment>
   onCreateSegment: (data: CreateSegmentData) => void
   onUpdateSegmentTimestamp: (data: TimestampUpdate) => void
 }

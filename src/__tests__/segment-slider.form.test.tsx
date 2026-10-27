@@ -15,7 +15,7 @@ import { lookup } from '@/lib/utils'
 import { resolveTranslation } from './helpers/i18n-mock'
 import type { TranslationArg } from './helpers/i18n-mock'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { SegmentSlider } from '@/components/segment/SegmentSlider'
 
 const translations = {
@@ -65,20 +65,18 @@ beforeAll(() => {
   })
 })
 
-function createSegment(
-  overrides: Partial<MediaSegmentDto> = {},
-): MediaSegmentDto {
+function createSegment(overrides: Partial<Segment> = {}): Segment {
   return {
-    EndTicks: 20,
-    Id: 'segment-1',
-    StartTicks: 10,
-    Type: 'Intro',
+    endSeconds: 20,
+    id: 'segment-1',
+    startSeconds: 10,
+    type: 'Intro',
     ...overrides,
   }
 }
 
 function renderSlider(
-  segment: MediaSegmentDto = createSegment(),
+  segment: Segment = createSegment(),
   props: Partial<React.ComponentProps<typeof SegmentSlider>> = {},
 ) {
   const onUpdate = vi.fn()
@@ -281,7 +279,7 @@ describe('SegmentSlider TanStack Form migration', () => {
 
   it('commits a start drag when the stored end runs past the runtime', async () => {
     const { onUpdate } = renderSlider(
-      createSegment({ StartTicks: 90, EndTicks: 100.4 }),
+      createSegment({ startSeconds: 90, endSeconds: 100.4 }),
     )
     const sliderTrack = trackOf100px()
     const startHandle = screen.getByRole('slider', { name: /start handle/i })
@@ -367,7 +365,7 @@ describe('SegmentSlider TanStack Form migration', () => {
 
     rerender(
       <SegmentSlider
-        segment={createSegment({ EndTicks: 40, StartTicks: 30 })}
+        segment={createSegment({ endSeconds: 40, startSeconds: 30 })}
         index={0}
         isActive
         runtimeSeconds={100}

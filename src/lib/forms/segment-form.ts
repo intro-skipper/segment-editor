@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import type { ValidationResult } from '@/types/segment'
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { Segment, ValidationResult } from '@/types/segment'
+import type { MediaSegmentType } from '@/types/jellyfin'
 import { SEGMENT_TYPES } from '@/lib/constants'
 import { maxEndSeconds, rangeError } from '@/lib/segment-range'
 
@@ -74,12 +74,12 @@ export function clampTimeText(
 }
 
 export function getSegmentFormDefaults(
-  segment: Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>,
+  segment: Pick<Segment, 'type' | 'startSeconds' | 'endSeconds'>,
 ): SegmentFormValues {
   return {
-    type: segment.Type ?? 'Unknown',
-    startText: formatSegmentInputSeconds(segment.StartTicks ?? 0),
-    endText: formatSegmentInputSeconds(segment.EndTicks ?? 0),
+    type: segment.type ?? 'Unknown',
+    startText: formatSegmentInputSeconds(segment.startSeconds),
+    endText: formatSegmentInputSeconds(segment.endSeconds),
   }
 }
 
@@ -277,13 +277,13 @@ function parseSegmentFormValues(
 }
 
 export function buildSegmentFromFormValues(
-  segment: MediaSegmentDto,
+  segment: Segment,
   values: SegmentFormValues,
   maxDuration?: number | null,
 ):
   | {
       success: true
-      segment: MediaSegmentDto
+      segment: Segment
       validation: ValidationResult
     }
   | {
@@ -297,9 +297,9 @@ export function buildSegmentFromFormValues(
     success: true,
     segment: {
       ...segment,
-      Type: parsed.data.type,
-      StartTicks: parsed.data.startSeconds,
-      EndTicks: parsed.data.endSeconds,
+      type: parsed.data.type,
+      startSeconds: parsed.data.startSeconds,
+      endSeconds: parsed.data.endSeconds,
     },
     validation: { valid: true },
   }

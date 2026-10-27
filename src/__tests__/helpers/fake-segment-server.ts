@@ -1,5 +1,6 @@
 import { vi } from 'vitest'
 import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { useApiStore } from '@/stores/api-store'
 
 const BASE_URL = 'http://localhost:8096'
@@ -15,29 +16,28 @@ export interface RecordedRequest {
   body: unknown
 }
 
-/** A segment in UI seconds, stored by the fake in ticks like the server. */
+/** A segment in seconds, stored by the fake in ticks like the server. */
 export const segment = (
   id: string,
-  type: MediaSegmentDto['Type'],
+  type: Segment['type'],
   startSeconds: number,
   endSeconds: number,
-): MediaSegmentDto & { Id: string } => ({
-  Id: id,
-  Type: type,
-  StartTicks: startSeconds,
-  EndTicks: endSeconds,
+): Segment & { id: string } => ({ id, type, startSeconds, endSeconds })
+
+const toTicks = (s: Segment, itemId: string): MediaSegmentDto => ({
+  Id: s.id,
+  ItemId: itemId,
+  Type: s.type,
+  StartTicks: s.startSeconds * TICKS_PER_SECOND,
+  EndTicks: s.endSeconds * TICKS_PER_SECOND,
 })
 
-const toTicks = (s: MediaSegmentDto): MediaSegmentDto => ({
-  ...s,
-  StartTicks: (s.StartTicks ?? 0) * TICKS_PER_SECOND,
-  EndTicks: (s.EndTicks ?? 0) * TICKS_PER_SECOND,
-})
-
-const toSeconds = (s: MediaSegmentDto): MediaSegmentDto => ({
-  ...s,
-  StartTicks: (s.StartTicks ?? 0) / TICKS_PER_SECOND,
-  EndTicks: (s.EndTicks ?? 0) / TICKS_PER_SECOND,
+const toSeconds = (s: MediaSegmentDto): Segment => ({
+  id: s.Id,
+  itemId: s.ItemId,
+  type: s.Type,
+  startSeconds: (s.StartTicks ?? 0) / TICKS_PER_SECOND,
+  endSeconds: (s.EndTicks ?? 0) / TICKS_PER_SECOND,
 })
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -56,9 +56,9 @@ export function fakeSegmentServer({
 }: {
   itemId: string
   bulk: boolean
-  segments?: Array<MediaSegmentDto>
+  segments?: Array<Segment>
 }) {
-  let stored = segments.map((s) => toTicks({ ...s, ItemId: itemId }))
+  let stored = segments.map((s) => toTicks(s, itemId))
   let version = 1
   const requests: Array<RecordedRequest> = []
   const failures: Array<{
@@ -135,14 +135,12 @@ export function fakeSegmentServer({
       requests
         .filter((r) => r.method !== 'GET')
         .map((r) => `${r.method} ${r.path}`),
-    /** What the server holds, in UI seconds and start order. */
+    /** What the server holds, in seconds and start order. */
     stored: () =>
-      stored
-        .map(toSeconds)
-        .toSorted((a, b) => (a.StartTicks ?? 0) - (b.StartTicks ?? 0)),
+      stored.map(toSeconds).toSorted((a, b) => a.startSeconds - b.startSeconds),
     /** Another client changed the item: new segments, new ETag. */
-    changeElsewhere: (next: Array<MediaSegmentDto>) => {
-      stored = next.map((s) => toTicks({ ...s, ItemId: itemId }))
+    changeElsewhere: (next: Array<Segment>) => {
+      stored = next.map((s) => toTicks(s, itemId))
       version++
     },
     /** Answers `times` `method` requests with `status`, after letting `after` through. */

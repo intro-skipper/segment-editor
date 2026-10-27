@@ -8,7 +8,7 @@ import { resolveTranslation } from './helpers/i18n-mock'
 import type { TranslationArg } from './helpers/i18n-mock'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { MediaSegmentType } from '@/types/jellyfin'
 import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
 import { formatCompactTime } from '@/lib/time-utils'
@@ -24,18 +24,17 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-// StartTicks/EndTicks are in SECONDS at the UI boundary (see segments/api.ts)
 const segment = (
   start: number,
   end: number,
   type: MediaSegmentType = MediaSegmentType.Intro,
   id = `seg-${type}-${start}`,
-): MediaSegmentDto => ({
-  Id: id,
-  ItemId: 'item-1',
-  Type: type,
-  StartTicks: start,
-  EndTicks: end,
+): Segment => ({
+  id,
+  itemId: 'item-1',
+  type,
+  startSeconds: start,
+  endSeconds: end,
 })
 
 describe('formatCompactTime', () => {

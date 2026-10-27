@@ -31,7 +31,8 @@ import {
   setPaused,
   settle,
 } from './helpers/playback-fakes'
-import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
+import type { BaseItemDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { PlaybackStrategy } from '@/services/video/api'
 import type * as VideoApiModule from '@/services/video/api'
 import type * as SubtitleModule from '@/services/video/subtitle'
@@ -203,12 +204,12 @@ const NEXT_EPISODE: BaseItemDto = {
   MediaSources: [{ ...ITEM.MediaSources?.[0], Id: 'item-2-media-source' }],
 }
 
-const INTRO: MediaSegmentDto = {
-  Id: 'intro',
-  ItemId: 'item-1',
-  Type: 'Intro',
-  StartTicks: 10,
-  EndTicks: 20,
+const INTRO: Segment = {
+  id: 'intro',
+  itemId: 'item-1',
+  type: 'Intro',
+  startSeconds: 10,
+  endSeconds: 20,
 }
 
 /** What the first config resolution returns; a forced one is always HLS. */
@@ -228,7 +229,7 @@ function Owner({ item, ...playerProps }: Omit<PlayerProps, 'videoRef'>) {
 
 interface RenderOptions {
   item?: BaseItemDto
-  segments?: Array<MediaSegmentDto>
+  segments?: Array<Segment>
 }
 
 async function renderPlayer({ item = ITEM, segments }: RenderOptions = {}) {

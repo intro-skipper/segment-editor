@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Copy, Save, Trash2 } from 'lucide-react'
 import { useForm, useStore } from '@tanstack/react-form'
 
-import type { MediaSegmentDto, MediaSegmentType } from '@/types/jellyfin'
+import type { MediaSegmentType } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { formatTime } from '@/lib/time-utils'
 import {
   buildSegmentFromFormValues,
@@ -53,12 +54,12 @@ import {
 
 interface SegmentEditDialogProps {
   open: boolean
-  segment: MediaSegmentDto
+  segment: Segment
   /** Total runtime in seconds; used to clamp time inputs and validate end time */
   runtimeSeconds?: number
   onClose: () => void
-  onSave: (segment: MediaSegmentDto) => void
-  onDelete: (segment: MediaSegmentDto) => void
+  onSave: (segment: Segment) => void
+  onDelete: (segment: Segment) => void
 }
 
 export function SegmentEditDialog(props: SegmentEditDialogProps) {
@@ -72,13 +73,13 @@ export function SegmentEditDialog(props: SegmentEditDialogProps) {
     wasOpenRef.current = props.open
   }, [props.open])
 
-  const segmentKey = props.segment.Id
-    ? props.segment.Id
+  const segmentKey = props.segment.id
+    ? props.segment.id
     : [
-        props.segment.ItemId,
-        props.segment.Type,
-        props.segment.StartTicks,
-        props.segment.EndTicks,
+        props.segment.itemId,
+        props.segment.type,
+        props.segment.startSeconds,
+        props.segment.endSeconds,
       ].join(':')
 
   return (
@@ -115,10 +116,7 @@ function SegmentEditDialogContent({
   const values = useStore(form.store, (state) => state.values)
   const { draftRange, validation } = getSegmentDraftState(
     values,
-    {
-      startSeconds: segment.StartTicks ?? 0,
-      endSeconds: segment.EndTicks ?? 0,
-    },
+    segment,
     runtimeSeconds,
   )
   const duration = Math.max(0, draftRange.endSeconds - draftRange.startSeconds)

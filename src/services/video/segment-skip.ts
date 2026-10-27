@@ -1,7 +1,7 @@
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 
 export interface SegmentTimeRange {
-  segment: MediaSegmentDto
+  segment: Segment
   startSeconds: number
   endSeconds: number
 }
@@ -14,34 +14,23 @@ export interface SegmentTimeIndex {
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   value !== null && value !== undefined && Number.isFinite(value)
 
-// NOTE: Segment query layer (`services/segments/store.ts`) maps server ticks to
-// UI seconds but preserves DTO field names (`StartTicks`/`EndTicks`).
-/** Returns UI-second start time stored in the DTO's StartTicks field. */
-const getSegmentStart = (segment: MediaSegmentDto): number | undefined =>
-  segment.StartTicks
-
-/** Returns UI-second end time stored in the DTO's EndTicks field. */
-const getSegmentEnd = (segment: MediaSegmentDto): number | undefined =>
-  segment.EndTicks
-
 export function buildSegmentTimeIndex(
-  segments: ReadonlyArray<MediaSegmentDto> | undefined,
+  segments: ReadonlyArray<Segment> | undefined,
 ): SegmentTimeIndex {
   const ranges: Array<SegmentTimeRange> = []
   const rangeById = new Map<string, SegmentTimeRange>()
   if (!segments || segments.length === 0) return { ranges, rangeById }
 
   for (const segment of segments) {
-    const startSeconds = getSegmentStart(segment)
-    const endSeconds = getSegmentEnd(segment)
+    const { startSeconds, endSeconds } = segment
     if (!isFiniteNumber(startSeconds) || !isFiniteNumber(endSeconds)) {
       continue
     }
     if (endSeconds > startSeconds) {
       const range = { segment, startSeconds, endSeconds }
       ranges.push(range)
-      if (segment.Id !== undefined) {
-        rangeById.set(segment.Id, range)
+      if (segment.id !== undefined) {
+        rangeById.set(segment.id, range)
       }
     }
   }
@@ -80,16 +69,16 @@ export function findActiveSegmentRange(
 
 export function getSegmentTimeRangeId(range: SegmentTimeRange): string {
   return (
-    range.segment.Id ??
-    `${range.startSeconds}:${range.endSeconds}:${range.segment.Type ?? ''}`
+    range.segment.id ??
+    `${range.startSeconds}:${range.endSeconds}:${range.segment.type ?? ''}`
   )
 }
 
 export function getSegmentSkipTargetEndSeconds(
-  segment: MediaSegmentDto,
+  segment: Segment,
   range: SegmentTimeRange | undefined,
 ): number | null {
-  const fallbackEndSeconds = getSegmentEnd(segment)
+  const fallbackEndSeconds = segment.endSeconds
   const targetEndSeconds = isFiniteNumber(range?.endSeconds)
     ? range.endSeconds
     : fallbackEndSeconds

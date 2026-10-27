@@ -8,7 +8,7 @@
 
 import { useTranslation } from 'react-i18next'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { SegmentRegion } from '@/lib/segment-utils'
 import { getSegmentRegions } from '@/lib/segment-utils'
 import { formatCompactTime } from '@/lib/time-utils'
@@ -20,8 +20,7 @@ import { formatCompactTime } from '@/lib/time-utils'
 const MIN_VISIBLE_WIDTH_PERCENT = 0.8
 
 interface SegmentTimelineProps {
-  /** Segments with StartTicks/EndTicks in seconds (as returned by useSegments) */
-  segments: Array<MediaSegmentDto>
+  segments: Array<Segment>
   /** Total runtime of the item in seconds */
   runtimeSeconds: number
   /** Renders a static placeholder track while segment data loads */
@@ -49,7 +48,7 @@ export function SegmentTimeline({
   // Fall back to the furthest segment end so existing segments still render
   // (with correct relative placement) when the item has no known runtime.
   const maxSegmentEnd = segments.reduce(
-    (max, segment) => Math.max(max, segment.EndTicks ?? 0),
+    (max, segment) => Math.max(max, segment.endSeconds),
     0,
   )
   const duration = runtimeSeconds > 0 ? runtimeSeconds : maxSegmentEnd

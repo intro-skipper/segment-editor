@@ -22,7 +22,7 @@ import {
   usePlaybackEngine,
   useSkipOffer,
 } from './playback-context'
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { VideoPlayerError } from '@/services/video/playback-error'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -217,8 +217,8 @@ function PlayerLoadingOverlay({
 }
 
 interface SegmentSkipOverlayProps {
-  segment: MediaSegmentDto
-  onSkipSegment: (segment: MediaSegmentDto) => void
+  segment: Segment
+  onSkipSegment: (segment: Segment) => void
 }
 
 function SegmentSkipOverlay({
@@ -227,7 +227,7 @@ function SegmentSkipOverlay({
 }: SegmentSkipOverlayProps) {
   const { t } = useTranslation()
   const label = t('player.skipSegment', {
-    type: t(`segmentType.${segment.Type}`),
+    type: t(`segmentType.${segment.type}`),
   })
 
   return (

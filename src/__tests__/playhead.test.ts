@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Playhead } from '@/services/video/playhead'
 import { useAppStore } from '@/stores/app-store'
-import type { BaseItemDto, MediaSegmentDto } from '@/types/jellyfin'
+import type { BaseItemDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import {
   createItem,
   createPlayback,
@@ -19,21 +20,21 @@ import {
   settle,
 } from './helpers/playback-fakes'
 
-const intro: MediaSegmentDto = {
-  Id: 'intro',
-  ItemId: 'item-1',
-  Type: 'Intro',
-  StartTicks: 10,
-  EndTicks: 20,
+const intro: Segment = {
+  id: 'intro',
+  itemId: 'item-1',
+  type: 'Intro',
+  startSeconds: 10,
+  endSeconds: 20,
 }
 
 /** Runs past the 100 s duration, so seeking to its end lands on the duration, inside it. */
-const credits: MediaSegmentDto = {
-  Id: 'credits',
-  ItemId: 'item-1',
-  Type: 'Outro',
-  StartTicks: 90,
-  EndTicks: 120,
+const credits: Segment = {
+  id: 'credits',
+  itemId: 'item-1',
+  type: 'Outro',
+  startSeconds: 90,
+  endSeconds: 120,
 }
 
 function setReadOnly(video: HTMLVideoElement, key: string, value: unknown) {
@@ -41,7 +42,7 @@ function setReadOnly(video: HTMLVideoElement, key: string, value: unknown) {
 }
 
 /** A connected playhead on a jsdom <video>, ready to offer skips, at frame step 0.5 s and duration 100 s. */
-function createPlayhead(segments: Array<MediaSegmentDto> = []) {
+function createPlayhead(segments: Array<Segment> = []) {
   const video = createVideo()
   const playhead = new Playhead({ current: video })
   playhead.frameStepSeconds = 0.5
@@ -245,7 +246,7 @@ describe('Playhead segment skip', () => {
     const { video, playhead } = createPlayhead([intro])
     playTo(video, 12)
 
-    const outro = { ...intro, Type: 'Outro' as const }
+    const outro = { ...intro, type: 'Outro' as const }
     playhead.setSegments([outro])
     expect(playhead.getSkipOffer()).toBe(outro)
 

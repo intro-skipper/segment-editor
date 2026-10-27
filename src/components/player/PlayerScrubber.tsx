@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { ChapterInfo, MediaSegmentDto } from '@/types/jellyfin'
+import type { ChapterInfo } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import type { TrickplayData, TrickplayPosition } from '@/lib/trickplay-utils'
 import type { SegmentRegion } from '@/lib/segment-utils'
 import { cn } from '@/lib/utils'
@@ -369,7 +370,7 @@ interface PlayerScrubberProps {
   duration: number
   buffered?: number
   chapters?: Array<ChapterInfo> | null
-  segments?: Array<MediaSegmentDto>
+  segments?: Array<Segment>
   onSeek: (time: number) => void
   /** Item ID for trickplay URL construction */
   itemId?: string
@@ -471,8 +472,6 @@ export function PlayerScrubber({
   }
 
   const chapterMarkers = getChapterMarkers(chapters, safeDuration)
-  // Note: editingSegments store StartTicks/EndTicks in SECONDS (not Jellyfin ticks)
-  // because the SegmentSlider works with seconds for the UI.
   const segmentRegions = getSegmentRegions(segments, safeDuration)
 
   return (

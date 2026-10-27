@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import { MediaSegmentType } from '@/types/jellyfin'
 import {
   getSegmentColor,
@@ -8,18 +8,17 @@ import {
   getSegmentRegions,
 } from '@/lib/segment-utils'
 
-// StartTicks/EndTicks are in SECONDS at the UI boundary (see segments/api.ts)
 const segment = (
   start: number,
   end: number,
   type: MediaSegmentType = MediaSegmentType.Intro,
   id = `seg-${start}-${end}`,
-): MediaSegmentDto => ({
-  Id: id,
-  ItemId: 'item-1',
-  Type: type,
-  StartTicks: start,
-  EndTicks: end,
+): Segment => ({
+  id,
+  itemId: 'item-1',
+  type,
+  startSeconds: start,
+  endSeconds: end,
 })
 
 describe('getSegmentRegions', () => {
@@ -90,45 +89,23 @@ describe('getSegmentRegions', () => {
     ).toEqual([])
   })
 
-  it('treats missing ticks as 0 and clamps to the runtime', () => {
-    const noStart: MediaSegmentDto = {
-      Id: 'seg-no-start',
-      ItemId: 'item-1',
-      Type: MediaSegmentType.Intro,
-      EndTicks: 400,
-    }
-    const regions = getSegmentRegions([noStart], 300)
-
-    expect(regions).toHaveLength(1)
-    expect(regions[0].start).toBe(0)
-    expect(regions[0].width).toBe(100)
-    expect(regions[0].startSeconds).toBe(0)
-    expect(regions[0].endSeconds).toBe(300)
-  })
-
   it('drops reversed spans (end before start) in both modes', () => {
     const reversed = segment(90, 30)
-    const noEnd: MediaSegmentDto = {
-      Id: 'seg-no-end',
-      ItemId: 'item-1',
-      Type: MediaSegmentType.Intro,
-      StartTicks: 120,
-    }
 
-    expect(getSegmentRegions([reversed, noEnd], 300)).toEqual([])
+    expect(getSegmentRegions([reversed], 300)).toEqual([])
     expect(
-      getSegmentRegions([reversed, noEnd], 300, {
+      getSegmentRegions([reversed], 300, {
         minVisibleWidthPercent: 0.8,
       }),
     ).toEqual([])
   })
 
   it('falls back to the unknown color for untyped segments', () => {
-    const untyped: MediaSegmentDto = {
-      Id: 'seg-untyped',
-      ItemId: 'item-1',
-      StartTicks: 0,
-      EndTicks: 50,
+    const untyped: Segment = {
+      id: 'seg-untyped',
+      itemId: 'item-1',
+      startSeconds: 0,
+      endSeconds: 50,
     }
     const regions = getSegmentRegions([untyped], 100)
 
@@ -139,14 +116,14 @@ describe('getSegmentRegions', () => {
   it('does not crash on server enum values unknown to this client', () => {
     // A newer Jellyfin server may report types this client does not know;
     // the schema warning is logged but DTOs are still forwarded to the UI.
-    const futureType: MediaSegmentDto = {
-      Id: 'seg-future',
-      ItemId: 'item-1',
+    const futureType: Segment = {
+      id: 'seg-future',
+      itemId: 'item-1',
       // SAFETY: modelling a segment type this client build predates, which is
       // exactly the out-of-contract value the fallback colour exists for.
-      Type: 'HolidaySpecial' as MediaSegmentType,
-      StartTicks: 10,
-      EndTicks: 60,
+      type: 'HolidaySpecial' as MediaSegmentType,
+      startSeconds: 10,
+      endSeconds: 60,
     }
     const regions = getSegmentRegions([futureType], 100)
 

@@ -6,30 +6,31 @@ import {
   getSegmentSkipTargetEndSeconds,
   getSegmentTimeRangeId,
 } from '@/services/video/segment-skip'
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 
-function segment(overrides: Partial<MediaSegmentDto>): MediaSegmentDto {
+function segment(
+  overrides: Partial<Segment> & Pick<Segment, 'startSeconds' | 'endSeconds'>,
+): Segment {
   return {
-    ItemId: 'item-1',
-    Type: 'Intro',
+    itemId: 'item-1',
+    type: 'Intro',
     ...overrides,
   }
 }
 
 describe('player segment skip helpers', () => {
   it('normalizes finite positive ranges and indexes them by id', () => {
-    const intro = segment({ Id: 'intro', StartTicks: 30, EndTicks: 40 })
-    const recap = segment({ Id: 'recap', StartTicks: 10, EndTicks: 20 })
+    const intro = segment({ id: 'intro', startSeconds: 30, endSeconds: 40 })
+    const recap = segment({ id: 'recap', startSeconds: 10, endSeconds: 20 })
 
     const { ranges, rangeById } = buildSegmentTimeIndex([
       intro,
-      segment({ Id: 'missing-start', EndTicks: 50 }),
-      segment({ Id: 'equal-boundary', StartTicks: 50, EndTicks: 50 }),
-      segment({ Id: 'invalid-end', StartTicks: 60, EndTicks: Number.NaN }),
+      segment({ id: 'equal-boundary', startSeconds: 50, endSeconds: 50 }),
+      segment({ id: 'invalid-end', startSeconds: 60, endSeconds: Number.NaN }),
       recap,
     ])
 
-    expect(ranges.map((range) => range.segment.Id)).toEqual(['recap', 'intro'])
+    expect(ranges.map((range) => range.segment.id)).toEqual(['recap', 'intro'])
     expect(
       ranges.map((range) => [range.startSeconds, range.endSeconds]),
     ).toEqual([
@@ -39,35 +40,35 @@ describe('player segment skip helpers', () => {
 
     expect(rangeById.get('recap')?.segment).toBe(recap)
     expect(rangeById.get('intro')?.segment).toBe(intro)
-    expect(rangeById.has('missing-start')).toBe(false)
+    expect(rangeById.has('invalid-end')).toBe(false)
   })
 
   it('finds the active segment by start-inclusive end-exclusive time', () => {
     const ranges = buildSegmentTimeIndex([
-      segment({ Id: 'intro', StartTicks: 30, EndTicks: 40 }),
-      segment({ Id: 'recap', StartTicks: 10, EndTicks: 20 }),
+      segment({ id: 'intro', startSeconds: 30, endSeconds: 40 }),
+      segment({ id: 'recap', startSeconds: 10, endSeconds: 20 }),
     ]).ranges
 
-    expect(findActiveSegmentRange(ranges, 10)?.segment.Id).toBe('recap')
-    expect(findActiveSegmentRange(ranges, 19.999)?.segment.Id).toBe('recap')
+    expect(findActiveSegmentRange(ranges, 10)?.segment.id).toBe('recap')
+    expect(findActiveSegmentRange(ranges, 19.999)?.segment.id).toBe('recap')
     expect(findActiveSegmentRange(ranges, 20)).toBeNull()
-    expect(findActiveSegmentRange(ranges, 35)?.segment.Id).toBe('intro')
+    expect(findActiveSegmentRange(ranges, 35)?.segment.id).toBe('intro')
     expect(findActiveSegmentRange(ranges, Number.NaN)).toBeNull()
   })
 
   it('keeps an earlier overlapping segment active after a nested segment ends', () => {
     const ranges = buildSegmentTimeIndex([
-      segment({ Id: 'outer', StartTicks: 0, EndTicks: 100 }),
-      segment({ Id: 'nested', StartTicks: 50, EndTicks: 60 }),
+      segment({ id: 'outer', startSeconds: 0, endSeconds: 100 }),
+      segment({ id: 'nested', startSeconds: 50, endSeconds: 60 }),
     ]).ranges
 
-    expect(findActiveSegmentRange(ranges, 55)?.segment.Id).toBe('nested')
-    expect(findActiveSegmentRange(ranges, 70)?.segment.Id).toBe('outer')
+    expect(findActiveSegmentRange(ranges, 55)?.segment.id).toBe('nested')
+    expect(findActiveSegmentRange(ranges, 70)?.segment.id).toBe('outer')
   })
 
   it('resolves stable range ids and skip targets without an id', () => {
     const range = buildSegmentTimeIndex([
-      segment({ Type: 'Outro', StartTicks: 70, EndTicks: 90 }),
+      segment({ type: 'Outro', startSeconds: 70, endSeconds: 90 }),
     ]).ranges[0]
 
     expect(getSegmentTimeRangeId(range)).toBe('70:90:Outro')
@@ -76,12 +77,12 @@ describe('player segment skip helpers', () => {
 
   it('prefers the normalized indexed range end when skipping an identified segment', () => {
     const segmentWithStaleEnd = segment({
-      Id: 'intro',
-      StartTicks: 30,
-      EndTicks: 31,
+      id: 'intro',
+      startSeconds: 30,
+      endSeconds: 31,
     })
     const normalizedRange = buildSegmentTimeIndex([
-      { ...segmentWithStaleEnd, EndTicks: 40 },
+      { ...segmentWithStaleEnd, endSeconds: 40 },
     ]).ranges[0]
 
     expect(
@@ -89,7 +90,11 @@ describe('player segment skip helpers', () => {
     ).toBe(40)
     expect(
       getSegmentSkipTargetEndSeconds(
-        segment({ Id: 'missing-end', StartTicks: 10 }),
+        segment({
+          id: 'invalid-end',
+          startSeconds: 10,
+          endSeconds: Number.NaN,
+        }),
         undefined,
       ),
     ).toBeNull()

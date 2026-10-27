@@ -6,8 +6,7 @@
 
 import * as React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MediaSegmentDto } from '@/types/jellyfin'
-import type { CreateSegmentData } from '@/types/segment'
+import type { CreateSegmentData, Segment } from '@/types/segment'
 import type { SegmentSnapshot } from './store'
 import { UNREAD_SNAPSHOT, replaceSegments } from './store'
 import { NO_SEGMENTS, segmentsQueryOptions, useSegments } from './queries'
@@ -38,12 +37,12 @@ export type SegmentTarget = { id: string } | { index: number } | 'active'
  * and the edited segment re-sorts and becomes active.
  */
 export type SegmentPatch = Partial<
-  Pick<MediaSegmentDto, 'Type' | 'StartTicks' | 'EndTicks'>
+  Pick<Segment, 'type' | 'startSeconds' | 'endSeconds'>
 >
 
 interface Draft {
   itemId: string
-  segments: Array<MediaSegmentDto> | null
+  segments: Array<Segment> | null
   activeIndex: number
   /**
    * The snapshot the draft started from; saving writes from it, so a change
@@ -54,7 +53,7 @@ interface Draft {
 }
 
 interface Edit {
-  segments: Array<MediaSegmentDto>
+  segments: Array<Segment>
   activeIndex: number
 }
 
@@ -63,7 +62,7 @@ interface SaveInput {
   identity: QueryIdentity
   itemId: string
   base: Draft['base']
-  segments: Array<MediaSegmentDto>
+  segments: Array<Segment>
 }
 
 const emptyDraft = (itemId: string): Draft => ({
@@ -73,14 +72,10 @@ const emptyDraft = (itemId: string): Draft => ({
   base: UNREAD_SNAPSHOT,
 })
 
-const startOf = (segment: MediaSegmentDto): number => segment.StartTicks ?? 0
-const endOf = (segment: MediaSegmentDto): number =>
-  segment.EndTicks ?? startOf(segment)
-
 /** Insertion point after every segment that starts earlier, or ends no later at the same start. */
 function findInsertionIndex(
-  segments: ReadonlyArray<MediaSegmentDto>,
-  segment: MediaSegmentDto,
+  segments: ReadonlyArray<Segment>,
+  segment: Segment,
 ): number {
   let low = 0
   let high = segments.length
@@ -88,9 +83,9 @@ function findInsertionIndex(
     const mid = (low + high) >> 1
     const candidate = segments[mid]
     if (
-      startOf(candidate) < startOf(segment) ||
-      (startOf(candidate) === startOf(segment) &&
-        endOf(candidate) <= endOf(segment))
+      candidate.startSeconds < segment.startSeconds ||
+      (candidate.startSeconds === segment.startSeconds &&
+        candidate.endSeconds <= segment.endSeconds)
     ) {
       low = mid + 1
     } else {
@@ -101,28 +96,28 @@ function findInsertionIndex(
 }
 
 function insertSorted(
-  segments: ReadonlyArray<MediaSegmentDto>,
-  segment: MediaSegmentDto,
+  segments: ReadonlyArray<Segment>,
+  segment: Segment,
 ): Edit {
   const activeIndex = findInsertionIndex(segments, segment)
   return { segments: segments.toSpliced(activeIndex, 0, segment), activeIndex }
 }
 
 function resolveIndex(
-  segments: ReadonlyArray<MediaSegmentDto>,
+  segments: ReadonlyArray<Segment>,
   activeIndex: number,
   target: SegmentTarget,
 ): number {
   if (target !== 'active' && 'id' in target) {
-    return segments.findIndex((segment) => segment.Id === target.id)
+    return segments.findIndex((segment) => segment.id === target.id)
   }
   const index = target === 'active' ? activeIndex : target.index
   return index >= 0 && index < segments.length ? index : -1
 }
 
-const rangeOf = (segment: MediaSegmentDto): SegmentRange => ({
-  start: segment.StartTicks ?? 0,
-  end: segment.EndTicks ?? 0,
+const rangeOf = (segment: Segment): SegmentRange => ({
+  start: segment.startSeconds,
+  end: segment.endSeconds,
 })
 
 /**
@@ -156,33 +151,33 @@ function placeMoved(
 }
 
 const withRange = (
-  segment: MediaSegmentDto,
+  segment: Omit<Segment, 'startSeconds' | 'endSeconds'>,
   { start, end }: SegmentRange,
-): MediaSegmentDto => ({ ...segment, StartTicks: start, EndTicks: end })
+): Segment => ({ ...segment, startSeconds: start, endSeconds: end })
 
 const compareStrings = (a: string, b: string): number =>
   a < b ? -1 : a > b ? 1 : 0
 
-const compareCanonical = (a: MediaSegmentDto, b: MediaSegmentDto): number =>
-  startOf(a) - startOf(b) ||
-  (a.EndTicks ?? 0) - (b.EndTicks ?? 0) ||
-  compareStrings(a.Id ?? '', b.Id ?? '') ||
-  compareStrings(a.Type ?? '', b.Type ?? '')
+const compareCanonical = (a: Segment, b: Segment): number =>
+  a.startSeconds - b.startSeconds ||
+  a.endSeconds - b.endSeconds ||
+  compareStrings(a.id ?? '', b.id ?? '') ||
+  compareStrings(a.type ?? '', b.type ?? '')
 
 /** Same segments in any order: list order is presentation, not an edit. */
 function isSameSegmentSet(
-  a: ReadonlyArray<MediaSegmentDto>,
-  b: ReadonlyArray<MediaSegmentDto>,
+  a: ReadonlyArray<Segment>,
+  b: ReadonlyArray<Segment>,
 ): boolean {
   if (a.length !== b.length) return false
   const sortedB = b.toSorted(compareCanonical)
   return a.toSorted(compareCanonical).every((segment, index) => {
     const other = sortedB[index]
     return (
-      segment.Id === other.Id &&
-      segment.Type === other.Type &&
-      segment.StartTicks === other.StartTicks &&
-      segment.EndTicks === other.EndTicks
+      segment.id === other.id &&
+      segment.type === other.type &&
+      segment.startSeconds === other.startSeconds &&
+      segment.endSeconds === other.endSeconds
     )
   })
 }
@@ -276,7 +271,7 @@ export function useSegmentEditSession(
 
   const create = ({ type, start, end }: CreateSegmentData): void => {
     const segment = withRange(
-      { Id: generateUUID(), ItemId: itemId, Type: type },
+      { id: generateUUID(), itemId, type },
       placeRange({ start, end: end ?? start + 1 }, rules),
     )
     edit(({ segments: current }) => insertSorted(current, segment))
@@ -314,7 +309,7 @@ export function useSegmentEditSession(
 
   /** 'replace' swaps the whole draft for `imported`; 'merge' adds them. */
   const importSegments = (
-    imported: Array<MediaSegmentDto>,
+    imported: Array<Segment>,
     mode: 'replace' | 'merge',
   ): void => {
     const placed = imported.map((segment) =>

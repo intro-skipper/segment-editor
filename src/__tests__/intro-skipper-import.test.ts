@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { MediaSegmentDto } from '@/types/jellyfin'
+import type { Segment } from '@/types/segment'
 import {
   introSkipperClipboardTextToSegments,
   segmentsToIntroSkipperClipboardText,
@@ -46,18 +46,18 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.skipped).toBe(1)
 
     // Sorted by start time
-    expect(result.segments[0]?.Type).toBe('Recap')
-    expect(result.segments[0]?.StartTicks).toBeCloseTo(7, 5)
-    expect(result.segments[0]?.EndTicks).toBeCloseTo(120, 5)
+    expect(result.segments[0]?.type).toBe('Recap')
+    expect(result.segments[0]?.startSeconds).toBeCloseTo(7, 5)
+    expect(result.segments[0]?.endSeconds).toBeCloseTo(120, 5)
 
-    expect(result.segments[1]?.Type).toBe('Intro')
-    expect(result.segments[1]?.StartTicks).toBeCloseTo(121, 5)
-    expect(result.segments[1]?.EndTicks).toBeCloseTo(174, 5)
+    expect(result.segments[1]?.type).toBe('Intro')
+    expect(result.segments[1]?.startSeconds).toBeCloseTo(121, 5)
+    expect(result.segments[1]?.endSeconds).toBeCloseTo(174, 5)
 
     // END_CREDITS without endTimeMs runs until media end (maxDurationSeconds)
-    expect(result.segments[2]?.Type).toBe('Outro')
-    expect(result.segments[2]?.StartTicks).toBeCloseTo(3673, 5)
-    expect(result.segments[2]?.EndTicks).toBeCloseTo(10_000, 5)
+    expect(result.segments[2]?.type).toBe('Outro')
+    expect(result.segments[2]?.startSeconds).toBeCloseTo(3673, 5)
+    expect(result.segments[2]?.endSeconds).toBeCloseTo(10_000, 5)
   })
 
   it('skips events that end past the media or before they start', () => {
@@ -74,7 +74,7 @@ describe('Intro Skipper clipboard import', () => {
       maxDurationSeconds: 10_000,
     })
 
-    expect(result.segments.map((s) => s.Type)).toEqual(['Recap'])
+    expect(result.segments.map((s) => s.type)).toEqual(['Recap'])
     expect(result.skipped).toBe(2)
   })
 
@@ -95,7 +95,7 @@ describe('Intro Skipper clipboard import', () => {
 
     expect(result.error).toBeUndefined()
     expect(result.segments).toHaveLength(1)
-    expect(result.segments[0]?.Type).toBe('Recap')
+    expect(result.segments[0]?.type).toBe('Recap')
   })
 
   it('imports when JSON is a single event object (no wrapper)', () => {
@@ -113,7 +113,7 @@ describe('Intro Skipper clipboard import', () => {
 
     expect(result.error).toBeUndefined()
     expect(result.segments).toHaveLength(1)
-    expect(result.segments[0]?.Type).toBe('Intro')
+    expect(result.segments[0]?.type).toBe('Intro')
   })
 
   it('imports seconds-based markers object (intro/credits/preview)', () => {
@@ -144,17 +144,17 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments).toHaveLength(3)
 
     // Sorted by start time
-    expect(result.segments[0]?.Type).toBe('Intro')
-    expect(result.segments[0]?.StartTicks).toBeCloseTo(392, 5)
-    expect(result.segments[0]?.EndTicks).toBeCloseTo(483, 5)
+    expect(result.segments[0]?.type).toBe('Intro')
+    expect(result.segments[0]?.startSeconds).toBeCloseTo(392, 5)
+    expect(result.segments[0]?.endSeconds).toBeCloseTo(483, 5)
 
-    expect(result.segments[1]?.Type).toBe('Outro')
-    expect(result.segments[1]?.StartTicks).toBeCloseTo(1331, 5)
-    expect(result.segments[1]?.EndTicks).toBeCloseTo(1422, 5)
+    expect(result.segments[1]?.type).toBe('Outro')
+    expect(result.segments[1]?.startSeconds).toBeCloseTo(1331, 5)
+    expect(result.segments[1]?.endSeconds).toBeCloseTo(1422, 5)
 
-    expect(result.segments[2]?.Type).toBe('Preview')
-    expect(result.segments[2]?.StartTicks).toBeCloseTo(1422, 5)
-    expect(result.segments[2]?.EndTicks).toBeCloseTo(1437, 5)
+    expect(result.segments[2]?.type).toBe('Preview')
+    expect(result.segments[2]?.startSeconds).toBeCloseTo(1422, 5)
+    expect(result.segments[2]?.endSeconds).toBeCloseTo(1437, 5)
   })
 
   it('imports when events array is deeply nested', () => {
@@ -198,43 +198,43 @@ describe('Intro Skipper clipboard import', () => {
     expect(result.segments).toHaveLength(3)
     expect(result.skipped).toBe(1)
 
-    expect(result.segments[0]?.Type).toBe('Recap')
-    expect(result.segments[1]?.Type).toBe('Intro')
-    expect(result.segments[2]?.Type).toBe('Outro')
+    expect(result.segments[0]?.type).toBe('Recap')
+    expect(result.segments[1]?.type).toBe('Intro')
+    expect(result.segments[2]?.type).toBe('Outro')
   })
 
   it('exports segments back into Intro Skipper JSON structure', () => {
     const segments = [
       {
-        Id: 'a',
-        ItemId: 'item-1',
-        Type: 'Recap' as const,
-        StartTicks: 7,
-        EndTicks: 120,
+        id: 'a',
+        itemId: 'item-1',
+        type: 'Recap' as const,
+        startSeconds: 7,
+        endSeconds: 120,
       },
       {
-        Id: 'b',
-        ItemId: 'item-1',
-        Type: 'Intro' as const,
-        StartTicks: 121,
-        EndTicks: 174,
+        id: 'b',
+        itemId: 'item-1',
+        type: 'Intro' as const,
+        startSeconds: 121,
+        endSeconds: 174,
       },
       {
-        Id: 'c',
-        ItemId: 'item-1',
-        Type: 'Outro' as const,
-        StartTicks: 3673,
-        EndTicks: 10_000,
+        id: 'c',
+        itemId: 'item-1',
+        type: 'Outro' as const,
+        startSeconds: 3673,
+        endSeconds: 10_000,
       },
       // Should be ignored
       {
-        Id: 'd',
-        ItemId: 'item-1',
-        Type: 'Preview' as const,
-        StartTicks: 1,
-        EndTicks: 2,
+        id: 'd',
+        itemId: 'item-1',
+        type: 'Preview' as const,
+        startSeconds: 1,
+        endSeconds: 2,
       },
-    ] satisfies Array<MediaSegmentDto>
+    ] satisfies Array<Segment>
 
     const result = segmentsToIntroSkipperPayload(segments)
     expect(result.payload).toHaveLength(3)
