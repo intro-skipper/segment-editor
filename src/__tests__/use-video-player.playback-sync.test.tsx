@@ -867,6 +867,20 @@ describe('PlaybackEngine sources', () => {
     )
   })
 
+  it('keeps playing another media source switched to before the first frame', async () => {
+    const { engine, video } = createPlayback()
+    engine.load(createItem())
+    await settle()
+    setPaused(video, false)
+
+    engine.load({ ...createItem(), MediaSources: [{ Id: 'other-source' }] })
+    await settle()
+    const play = vi.spyOn(video, 'play')
+    emit(video, 'canplay')
+
+    expect(play).toHaveBeenCalled()
+  })
+
   it('does not take another media source that plays as HLS for a switch to transcode', async () => {
     const onSwitchedToTranscode = vi.fn()
     const { engine, backend } = createPlayback({
@@ -899,6 +913,41 @@ describe('PlaybackEngine sources', () => {
     emit(video, 'canplay')
 
     expect(video.currentTime).toBe(0)
+  })
+
+  it('stops a native HLS stream when the item changes, so the next item starts from the beginning', async () => {
+    class NativeHls extends FakeHls {
+      static override isSupported = () => false
+    }
+    const { engine, video, backend } = createPlayback({
+      sync: true,
+      loadHls: async () => NativeHls,
+    })
+    video.canPlayType = () => 'maybe'
+    engine.load(createItem())
+    await settle()
+    expect(video.src).toContain('/Videos/item-1/')
+
+    video.currentTime = 600
+    setPaused(video, false)
+    const config = deferred<{ strategy: PlaybackStrategy; url: string }>()
+    backend.getPlaybackConfig.mockReturnValueOnce(config.promise)
+    engine.load(createItem('item-2'))
+    await settle()
+
+    expect(video.hasAttribute('src')).toBe(false)
+    expect(video.paused).toBe(true)
+
+    config.resolve({ strategy: 'hls', url: 'https://jellyfin.example/2.m3u8' })
+    await settle()
+    expect(backend.start).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        itemId: 'item-2',
+        positionTicks: 0,
+        isPaused: true,
+      }),
+    )
+    expect(video.src).toBe('https://jellyfin.example/2.m3u8')
   })
 
   it('hides the previous item’s error while the next item resolves', async () => {

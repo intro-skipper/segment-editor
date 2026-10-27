@@ -445,8 +445,11 @@ export class PlaybackEngine<
       return
     }
 
-    const time = this.media.current?.currentTime ?? 0
-    if (sameItem && !this.carry && time > 0) this.captureCarry()
+    const media = this.media.current
+    // A version switch keeps playing even before the first frame (time 0).
+    const progressed =
+      media !== null && (media.currentTime > 0 || !media.paused)
+    if (sameItem && !this.carry && progressed) this.captureCarry()
     this.unload()
 
     if (!item || !itemId || !mediaSourceId) {
