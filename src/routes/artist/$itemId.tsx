@@ -2,6 +2,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
+import { currentQueryIdentity } from '@/hooks/queries/query-identity'
 import { artistQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { ArtistPage, ArtistSkeleton } from '@/components/routes/ArtistItemRoute'
 import { DetailRouteErrorComponent } from '../-detail-route-error-component'
@@ -31,10 +32,11 @@ export const Route = createFileRoute('/artist/$itemId')({
     const { queryClient } = context
 
     assertJellyfinCredentials()
+    const identity = currentQueryIdentity()
 
     const [artist] = await Promise.all([
-      queryClient.ensureQueryData(itemsQueryOptions.detail(itemId)),
-      queryClient.ensureQueryData(artistQueryOptions.albums(itemId)),
+      queryClient.ensureQueryData(itemsQueryOptions.detail(identity, itemId)),
+      queryClient.ensureQueryData(artistQueryOptions.albums(identity, itemId)),
       import('@/components/views/ArtistView'),
     ])
     assertItemFound(artist, abortController.signal)

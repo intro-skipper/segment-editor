@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
 import { artistQueryOptions, itemsQueryOptions } from '@/services/items/queries'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -49,9 +50,14 @@ export function ArtistSkeleton() {
 
 export function ArtistPage() {
   const { itemId } = routeApi.useParams()
+  const identity = useQueryIdentity()
 
-  const { data: artist } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
-  const { data: albums } = useSuspenseQuery(artistQueryOptions.albums(itemId))
+  const { data: artist } = useSuspenseQuery(
+    itemsQueryOptions.detail(identity, itemId),
+  )
+  const { data: albums } = useSuspenseQuery(
+    artistQueryOptions.albums(identity, itemId),
+  )
 
   if (!artist) {
     return <RouteErrorFallback message="Artist not found" />

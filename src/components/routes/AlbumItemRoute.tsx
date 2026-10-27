@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 
 import { albumQueryOptions, itemsQueryOptions } from '@/services/items/queries'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -48,9 +49,14 @@ export function AlbumSkeleton() {
 
 export function AlbumPage() {
   const { itemId } = routeApi.useParams()
+  const identity = useQueryIdentity()
 
-  const { data: album } = useSuspenseQuery(itemsQueryOptions.detail(itemId))
-  const { data: tracks } = useSuspenseQuery(albumQueryOptions.tracks(itemId))
+  const { data: album } = useSuspenseQuery(
+    itemsQueryOptions.detail(identity, itemId),
+  )
+  const { data: tracks } = useSuspenseQuery(
+    albumQueryOptions.tracks(identity, itemId),
+  )
 
   if (!album) {
     return <RouteErrorFallback message="Album not found" />

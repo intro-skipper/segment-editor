@@ -21,7 +21,10 @@ interface ApiActions {
   setServerVersion: (version: string) => void
   setConnectionStatus: (valid: boolean, auth: boolean) => void
   setAuthMethod: (method: AuthMethod) => void
-  setUserInfo: (userId: string, username: string) => void
+  setUserInfo: (
+    userId: string | undefined,
+    username: string | undefined,
+  ) => void
   clearAuth: () => void
 }
 
@@ -66,10 +69,11 @@ export const useApiStore = create<ApiStore>()(
         set({ validConnection, validAuth }),
       setAuthMethod: (authMethod) => set({ authMethod }),
       setUserInfo: (userId, username) => set({ userId, username }),
+      // Keeps serverAddress and userId: signing out is not a switch of query
+      // identity, so the shown pages keep their data; the next sign-in sets both.
       clearAuth: () =>
         set({
           apiKey: undefined,
-          userId: undefined,
           username: undefined,
           validConnection: false,
           validAuth: false,
