@@ -42,23 +42,34 @@ export function placeRange(
   moved: 'start' | 'end' | 'both' = 'both',
 ): SegmentRange {
   const max = maxEndSeconds(rules)
-  const snap = (seconds: number) => snapToFrame(seconds, rules.frameStepSeconds)
+  const step = rules.frameStepSeconds
+  const snap = (seconds: number) => snapToFrame(seconds, step)
+  // The minimum length rarely falls on a frame, so a boundary it holds back
+  // goes to the nearest frame that still keeps the length.
+  const toFrame = (seconds: number, round: (frames: number) => number) =>
+    step === undefined || !(step > 0) || !Number.isFinite(seconds)
+      ? seconds
+      : snap(round(seconds / step) * step)
+  const latestStart = (end: number) =>
+    toFrame(end - MIN_SEGMENT_GAP, (frames) => Math.floor(frames + 1e-9))
+  const earliestEnd = (start: number) =>
+    toFrame(start + MIN_SEGMENT_GAP, (frames) => Math.ceil(frames - 1e-9))
 
   if (moved === 'start') {
     return {
-      start: clamp(snap(next.start), 0, next.end - MIN_SEGMENT_GAP),
+      start: clamp(snap(next.start), 0, latestStart(next.end)),
       end: next.end,
     }
   }
   // An end-only move still pulls back a start that lies past the media.
   const start =
     moved === 'both' || next.start > max - MIN_SEGMENT_GAP
-      ? clamp(snap(next.start), 0, Math.max(0, max - MIN_SEGMENT_GAP))
+      ? clamp(snap(next.start), 0, Math.max(0, latestStart(max)))
       : next.start
   // Staying inside the media wins over the minimum length.
   return {
     start,
-    end: Math.min(max, Math.max(snap(next.end), start + MIN_SEGMENT_GAP)),
+    end: Math.min(max, Math.max(snap(next.end), earliestEnd(start))),
   }
 }
 

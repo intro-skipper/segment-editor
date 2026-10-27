@@ -491,6 +491,27 @@ describe('segment edit session', () => {
     ])
   })
 
+  it('keeps boundaries held back by the minimum length on frames', async () => {
+    fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [INTRO] })
+    const { result } = await renderLoadedSession({
+      runtimeSeconds: 1300,
+      frameStepSeconds: 0.04,
+    })
+
+    act(() =>
+      result.current.importSegments(
+        [segment('b8f9667b-0b42-4900-87d8-94b181223490', 'Recap', 10, 10.04)],
+        'merge',
+      ),
+    )
+    act(() => result.current.update({ id: INTRO.Id }, { StartTicks: 89.99 }))
+
+    expect(result.current.segments).toMatchObject([
+      { Type: 'Recap', StartTicks: 10, EndTicks: 10.12 },
+      { Type: 'Intro', StartTicks: 89.88, EndTicks: 90 },
+    ])
+  })
+
   it('drops the draft when the item changes', async () => {
     fakeSegmentServer({ itemId: ITEM_ID, bulk: true, segments: [INTRO] })
     const { result, rerender } = await renderLoadedSession()
