@@ -6,6 +6,7 @@ import {
 import type { QueryClient } from '@tanstack/react-query'
 import { createStandardQueryOptions } from '@/hooks/queries/create-query-hook'
 import { resolveAdjacentEpisodes } from '@/lib/adjacent-episodes'
+import { inSeriesOrder } from '@/lib/series-utils'
 import type { PagedItemsResult } from '@/services/items/api'
 import type {
   BaseItemDto,
@@ -101,10 +102,12 @@ export const itemsQueryOptions = {
 } as const
 
 export const seriesQueryOptions = {
+  /** The series' seasons in Series Order. */
   seasons: (seriesId: string) =>
     createStandardQueryOptions({
       queryKey: seriesKeys.seasons(seriesId),
-      queryFn: (context) => getSeasons(seriesId, context),
+      queryFn: async (context) =>
+        inSeriesOrder(await getSeasons(seriesId, context)),
       cacheDuration: 'LONG',
       operation: 'Fetch seasons',
     }),

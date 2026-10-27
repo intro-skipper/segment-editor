@@ -10,6 +10,18 @@ export const isSpecialSeason = (season: BaseItemDto): boolean =>
   (season.Name ?? '').toLowerCase().includes('special')
 
 /**
+ * Seasons in Series Order (see CONTEXT.md): regular seasons as Jellyfin lists
+ * them, then Specials. The seasons query returns this order, so the series
+ * page, the Episode Switcher and Adjacent Episodes all agree.
+ */
+export const inSeriesOrder = (
+  seasons: Array<BaseItemDto>,
+): Array<BaseItemDto> => [
+  ...seasons.filter((season) => !isSpecialSeason(season)),
+  ...seasons.filter(isSpecialSeason),
+]
+
+/**
  * The season the series page shows: `selectedSeasonId` when it names one of
  * `seasons`, else the first regular season, else the first season. The route
  * loader uses it to prefetch that season's episodes.

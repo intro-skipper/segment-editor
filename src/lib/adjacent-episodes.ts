@@ -1,5 +1,4 @@
 import type { BaseItemDto } from '@/types/jellyfin'
-import { isSpecialSeason } from '@/lib/series-utils'
 
 export interface AdjacentEpisodes {
   previous: BaseItemDto | null
@@ -8,6 +7,7 @@ export interface AdjacentEpisodes {
 
 /** Data access the resolver needs; callers route these through the query cache. */
 export interface SeriesFetchers {
+  /** The series' seasons in Series Order. */
   fetchSeasons: (seriesId: string) => Promise<Array<BaseItemDto>>
   fetchEpisodes: (
     seriesId: string,
@@ -27,10 +27,9 @@ const ownEpisodes = (episodes: Array<BaseItemDto>, seasonId: string) =>
   episodes.filter((item) => item.SeasonId === seasonId)
 
 /**
- * Resolves the Adjacent Episodes of `episode` in Series Order (see CONTEXT.md):
- * regular seasons in the order Jellyfin returns them, then Specials, with
- * episodes in order within each season. Stepping crosses season boundaries
- * and skips seasons with no playable episodes.
+ * Resolves the Adjacent Episodes of `episode` in Series Order (see CONTEXT.md),
+ * with episodes in order within each season. Stepping crosses season
+ * boundaries and skips seasons with no playable episodes.
  */
 export async function resolveAdjacentEpisodes(
   fetchers: SeriesFetchers,
@@ -40,15 +39,8 @@ export async function resolveAdjacentEpisodes(
   if (!episodeId || !seriesId || !seasonId) return NO_ADJACENT
 
   const seasons = await fetchers.fetchSeasons(seriesId)
-  const currentSeason = seasons.find((season) => season.Id === seasonId)
-  if (!currentSeason) return NO_ADJACENT
-
-  // Same order the series page shows its season tabs in.
-  const ordered = [
-    ...seasons.filter((season) => !isSpecialSeason(season)),
-    ...seasons.filter(isSpecialSeason),
-  ]
-  const seasonIndex = ordered.indexOf(currentSeason)
+  const seasonIndex = seasons.findIndex((season) => season.Id === seasonId)
+  if (seasonIndex === -1) return NO_ADJACENT
 
   const episodes = ownEpisodes(
     await fetchers.fetchEpisodes(seriesId, seasonId),
@@ -79,10 +71,10 @@ export async function resolveAdjacentEpisodes(
   const [previous, next] = await Promise.all([
     episodeIndex > 0
       ? episodes[episodeIndex - 1]
-      : findAcrossSeasons(ordered.slice(0, seasonIndex).reverse(), 'last'),
+      : findAcrossSeasons(seasons.slice(0, seasonIndex).reverse(), 'last'),
     episodeIndex < episodes.length - 1
       ? episodes[episodeIndex + 1]
-      : findAcrossSeasons(ordered.slice(seasonIndex + 1), 'first'),
+      : findAcrossSeasons(seasons.slice(seasonIndex + 1), 'first'),
   ])
 
   return { previous, next }
