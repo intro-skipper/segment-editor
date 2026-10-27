@@ -275,6 +275,83 @@ describe('segment edit session', () => {
     expect(result.current.isDirty).toBe(true)
   })
 
+  it('saves edits made during a save on top of what it wrote', async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [INTRO],
+    })
+    const { result } = await renderLoadedSession()
+    const release = server.hold('PUT')
+
+    act(() => result.current.create({ type: 'Outro', start: 1200, end: 1260 }))
+    let saved: Promise<void> = Promise.resolve()
+    act(() => {
+      saved = result.current.save()
+    })
+    act(() => result.current.create({ type: 'Recap', start: 0, end: 30 }))
+    release()
+    await act(() => saved)
+    await act(() => result.current.save())
+
+    expect(showErrorMock).not.toHaveBeenCalled()
+    expect(types(server.stored())).toEqual(['Recap', 'Intro', 'Outro'])
+  })
+
+  it('stays unsaved during a save even when edits return to the server set', async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [INTRO],
+    })
+    const { result } = await renderLoadedSession()
+    const release = server.hold('PUT')
+
+    act(() => result.current.remove({ id: INTRO.Id }))
+    let saved: Promise<void> = Promise.resolve()
+    act(() => {
+      saved = result.current.save()
+    })
+    await waitFor(() => expect(result.current.isSaving).toBe(true))
+    act(() => result.current.importSegments([INTRO], 'replace'))
+
+    expect(result.current.isDirty).toBe(true)
+    release()
+    await act(() => saved)
+  })
+
+  it("keeps the next item's conflict guard when a save fails after switching items", async () => {
+    const server = fakeSegmentServer({
+      itemId: ITEM_ID,
+      bulk: true,
+      segments: [INTRO],
+    })
+    const { result, rerender } = await renderLoadedSession()
+    const release = server.hold('PUT')
+    server.fail('PUT', 400, { times: 1 })
+
+    act(() => result.current.create({ type: 'Outro', start: 1200, end: 1260 }))
+    let saved: Promise<void> = Promise.resolve()
+    act(() => {
+      saved = result.current.save()
+    })
+    rerender({ id: OTHER_ITEM_ID })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    act(() => result.current.create({ type: 'Recap', start: 0, end: 30 }))
+    release()
+    await act(() => saved)
+    showErrorMock.mockClear()
+
+    server.changeElsewhere([OUTRO])
+    await act(() => result.current.save())
+
+    expect(showErrorMock).toHaveBeenCalledWith(
+      'Save segments failed',
+      expect.stringContaining('changed on the server'),
+    )
+    expect(types(server.stored())).toEqual(['Outro'])
+  })
+
   it('ignores a second save while one is in flight', async () => {
     const server = fakeSegmentServer({
       itemId: ITEM_ID,

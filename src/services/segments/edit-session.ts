@@ -35,6 +35,7 @@ export type SegmentPatch = Partial<
 >
 
 interface Draft {
+  itemId: string
   segments: Array<MediaSegmentDto> | null
   activeIndex: number
   /**
@@ -56,11 +57,12 @@ interface SaveInput {
   segments: Array<MediaSegmentDto>
 }
 
-const NO_DRAFT: Draft = {
+const emptyDraft = (itemId: string): Draft => ({
+  itemId,
   segments: null,
   activeIndex: 0,
   base: UNREAD_SNAPSHOT,
-}
+})
 
 const startOf = (segment: MediaSegmentDto): number => segment.StartTicks ?? 0
 const endOf = (segment: MediaSegmentDto): number =>
@@ -153,16 +155,8 @@ export function useSegmentEditSession(
     snapshot?.segments ?? NO_SEGMENTS,
   )
 
-  const [draft, setDraft] = React.useState(NO_DRAFT)
-  const [draftItemId, setDraftItemId] = React.useState(itemId)
-  if (draftItemId !== itemId) {
-    setDraftItemId(itemId)
-    setDraft(NO_DRAFT)
-  }
-
-  const segments = draft.segments ?? serverSegments
-  const isDirty =
-    draft.segments !== null && !isSameSegmentSet(draft.segments, serverSegments)
+  const [draft, setDraft] = React.useState(() => emptyDraft(itemId))
+  if (draft.itemId !== itemId) setDraft(emptyDraft(itemId))
 
   const saveMutation = useMutation({
     mutationFn: async ({ itemId: id, base, segments: next }: SaveInput) =>
@@ -198,6 +192,13 @@ export function useSegmentEditSession(
   })
   const isSaving = saveMutation.isPending
 
+  const segments = draft.segments ?? serverSegments
+  // A draft stays unsaved until its save settles, even if it meanwhile
+  // matches the server set: the save in flight may still write older edits.
+  const isDirty =
+    draft.segments !== null &&
+    (isSaving || !isSameSegmentSet(draft.segments, serverSegments))
+
   const edit = (apply: (current: Edit) => Edit | null): void => {
     setDraft((previous) => {
       const next = apply({
@@ -209,7 +210,7 @@ export function useSegmentEditSession(
         previous.segments === null
           ? (snapshot ?? UNREAD_SNAPSHOT)
           : previous.base
-      return { ...next, base }
+      return { ...previous, ...next, base }
     })
   }
 
@@ -288,8 +289,9 @@ export function useSegmentEditSession(
   const save = async (): Promise<void> => {
     if (!isDirty || isSaving || draft.segments === null) return
     const saving = draft.segments
+    let saved: SegmentSnapshot
     try {
-      await saveMutation.mutateAsync({
+      saved = await saveMutation.mutateAsync({
         itemId,
         base: draft.base,
         segments: saving,
@@ -298,21 +300,24 @@ export function useSegmentEditSession(
       // onError reported it; the draft stays for another try. A draft that
       // started before the server set loaded keeps only adding segments.
       setDraft((previous) =>
-        previous.base === UNREAD_SNAPSHOT
+        previous.itemId !== itemId || previous.base === UNREAD_SNAPSHOT
           ? previous
           : { ...previous, base: 'reread' },
       )
       return
     }
-    // Clear only the draft this save wrote: edits made while it was in
-    // flight are a different array and stay unsaved.
-    setDraft((previous) =>
-      previous.segments === saving ? { ...previous, segments: null } : previous,
-    )
+    // Clear only the draft this save wrote. Edits made while it was in
+    // flight stay unsaved, now on top of what it wrote.
+    setDraft((previous) => {
+      if (previous.itemId !== itemId) return previous
+      return previous.segments === saving
+        ? { ...previous, segments: null }
+        : { ...previous, base: saved }
+    })
   }
 
   const discard = (): void => {
-    setDraft(NO_DRAFT)
+    setDraft(emptyDraft(itemId))
   }
 
   return {
