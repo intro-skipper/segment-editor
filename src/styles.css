@@ -91,6 +91,7 @@
   --spacing-thumbnail-md: 12.5rem;
   /* Layout spacing tokens */
   --spacing-dialog-max-width: calc(100% - 2rem);
+  --spacing-dialog-wide-max-width: min(48rem, calc(100% - 2rem));
   --spacing-empty-state-min-height: 50svh;
   /* Scroll areas inside menus and dialogs */
   --spacing-popup-max-height: min(30rem, 60dvh);

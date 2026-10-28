@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { BaseItemDto } from '@/types/jellyfin'
 import { DEFAULT_FRAME_STEP, PLAYER_CONFIG } from '@/lib/constants'
 import { resolveFrameStepSeconds } from '@/lib/frame-rate-utils'
-import {
-  PLAYER_HOTKEYS,
-  PLAYER_SHORTCUT_CHEATSHEET,
-} from '@/lib/player-shortcuts'
+import { PLAYER_HOTKEYS, PLAYER_SHORTCUT_GROUPS } from '@/lib/player-shortcuts'
 import {
   formatSkipDurationLabel,
   getFrameStepTargetTime,
@@ -132,14 +129,17 @@ describe('player timing utilities', () => {
     expect(resolveFrameStepSeconds(item)).toBeCloseTo(1 / 25, 9)
   })
 
-  it('cheatsheet step frame and speed hotkeys match PLAYER_HOTKEYS', () => {
-    const stepFrameHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+  it('shortcut groups list the step frame and speed hotkeys from PLAYER_HOTKEYS', () => {
+    const shortcuts = PLAYER_SHORTCUT_GROUPS.flatMap((group) => [
+      ...group.shortcuts,
+    ])
+    const stepFrameHotkeys = shortcuts.find(
       (entry) => entry.labelKey === 'shortcuts.stepFrameBackForward',
     )?.hotkeys
-    const decreaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+    const decreaseSpeedHotkeys = shortcuts.find(
       (entry) => entry.labelKey === 'shortcuts.decreaseSpeed',
     )?.hotkeys
-    const increaseSpeedHotkeys = PLAYER_SHORTCUT_CHEATSHEET.find(
+    const increaseSpeedHotkeys = shortcuts.find(
       (entry) => entry.labelKey === 'shortcuts.increaseSpeed',
     )?.hotkeys
 

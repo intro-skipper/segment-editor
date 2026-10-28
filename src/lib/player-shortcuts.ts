@@ -26,58 +26,92 @@ export const EPISODE_HOTKEYS = {
   nextEpisode: 'Shift+N',
 } as const
 
-/** Display-friendly cheatsheet — a superset of PLAYER_HOTKEYS.
- *  Includes shortcuts registered in PlayerEditor (Mod+S, [, ]) and
- *  EPISODE_HOTKEYS that are not part of usePlayerKeyboard. */
-export const PLAYER_SHORTCUT_CHEATSHEET = Object.freeze([
-  // togglePlay uses { key } shape because useHotkey receives it as a KeyboardEvent.key value
-  { labelKey: 'shortcuts.playPause', hotkeys: [PLAYER_HOTKEYS.togglePlay.key] },
+/** Toggles the shortcuts dialog, registered by PlayerSettingsMenu. */
+export const SHORTCUTS_DIALOG_HOTKEY = '?'
+
+/** The shortcuts dialog's content, grouped by task: a superset of PLAYER_HOTKEYS.
+ *  Includes shortcuts registered in PlayerEditor (Mod+S, [, ]),
+ *  EPISODE_HOTKEYS and SHORTCUTS_DIALOG_HOTKEY. */
+export const PLAYER_SHORTCUT_GROUPS = Object.freeze([
   {
-    labelKey: 'shortcuts.skipBackForward',
-    hotkeys: [PLAYER_HOTKEYS.skipBackward, PLAYER_HOTKEYS.skipForward],
-  },
-  {
-    labelKey: 'shortcuts.changeSkipTime',
-    hotkeys: [PLAYER_HOTKEYS.cycleSkipTimeUp, PLAYER_HOTKEYS.cycleSkipTimeDown],
-  },
-  {
-    labelKey: 'shortcuts.setStartTime',
-    hotkeys: [PLAYER_HOTKEYS.pushStartTimestamp],
-  },
-  {
-    labelKey: 'shortcuts.setEndTime',
-    hotkeys: [PLAYER_HOTKEYS.pushEndTimestamp],
-  },
-  { labelKey: 'shortcuts.toggleMute', hotkeys: [PLAYER_HOTKEYS.toggleMute] },
-  {
-    labelKey: 'shortcuts.toggleFullscreen',
-    hotkeys: [PLAYER_HOTKEYS.toggleFullscreen],
-  },
-  {
-    labelKey: 'shortcuts.toggleSubtitles',
-    hotkeys: [PLAYER_HOTKEYS.toggleSubtitles],
-  },
-  { labelKey: 'shortcuts.saveAll', hotkeys: ['Mod+S'] },
-  { labelKey: 'shortcuts.prevSegment', hotkeys: ['['] },
-  { labelKey: 'shortcuts.nextSegment', hotkeys: [']'] },
-  {
-    labelKey: 'shortcuts.prevEpisode',
-    hotkeys: [EPISODE_HOTKEYS.previousEpisode],
-  },
-  { labelKey: 'shortcuts.nextEpisode', hotkeys: [EPISODE_HOTKEYS.nextEpisode] },
-  {
-    labelKey: 'shortcuts.stepFrameBackForward',
-    hotkeys: [
-      PLAYER_HOTKEYS.stepFrameBackward,
-      PLAYER_HOTKEYS.stepFrameForward,
+    labelKey: 'shortcuts.groupPlayback',
+    shortcuts: [
+      // togglePlay uses { key } shape because useHotkey receives it as a KeyboardEvent.key value
+      {
+        labelKey: 'shortcuts.playPause',
+        hotkeys: [PLAYER_HOTKEYS.togglePlay.key],
+      },
+      {
+        labelKey: 'shortcuts.skipBackForward',
+        hotkeys: [PLAYER_HOTKEYS.skipBackward, PLAYER_HOTKEYS.skipForward],
+      },
+      {
+        labelKey: 'shortcuts.changeSkipTime',
+        hotkeys: [
+          PLAYER_HOTKEYS.cycleSkipTimeUp,
+          PLAYER_HOTKEYS.cycleSkipTimeDown,
+        ],
+      },
+      {
+        labelKey: 'shortcuts.stepFrameBackForward',
+        hotkeys: [
+          PLAYER_HOTKEYS.stepFrameBackward,
+          PLAYER_HOTKEYS.stepFrameForward,
+        ],
+      },
+      {
+        labelKey: 'shortcuts.increaseSpeed',
+        hotkeys: [PLAYER_HOTKEYS.increaseSpeed],
+      },
+      {
+        labelKey: 'shortcuts.decreaseSpeed',
+        hotkeys: [PLAYER_HOTKEYS.decreaseSpeed],
+      },
     ],
   },
   {
-    labelKey: 'shortcuts.increaseSpeed',
-    hotkeys: [PLAYER_HOTKEYS.increaseSpeed],
+    labelKey: 'shortcuts.groupSegments',
+    shortcuts: [
+      {
+        labelKey: 'shortcuts.setStartTime',
+        hotkeys: [PLAYER_HOTKEYS.pushStartTimestamp],
+      },
+      {
+        labelKey: 'shortcuts.setEndTime',
+        hotkeys: [PLAYER_HOTKEYS.pushEndTimestamp],
+      },
+      { labelKey: 'shortcuts.prevSegment', hotkeys: ['['] },
+      { labelKey: 'shortcuts.nextSegment', hotkeys: [']'] },
+      { labelKey: 'shortcuts.saveAll', hotkeys: ['Mod+S'] },
+    ],
   },
   {
-    labelKey: 'shortcuts.decreaseSpeed',
-    hotkeys: [PLAYER_HOTKEYS.decreaseSpeed],
+    labelKey: 'shortcuts.groupViewNavigation',
+    shortcuts: [
+      {
+        labelKey: 'shortcuts.toggleMute',
+        hotkeys: [PLAYER_HOTKEYS.toggleMute],
+      },
+      {
+        labelKey: 'shortcuts.toggleSubtitles',
+        hotkeys: [PLAYER_HOTKEYS.toggleSubtitles],
+      },
+      {
+        labelKey: 'shortcuts.toggleFullscreen',
+        hotkeys: [PLAYER_HOTKEYS.toggleFullscreen],
+      },
+      {
+        labelKey: 'shortcuts.prevEpisode',
+        hotkeys: [EPISODE_HOTKEYS.previousEpisode],
+      },
+      {
+        labelKey: 'shortcuts.nextEpisode',
+        hotkeys: [EPISODE_HOTKEYS.nextEpisode],
+      },
+      {
+        labelKey: 'player.keyboardShortcuts',
+        hotkeys: [SHORTCUTS_DIALOG_HOTKEY],
+      },
+    ],
   },
 ] as const)
