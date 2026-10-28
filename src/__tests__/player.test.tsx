@@ -14,6 +14,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import {
   afterEach,
@@ -852,6 +853,49 @@ describe('Player tracks and segments', () => {
 })
 
 describe('Player keyboard shortcuts', () => {
+  it('lists the shortcuts by group in a dialog that ? toggles and the settings menu opens', async () => {
+    const { container } = await renderPlayer()
+
+    press('?')
+    const dialog = await screen.findByRole('dialog', {
+      name: 'player.keyboardShortcuts',
+    })
+    // Windowed, it portals to body so it stacks above any dialog already open.
+    expect(container.querySelector('section')?.contains(dialog)).toBe(false)
+    const segments = within(dialog).getByRole('heading', {
+      name: 'shortcuts.groupSegments',
+    })
+    expect(
+      within(asElement(segments.closest('section'), HTMLElement)).getByText(
+        'shortcuts.setStartTime',
+      ),
+    ).toBeTruthy()
+
+    press('?')
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'player.keyboardShortcuts' }),
+      ).toBeNull(),
+    )
+
+    openMenu('Player settings')
+    fireEvent.click(menuItem('player.keyboardShortcuts?'))
+    expect(
+      await screen.findByRole('dialog', { name: 'player.keyboardShortcuts' }),
+    ).toBeTruthy()
+  })
+
+  it('keeps Up and Down on the settings menu radios instead of jumping to the shortcuts item', async () => {
+    await renderPlayer()
+    openMenu('Player settings')
+    const radio = screen.getByRole('radio', { name: '1.5x speed' })
+    radio.focus()
+
+    fireEvent.keyDown(radio, { key: 'ArrowDown' })
+
+    expect(document.activeElement).toBe(radio)
+  })
+
   it('plays and pauses on Space', async () => {
     const { video } = await renderPlayer()
     press(' ', { code: 'Space' })

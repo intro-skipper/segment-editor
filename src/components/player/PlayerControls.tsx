@@ -237,7 +237,11 @@ export function PlayerControls({
       </Button>
 
       {/* Settings menu */}
-      <PlayerSettingsMenu {...settings} portalContainer={portalContainer} />
+      <PlayerSettingsMenu
+        {...settings}
+        portalContainer={portalContainer}
+        isFullscreen={isFullscreen}
+      />
     </div>
   )
 }

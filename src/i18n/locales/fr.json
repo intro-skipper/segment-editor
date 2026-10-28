@@ -196,6 +196,9 @@
     "skipSegment": "Passer {{type}}"
   },
   "shortcuts": {
+    "groupPlayback": "Lecture",
+    "groupSegments": "Segments",
+    "groupViewNavigation": "Affichage et navigation",
     "playPause": "Lecture/Pause",
     "skipBackForward": "Reculer/Avancer",
     "changeSkipTime": "Modifier le temps de saut",

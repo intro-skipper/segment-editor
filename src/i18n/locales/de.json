@@ -232,6 +232,9 @@
     "skipSegment": "{{type}} überspringen"
   },
   "shortcuts": {
+    "groupPlayback": "Wiedergabe",
+    "groupSegments": "Segmente",
+    "groupViewNavigation": "Ansicht und Navigation",
     "playPause": "Abspielen/Pause",
     "skipBackForward": "Vor-/Zurückspringen",
     "changeSkipTime": "Sprungzeit ändern",
