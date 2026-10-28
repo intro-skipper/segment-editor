@@ -36,7 +36,7 @@ export function PlayerShortcutsDialog({
         <DialogCloseButton />
         <div className="flex flex-col gap-6">
           <DialogTitle>{t('player.keyboardShortcuts')}</DialogTitle>
-          <div className="flex flex-wrap gap-x-8 gap-y-6">
+          <div className="flex max-h-(--spacing-popup-max-height) flex-wrap gap-x-8 gap-y-6 overflow-y-auto">
             {SHORTCUT_GROUPS_DISPLAY.map((group) => (
               <section key={group.labelKey} className="flex-1 basis-52">
                 <h3 className="text-xs font-semibold mbe-1">
