@@ -87,20 +87,20 @@ export function ConnectionWizardContent({
 
   const controller = useConnectionWizardController()
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      controller.reset()
-    }
-    onOpenChange(newOpen)
-  }
-
   const handleComplete = () => {
-    handleOpenChange(false)
+    onOpenChange(false)
     onComplete?.()
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      // Resetting once closed keeps the closing dialog on the step it showed.
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) controller.reset()
+      }}
+    >
       <DialogContent
         className="sm:max-w-md"
         initialFocus={serverAddressInputRef}

@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useValueWhileOpen } from '@/hooks/use-value-while-open'
 
 /** Title + description alert with the footer buttons as children. */
 function EditorAlertDialog({
@@ -64,6 +65,7 @@ export function ImportSegmentsDialog({
   onReplace: () => void
 }) {
   const { t } = useTranslation()
+  const shownCount = useValueWhileOpen(open, existingCount)
 
   return (
     <EditorAlertDialog
@@ -72,7 +74,7 @@ export function ImportSegmentsDialog({
       title={t('editor.importTitle', 'Import Segments')}
       description={t(
         'editor.importDescription',
-        `You have ${existingCount} existing segments. Would you like to replace them or merge with the imported segments?`,
+        `You have ${shownCount} existing segments. Would you like to replace them or merge with the imported segments?`,
       )}
     >
       <AlertDialogCancel onClick={onDismiss}>

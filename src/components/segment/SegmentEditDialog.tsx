@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useValueWhileOpen } from '@/hooks/use-value-while-open'
 
 interface SegmentEditDialogProps {
   open: boolean
@@ -385,6 +386,7 @@ export function SegmentDeleteConfirmDialog({
   onConfirm,
 }: SegmentDeleteConfirmDialogProps) {
   const { t } = useTranslation()
+  const shownType = useValueWhileOpen(open, segmentType)
 
   return (
     <AlertDialog
@@ -397,7 +399,7 @@ export function SegmentDeleteConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{t('editor.deleteSureTitle')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('editor.deleteSure', { Type: segmentType })}
+            {t('editor.deleteSure', { Type: shownType })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

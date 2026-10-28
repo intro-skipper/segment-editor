@@ -3,7 +3,6 @@ import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
@@ -49,9 +48,10 @@ function AlertDialogContent({
           'data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:motion-safe:zoom-out-95 data-open:motion-safe:zoom-in-95 bg-popover text-popover-foreground shadow-2xl ring-foreground/5 gap-6 rounded-4xl p-6 ring-1 animation-duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-md group/alert-dialog-content fixed inset-x-0 inset-bs-1/2 z-50 mx-auto grid w-full -translate-y-1/2 outline-hidden',
           className,
         )}
-        render={withFreezeOnExit(children)}
         {...props}
-      />
+      >
+        {children}
+      </AlertDialogPrimitive.Popup>
     </AlertDialogPortal>
   )
 }

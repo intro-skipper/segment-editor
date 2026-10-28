@@ -4,7 +4,6 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -46,9 +45,10 @@ function DialogContent({
           'bg-popover shadow-2xl data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:motion-safe:zoom-out-95 data-open:motion-safe:zoom-in-95 ring-foreground/5 grid max-w-(--spacing-dialog-max-width) gap-6 rounded-4xl p-6 text-sm ring-1 animation-duration-100 sm:max-w-md fixed inset-x-0 inset-bs-1/2 z-50 mx-auto w-full -translate-y-1/2 outline-hidden',
           className,
         )}
-        render={withFreezeOnExit(children)}
         {...props}
-      />
+      >
+        {children}
+      </DialogPrimitive.Popup>
     </DialogPortal>
   )
 }
