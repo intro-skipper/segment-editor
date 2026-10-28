@@ -67,6 +67,21 @@ export const Route = createFileRoute('/series/$itemId')({
     assertJellyfinCredentials()
     const identity = currentQueryIdentity()
 
+    // Opening a series waits for the shown season and, briefly, the artwork
+    // tint, so the page arrives complete in one transition (pendingComponent
+    // covers a slow server). Switching seasons on the series already on screen
+    // only warms the season, so the tab responds at once. 'stay' alone does not
+    // say that: the router also reports series-to-series navigation as 'stay',
+    // so check that this series' page is mounted, i.e. observes its details.
+    // Read it before awaiting: the header starts observing the destination
+    // series while the loader runs.
+    const shownSeries = queryClient.getQueryCache().find({
+      queryKey: itemsQueryOptions.detail(identity, itemId).queryKey,
+      exact: true,
+    })
+    const switchingSeason =
+      cause === 'stay' && (shownSeries?.getObserversCount() ?? 0) > 0
+
     const [series, seasons] = await Promise.all([
       queryClient.ensureQueryData(itemsQueryOptions.detail(identity, itemId)),
       queryClient.ensureQueryData(seriesQueryOptions.seasons(identity, itemId)),
@@ -85,13 +100,6 @@ export const Route = createFileRoute('/series/$itemId')({
             .catch(() => undefined)
         : undefined
 
-    // Opening a series waits for the shown season and, briefly, the artwork
-    // tint, so the page arrives complete in one transition (pendingComponent
-    // covers a slow server). A season tab navigates within the same series
-    // with an explicit seasonId; that only warms the season, so the tab
-    // responds at once. Series-to-series navigation is also 'stay', hence the
-    // seasonId check rather than cause alone.
-    const switchingSeason = cause === 'stay' && deps.seasonId !== undefined
     if (!switchingSeason) {
       const imageUrl = selectMonochrome(useAppStore.getState())
         ? undefined

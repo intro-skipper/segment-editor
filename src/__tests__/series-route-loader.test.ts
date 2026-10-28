@@ -3,7 +3,11 @@
  */
 
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { QueryClient, onlineManager } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryObserver,
+  onlineManager,
+} from '@tanstack/react-query'
 import type * as ItemsApi from '@/services/items/api'
 import { useApiStore } from '@/stores/api-store'
 
@@ -116,9 +120,21 @@ describe('series route loader', () => {
     await expectHeldUntilEpisodes(runLoader('stay'))
   })
 
+  it('holds returning to a series through history, even with a seasonId', async () => {
+    await expectHeldUntilEpisodes(runLoader('stay', SEASON_ID))
+  })
+
   // A loader that waits for the held episodes never settles, so the short timeout fails it.
-  it('switches seasons without waiting for their episodes', async () => {
-    const { run } = runLoader('stay', SEASON_ID)
+  it('switches seasons on the shown series without waiting for their episodes', async () => {
+    const queryClient = new QueryClient()
+    // The mounted series page observes its detail query.
+    const shownPage = new QueryObserver(
+      queryClient,
+      itemsQueryOptions.detail(currentQueryIdentity(), SERIES_ID),
+    ).subscribe(() => {})
+    onTestFinished(shownPage)
+
+    const { run } = runLoader('stay', SEASON_ID, queryClient)
     await run
     jellyfin.releaseEpisodes()
   }, 1000)
