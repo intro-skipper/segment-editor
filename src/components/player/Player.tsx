@@ -148,7 +148,6 @@ export function Player({
         videoFitMode,
         onMouseMove: handleFullscreenMouseMove,
         onMouseLeave: handleContainerMouseLeave,
-        onToggleVideoFitMode: toggleVideoFitMode,
       }}
       video={{
         posterUrl,
@@ -159,9 +158,15 @@ export function Player({
       controls={
         <PlayerControls
           display={{
-            mode: isFullscreen ? 'fullscreen' : 'inline',
             onToggleFullscreen: toggleFullscreen,
             portalContainer: containerRef,
+            ...(isFullscreen
+              ? {
+                  mode: 'fullscreen',
+                  videoFitMode,
+                  onToggleVideoFitMode: toggleVideoFitMode,
+                }
+              : { mode: 'inline' }),
           }}
           onCreateSegment={onCreateSegment}
           mediaSourceControls={mediaSourceControls}

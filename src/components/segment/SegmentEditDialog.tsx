@@ -324,7 +324,6 @@ function SegmentEditDialogContent({
             <div className="flex gap-2 w-full sm:w-auto sm:flex-1 order-2 sm:order-1">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={handleCopy}
                 className="flex-1 sm:flex-none"
               >
@@ -333,7 +332,6 @@ function SegmentEditDialogContent({
               </Button>
               <Button
                 variant="destructive"
-                size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
                 className="flex-1 sm:flex-none"
               >

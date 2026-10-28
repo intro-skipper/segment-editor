@@ -27,7 +27,7 @@ function clamp(value: number, min: number, max: number) {
 function TrickplayPreview({ position }: { position: TrickplayPosition }) {
   return (
     <div
-      className="rounded overflow-clip shadow-lg mbe-1 bg-black"
+      className="rounded-lg overflow-clip ring-1 ring-foreground/5 shadow-2xl mbe-1 bg-black"
       style={{
         width: position.thumbnailWidth,
         height: position.thumbnailHeight,
@@ -161,7 +161,7 @@ function ChapterTooltip({
   if (!chapter) return null
   return (
     <div
-      className="absolute -inset-bs-8 max-w-xs truncate bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg pointer-events-none z-20"
+      className="absolute -inset-bs-8 max-w-xs truncate rounded-full px-2.5 py-1 ring-1 ring-foreground/5 shadow-2xl bg-popover text-popover-foreground text-xs pointer-events-none z-20"
       style={{
         left: `${chapter.position}%`,
         transform: 'translateX(-50%)',
@@ -188,7 +188,7 @@ function HoverTimePreview({
       style={hoverIndicatorStyle}
     >
       {trickplayPosition && <TrickplayPreview position={trickplayPosition} />}
-      <div className="bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap tabular-nums">
+      <div className="rounded-full px-2.5 py-1 ring-1 ring-foreground/5 shadow-2xl bg-popover text-popover-foreground text-xs whitespace-nowrap tabular-nums">
         {formatTime(hoverTime)}
       </div>
     </div>

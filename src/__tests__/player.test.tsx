@@ -15,7 +15,15 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import { useState } from 'react'
 import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -928,6 +936,27 @@ describe('Player keyboard shortcuts', () => {
     fireEvent.click(button('Fullscreen'))
 
     expect(requestFullscreen).toHaveBeenCalledTimes(2)
+  })
+
+  it('switches between fit and fill from the fullscreen controls', async () => {
+    const { container, video } = await renderPlayer()
+    const section = asElement(container.querySelector('section'), HTMLElement)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => section,
+    })
+    onTestFinished(() => {
+      Reflect.deleteProperty(document, 'fullscreenElement')
+    })
+    act(() => {
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+
+    fireEvent.click(button('Fill screen'))
+    expect(video.classList.contains('object-cover')).toBe(true)
+
+    fireEvent.click(button('Fit to screen'))
+    expect(video.classList.contains('object-contain')).toBe(true)
   })
 
   it('changes speed on Alt+. and Alt+, and stops at either end', async () => {

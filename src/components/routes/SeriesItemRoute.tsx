@@ -85,7 +85,7 @@ export function SeriesPage() {
   return (
     <DynamicThemeScope
       seedColor={seedColor}
-      className="relative z-10 flex flex-1 flex-col px-fluid-md py-6"
+      className="relative flex flex-1 flex-col px-fluid-md py-6"
     >
       <FeatureErrorBoundary featureName="Series">
         <Suspense fallback={<SeriesSkeleton />}>

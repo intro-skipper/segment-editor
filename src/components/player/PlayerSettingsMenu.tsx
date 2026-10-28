@@ -20,6 +20,9 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { PLAYER_CONFIG } from '@/lib/constants'
@@ -94,82 +97,75 @@ export function PlayerSettingsMenu({
         className="min-w-70"
         container={portalContainer}
       >
-        <div className="p-3">
-          <div className="mbe-4 pbe-4 border-be border-border">
-            <p
-              className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
-              id={`${idPrefix}-skip-duration`}
-            >
-              {t('player.skipDuration', 'Skip Duration')}
-            </p>
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="radiogroup"
-              aria-labelledby={`${idPrefix}-skip-duration`}
-            >
-              {SKIP_TIMES.map((time, idx) => {
-                const label = formatSkipDurationLabel(time)
-                const ariaLabel = isFrameSkipSeconds(time)
-                  ? t('player.skipOneFrame', 'Skip 1 frame')
-                  : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
-                return (
-                  <Button
-                    type="button"
-                    key={time}
-                    size="sm"
-                    variant={idx === skipTimeIndex ? 'default' : 'secondary'}
-                    onClick={() => onSkipTimeChange(idx)}
-                    role="radio"
-                    aria-checked={idx === skipTimeIndex}
-                    aria-label={ariaLabel}
-                  >
-                    {label}
-                  </Button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mbe-4 pbe-4 border-be border-border">
-            <p
-              className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
-              id={`${idPrefix}-playback-speed`}
-            >
-              {t('player.playbackSpeed', 'Playback Speed')}
-            </p>
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="radiogroup"
-              aria-labelledby={`${idPrefix}-playback-speed`}
-            >
-              {PLAYBACK_SPEEDS.map((speed, idx) => (
+        <DropdownMenuGroup>
+          <DropdownMenuLabel id={`${idPrefix}-skip-duration`}>
+            {t('player.skipDuration', 'Skip Duration')}
+          </DropdownMenuLabel>
+          <div
+            className="flex flex-wrap gap-1.5 px-3 pbe-2"
+            role="radiogroup"
+            aria-labelledby={`${idPrefix}-skip-duration`}
+          >
+            {SKIP_TIMES.map((time, idx) => {
+              const label = formatSkipDurationLabel(time)
+              const ariaLabel = isFrameSkipSeconds(time)
+                ? t('player.skipOneFrame', 'Skip 1 frame')
+                : t('player.skipSeconds', 'Skip {{time}} seconds', { time })
+              return (
                 <Button
                   type="button"
-                  key={speed}
+                  key={time}
                   size="sm"
-                  variant={idx === playbackSpeedIndex ? 'default' : 'secondary'}
-                  onClick={() => engine.setSpeedIndex(idx)}
+                  variant="outline"
+                  onClick={() => onSkipTimeChange(idx)}
                   role="radio"
-                  aria-checked={idx === playbackSpeedIndex}
-                  aria-label={t('player.speedValue', '{{speed}}x speed', {
-                    speed,
-                  })}
+                  aria-checked={idx === skipTimeIndex}
+                  aria-label={ariaLabel}
                 >
-                  {speed}x
+                  {label}
                 </Button>
-              ))}
-            </div>
+              )
+            })}
           </div>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
 
-          {hasActiveSubtitle && (
-            <div className="mbe-4 pbe-4 border-be border-border">
-              <p
-                className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider"
-                id={`${idPrefix}-subtitle-offset`}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel id={`${idPrefix}-playback-speed`}>
+            {t('player.playbackSpeed', 'Playback Speed')}
+          </DropdownMenuLabel>
+          <div
+            className="flex flex-wrap gap-1.5 px-3 pbe-2"
+            role="radiogroup"
+            aria-labelledby={`${idPrefix}-playback-speed`}
+          >
+            {PLAYBACK_SPEEDS.map((speed, idx) => (
+              <Button
+                type="button"
+                key={speed}
+                size="sm"
+                variant="outline"
+                onClick={() => engine.setSpeedIndex(idx)}
+                role="radio"
+                aria-checked={idx === playbackSpeedIndex}
+                aria-label={t('player.speedValue', '{{speed}}x speed', {
+                  speed,
+                })}
               >
+                {speed}x
+              </Button>
+            ))}
+          </div>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+
+        {hasActiveSubtitle && (
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel id={`${idPrefix}-subtitle-offset`}>
                 {t('player.subtitleOffset', 'Subtitle Offset')}
-              </p>
-              <div className="flex flex-col gap-2">
+              </DropdownMenuLabel>
+              <div className="flex flex-col gap-2 px-3 pbe-2">
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -187,7 +183,7 @@ export function PlayerSettingsMenu({
                       '{{offset}}s',
                       { offset: subtitleOffset.toFixed(1) },
                     )}
-                    className="flex-1 h-2 appearance-none bg-muted rounded-full cursor-pointer accent-primary"
+                    className="flex-1 h-2 appearance-none rounded-full bg-primary/20 cursor-pointer range-thumb"
                   />
                   <span className="text-sm tabular-nums min-w-12 text-end">
                     {subtitleOffset > 0 ? '+' : ''}
@@ -207,16 +203,19 @@ export function PlayerSettingsMenu({
                   <span>{t('player.subtitleLater', 'Later')}</span>
                 </div>
               </div>
-            </div>
-          )}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+          </>
+        )}
 
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mbe-2 uppercase tracking-wider">
-              {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
-            </p>
-            <div className="flex flex-col gap-1.5 text-sm">{shortcutItems}</div>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            {t('player.keyboardShortcuts', 'Keyboard Shortcuts')}
+          </DropdownMenuLabel>
+          <div className="flex flex-col gap-1.5 px-3 pbe-2 text-sm">
+            {shortcutItems}
           </div>
-        </div>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
