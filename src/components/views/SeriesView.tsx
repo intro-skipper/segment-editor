@@ -187,7 +187,7 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
 
   const {
     data: episodes = NO_ITEMS,
-    isLoading,
+    isPending,
     error,
     refetch,
   } = useEpisodes(seriesId, season.Id ?? '', { enabled: !!season.Id })
@@ -200,7 +200,8 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
     })
   }
 
-  if (isLoading) {
+  // Pending, not just fetching: a query paused offline must not read as an empty season.
+  if (isPending) {
     return (
       <div role="status" aria-busy="true">
         <span className="sr-only">

@@ -101,6 +101,17 @@ describe('series route loader', () => {
     expect(isSettled()).toBe(true)
   }, 1000)
 
+  it('stops waiting for episodes when the connection drops mid-load', async () => {
+    onTestFinished(() => onlineManager.setOnline(true))
+    const { run, isSettled } = runLoader('enter')
+    await vi.waitFor(() => expect(getEpisodes).toHaveBeenCalled())
+
+    onlineManager.setOnline(false)
+    await run
+    expect(isSettled()).toBe(true)
+    jellyfin.releaseEpisodes()
+  }, 1000)
+
   it('holds a series opened from another series, which the router also reports as stay', async () => {
     await expectHeldUntilEpisodes(runLoader('stay'))
   })

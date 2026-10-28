@@ -30,6 +30,25 @@ const seriesParamsSchema = z.object({
 /** How long entering a series waits for the artwork tint before showing the page untinted. */
 const TINT_WAIT_MS = 300
 
+/**
+ * Settles with `work`, or as soon as TanStack Query is offline: a query paused
+ * offline never settles, so the loader must not wait on it.
+ */
+async function unlessOffline(work: Promise<unknown>): Promise<void> {
+  if (!onlineManager.isOnline()) return
+  let unsubscribe = () => {}
+  const offline = new Promise<void>((resolve) => {
+    unsubscribe = onlineManager.subscribe((online) => {
+      if (!online) resolve()
+    })
+  })
+  try {
+    await Promise.race([work, offline])
+  } finally {
+    unsubscribe()
+  }
+}
+
 const seriesSearchSchema = z.object({
   seasonId: jellyfinIdSchema.optional().catch(undefined),
 })
@@ -83,8 +102,7 @@ export const Route = createFileRoute('/series/$itemId')({
           getSeedColor(imageUrl),
           new Promise((resolve) => setTimeout(resolve, TINT_WAIT_MS)),
         ])
-      // Offline, the episodes query pauses without settling; let the page render.
-      await Promise.all([onlineManager.isOnline() && episodes, tint])
+      await Promise.all([episodes && unlessOffline(episodes), tint])
     }
   },
   errorComponent: DetailRouteErrorComponent,

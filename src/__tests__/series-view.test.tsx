@@ -20,6 +20,10 @@ const navigateMock = vi.hoisted(() => vi.fn())
 const observerRefMock = vi.hoisted(() => vi.fn())
 const segmentTimelineMock = vi.hoisted(() => vi.fn(() => null))
 const segmentsOptionsMock = vi.hoisted(() => vi.fn())
+const episodesQuery = vi.hoisted(() => ({
+  /** A paused (offline) query is pending without fetching. */
+  paused: false,
+}))
 const fetchEpisodesMock = vi.hoisted(() =>
   vi.fn(async (_seasonId: string): Promise<Array<BaseItemDto>> => []),
 )
@@ -33,6 +37,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/services/items/queries', () => ({
+  NO_ITEMS: [],
   seriesQueryOptions: {
     episodes: (_identity: unknown, seriesId: string, seasonId: string) => ({
       queryKey: ['episodes', seriesId, seasonId],
@@ -40,16 +45,18 @@ vi.mock('@/services/items/queries', () => ({
     }),
   },
   useEpisodes: () => ({
-    data: [
-      {
-        Id: 'episode-1',
-        Name: 'Episode 1',
-        ParentIndexNumber: 1,
-        IndexNumber: 1,
-        RunTimeTicks: 600_000_000,
-      },
-    ],
-    isLoading: false,
+    isPending: episodesQuery.paused,
+    data: episodesQuery.paused
+      ? undefined
+      : [
+          {
+            Id: 'episode-1',
+            Name: 'Episode 1',
+            ParentIndexNumber: 1,
+            IndexNumber: 1,
+            RunTimeTicks: 600_000_000,
+          },
+        ],
     error: null,
     refetch: vi.fn(),
   }),
@@ -95,6 +102,24 @@ describe('SeriesView', () => {
     segmentTimelineMock.mockClear()
     segmentsOptionsMock.mockReset()
     fetchEpisodesMock.mockClear()
+    episodesQuery.paused = false
+  })
+
+  it('shows loading rows, not an empty season, while the episodes query is paused offline', () => {
+    episodesQuery.paused = true
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SeriesView
+          series={series}
+          seasons={[season]}
+          selectedSeasonId="season-1"
+          onSeasonSelect={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.queryByText('series.noEpisodes')).toBeNull()
   })
 
   it('fetches a season when the pointer reaches its tab, before it is picked', async () => {
