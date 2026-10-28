@@ -32,7 +32,9 @@
       "system": "Système",
       "dark": "Sombre",
       "light": "Clair",
+      "colorMode": "Mode couleur",
       "monochrome": "Monochrome",
+      "color": "Couleur",
       "monochromeDescription": "Désactiver les couleurs d'illustration et d'accentuation"
     },
     "locale": {

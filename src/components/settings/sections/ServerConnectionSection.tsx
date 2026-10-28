@@ -7,6 +7,7 @@ import { SettingsSection } from '../primitives/SettingsSection'
 import { useApiStore } from '@/stores/api-store'
 import { showNotification } from '@/lib/notifications'
 import { ConnectionWizard } from '@/components/connection/ConnectionWizard'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 export function ServerConnectionSection() {
@@ -57,14 +58,14 @@ export function ServerConnectionSection() {
         title="Server Connection"
         badge={
           validConnection ? (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Badge variant={validAuth ? 'success' : 'destructive'}>
               {validAuth ? (
-                <CheckCircle className="size-3.5 text-success" />
+                <CheckCircle aria-hidden />
               ) : (
-                <XCircle className="size-3.5 text-destructive" />
+                <XCircle aria-hidden />
               )}
-              <span>{serverVersion || 'Connected'}</span>
-            </div>
+              {serverVersion || 'Connected'}
+            </Badge>
           ) : null
         }
       >

@@ -15,7 +15,7 @@ interface DynamicThemeScopeProps {
 /**
  * Scopes the app's theme tokens to a Material 3 dynamic scheme derived from
  * item artwork. Components inside consume the same shadcn tokens as
- * everywhere else, so the scheme reaches every primary, accent, surface,
+ * everywhere else, so the scheme reaches every primary, secondary, surface,
  * border, and focus ring without per-component styling. Renders children on
  * the neutral base theme when no seed color is available (loading, no
  * artwork, or monochrome mode).

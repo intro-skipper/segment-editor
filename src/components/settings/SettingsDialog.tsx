@@ -84,7 +84,7 @@ function SettingsHeader({ title }: { title: string }) {
       </IconDisc>
       <div className="min-w-0">
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription id="settings-description">
+        <DialogDescription id="settings-description" className="sr-only">
           Configure your preferences
         </DialogDescription>
       </div>

@@ -45,7 +45,9 @@
       "system": "System",
       "dark": "Dark",
       "light": "Light",
+      "colorMode": "Color mode",
       "monochrome": "Monochrome",
+      "color": "Color",
       "monochromeDescription": "Disable artwork and accent colors"
     },
     "locale": {

@@ -55,7 +55,7 @@ function getPaginationLinkClassName({
   size?: VariantProps<typeof buttonVariants>['size']
 }) {
   return cn(
-    'min-h-11 min-w-11 aria-disabled:pointer-events-none aria-disabled:opacity-50',
+    'aria-disabled:pointer-events-none aria-disabled:opacity-50',
     buttonVariants({ variant: isActive ? 'default' : 'ghost', size }),
     className,
   )
@@ -174,7 +174,7 @@ function PaginationEllipsis({
       aria-hidden
       data-slot="pagination-ellipsis"
       className={cn(
-        "min-h-11 min-w-11 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center",
+        "size-9 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center",
         className,
       )}
       {...props}

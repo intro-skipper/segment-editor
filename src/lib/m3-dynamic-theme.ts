@@ -97,8 +97,6 @@ export function buildDynamicThemeVars(
     '--secondary-foreground': color(M.onSecondaryContainer),
     '--muted': color(M.surfaceContainerHigh),
     '--muted-foreground': color(M.onSurfaceVariant),
-    '--accent': color(M.tertiaryContainer),
-    '--accent-foreground': color(M.onTertiaryContainer),
     '--border': color(M.outlineVariant),
     '--input': color(M.outlineVariant),
     '--ring': color(M.primary),

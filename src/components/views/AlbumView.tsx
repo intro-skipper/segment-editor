@@ -77,9 +77,9 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-col sm:flex-row gap-fluid-md">
-        <div className="flex-shrink-0 w-(--spacing-thumbnail-sm) h-(--spacing-thumbnail-sm) sm:w-(--spacing-thumbnail-md) sm:h-(--spacing-thumbnail-md) bg-muted rounded-lg overflow-clip mx-auto sm:mx-0">
+        <div className="shrink-0 size-(--spacing-thumbnail-sm) sm:size-(--spacing-thumbnail-md) bg-muted rounded-2xl overflow-clip mx-auto sm:mx-0">
           <ItemImage
             item={album}
             maxWidth={200}
@@ -89,13 +89,7 @@ export function AlbumView({ album, tracks }: AlbumViewProps) {
         </div>
 
         <div className="flex min-w-0 flex-col justify-end text-center sm:text-start">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Album
-          </p>
-          <h2 className="text-xl sm:text-2xl font-semibold mbs-1 text-balance break-words">
-            {albumName}
-          </h2>
-          <p className="text-muted-foreground mbs-2 break-words">
+          <p className="text-fluid-body font-medium text-foreground break-words">
             {artistName}
           </p>
           {album.ProductionYear && (

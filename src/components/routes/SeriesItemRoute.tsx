@@ -28,14 +28,15 @@ export function SeriesSkeleton() {
       aria-busy="true"
     >
       <span className="sr-only">Loading series</span>
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-24" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="flex flex-col gap-3">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="flex gap-2 md:gap-3 pbe-2 md:pbe-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-10 w-24 rounded-full" />
+          ))}
+        </div>
+        <div className="flex flex-col gap-2 md:gap-3 mbs-2 md:mbs-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
           ))}
         </div>
       </div>

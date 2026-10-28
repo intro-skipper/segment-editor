@@ -9,9 +9,12 @@ import { Skeleton } from './skeleton'
 
 function MediaCardSkeleton() {
   return (
-    <div className="flex flex-col gap-3" aria-hidden="true">
-      <Skeleton className="aspect-2/3 w-full rounded-2xl" />
-      <div className="flex flex-col gap-2 px-1">
+    <div
+      className="overflow-clip rounded-2xl border border-border/50 bg-card"
+      aria-hidden="true"
+    >
+      <Skeleton className="aspect-2/3 w-full rounded-none" />
+      <div className="flex flex-col gap-2 px-fluid-sm py-2.5 md:py-3">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-3 w-1/2" />
       </div>

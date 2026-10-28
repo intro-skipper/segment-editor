@@ -140,7 +140,7 @@ const EpisodeCard = function EpisodeCardComponent({
       animationDelay={animationDelay}
       aria-label={ariaLabel}
     >
-      <div className="relative flex-shrink-0 w-16 h-16 md:w-24 md:h-24 rounded-lg overflow-clip bg-muted shadow-md">
+      <div className="relative flex-shrink-0 size-episode-thumb rounded-lg overflow-clip bg-muted">
         <ItemImage
           item={episode}
           maxWidth={192}
@@ -159,7 +159,7 @@ const EpisodeCard = function EpisodeCardComponent({
       </div>
 
       <div className="flex-grow min-w-0 py-0.5 md:py-1">
-        <p className="font-semibold truncate leading-tight text-base md:text-lg text-foreground">
+        <p className="font-semibold truncate leading-snug text-fluid-body text-foreground">
           {episode.Name || episodeLabel}
         </p>
         <p className="text-fluid-body truncate mbs-0.5 md:mbs-1 text-muted-foreground tabular-nums">
@@ -279,7 +279,7 @@ export function SeriesView({
   }
 
   return (
-    <div className="w-full max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto relative z-10">
+    <div className="w-full max-w-5xl mx-auto relative z-10">
       <SeasonTabs
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
