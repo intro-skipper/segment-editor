@@ -45,7 +45,7 @@ export default function SettingsDialog() {
 
   return (
     <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 overflow-clip">
+      <DialogContent className="sm:max-w-md gap-0 p-0 overflow-clip">
         <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />
 

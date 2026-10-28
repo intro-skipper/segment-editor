@@ -582,7 +582,7 @@ export default function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-lg p-0 overflow-clip"
+        className="sm:max-w-lg gap-0 p-0 overflow-clip"
         onKeyDown={handleKeyDown}
         aria-label={t('search.title', 'Search')}
       >
