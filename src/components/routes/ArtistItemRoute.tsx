@@ -4,6 +4,9 @@ import { getRouteApi } from '@tanstack/react-router'
 
 import { artistQueryOptions, itemsQueryOptions } from '@/services/items/queries'
 import { useQueryIdentity } from '@/hooks/queries/query-identity'
+import { getBestImageUrl } from '@/services/video/api'
+import { useArtworkColor } from '@/hooks/use-artwork-color'
+import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
@@ -26,12 +29,8 @@ export function ArtistSkeleton() {
       aria-busy="true"
     >
       <span className="sr-only">Loading artist</span>
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-24" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <div className="grid grid-cols-media gap-fluid-md">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
@@ -59,17 +58,25 @@ export function ArtistPage() {
     artistQueryOptions.albums(identity, itemId),
   )
 
+  const imageUrl = artist ? getBestImageUrl(artist, 300) : null
+  const seedColor = useArtworkColor(imageUrl || null, {
+    enabled: !!imageUrl,
+  })
+
   if (!artist) {
     return <RouteErrorFallback message="Artist not found" />
   }
 
   return (
-    <div className="flex flex-1 flex-col px-fluid-md py-6">
+    <DynamicThemeScope
+      seedColor={seedColor}
+      className="relative flex flex-1 flex-col px-fluid-md py-6"
+    >
       <FeatureErrorBoundary featureName="Artist">
         <Suspense fallback={<ArtistSkeleton />}>
           <ArtistView artist={artist} albums={albums} />
         </Suspense>
       </FeatureErrorBoundary>
-    </div>
+    </DynamicThemeScope>
   )
 }

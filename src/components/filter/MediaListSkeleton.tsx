@@ -19,7 +19,7 @@ export function MediaListSkeleton({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-fluid-sm p-2.5 md:p-3 rounded-2xl bg-card border border-border/50 animate-in fade-in animation-duration-300"
+          className="flex items-center gap-fluid-sm p-3 rounded-2xl bg-card border border-border/50 animate-in fade-in animation-duration-300"
           style={{ animationDelay: staggerDelay(i, STAGGER_FAST) }}
           aria-hidden="true"
         >

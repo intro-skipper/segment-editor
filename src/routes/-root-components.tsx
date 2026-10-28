@@ -2,7 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 import { Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router'
 
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Home, SearchX } from 'lucide-react'
+import { ArrowLeft, Home, RefreshCw, SearchX } from 'lucide-react'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 
 import Header from '../components/Header'
@@ -11,6 +11,7 @@ import { Toaster } from '../components/ui/sonner'
 import { Button } from '../components/ui/button'
 import { buttonVariants } from '../components/ui/button-variants'
 import { ErrorCard } from '../components/ui/error-card'
+import { cn } from '../lib/utils'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
 import { isPluginMode } from '../services/jellyfin/core'
@@ -46,14 +47,23 @@ function HeaderFallback() {
   }
 
   return (
-    <header className="sticky inset-bs-0 z-40 bg-background">
+    <header className="sticky inset-bs-0 z-40 bg-background border-be border-border/40">
       <nav className="px-fluid-md py-4">
         <div className="flex items-center justify-between gap-4">
-          <Link to="/" className="font-display text-xl font-semibold">
+          <Link
+            to="/"
+            className="font-display text-fluid-display font-semibold tracking-tight"
+          >
             {t('app.name', 'Segment Editor')}
           </Link>
-          <Button variant="ghost" size="sm" onClick={handleRefresh}>
-            {t('common.reload', 'Reload')}
+          <Button
+            variant="subtle"
+            size="icon"
+            onClick={handleRefresh}
+            className="size-11"
+            aria-label={t('common.reload', 'Reload')}
+          >
+            <RefreshCw className="size-5" aria-hidden />
           </Button>
         </div>
       </nav>
@@ -130,7 +140,10 @@ export function RootComponent() {
         {showSkipToMain ? (
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:inset-bs-4 focus:inset-s-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-xl"
+            className={cn(
+              buttonVariants(),
+              'sr-only focus:not-sr-only focus:absolute focus:inset-bs-4 focus:inset-s-4 focus:z-50 focus:h-9 focus:px-4 focus:whitespace-nowrap',
+            )}
           >
             {t('accessibility.skipToMain', 'Skip to main content')}
           </a>

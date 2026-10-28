@@ -276,7 +276,7 @@ function CommandPaletteSearchField({
       />
       <Button
         type="button"
-        variant={includeEpisodes ? 'secondary' : 'outline'}
+        variant={includeEpisodes ? 'default' : 'secondary'}
         size="xs"
         className={cn(
           'absolute inset-bs-1/2 -translate-y-1/2 h-8 sm:h-7',

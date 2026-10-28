@@ -79,8 +79,10 @@ function ServerItem({
       data-interactive-transition="true"
       aria-label={`${serverName} at ${server.address}, ${scoreDisplay.label} connection quality`}
       className={cn(
-        'w-full text-start p-4 rounded-xl border-2 border-transparent hover:bg-muted/60',
-        isSelected && 'border-primary bg-primary/10',
+        'group w-full text-start px-3 py-2.5 rounded-xl',
+        isSelected
+          ? 'bg-primary/10 text-primary'
+          : 'hover:bg-muted/80 text-foreground',
         'animate-in fade-in motion-safe:slide-in-from-bottom-2 fill-mode-both',
       )}
       style={{ animationDelay: staggerDelay(index, STAGGER_SLOW) }}
@@ -88,17 +90,13 @@ function ServerItem({
       <div className="flex items-start gap-3">
         <div
           className={cn(
-            'size-10 rounded-lg flex items-center justify-center shrink-0',
-            isSelected ? 'bg-primary/15' : 'bg-muted',
+            'size-10 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-150',
+            isSelected
+              ? 'bg-primary/20 text-primary'
+              : 'bg-muted/60 text-muted-foreground group-hover:bg-muted group-hover:text-foreground',
           )}
         >
-          <Server
-            className={cn(
-              'size-5',
-              isSelected ? 'text-primary' : 'text-muted-foreground',
-            )}
-            aria-hidden
-          />
+          <Server className="size-5" aria-hidden />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -282,18 +280,21 @@ export function SelectStep({
 
       {isMixedContent && (
         <div
-          className="flex items-start gap-3 p-4 rounded-xl border border-warning/20 bg-warning/10"
+          className="flex items-start gap-3 p-3 rounded-xl bg-warning/10"
           role="alert"
         >
-          <AlertTriangle className="size-5 text-warning shrink-0 mbs-0.5" />
+          <AlertTriangle
+            className="size-5 text-warning shrink-0 mbs-0.5"
+            aria-hidden
+          />
           <div className="flex flex-col gap-1">
             <p className="font-medium text-warning">
               {t('login.http_warning.title')}
             </p>
-            <p className="text-sm text-warning">
+            <p className="text-sm text-muted-foreground">
               {t('login.http_warning.message')}
             </p>
-            <p className="text-xs text-warning mbs-1">
+            <p className="text-xs text-muted-foreground mbs-1">
               {t('login.http_warning.browser_recommendation')}
             </p>
           </div>

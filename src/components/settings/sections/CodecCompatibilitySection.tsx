@@ -9,8 +9,8 @@ import {
   clearCache,
   getDirectPlayContainers,
   isCodecSupported,
-  isDirectPlayContainerSupported,
 } from '@/services/video/compatibility'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 interface CodecSupport {
@@ -151,21 +151,23 @@ function CodecList({ title, codecs }: CodecListProps) {
   return (
     <div className="flex flex-col gap-2">
       <h4 className="text-sm font-medium text-foreground">{title}</h4>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-wrap gap-2">
         {codecs.map(({ codec, supported, loading }) => (
-          <div
+          <Badge
             key={codec}
-            className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
+            variant={
+              loading ? 'outline' : supported ? 'success' : 'destructive'
+            }
           >
             {loading ? (
-              <Loader className="size-4 text-muted-foreground" aria-hidden />
+              <Loader aria-hidden />
             ) : supported ? (
-              <CheckCircle className="size-4 text-success" />
+              <CheckCircle aria-hidden />
             ) : (
-              <XCircle className="size-4 text-destructive" />
+              <XCircle aria-hidden />
             )}
-            <span className="text-sm font-mono uppercase">{codec}</span>
-          </div>
+            {codec.toUpperCase()}
+          </Badge>
         ))}
       </div>
     </div>
@@ -195,10 +197,6 @@ export function CodecCompatibilitySection() {
   return (
     <SettingsSection icon={Monitor} title="Direct play compatibility">
       <div className="flex flex-col gap-4">
-        <div className="text-xs text-muted-foreground">
-          Browser codec support for direct video playback
-        </div>
-
         {!state.isExpanded ? (
           <Button
             variant="outline"
@@ -216,19 +214,10 @@ export function CodecCompatibilitySection() {
               </h4>
               <div className="flex gap-2 flex-wrap">
                 {supportedContainers.map((container) => (
-                  <div
-                    key={container}
-                    className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/30"
-                  >
-                    {isDirectPlayContainerSupported(container) ? (
-                      <CheckCircle className="size-3 text-success" />
-                    ) : (
-                      <XCircle className="size-3 text-destructive" />
-                    )}
-                    <span className="text-xs font-mono uppercase">
-                      {container}
-                    </span>
-                  </div>
+                  <Badge key={container} variant="success">
+                    <CheckCircle aria-hidden />
+                    {container.toUpperCase()}
+                  </Badge>
                 ))}
               </div>
             </div>

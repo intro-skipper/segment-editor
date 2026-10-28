@@ -48,7 +48,7 @@ export function MediaListRow({
       </div>
       <div className="flex-grow min-w-0">
         <p
-          className="font-medium text-fluid-body leading-snug line-clamp-2 text-foreground"
+          className="font-semibold text-fluid-body leading-snug line-clamp-2 text-foreground"
           title={item.Name || undefined}
         >
           {item.Name || 'Unknown'}

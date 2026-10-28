@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Palette } from 'lucide-react'
 
@@ -6,10 +7,12 @@ import { SettingsSelect } from '../primitives/SettingsSelect'
 import type { SelectOption } from '../primitives/SettingsSelect'
 import type { Theme } from '@/stores/app-store'
 import { useAppStore } from '@/stores/app-store'
-import { cn } from '@/lib/utils'
+
+type ColorModeValue = 'color' | 'monochrome'
 
 export function AppearanceSection() {
   const { t } = useTranslation()
+  const descriptionId = useId()
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
   const monochrome = useAppStore((s) => s.monochrome)
@@ -22,55 +25,32 @@ export function AppearanceSection() {
   ]
   const title = t('app.theme.title')
   const monochromeLabel = t('app.theme.monochrome')
-  const monochromeDescription = t('app.theme.monochromeDescription')
+  const colorModeOptions: Array<SelectOption<ColorModeValue>> = [
+    { value: 'color', label: t('app.theme.color') },
+    { value: 'monochrome', label: monochromeLabel },
+  ]
 
   return (
     <SettingsSection icon={Palette} title={title}>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <SettingsSelect
           value={theme}
           onValueChange={setTheme}
           options={options}
           aria-label={title}
         />
-        <button
-          type="button"
-          aria-pressed={monochrome}
-          data-interactive-transition="true"
-          onClick={() => setMonochrome(!monochrome)}
-          className={cn(
-            'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-start text-sm',
-            monochrome
-              ? 'border-primary/40 bg-primary/10 text-foreground'
-              : 'border-border/70 bg-input/20 hover:bg-muted/50',
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <Palette className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0">
-              <span className="block font-medium">{monochromeLabel}</span>
-              <span className="block text-xs text-muted-foreground">
-                {monochromeDescription}
-              </span>
-            </span>
-          </span>
-          <span
-            aria-hidden="true"
-            className={cn(
-              'relative h-5 w-9 shrink-0 rounded-full border transition-colors',
-              monochrome
-                ? 'border-primary bg-primary'
-                : 'border-border bg-muted',
-            )}
-          >
-            <span
-              className={cn(
-                'absolute inset-bs-1/2 size-4 -translate-y-1/2 rounded-full bg-background shadow-sm ease-(--ease-out-expo) motion-safe:transition-transform',
-                monochrome ? 'translate-x-4' : 'translate-x-0.5',
-              )}
-            />
-          </span>
-        </button>
+        <SettingsSelect
+          value={monochrome ? 'monochrome' : 'color'}
+          onValueChange={(value) => {
+            setMonochrome(value === 'monochrome')
+          }}
+          options={colorModeOptions}
+          aria-label={t('app.theme.colorMode')}
+          aria-describedby={descriptionId}
+        />
+        <p id={descriptionId} className="text-xs text-muted-foreground">
+          {t('app.theme.monochromeDescription')}
+        </p>
       </div>
     </SettingsSection>
   )

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { decode } from 'blurhash'
+import { ImageOff } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
 import { getBestImageUrl, getImageBlurhash } from '@/services/video/api'
@@ -114,10 +115,9 @@ function useItemImageSource(
 }
 
 function ItemImageFallback({
-  item,
   aspectRatio,
   className,
-}: Pick<ItemImageProps, 'item' | 'aspectRatio' | 'className'>) {
+}: Pick<ItemImageProps, 'aspectRatio' | 'className'>) {
   return (
     <div
       className={cn(
@@ -126,9 +126,10 @@ function ItemImageFallback({
         className,
       )}
     >
-      <span className="text-muted-foreground text-xs text-center px-2 line-clamp-2">
-        {item.Name || 'No image'}
-      </span>
+      <ImageOff
+        className="size-8 text-muted-foreground/50"
+        aria-hidden="true"
+      />
     </div>
   )
 }
@@ -161,13 +162,7 @@ export function ItemImage({
     (!imageUrl && !blurhashDataUrl) || hasFinalImageError
 
   if (shouldShowFallback) {
-    return (
-      <ItemImageFallback
-        item={item}
-        aspectRatio={aspectRatio}
-        className={className}
-      />
-    )
+    return <ItemImageFallback aspectRatio={aspectRatio} className={className} />
   }
 
   return (

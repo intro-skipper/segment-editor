@@ -52,8 +52,6 @@
     oklch(0.3992 0.0291 47.97),
     oklch(0.8299 0.0334 44.32)
   );
-  --accent: oklch(0.6513 0.1286 110.53);
-  --accent-foreground: oklch(0.2827 0.0622 111.12);
   --destructive: light-dark(
     oklch(0.506 0.1927 27.7),
     oklch(0.8383 0.0891 26.76)
@@ -117,8 +115,6 @@
   --popover: light-dark(oklch(1 0 none), oklch(0.2101 0 none));
   --muted: light-dark(oklch(0.967 0 none), oklch(0.252 0 none));
   --muted-foreground: light-dark(oklch(0.551 0 none), oklch(0.6268 0 none));
-  --accent: light-dark(oklch(0.9491 0 none), oklch(0.3211 0 none));
-  --accent-foreground: var(--foreground);
   --border: light-dark(oklch(0.9276 0 none), oklch(0.252 0 none));
   --primary: light-dark(oklch(0.48 0 none), oklch(0.76 0 none));
   --primary-foreground: light-dark(oklch(0.985 0 none), oklch(0.18 0 none));
@@ -179,6 +175,7 @@
      text). Each replaces a breakpoint pair such as px-4 sm:px-6. */
   --spacing-fluid-sm: clamp(0.75rem, 0.5rem + 1.25vw, 1rem);
   --spacing-fluid-md: clamp(1rem, 0.5rem + 2.5vw, 1.5rem);
+  --spacing-episode-thumb: clamp(4rem, 2rem + 10vw, 6rem);
   --text-fluid-body: clamp(0.875rem, 0.7857rem + 0.4464vw, 1rem);
   --text-fluid-body--line-height: 1.5;
   --text-fluid-title: clamp(1.5rem, 1.125rem + 1.875vw, 1.875rem);
@@ -214,8 +211,6 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);

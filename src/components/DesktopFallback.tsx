@@ -4,36 +4,38 @@
  * Directs users to open the standalone browser version instead.
  */
 
+import { MonitorX } from 'lucide-react'
+
 import { getStandaloneEditorUrl } from '@/services/jellyfin/core'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { cn } from '@/lib/utils'
+import { ErrorCard } from '@/components/ui/error-card'
 
 export function DesktopFallback() {
   const editorUrl = getStandaloneEditorUrl()
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8 font-sans text-foreground">
-      <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card p-10 text-center">
-        <h1 className="mbe-3 font-display text-xl font-semibold">
-          Segment Editor
-        </h1>
-        <p className="mbe-6 text-sm leading-relaxed text-muted-foreground">
-          This app is not supported in the Jellyfin desktop client. Please open
-          it in your browser instead.
-        </p>
-        <a
-          href={editorUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-interactive-transition="true"
-          className={cn(buttonVariants({ size: 'lg' }), 'mbe-4')}
-        >
-          Open in Browser
-        </a>
-        <div className="mbs-1 cursor-text select-all break-all rounded-md border border-border bg-background px-4 py-2.5 font-mono text-xs text-muted-foreground">
+    <div className="flex min-h-dvh flex-col">
+      <ErrorCard
+        icon={<MonitorX />}
+        tone="muted"
+        title={<h1>Segment Editor</h1>}
+        description="This app is not supported in the Jellyfin desktop client. Please open it in your browser instead."
+        actions={
+          <a
+            href={editorUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-interactive-transition="true"
+            className={buttonVariants({ size: 'lg' })}
+          >
+            Open in Browser
+          </a>
+        }
+      >
+        <div className="mbe-4 cursor-text select-all break-all rounded-2xl border border-input bg-input/30 px-4 py-2.5 font-mono text-xs text-muted-foreground">
           {editorUrl}
         </div>
-      </div>
+      </ErrorCard>
     </div>
   )
 }

@@ -87,7 +87,7 @@ export const MediaCard = function MediaCardComponent({
           item={item}
           maxWidth={200}
           aspectRatio="aspect-2/3"
-          className="w-full"
+          className="w-full rounded-none"
         />
 
         <div className="px-fluid-sm py-2.5 md:py-3">

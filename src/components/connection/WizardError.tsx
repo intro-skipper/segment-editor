@@ -43,11 +43,7 @@ export function WizardError({
   const suggestion = getErrorSuggestion(message)
 
   return (
-    <div
-      role="alert"
-      aria-live="assertive"
-      className="flex flex-col items-center text-center p-4 rounded-xl bg-destructive/10 border border-destructive/20"
-    >
+    <div role="alert" className="flex flex-col items-center text-center py-2">
       <IconDisc tone="destructive" className="mbe-3">
         <Icon />
       </IconDisc>

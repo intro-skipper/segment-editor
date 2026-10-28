@@ -71,7 +71,7 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       {albums.length === 0 ? (
         <EmptyState
           icon={<Disc3 />}
@@ -79,7 +79,7 @@ export function ArtistView({ artist, albums }: ArtistViewProps) {
         />
       ) : (
         <ul
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+          className="grid grid-cols-media gap-fluid-md"
           aria-label={`${albums.length} albums by ${artistName}`}
         >
           {albums.map((album) => (

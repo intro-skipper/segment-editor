@@ -45,7 +45,9 @@
       "system": "System",
       "dark": "Dunkel",
       "light": "Hell",
+      "colorMode": "Farbmodus",
       "monochrome": "Monochrom",
+      "color": "Farbe",
       "monochromeDescription": "Artwork- und Akzentfarben deaktivieren"
     },
     "locale": {
