@@ -11,7 +11,15 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 
 import { ConnectionWizard } from '@/components/connection/ConnectionWizard'
 import { RecommendedServerInfoScore } from '@/types/jellyfin'
@@ -65,6 +73,25 @@ function createServer(
       Version: '10.9.0',
     },
   }
+}
+
+/**
+ * Keeps the next exit animation running until the returned function is called;
+ * jsdom has no animations, so Base UI would otherwise finish a close at once.
+ */
+function holdExitAnimation(): () => void {
+  let finishExit = () => {}
+  const finished = new Promise<void>((resolve) => {
+    finishExit = resolve
+  })
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    value: () => [{ finished, effect: { getTiming: () => ({}) } }],
+  })
+  onTestFinished(() => {
+    Reflect.deleteProperty(Element.prototype, 'getAnimations')
+  })
+  return finishExit
 }
 
 function getInput(label: string): HTMLInputElement {
@@ -329,16 +356,50 @@ describe('ConnectionWizard TanStack Form migration', () => {
       expect(discoverServersMock).toHaveBeenCalledTimes(1)
     })
 
+    const finishExit = holdExitAnimation()
+
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
 
+    // Aborted while the dialog is still animating out, so a late response cannot land.
     await waitFor(() => {
-      expect(capturedSignal?.aborted).toBe(true)
+      expect(screen.getByRole('dialog').hasAttribute('data-closed')).toBe(true)
+    })
+    expect(capturedSignal?.aborted).toBe(true)
+    finishExit()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Reopen wizard' }))
 
     await waitFor(() => {
       expect(getInput('Server Address').value).toBe('')
+    })
+  })
+
+  it('is usable again when reopened before a cancelled request finishes closing', async () => {
+    discoverServersMock.mockImplementation(() => new Promise(() => {}))
+
+    render(<ConnectionWizardHarness />)
+
+    fireEvent.change(screen.getByLabelText('Server Address'), {
+      target: { value: 'demo.local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Find Server' }))
+    await waitFor(() => {
+      expect(getInput('Server Address').disabled).toBe(true)
+    })
+
+    holdExitAnimation()
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    await waitFor(() => {
+      expect(screen.getByRole('dialog').hasAttribute('data-closed')).toBe(true)
+    })
+    // Reopening interrupts the close, so the deferred reset never runs.
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen wizard' }))
+
+    await waitFor(() => {
+      expect(getInput('Server Address').disabled).toBe(false)
     })
   })
 })

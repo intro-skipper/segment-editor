@@ -5,7 +5,6 @@ import { Select as SelectPrimitive } from '@base-ui/react/select'
 
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { withFreezeOnExit } from '@/components/ui/with-freeze-on-exit'
 
 const Select = SelectPrimitive.Root
 
@@ -78,15 +77,12 @@ function SelectContent({
             'bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:motion-safe:zoom-out-95 data-open:motion-safe:zoom-in-95 data-[side=bottom]:motion-safe:slide-in-from-top-2 data-[side=left]:motion-safe:slide-in-from-right-2 data-[side=right]:motion-safe:slide-in-from-left-2 data-[side=top]:motion-safe:slide-in-from-bottom-2 ring-foreground/5 min-w-36 rounded-2xl p-1 shadow-2xl ring-1 animation-duration-100 relative isolate z-50 max-h-(--available-height) w-(--anchor-width) origin-(--transform-origin) overflow-x-hidden overflow-y-auto',
             className,
           )}
-          render={withFreezeOnExit(
-            <>
-              <SelectScrollUpButton />
-              <SelectPrimitive.List>{children}</SelectPrimitive.List>
-              <SelectScrollDownButton />
-            </>,
-          )}
           {...props}
-        />
+        >
+          <SelectScrollUpButton />
+          <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          <SelectScrollDownButton />
+        </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
     </SelectPrimitive.Portal>
   )

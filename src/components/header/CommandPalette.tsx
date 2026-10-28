@@ -41,6 +41,7 @@ const EXCLUDED_ITEM_TYPE_LOOKUP = new Set(EXCLUDED_ITEM_TYPES)
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onOpenChangeComplete: (open: boolean) => void
 }
 
 interface CommandPaletteState {
@@ -56,7 +57,6 @@ type CommandPaletteAction =
   | { type: 'debouncedSearchChanged'; value: string }
   | { type: 'selectedIndexChanged'; value: number }
   | { type: 'episodeInclusionToggled' }
-  | { type: 'closed' }
 
 const COMMAND_PALETTE_INITIAL_STATE: CommandPaletteState = {
   search: '',
@@ -82,13 +82,6 @@ function commandPaletteReducer(
       return {
         ...state,
         includeEpisodes: !state.includeEpisodes,
-        selectedIndex: 0,
-      }
-    case 'closed':
-      return {
-        ...state,
-        search: '',
-        debouncedSearch: '',
         selectedIndex: 0,
       }
   }
@@ -403,6 +396,7 @@ function CommandPaletteResults({
 export default function CommandPalette({
   open,
   onOpenChange,
+  onOpenChangeComplete,
 }: CommandPaletteProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -479,7 +473,7 @@ export default function CommandPalette({
   const shouldVirtualize = resultItems.length > MAX_VISIBLE_ITEMS
 
   const virtualWindow = useVirtualWindow({
-    enabled: open && shouldVirtualize,
+    enabled: shouldVirtualize,
     scrollElement,
     itemCount: resultItems.length,
     itemSize: ITEM_HEIGHT,
@@ -517,10 +511,6 @@ export default function CommandPalette({
       // Keep the previous trigger when focus sits on a non-HTML element (an
       // inline SVG control, or null mid-transition) so close still restores it.
       if (active instanceof HTMLElement) triggerRef.current = active
-    }
-
-    if (!isOpen) {
-      dispatch({ type: 'closed' })
     }
 
     onOpenChange(isOpen)
@@ -580,7 +570,11 @@ export default function CommandPalette({
     : undefined
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={onOpenChangeComplete}
+    >
       <DialogContent
         className="sm:max-w-lg gap-0 p-0 overflow-clip"
         onKeyDown={handleKeyDown}

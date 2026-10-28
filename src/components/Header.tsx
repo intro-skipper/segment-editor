@@ -28,6 +28,7 @@ import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { formatEpisodeLabel } from '@/lib/header-utils'
 import { getSeriesNavigationRoute } from '@/lib/navigation-utils'
 import { cn } from '@/lib/utils'
+import { useMountedUntilClosed } from '@/hooks/use-mounted-until-closed'
 import type { BaseItemDto } from '@/types/jellyfin'
 
 // React.lazy and hover/focus preloading require dynamic imports to preserve code splitting.
@@ -244,6 +245,8 @@ export default function Header() {
     select: (search) => search.collection,
   })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [commandPaletteMounted, onCommandPaletteOpenChangeComplete] =
+    useMountedUntilClosed(commandPaletteOpen)
 
   const toggleSettings = useSessionStore((s) => s.toggleSettings)
 
@@ -362,11 +365,12 @@ export default function Header() {
         </DynamicThemeScope>
       </header>
 
-      {commandPaletteOpen ? (
+      {commandPaletteMounted ? (
         <Suspense fallback={null}>
           <CommandPalette
             open={commandPaletteOpen}
             onOpenChange={setCommandPaletteOpen}
+            onOpenChangeComplete={onCommandPaletteOpenChangeComplete}
           />
         </Suspense>
       ) : null}
