@@ -19,6 +19,10 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   }
 })
 
+// Extraction lazy-loads the scheme builder. Loading it here keeps that cold
+// import out of the waitFor timeouts below, which it can exceed under load.
+await import('@/lib/m3-dynamic-theme')
+
 const imageInstances: Array<MockImage> = []
 
 class MockImage {
