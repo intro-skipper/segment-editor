@@ -2,7 +2,14 @@
  * @vitest-environment jsdom
  */
 
-import { cleanup, render } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -13,6 +20,13 @@ const navigateMock = vi.hoisted(() => vi.fn())
 const observerRefMock = vi.hoisted(() => vi.fn())
 const segmentTimelineMock = vi.hoisted(() => vi.fn(() => null))
 const segmentsOptionsMock = vi.hoisted(() => vi.fn())
+const episodesQuery = vi.hoisted(() => ({
+  /** A paused (offline) query is pending without fetching. */
+  paused: false,
+}))
+const fetchEpisodesMock = vi.hoisted(() =>
+  vi.fn(async (_seasonId: string): Promise<Array<BaseItemDto>> => []),
+)
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -23,17 +37,26 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/services/items/queries', () => ({
+  NO_ITEMS: [],
+  seriesQueryOptions: {
+    episodes: (_identity: unknown, seriesId: string, seasonId: string) => ({
+      queryKey: ['episodes', seriesId, seasonId],
+      queryFn: () => fetchEpisodesMock(seasonId),
+    }),
+  },
   useEpisodes: () => ({
-    data: [
-      {
-        Id: 'episode-1',
-        Name: 'Episode 1',
-        ParentIndexNumber: 1,
-        IndexNumber: 1,
-        RunTimeTicks: 600_000_000,
-      },
-    ],
-    isLoading: false,
+    isPending: episodesQuery.paused,
+    data: episodesQuery.paused
+      ? undefined
+      : [
+          {
+            Id: 'episode-1',
+            Name: 'Episode 1',
+            ParentIndexNumber: 1,
+            IndexNumber: 1,
+            RunTimeTicks: 600_000_000,
+          },
+        ],
     error: null,
     refetch: vi.fn(),
   }),
@@ -78,16 +101,58 @@ describe('SeriesView', () => {
     observerRefMock.mockReset()
     segmentTimelineMock.mockClear()
     segmentsOptionsMock.mockReset()
+    fetchEpisodesMock.mockClear()
+    episodesQuery.paused = false
+  })
+
+  it('shows loading rows, not an empty season, while the episodes query is paused offline', () => {
+    episodesQuery.paused = true
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SeriesView
+          series={series}
+          seasons={[season]}
+          selectedSeasonId="season-1"
+          onSeasonSelect={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.queryByText('series.noEpisodes')).toBeNull()
+  })
+
+  it('fetches a season when the pointer reaches its tab, before it is picked', async () => {
+    const onSeasonSelect = vi.fn()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SeriesView
+          series={series}
+          seasons={[season, { Id: 'season-2', Name: 'Season 2' }]}
+          selectedSeasonId="season-1"
+          onSeasonSelect={onSeasonSelect}
+        />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.pointerEnter(screen.getByRole('tab', { name: 'Season 2' }))
+
+    await waitFor(() =>
+      expect(fetchEpisodesMock).toHaveBeenCalledWith('season-2'),
+    )
+    expect(onSeasonSelect).not.toHaveBeenCalled()
   })
 
   it('keeps the lazy observer target mounted for a cached segment error', () => {
     render(
-      <SeriesView
-        series={series}
-        seasons={[season]}
-        selectedSeasonId="season-1"
-        onSeasonSelect={vi.fn()}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <SeriesView
+          series={series}
+          seasons={[season]}
+          selectedSeasonId="season-1"
+          onSeasonSelect={vi.fn()}
+        />
+      </QueryClientProvider>,
     )
 
     expect(segmentsOptionsMock).toHaveBeenCalledWith('episode-1', {

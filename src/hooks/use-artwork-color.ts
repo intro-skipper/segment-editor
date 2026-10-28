@@ -176,7 +176,12 @@ async function extractSeed(
   })
 }
 
-async function getSeedColor(url: string): Promise<string | null> {
+/**
+ * Extracts (or returns the cached) seed for an artwork URL, resolving null
+ * on failure; the series loader awaits it so the page's first paint is
+ * already tinted.
+ */
+export async function getSeedColor(url: string): Promise<string | null> {
   const cached = seedCache.get(url)
   if (cached) return cached
 
