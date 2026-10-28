@@ -6,14 +6,7 @@ import type {
   TouchEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  AlertTriangle,
-  Expand,
-  Loader,
-  RefreshCw,
-  Shrink,
-  SkipForward,
-} from 'lucide-react'
+import { AlertTriangle, Loader, RefreshCw, SkipForward } from 'lucide-react'
 
 import type { VideoFitMode } from './use-fullscreen-player-ui'
 import type { NativeCaptionTrack } from './caption-tracks'
@@ -35,7 +28,6 @@ interface PlayerSurfaceFullscreenState {
   videoFitMode: VideoFitMode
   onMouseMove: () => void
   onMouseLeave: () => void
-  onToggleVideoFitMode: () => void
 }
 
 interface PlayerSurfaceVideoState {
@@ -170,7 +162,6 @@ function PlayerErrorOverlay({
       <p className="text-lg font-medium mbe-2 break-words">{error.message}</p>
       {error.recoverable ? (
         <Button
-          variant="overlay"
           size="sm"
           onClick={(event) => {
             event.stopPropagation()
@@ -218,11 +209,13 @@ function PlayerLoadingOverlay({
 
 interface SegmentSkipOverlayProps {
   segment: Segment
+  isFullscreen: boolean
   onSkipSegment: (segment: Segment) => void
 }
 
 function SegmentSkipOverlay({
   segment,
+  isFullscreen,
   onSkipSegment,
 }: SegmentSkipOverlayProps) {
   const { t } = useTranslation()
@@ -231,73 +224,50 @@ function SegmentSkipOverlay({
   })
 
   return (
-    <div
-      className="absolute inset-be-4 inset-e-4 z-20"
-      data-player-controls-overlay="true"
-    >
-      <Button
-        variant="overlay"
-        size="sm"
-        onClick={() => onSkipSegment(segment)}
-        aria-label={label}
+    <div className="self-stretch px-4 pbe-4">
+      {/* Fullscreen shares the controls' width, so the pill lines up with their right edge. */}
+      <div
+        className={cn(
+          'flex justify-end *:pointer-events-auto',
+          isFullscreen && 'max-w-9/10 mx-auto',
+        )}
+        data-player-controls-overlay="true"
       >
-        <SkipForward className="size-4" aria-hidden="true" />
-        {label}
-      </Button>
+        <Button
+          size="lg"
+          onClick={() => onSkipSegment(segment)}
+          aria-label={label}
+        >
+          <SkipForward className="size-4" aria-hidden="true" />
+          {label}
+        </Button>
+      </div>
     </div>
   )
 }
 
 interface FullscreenControlsOverlayProps {
-  fullscreen: PlayerSurfaceFullscreenState
+  showControls: boolean
   controls: ReactNode
   timelineScrubber: ReactNode
 }
 
 function FullscreenControlsOverlay({
-  fullscreen,
+  showControls,
   controls,
   timelineScrubber,
 }: FullscreenControlsOverlayProps) {
-  const { t } = useTranslation()
-  const { showControls, videoFitMode, onToggleVideoFitMode } = fullscreen
-
   return (
     <div
       className={cn(
-        'absolute inset-x-0 inset-be-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300',
-        showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        'self-stretch bg-gradient-to-t from-background/90 from-60% to-transparent px-4 pbs-10 pbe-4 transition-opacity duration-300',
+        showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0',
       )}
       aria-hidden={!showControls}
       inert={!showControls || undefined}
     >
       <div className="max-w-9/10 mx-auto" data-player-controls-overlay="true">
-        <div className="flex justify-end mbe-2">
-          <Button
-            variant="overlay"
-            size="xs"
-            onClick={onToggleVideoFitMode}
-            aria-label={
-              videoFitMode === 'contain'
-                ? t('player.fillScreen', 'Fill screen')
-                : t('player.fitScreen', 'Fit to screen')
-            }
-          >
-            {videoFitMode === 'contain' ? (
-              <>
-                <Expand className="size-4" />
-                {t('player.fill', 'Fill')}
-              </>
-            ) : (
-              <>
-                <Shrink className="size-4" />
-                {t('player.fit', 'Fit')}
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="mbe-4 text-white">{timelineScrubber}</div>
+        <div className="mbe-4">{timelineScrubber}</div>
 
         {controls}
       </div>
@@ -354,20 +324,24 @@ export function PlayerSurface({
           />
         ) : null}
 
-        {skipOffer ? (
-          <SegmentSkipOverlay
-            segment={skipOffer}
-            onSkipSegment={engine.playhead.skipSegment}
-          />
-        ) : null}
+        {/* One bottom-anchored column, so the skip pill stays above the fullscreen controls however tall they wrap. */}
+        <div className="absolute inset-x-0 inset-be-0 z-10 flex flex-col items-end pointer-events-none">
+          {skipOffer ? (
+            <SegmentSkipOverlay
+              segment={skipOffer}
+              isFullscreen={fullscreen.isFullscreen}
+              onSkipSegment={engine.playhead.skipSegment}
+            />
+          ) : null}
 
-        {fullscreen.isFullscreen ? (
-          <FullscreenControlsOverlay
-            fullscreen={fullscreen}
-            controls={controls}
-            timelineScrubber={timelineScrubber}
-          />
-        ) : null}
+          {fullscreen.isFullscreen ? (
+            <FullscreenControlsOverlay
+              showControls={fullscreen.showControls}
+              controls={controls}
+              timelineScrubber={timelineScrubber}
+            />
+          ) : null}
+        </div>
       </section>
 
       {!fullscreen.isFullscreen ? (

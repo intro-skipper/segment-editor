@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import {
+  Expand,
   EyeOff,
   Maximize,
   Minimize,
   Pause,
   Play,
   Plus,
+  Shrink,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -14,6 +16,7 @@ import { TrackSelector } from './TrackSelector'
 import { MediaSourceSelector } from './MediaSourceSelector'
 import { PlayerSettingsMenu } from './PlayerSettingsMenu'
 import type { PlayerSettingsMenuProps } from './PlayerSettingsMenu'
+import type { VideoFitMode } from './use-fullscreen-player-ui'
 import { usePlayback, usePlaybackEngine } from './playback-context'
 import type { CreateSegmentData } from '@/types/segment'
 import type { SelectableMediaSource } from '@/lib/media-source-utils'
@@ -28,11 +31,17 @@ import {
 
 export interface PlayerControlsProps {
   display: {
-    mode: 'fullscreen' | 'inline'
     onToggleFullscreen: () => void
     /** Container element for dropdown portals (needed for fullscreen) */
     portalContainer: React.RefObject<HTMLElement | null>
-  }
+  } & (
+    | { mode: 'inline' }
+    | {
+        mode: 'fullscreen'
+        videoFitMode: VideoFitMode
+        onToggleVideoFitMode: () => void
+      }
+  )
   /** Called with the frame-snapped live position as the start. */
   onCreateSegment: (data: CreateSegmentData) => void
   /** Alternate Jellyfin media versions available for this item. */
@@ -94,7 +103,7 @@ function VolumeControl({
             aria-valuemax={1}
             aria-valuenow={sliderVolume}
             aria-valuetext={`${Math.round(sliderVolume * 100)}%`}
-            className="h-24 w-2 appearance-none bg-muted rounded-full cursor-pointer slider-vertical"
+            className="h-24 w-2 appearance-none rounded-full bg-primary/20 cursor-pointer slider-vertical range-thumb"
           />
           <Button variant="ghost" size="xs" onClick={engine.toggleMute}>
             {isMuted ? t('player.unmute') : t('player.mute')}
@@ -187,6 +196,25 @@ export function PlayerControls({
           aria-label={t('player.minimize', 'Minimize player')}
         >
           <EyeOff strokeWidth={2.5} aria-hidden="true" />
+        </Button>
+      )}
+
+      {isFullscreen && (
+        <Button
+          variant="player"
+          size="icon-xl"
+          onClick={display.onToggleVideoFitMode}
+          aria-label={
+            display.videoFitMode === 'contain'
+              ? t('player.fillScreen', 'Fill screen')
+              : t('player.fitScreen', 'Fit to screen')
+          }
+        >
+          {display.videoFitMode === 'contain' ? (
+            <Expand strokeWidth={2.5} aria-hidden="true" />
+          ) : (
+            <Shrink strokeWidth={2.5} aria-hidden="true" />
+          )}
         </Button>
       )}
 

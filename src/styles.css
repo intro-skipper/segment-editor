@@ -310,6 +310,27 @@
   direction: rtl;
 }
 
+/* Range input thumb drawn like the player scrubber's thumb */
+@utility range-thumb {
+  &::-webkit-slider-thumb {
+    appearance: none;
+    inline-size: 1rem;
+    block-size: 1rem;
+    border-radius: 9999px;
+    background: var(--primary);
+    box-shadow: 0 0 0 2px var(--popover);
+  }
+
+  &::-moz-range-thumb {
+    inline-size: 1rem;
+    block-size: 1rem;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--primary);
+    box-shadow: 0 0 0 2px var(--popover);
+  }
+}
+
 /* ============================================================================
  * View Transitions - Native API for smooth page navigation
  * Uses typed transitions for different navigation patterns:

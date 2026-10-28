@@ -3,7 +3,6 @@
  */
 
 import { createRef } from 'react'
-import { asElement } from './helpers/dom'
 import { isTranslationOptions, resolveTranslation } from './helpers/i18n-mock'
 import type { TranslationArg } from './helpers/i18n-mock'
 import {
@@ -60,7 +59,6 @@ function createProps(overrides: SurfacePropOverrides = {}): SurfaceProps {
       videoFitMode: 'contain',
       onMouseMove: vi.fn(),
       onMouseLeave: vi.fn(),
-      onToggleVideoFitMode: vi.fn(),
       ...overrides.fullscreen,
     },
     video: {
@@ -152,12 +150,10 @@ describe('PlayerSurface', () => {
   })
 
   it('renders fullscreen controls, hides inline scrubber, and exposes hidden-control state', () => {
-    const onToggleVideoFitMode = vi.fn()
-    const { container } = renderSurface({
+    renderSurface({
       fullscreen: {
         isFullscreen: true,
         showControls: false,
-        onToggleVideoFitMode,
       },
     })
 
@@ -168,15 +164,6 @@ describe('PlayerSurface', () => {
       .closest('[aria-hidden]')
     expect(overlay?.getAttribute('aria-hidden')).toBe('true')
     expect(overlay?.hasAttribute('inert')).toBe(true)
-
-    fireEvent.click(
-      asElement(
-        container.querySelector('[aria-label="Fill screen"]'),
-        HTMLElement,
-      ),
-    )
-
-    expect(onToggleVideoFitMode).toHaveBeenCalledTimes(1)
   })
 
   it('wires section and video interaction, and plays on Enter', () => {
