@@ -14,6 +14,7 @@ import { ErrorCard } from '../components/ui/error-card'
 import { cn } from '../lib/utils'
 
 import { useConnectionInit } from '../hooks/use-connection-init'
+import { useMountedUntilClosed } from '../hooks/use-mounted-until-closed'
 import { isPluginMode } from '../services/jellyfin/core'
 import { useSessionStore } from '../stores/session-store'
 
@@ -114,6 +115,8 @@ export function RootComponent() {
 
   const { showWizard } = useConnectionInit()
   const settingsOpen = useSessionStore(selectSettingsOpen)
+  const [settingsMounted, onSettingsOpenChangeComplete] =
+    useMountedUntilClosed(settingsOpen)
 
   // Latch the wizard open the first time it is needed: showWizard flips
   // false as soon as auth succeeds, but the wizard must stay mounted through
@@ -161,10 +164,12 @@ export function RootComponent() {
             <Outlet />
           </ErrorBoundary>
         </main>
-        {settingsOpen ? (
+        {settingsMounted ? (
           <ErrorBoundary componentName="SettingsDialog">
             <Suspense fallback={null}>
-              <SettingsDialog />
+              <SettingsDialog
+                onOpenChangeComplete={onSettingsOpenChangeComplete}
+              />
             </Suspense>
           </ErrorBoundary>
         ) : null}

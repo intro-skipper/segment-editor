@@ -21,7 +21,11 @@ import {
 } from '@/components/ui/dialog'
 import { IconDisc } from '@/components/ui/icon-disc'
 
-export default function SettingsDialog() {
+export default function SettingsDialog({
+  onOpenChangeComplete,
+}: {
+  onOpenChangeComplete: (open: boolean) => void
+}) {
   const { t } = useTranslation()
   const triggerRef = useRef<HTMLElement | null>(null)
 
@@ -44,7 +48,11 @@ export default function SettingsDialog() {
   }
 
   return (
-    <Dialog open={settingsOpen} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={settingsOpen}
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={onOpenChangeComplete}
+    >
       <DialogContent className="sm:max-w-md gap-0 p-0 overflow-clip">
         <DialogCloseButton />
         <SettingsHeader title={`${t('app.title')} Settings`} />

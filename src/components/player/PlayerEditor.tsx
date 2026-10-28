@@ -24,6 +24,7 @@ import {
 import { showNotification } from '@/lib/notifications'
 import { usePlaybackSession } from '@/hooks/use-playback-session'
 import { cn, elementAt } from '@/lib/utils'
+import { useValueWhileOpen } from '@/hooks/use-value-while-open'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -236,6 +237,14 @@ function useRenderPlayerEditor({
     }
   }, [blocker.status, isDirty])
 
+  // Held while closing, so the dialog animates out even after its segment is deleted.
+  const editingSegment = useValueWhileOpen(
+    editDialogOpen,
+    editingSegmentIndex === null
+      ? undefined
+      : elementAt(editingSegments, editingSegmentIndex),
+  )
+
   const editingSegmentsRef = React.useRef(editingSegments)
   React.useEffect(() => {
     editingSegmentsRef.current = editingSegments
@@ -289,7 +298,6 @@ function useRenderPlayerEditor({
 
   const handleCloseEditDialog = () => {
     setEditDialogOpen(false)
-    setEditingSegmentIndex(null)
   }
 
   const handleSaveSegmentFromDialog = (segment: Segment) => {
@@ -531,11 +539,11 @@ function useRenderPlayerEditor({
         )}
       </div>
 
-      {editingSegmentIndex !== null && editingSegments[editingSegmentIndex] && (
+      {editingSegment && (
         <SegmentEditDialog
-          key={editingSegments[editingSegmentIndex].id}
+          key={editingSegment.id}
           open={editDialogOpen}
-          segment={editingSegments[editingSegmentIndex]}
+          segment={editingSegment}
           runtimeSeconds={runtimeSeconds}
           onClose={handleCloseEditDialog}
           onSave={handleSaveSegmentFromDialog}
