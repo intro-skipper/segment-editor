@@ -24,7 +24,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStep)
 
   return (
-    <div className="flex items-center justify-center gap-2 mbe-6">
+    <div className="flex items-center justify-center gap-2">
       {STEPS.map((step, index) => {
         const isActive = index === currentIndex
         const isCompleted = index < currentIndex

@@ -182,7 +182,7 @@ function SegmentEditDialogContent({
           </DialogHeader>
 
           <div
-            className="grid gap-4 py-4"
+            className="grid gap-4"
             aria-describedby={
               !validation.valid ? 'segment-validation-error' : undefined
             }

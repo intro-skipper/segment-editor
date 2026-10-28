@@ -27,7 +27,9 @@ function Freeze({ frozen, children }: FreezeProps) {
   return (
     <React.Suspense>
       {frozen ? <Suspend /> : null}
-      <div ref={rootRef}>{children}</div>
+      <div ref={rootRef} className="contents">
+        {children}
+      </div>
     </React.Suspense>
   )
 }

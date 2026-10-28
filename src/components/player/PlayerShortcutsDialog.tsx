@@ -37,32 +37,30 @@ export function PlayerShortcutsDialog({
         className="sm:max-w-(--spacing-dialog-wide-max-width)"
       >
         <DialogCloseButton />
-        <div className="flex flex-col gap-6">
-          <DialogTitle>{t('player.keyboardShortcuts')}</DialogTitle>
-          <div className="flex max-h-(--spacing-popup-max-height) flex-wrap gap-x-8 gap-y-6 overflow-y-auto">
-            {SHORTCUT_GROUPS_DISPLAY.map((group) => (
-              <section key={group.labelKey} className="flex-1 basis-52">
-                <h3 className="text-xs font-semibold mbe-1">
-                  {t(group.labelKey)}
-                </h3>
-                <dl>
-                  {group.shortcuts.map((shortcut) => (
-                    <div
-                      key={shortcut.labelKey}
-                      className="flex items-center justify-between gap-3 py-1.5"
-                    >
-                      <dt className="min-w-0">{t(shortcut.labelKey)}</dt>
-                      <dd className="flex shrink-0 gap-1">
-                        {shortcut.displayKeys.map((key) => (
-                          <kbd key={key}>{key}</kbd>
-                        ))}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ))}
-          </div>
+        <DialogTitle>{t('player.keyboardShortcuts')}</DialogTitle>
+        <div className="flex max-h-(--spacing-popup-max-height) flex-wrap gap-x-8 gap-y-6 overflow-y-auto">
+          {SHORTCUT_GROUPS_DISPLAY.map((group) => (
+            <section key={group.labelKey} className="flex-1 basis-52">
+              <h3 className="text-xs font-semibold mbe-1">
+                {t(group.labelKey)}
+              </h3>
+              <dl>
+                {group.shortcuts.map((shortcut) => (
+                  <div
+                    key={shortcut.labelKey}
+                    className="flex items-center justify-between gap-3 py-1.5"
+                  >
+                    <dt className="min-w-0">{t(shortcut.labelKey)}</dt>
+                    <dd className="flex shrink-0 gap-1">
+                      {shortcut.displayKeys.map((key) => (
+                        <kbd key={key}>{key}</kbd>
+                      ))}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
         </div>
       </DialogContent>
     </Dialog>

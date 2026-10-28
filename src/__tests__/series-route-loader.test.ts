@@ -8,11 +8,13 @@ import {
   QueryObserver,
   onlineManager,
 } from '@tanstack/react-query'
+import { createMemoryHistory, createRouter } from '@tanstack/react-router'
 import type * as ItemsApi from '@/services/items/api'
 import { useApiStore } from '@/stores/api-store'
 
 const SERIES_ID = '0123456789abcdef0123456789abcdef'
 const SEASON_ID = 'fedcba9876543210fedcba9876543210'
+const OTHER_SERIES_ID = 'abcdef0123456789abcdef0123456789'
 
 const jellyfin = vi.hoisted(() => ({
   /** Answers the pending episodes request. */
@@ -36,9 +38,10 @@ const { Route } = await import('@/routes/series/$itemId')
 const { itemsQueryOptions, seriesQueryOptions } =
   await import('@/services/items/queries')
 const { currentQueryIdentity } = await import('@/hooks/queries/query-identity')
+const { routeTree } = await import('@/routeTree.gen')
 
 type LoaderContext = Parameters<
-  Extract<typeof Route.options.loader, (...args: never) => unknown>
+  Extract<typeof Route.options.loader, { handler: unknown }>['handler']
 >[0]
 
 function runLoader(
@@ -48,10 +51,9 @@ function runLoader(
 ) {
   let settled = false
   const loader = Route.options.loader
-  if (typeof loader !== 'function')
-    throw new Error('series route has no loader')
+  if (typeof loader !== 'object') throw new Error('series route has no loader')
   const run = Promise.resolve(
-    loader({
+    loader.handler({
       params: { itemId: SERIES_ID },
       deps: { seasonId },
       context: { queryClient },
@@ -138,4 +140,48 @@ describe('series route loader', () => {
     await run
     jellyfin.releaseEpisodes()
   }, 1000)
+
+  it('reloads a series the router kept before showing it again', async () => {
+    const queryClient = new QueryClient()
+    const router = createRouter({
+      routeTree,
+      history: createMemoryHistory({
+        initialEntries: [`/series/${SERIES_ID}`],
+      }),
+      context: { queryClient },
+    })
+    const answerEpisodes = async (navigation: Promise<void>, call: number) => {
+      await vi.waitFor(() => expect(getEpisodes).toHaveBeenCalledTimes(call))
+      jellyfin.releaseEpisodes()
+      await navigation
+    }
+    await answerEpisodes(router.load(), 1)
+    await answerEpisodes(
+      router.navigate({
+        to: '/series/$itemId',
+        params: { itemId: OTHER_SERIES_ID },
+      }),
+      2,
+    )
+    // The router keeps the first series until the next navigation, which can
+    // come after Query has collected the episodes it showed.
+    queryClient.removeQueries({
+      queryKey: seriesQueryOptions.episodes(
+        currentQueryIdentity(),
+        SERIES_ID,
+        SEASON_ID,
+      ).queryKey,
+    })
+
+    let shown = false
+    const back = router
+      .navigate({ to: '/series/$itemId', params: { itemId: SERIES_ID } })
+      .then(() => {
+        shown = true
+      })
+    await vi.waitFor(() => expect(getEpisodes).toHaveBeenCalledTimes(3))
+    expect(shown).toBe(false)
+    jellyfin.releaseEpisodes()
+    await back
+  })
 })
