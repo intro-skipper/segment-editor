@@ -60,58 +60,66 @@ export const Route = createFileRoute('/series/$itemId')({
   },
   validateSearch: seriesSearchSchema,
   loaderDeps: ({ search }) => ({ seasonId: search.seasonId }),
-  loader: async ({ params, deps, context, cause, abortController }) => {
-    const { itemId } = params
-    const { queryClient } = context
+  loader: {
+    // The router keeps a page it rendered until the next navigation, however
+    // long that takes, and would show it at once while its queries may have
+    // been collected. Blocking re-runs this loader first; cached data resolves at once.
+    staleReloadMode: 'blocking',
+    handler: async ({ params, deps, context, cause, abortController }) => {
+      const { itemId } = params
+      const { queryClient } = context
 
-    assertJellyfinCredentials()
-    const identity = currentQueryIdentity()
+      assertJellyfinCredentials()
+      const identity = currentQueryIdentity()
 
-    // Opening a series waits for the shown season and, briefly, the artwork
-    // tint, so the page arrives complete in one transition (pendingComponent
-    // covers a slow server). Switching seasons on the series already on screen
-    // only warms the season, so the tab responds at once. 'stay' alone does not
-    // say that: the router also reports series-to-series navigation as 'stay',
-    // so check that this series' page is mounted, i.e. observes its details.
-    // Read it before awaiting: the header starts observing the destination
-    // series while the loader runs.
-    const shownSeries = queryClient.getQueryCache().find({
-      queryKey: itemsQueryOptions.detail(identity, itemId).queryKey,
-      exact: true,
-    })
-    const switchingSeason =
-      cause === 'stay' && (shownSeries?.getObserversCount() ?? 0) > 0
+      // Opening a series waits for the shown season and, briefly, the artwork
+      // tint, so the page arrives complete in one transition (pendingComponent
+      // covers a slow server). Switching seasons on the series already on screen
+      // only warms the season, so the tab responds at once. 'stay' alone does not
+      // say that: the router also reports series-to-series navigation as 'stay',
+      // so check that this series' page is mounted, i.e. observes its details.
+      // Read it before awaiting: the header starts observing the destination
+      // series while the loader runs.
+      const shownSeries = queryClient.getQueryCache().find({
+        queryKey: itemsQueryOptions.detail(identity, itemId).queryKey,
+        exact: true,
+      })
+      const switchingSeason =
+        cause === 'stay' && (shownSeries?.getObserversCount() ?? 0) > 0
 
-    const [series, seasons] = await Promise.all([
-      queryClient.ensureQueryData(itemsQueryOptions.detail(identity, itemId)),
-      queryClient.ensureQueryData(seriesQueryOptions.seasons(identity, itemId)),
-      import('@/components/views/SeriesView'),
-    ])
-    assertItemFound(series, abortController.signal)
+      const [series, seasons] = await Promise.all([
+        queryClient.ensureQueryData(itemsQueryOptions.detail(identity, itemId)),
+        queryClient.ensureQueryData(
+          seriesQueryOptions.seasons(identity, itemId),
+        ),
+        import('@/components/views/SeriesView'),
+      ])
+      assertItemFound(series, abortController.signal)
 
-    const seasonId = resolveSelectedSeasonId(seasons, deps.seasonId)
-    // Cached episodes, even stale, resolve at once; a failure falls through to the list's error state.
-    const episodes =
-      series.Id && seasonId
-        ? queryClient
-            .ensureQueryData(
-              seriesQueryOptions.episodes(identity, series.Id, seasonId),
-            )
-            .catch(() => undefined)
-        : undefined
+      const seasonId = resolveSelectedSeasonId(seasons, deps.seasonId)
+      // Cached episodes, even stale, resolve at once; a failure falls through to the list's error state.
+      const episodes =
+        series.Id && seasonId
+          ? queryClient
+              .ensureQueryData(
+                seriesQueryOptions.episodes(identity, series.Id, seasonId),
+              )
+              .catch(() => undefined)
+          : undefined
 
-    if (!switchingSeason) {
-      const imageUrl = selectMonochrome(useAppStore.getState())
-        ? undefined
-        : getBestImageUrl(series, 300)
-      const tint =
-        imageUrl &&
-        Promise.race([
-          getSeedColor(imageUrl),
-          new Promise((resolve) => setTimeout(resolve, TINT_WAIT_MS)),
-        ])
-      await Promise.all([episodes && unlessOffline(episodes), tint])
-    }
+      if (!switchingSeason) {
+        const imageUrl = selectMonochrome(useAppStore.getState())
+          ? undefined
+          : getBestImageUrl(series, 300)
+        const tint =
+          imageUrl &&
+          Promise.race([
+            getSeedColor(imageUrl),
+            new Promise((resolve) => setTimeout(resolve, TINT_WAIT_MS)),
+          ])
+        await Promise.all([episodes && unlessOffline(episodes), tint])
+      }
+    },
   },
   errorComponent: DetailRouteErrorComponent,
   pendingComponent: SeriesSkeleton,
