@@ -1,5 +1,6 @@
 // @refresh reset
 import { createFileRoute } from '@tanstack/react-router'
+import { onlineManager } from '@tanstack/react-query'
 import { z } from 'zod'
 
 import { currentQueryIdentity } from '@/hooks/queries/query-identity'
@@ -82,7 +83,8 @@ export const Route = createFileRoute('/series/$itemId')({
           getSeedColor(imageUrl),
           new Promise((resolve) => setTimeout(resolve, TINT_WAIT_MS)),
         ])
-      await Promise.all([episodes, tint])
+      // Offline, the episodes query pauses without settling; let the page render.
+      await Promise.all([onlineManager.isOnline() && episodes, tint])
     }
   },
   errorComponent: DetailRouteErrorComponent,

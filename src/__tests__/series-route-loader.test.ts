@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { QueryClient } from '@tanstack/react-query'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { QueryClient, onlineManager } from '@tanstack/react-query'
 import type * as ItemsApi from '@/services/items/api'
 import { useApiStore } from '@/stores/api-store'
 
@@ -29,12 +29,19 @@ vi.mock('@/services/items/api', async (importOriginal) => ({
 
 const { getEpisodes } = await import('@/services/items/api')
 const { Route } = await import('@/routes/series/$itemId')
+const { itemsQueryOptions, seriesQueryOptions } =
+  await import('@/services/items/queries')
+const { currentQueryIdentity } = await import('@/hooks/queries/query-identity')
 
 type LoaderContext = Parameters<
   Extract<typeof Route.options.loader, (...args: never) => unknown>
 >[0]
 
-function runLoader(cause: LoaderContext['cause'], seasonId?: string) {
+function runLoader(
+  cause: LoaderContext['cause'],
+  seasonId?: string,
+  queryClient = new QueryClient(),
+) {
   let settled = false
   const loader = Route.options.loader
   if (typeof loader !== 'function')
@@ -43,7 +50,7 @@ function runLoader(cause: LoaderContext['cause'], seasonId?: string) {
     loader({
       params: { itemId: SERIES_ID },
       deps: { seasonId },
-      context: { queryClient: new QueryClient() },
+      context: { queryClient },
       cause,
       abortController: new AbortController(),
     } as LoaderContext),
@@ -74,6 +81,25 @@ describe('series route loader', () => {
   it('holds entering the page until the shown season has loaded', async () => {
     await expectHeldUntilEpisodes(runLoader('enter'))
   })
+
+  it('opens a series while offline instead of waiting on a paused episodes query', async () => {
+    const queryClient = new QueryClient()
+    const identity = currentQueryIdentity()
+    queryClient.setQueryData(
+      itemsQueryOptions.detail(identity, SERIES_ID).queryKey,
+      { Id: SERIES_ID, Type: 'Series' },
+    )
+    queryClient.setQueryData(
+      seriesQueryOptions.seasons(identity, SERIES_ID).queryKey,
+      [{ Id: SEASON_ID, IndexNumber: 1 }],
+    )
+    onlineManager.setOnline(false)
+    onTestFinished(() => onlineManager.setOnline(true))
+
+    const { run, isSettled } = runLoader('enter', undefined, queryClient)
+    await run
+    expect(isSettled()).toBe(true)
+  }, 1000)
 
   it('holds a series opened from another series, which the router also reports as stay', async () => {
     await expectHeldUntilEpisodes(runLoader('stay'))
