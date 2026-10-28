@@ -473,7 +473,7 @@ export default function CommandPalette({
   const shouldVirtualize = resultItems.length > MAX_VISIBLE_ITEMS
 
   const virtualWindow = useVirtualWindow({
-    enabled: open && shouldVirtualize,
+    enabled: shouldVirtualize,
     scrollElement,
     itemCount: resultItems.length,
     itemSize: ITEM_HEIGHT,
