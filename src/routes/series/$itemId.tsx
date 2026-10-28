@@ -5,6 +5,9 @@ import { z } from 'zod'
 import { currentQueryIdentity } from '@/hooks/queries/query-identity'
 import { itemsQueryOptions, seriesQueryOptions } from '@/services/items/queries'
 import { resolveSelectedSeasonId } from '@/lib/series-utils'
+import { getBestImageUrl } from '@/services/video/api'
+import { getSeedColor } from '@/hooks/use-artwork-color'
+import { selectMonochrome, useAppStore } from '@/stores/app-store'
 import { SeriesPage, SeriesSkeleton } from '@/components/routes/SeriesItemRoute'
 import { DetailRouteErrorComponent } from '../-detail-route-error-component'
 import {
@@ -23,6 +26,9 @@ const seriesParamsSchema = z.object({
   itemId: jellyfinIdSchema,
 })
 
+/** How long entering a series waits for the artwork tint before showing the page untinted. */
+const TINT_WAIT_MS = 300
+
 const seriesSearchSchema = z.object({
   seasonId: jellyfinIdSchema.optional().catch(undefined),
 })
@@ -34,7 +40,7 @@ export const Route = createFileRoute('/series/$itemId')({
   },
   validateSearch: seriesSearchSchema,
   loaderDeps: ({ search }) => ({ seasonId: search.seasonId }),
-  loader: async ({ params, deps, context, abortController }) => {
+  loader: async ({ params, deps, context, cause, abortController }) => {
     const { itemId } = params
     const { queryClient } = context
 
@@ -48,13 +54,35 @@ export const Route = createFileRoute('/series/$itemId')({
     ])
     assertItemFound(series, abortController.signal)
 
-    // Warm the shown season's episodes without awaiting them, so a slow
-    // request never holds up navigation.
     const seasonId = resolveSelectedSeasonId(seasons, deps.seasonId)
-    if (series.Id && seasonId) {
-      void queryClient.prefetchQuery(
-        seriesQueryOptions.episodes(identity, series.Id, seasonId),
-      )
+    // Cached episodes, even stale, resolve at once; a failure falls through to the list's error state.
+    const episodes =
+      series.Id && seasonId
+        ? queryClient
+            .ensureQueryData(
+              seriesQueryOptions.episodes(identity, series.Id, seasonId),
+            )
+            .catch(() => undefined)
+        : undefined
+
+    // Opening a series waits for the shown season and, briefly, the artwork
+    // tint, so the page arrives complete in one transition (pendingComponent
+    // covers a slow server). A season tab navigates within the same series
+    // with an explicit seasonId; that only warms the season, so the tab
+    // responds at once. Series-to-series navigation is also 'stay', hence the
+    // seasonId check rather than cause alone.
+    const switchingSeason = cause === 'stay' && deps.seasonId !== undefined
+    if (!switchingSeason) {
+      const imageUrl = selectMonochrome(useAppStore.getState())
+        ? undefined
+        : getBestImageUrl(series, 300)
+      const tint =
+        imageUrl &&
+        Promise.race([
+          getSeedColor(imageUrl),
+          new Promise((resolve) => setTimeout(resolve, TINT_WAIT_MS)),
+        ])
+      await Promise.all([episodes, tint])
     }
   },
   errorComponent: DetailRouteErrorComponent,

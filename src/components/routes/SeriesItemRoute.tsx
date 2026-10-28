@@ -8,6 +8,7 @@ import { getBestImageUrl } from '@/services/video/api'
 import { useArtworkColor } from '@/hooks/use-artwork-color'
 import { DynamicThemeScope } from '@/components/ui/dynamic-theme-scope'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EpisodeListSkeleton } from '@/components/views/EpisodeListSkeleton'
 import { RouteErrorFallback } from '@/components/ui/route-error-fallback'
 import { FeatureErrorBoundary } from '@/components/ui/feature-error-boundary'
 
@@ -19,27 +20,33 @@ const SeriesView = lazy(() =>
   })),
 )
 
-export function SeriesSkeleton() {
+/** The season tabs and episode rows in SeriesView's shape, for use inside the page's padding. */
+function SeriesSkeletonBody() {
   return (
     <div
-      className="flex-1 px-fluid-md py-6"
+      className="mx-auto w-full max-w-5xl"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       <span className="sr-only">Loading series</span>
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="flex gap-2 md:gap-3 pbe-2 md:pbe-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-24 rounded-full" />
-          ))}
-        </div>
-        <div className="flex flex-col gap-2 md:gap-3 mbs-2 md:mbs-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-          ))}
-        </div>
+      <div className="flex gap-2 md:gap-3 pbe-2 md:pbe-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-24 rounded-full" />
+        ))}
       </div>
+      <div className="mbs-2 md:mbs-4">
+        <EpisodeListSkeleton />
+      </div>
+    </div>
+  )
+}
+
+/** The route's pending screen: SeriesSkeletonBody with the page's padding. */
+export function SeriesSkeleton() {
+  return (
+    <div className="flex-1 px-fluid-md py-6">
+      <SeriesSkeletonBody />
     </div>
   )
 }
@@ -88,7 +95,7 @@ export function SeriesPage() {
       className="relative flex flex-1 flex-col px-fluid-md py-6"
     >
       <FeatureErrorBoundary featureName="Series">
-        <Suspense fallback={<SeriesSkeleton />}>
+        <Suspense fallback={<SeriesSkeletonBody />}>
           <SeriesView
             series={series}
             seasons={seasons}

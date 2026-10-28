@@ -1,21 +1,26 @@
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Play, RefreshCw, Tv } from 'lucide-react'
 
 import type { BaseItemDto } from '@/types/jellyfin'
-import { NO_ITEMS, useEpisodes } from '@/services/items/queries'
+import {
+  NO_ITEMS,
+  seriesQueryOptions,
+  useEpisodes,
+} from '@/services/items/queries'
+import { useQueryIdentity } from '@/hooks/queries/query-identity'
 import { NO_SEGMENTS, useSegments } from '@/services/segments/queries'
 import { useInView } from '@/hooks/use-in-view'
 import { ItemImage } from '@/components/media/ItemImage'
 import { SegmentTimeline } from '@/components/segment/SegmentTimeline'
 import { Button } from '@/components/ui/button'
 import { InteractiveCard } from '@/components/ui/interactive-card'
-import { LoadingState } from '@/components/ui/async-state'
+import { EpisodeListSkeleton } from '@/components/views/EpisodeListSkeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { resolveSelectedSeasonId } from '@/lib/series-utils'
 import { ticksToSeconds } from '@/lib/time-utils'
-import { staggerDelay, STAGGER_NORMAL } from '@/lib/animation-utils'
 
 interface SeriesViewProps {
   series: BaseItemDto
@@ -28,12 +33,15 @@ interface SeasonTabsProps {
   seasons: Array<BaseItemDto>
   selectedSeasonId: string | null
   onSeasonSelect: (seasonId: string) => void
+  /** Pointer or focus reached a tab: warm its episodes so the switch is instant. */
+  onSeasonIntent: (seasonId: string) => void
 }
 
 const SeasonTabs = function SeasonTabsComponent({
   seasons,
   selectedSeasonId,
   onSeasonSelect,
+  onSeasonIntent,
 }: SeasonTabsProps) {
   return (
     <div
@@ -55,6 +63,8 @@ const SeasonTabs = function SeasonTabsComponent({
             aria-selected={isSelected}
             aria-controls={`season-panel-${season.Id}`}
             onClick={() => season.Id && onSeasonSelect(season.Id)}
+            onPointerEnter={() => season.Id && onSeasonIntent(season.Id)}
+            onFocus={() => season.Id && onSeasonIntent(season.Id)}
           >
             {label}
           </Button>
@@ -107,14 +117,12 @@ function EpisodeSegmentTimeline({
 interface EpisodeCardProps {
   episode: BaseItemDto
   episodeId: string
-  index: number
   onEpisodeClick: (episodeId: string) => void
 }
 
 const EpisodeCard = function EpisodeCardComponent({
   episode,
   episodeId,
-  index,
   onEpisodeClick,
 }: EpisodeCardProps) {
   const { t } = useTranslation()
@@ -123,8 +131,6 @@ const EpisodeCard = function EpisodeCardComponent({
   const runtime = episode.RunTimeTicks
     ? Math.round(episode.RunTimeTicks / 600_000_000)
     : null
-  const animationDelay = staggerDelay(index, STAGGER_NORMAL, 400)
-
   const episodeName = episode.Name || episodeLabel
   const ariaLabel = runtime
     ? `${episodeLabel}: ${episodeName}, ${runtime} minutes`
@@ -134,12 +140,7 @@ const EpisodeCard = function EpisodeCardComponent({
   }
 
   return (
-    <InteractiveCard
-      onClick={selectEpisode}
-      animate
-      animationDelay={animationDelay}
-      aria-label={ariaLabel}
-    >
+    <InteractiveCard onClick={selectEpisode} aria-label={ariaLabel}>
       <div className="relative flex-shrink-0 size-episode-thumb rounded-lg overflow-clip bg-muted">
         <ItemImage
           item={episode}
@@ -201,11 +202,14 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
 
   if (isLoading) {
     return (
-      <LoadingState
-        message={t('series.loadingEpisodes', {
-          season: season.Name ?? season.IndexNumber,
-        })}
-      />
+      <div role="status" aria-busy="true">
+        <span className="sr-only">
+          {t('series.loadingEpisodes', {
+            season: season.Name ?? season.IndexNumber,
+          })}
+        </span>
+        <EpisodeListSkeleton />
+      </div>
     )
   }
 
@@ -235,7 +239,7 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
       role="tabpanel"
       id={`season-panel-${season.Id}`}
     >
-      {episodes.map((episode, index) => (
+      {episodes.map((episode) => (
         <div
           key={episode.Id}
           style={{
@@ -246,7 +250,6 @@ function SeasonEpisodes({ seriesId, season }: SeasonEpisodesProps) {
           <EpisodeCard
             episode={episode}
             episodeId={episode.Id ?? ''}
-            index={index}
             onEpisodeClick={handleEpisodeClick}
           />
         </div>
@@ -262,6 +265,16 @@ export function SeriesView({
   onSeasonSelect,
 }: SeriesViewProps) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const identity = useQueryIdentity()
+
+  const prefetchSeason = (seasonId: string) => {
+    if (series.Id) {
+      void queryClient.prefetchQuery(
+        seriesQueryOptions.episodes(identity, series.Id, seasonId),
+      )
+    }
+  }
 
   const resolvedSelectedSeasonId = resolveSelectedSeasonId(
     seasons,
@@ -284,6 +297,7 @@ export function SeriesView({
         seasons={seasons}
         selectedSeasonId={resolvedSelectedSeasonId}
         onSeasonSelect={onSeasonSelect}
+        onSeasonIntent={prefetchSeason}
       />
 
       <div className="mbs-2 md:mbs-4">

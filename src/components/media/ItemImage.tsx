@@ -174,7 +174,8 @@ export function ItemImage({
         className,
       )}
     >
-      {blurhashDataUrl && !isLoaded && (
+      {/* Stays under the photo so the photo fades in over it, not over bg-muted. */}
+      {blurhashDataUrl && (
         <img
           src={blurhashDataUrl}
           alt=""
