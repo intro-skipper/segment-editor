@@ -11,7 +11,15 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 
 import { ConnectionWizard } from '@/components/connection/ConnectionWizard'
 import { RecommendedServerInfoScore } from '@/types/jellyfin'
@@ -329,10 +337,29 @@ describe('ConnectionWizard TanStack Form migration', () => {
       expect(discoverServersMock).toHaveBeenCalledTimes(1)
     })
 
+    // Hold the exit animation open: jsdom has none, so Base UI would finish the close at once.
+    let finishExit = () => {}
+    const finished = new Promise<void>((resolve) => {
+      finishExit = resolve
+    })
+    Object.defineProperty(Element.prototype, 'getAnimations', {
+      configurable: true,
+      value: () => [{ finished, effect: { getTiming: () => ({}) } }],
+    })
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, 'getAnimations')
+    })
+
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
 
+    // Aborted while the dialog is still animating out, so a late response cannot land.
     await waitFor(() => {
-      expect(capturedSignal?.aborted).toBe(true)
+      expect(screen.getByRole('dialog').hasAttribute('data-closed')).toBe(true)
+    })
+    expect(capturedSignal?.aborted).toBe(true)
+    finishExit()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Reopen wizard' }))

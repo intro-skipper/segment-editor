@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState } from 'react'
 
 interface UseAbortControllerReturn {
   createController: () => AbortController
@@ -6,28 +6,22 @@ interface UseAbortControllerReturn {
   isActive: () => boolean
 }
 
+/** One in-flight request at a time; the functions keep their identity across renders. */
 export function useAbortController(): UseAbortControllerReturn {
-  'use memo'
-
-  const controllerRef = useRef<AbortController | null>(null)
-
-  const createController = () => {
-    controllerRef.current?.abort()
-    const controller = new AbortController()
-    controllerRef.current = controller
-    return controller
-  }
-
-  const abort = () => {
-    controllerRef.current?.abort()
-    controllerRef.current = null
-  }
-
-  const isActive = () => {
-    return (
-      controllerRef.current !== null && !controllerRef.current.signal.aborted
-    )
-  }
-
-  return { createController, abort, isActive }
+  const [api] = useState(() => {
+    let current: AbortController | null = null
+    return {
+      createController: () => {
+        current?.abort()
+        current = new AbortController()
+        return current
+      },
+      abort: () => {
+        current?.abort()
+        current = null
+      },
+      isActive: () => current !== null && !current.signal.aborted,
+    }
+  })
+  return api
 }

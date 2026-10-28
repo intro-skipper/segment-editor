@@ -59,6 +59,8 @@ interface ConnectionWizardController {
   handleServerSelect: (server: RecommendedServerInfo) => void
   handleProceedToAuth: () => void
   handleBack: () => void
+  /** Aborts the in-flight request, so it can no longer change the wizard or store a connection. */
+  cancelRequest: () => void
   reset: () => void
 }
 
@@ -290,6 +292,7 @@ export function useConnectionWizardController(): ConnectionWizardController {
     handleServerSelect,
     handleProceedToAuth,
     handleBack,
+    cancelRequest: abort,
     reset,
   }
 }

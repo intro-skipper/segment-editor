@@ -87,15 +87,20 @@ export function ConnectionWizardContent({
 
   const controller = useConnectionWizardController()
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) controller.cancelRequest()
+    onOpenChange(isOpen)
+  }
+
   const handleComplete = () => {
-    onOpenChange(false)
+    handleOpenChange(false)
     onComplete?.()
   }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       // Resetting once closed keeps the closing dialog on the step it showed.
       onOpenChangeComplete={(isOpen) => {
         if (!isOpen) controller.reset()
