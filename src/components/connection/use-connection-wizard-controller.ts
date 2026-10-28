@@ -59,7 +59,7 @@ interface ConnectionWizardController {
   handleServerSelect: (server: RecommendedServerInfo) => void
   handleProceedToAuth: () => void
   handleBack: () => void
-  /** Aborts the in-flight request, so it can no longer change the wizard or store a connection. */
+  /** Aborts the in-flight request and clears its loading state; the request can no longer store a connection. */
   cancelRequest: () => void
   reset: () => void
 }
@@ -221,11 +221,15 @@ export function useConnectionWizardController(): ConnectionWizardController {
     setRequestError(null)
   }
 
-  const reset = () => {
+  const cancelRequest = () => {
     abort()
+    setIsRequestPending(false)
+  }
+
+  const reset = () => {
+    cancelRequest()
     setStep('entry')
     setServers([])
-    setIsRequestPending(false)
     setRequestError(null)
     form.reset(CONNECTION_WIZARD_DEFAULT_VALUES)
   }
@@ -292,7 +296,7 @@ export function useConnectionWizardController(): ConnectionWizardController {
     handleServerSelect,
     handleProceedToAuth,
     handleBack,
-    cancelRequest: abort,
+    cancelRequest,
     reset,
   }
 }

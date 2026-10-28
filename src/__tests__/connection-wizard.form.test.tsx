@@ -75,6 +75,25 @@ function createServer(
   }
 }
 
+/**
+ * Keeps the next exit animation running until the returned function is called;
+ * jsdom has no animations, so Base UI would otherwise finish a close at once.
+ */
+function holdExitAnimation(): () => void {
+  let finishExit = () => {}
+  const finished = new Promise<void>((resolve) => {
+    finishExit = resolve
+  })
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    value: () => [{ finished, effect: { getTiming: () => ({}) } }],
+  })
+  onTestFinished(() => {
+    Reflect.deleteProperty(Element.prototype, 'getAnimations')
+  })
+  return finishExit
+}
+
 function getInput(label: string): HTMLInputElement {
   const element = screen.getByLabelText(label)
   if (!(element instanceof HTMLInputElement)) {
@@ -337,18 +356,7 @@ describe('ConnectionWizard TanStack Form migration', () => {
       expect(discoverServersMock).toHaveBeenCalledTimes(1)
     })
 
-    // Hold the exit animation open: jsdom has none, so Base UI would finish the close at once.
-    let finishExit = () => {}
-    const finished = new Promise<void>((resolve) => {
-      finishExit = resolve
-    })
-    Object.defineProperty(Element.prototype, 'getAnimations', {
-      configurable: true,
-      value: () => [{ finished, effect: { getTiming: () => ({}) } }],
-    })
-    onTestFinished(() => {
-      Reflect.deleteProperty(Element.prototype, 'getAnimations')
-    })
+    const finishExit = holdExitAnimation()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
 
@@ -366,6 +374,32 @@ describe('ConnectionWizard TanStack Form migration', () => {
 
     await waitFor(() => {
       expect(getInput('Server Address').value).toBe('')
+    })
+  })
+
+  it('is usable again when reopened before a cancelled request finishes closing', async () => {
+    discoverServersMock.mockImplementation(() => new Promise(() => {}))
+
+    render(<ConnectionWizardHarness />)
+
+    fireEvent.change(screen.getByLabelText('Server Address'), {
+      target: { value: 'demo.local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Find Server' }))
+    await waitFor(() => {
+      expect(getInput('Server Address').disabled).toBe(true)
+    })
+
+    holdExitAnimation()
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    await waitFor(() => {
+      expect(screen.getByRole('dialog').hasAttribute('data-closed')).toBe(true)
+    })
+    // Reopening interrupts the close, so the deferred reset never runs.
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen wizard' }))
+
+    await waitFor(() => {
+      expect(getInput('Server Address').disabled).toBe(false)
     })
   })
 })
