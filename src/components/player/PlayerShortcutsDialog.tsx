@@ -32,7 +32,10 @@ export function PlayerShortcutsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent container={container} className="sm:max-w-3xl">
+      <DialogContent
+        container={container}
+        className="sm:max-w-(--spacing-dialog-wide-max-width)"
+      >
         <DialogCloseButton />
         <div className="flex flex-col gap-6">
           <DialogTitle>{t('player.keyboardShortcuts')}</DialogTitle>
